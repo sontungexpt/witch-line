@@ -1,39 +1,31 @@
-local colors = require("sttusline.util.color")
-
+-- local colors = require("sttusline.util.color")
 return {
-	name = "form", -- nickname to link the componet with the group
+	name = "form",
 	timing = false, -- The component will be update every time interval
 	lazy = true,
+	dispersed = false, -- if true, the component will be rendered as a string, otherwise it will be rendered as a table
 
-	event = {},
-	min_width = function()
-		return 0
-	end,
-	user_event = {},
+	events = {},
+	user_events = {},
 
-	shared = {},
+	left = 1,
+	right = 1,
 
 	static = {},
-	configs = {},
-	styles = {},
+	context = function() end, -- context is a table that will be passed to the component's update function
 
-	group = false, -- if a component is flexible, it's children will be added when the parent is updated
+	style = {},
 
-	-- number or table
-	padding = 1, -- { left = 1, right = 1 }
+	-- group = false, -- if a component is flexible, it's children will be added when the parent is updated
 
 	init = function() end, -- called when the component is created
 
-	propagation = false,
-	pre_update = function() end,
-	update = function()
+	pre_update = function(ctx) end,
+	update = function(ctx)
 		return ""
 	end,
-	post_update = function() end,
-	condition = function()
+	post_update = function(ctx) end,
+	display_when = function(ctx)
 		return true
 	end,
-
-	{},
-	{},
 }

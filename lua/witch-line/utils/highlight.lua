@@ -1,22 +1,28 @@
 local vim = vim
-local uv = vim.uv or vim.loop
 local api = vim.api
 local hl = api.nvim_set_hl
 local get_hl_by_name = api.nvim_get_hl_by_name
 local is_color = api.nvim_get_color_by_name
-local config = require("witch-line.config")
 
 local type = type
 
 local M = {}
-local cache = {}
+-- local cache = {}
 
-M.get_cache = function()
-	return cache
-end
+-- function M.get_cache()
+-- 	return cache
+-- end
 
-M.gen_hl_name = function(prefix)
-	return string.format("%s_%s_%s", prefix, uv.hrtime() --[[ now ]], math.random(1000000, 9999999))
+do
+	local counter = 0
+	function M.reset_counter()
+		counter = 0
+	end
+
+	function M.gen_hl_name()
+		counter = counter + 1
+		return "witch-line" .. counter
+	end
 end
 
 M.add_hl_name = function(str, hl_name)
@@ -69,12 +75,6 @@ M.hl = function(group_name, hl_styles, force)
 		if not pcall(hl, 0, group_name, styles) then
 			cache[group_name] = nil
 		end
-	end
-end
-
-M.colorscheme = function()
-	for hl_name, hl_styles in pairs(cache) do
-		M.hl(hl_name, hl_styles, true)
 	end
 end
 

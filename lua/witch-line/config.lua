@@ -1,44 +1,80 @@
-local type = type
+local type, ipairs = type, ipairs
+local bo = vim.bo
 
 local M = {}
 
-local configs = {
+local default_configs = {
+	-- components
+	-- components = require("witch-line.default"),
 	disabled = {
 		filetypes = {},
 		buftypes = {
-			terminal = true,
+			"terminal",
 		},
 	},
-	components = require("witch-line.default"),
 }
 
-M.setup = function(user_opts)
-	M.merge_config(configs, user_opts, true)
-	return configs
+function M.is_buf_disabled(bufnr)
+	local buf_o = bo[bufnr]
+	local filetype = buf_o.filetype
+	local buftype = buf_o.buftype
+	local disabled = default_configs.disabled
+
+	for _, ft in ipairs(disabled.filetypes) do
+		if filetype == ft then
+			return true
+		end
+	end
+
+	for _, bt in ipairs(disabled.buftypes) do
+		if buftype == bt then
+			return true
+		end
+	end
+	return false
 end
 
-M.merge_config = function(default_opts, user_opts, force)
-	local default_options_type = type(default_opts)
-
-	if default_options_type == type(user_opts) then
-		if default_options_type == "table" and default_opts[1] == nil then
-			for k, v in pairs(user_opts) do
-				default_opts[k] = M.merge_config(default_opts[k], v)
-			end
-		elseif force then
-			default_opts = user_opts
-		elseif default_opts == nil then
-			default_opts = user_opts
-		end
-	elseif default_opts == nil then
-		default_opts = user_opts
+local function merge_user_config(defaults, overrides)
+	-- Handle nil cases immediately
+	if overrides == nil then
+		return defaults
+	elseif defaults == nil then
+		return overrides
 	end
-	return default_opts
+
+	local default_type = type(defaults)
+	local override_type = type(overrides)
+
+	-- Handle type mismatch
+	if default_type ~= override_type then
+		return defaults
+	-- Handle non-tables
+	elseif default_type ~= "table" then
+		return overrides
+	end
+
+	-- Handle array-like tables
+	if defaults[1] ~= nil then
+		for _, value in ipairs(overrides) do
+			defaults[#defaults + 1] = value
+		end
+	end
+
+	-- Deep merge dictionary-like tables
+	for key, value in pairs(overrides) do
+		defaults[key] = merge_user_config(defaults[key], value)
+	end
+
+	return defaults
+end
+
+M.set_user_config = function(user_configs)
+	return merge_user_config(default_configs, user_configs)
 end
 
 M.get_config = function()
 	return setmetatable({}, {
-		__index = configs,
+		__index = default_configs,
 		__newindex = function()
 			error("Attempt to modify read-only table")
 		end,

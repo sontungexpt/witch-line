@@ -1,7 +1,7 @@
 local fn = vim.fn
 local M = {}
 
-local CACHED_DIR = fn.stdpath("cache") .. "/sttusline"
+local CACHED_DIR = fn.stdpath("cache") .. "/witch-line"
 local CACHED_FILE = CACHED_DIR .. "/cache.lua"
 
 local cached = fn.filereadable(CACHED_FILE) == 1
