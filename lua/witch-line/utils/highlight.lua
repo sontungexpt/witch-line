@@ -1,27 +1,24 @@
 local vim = vim
 local api = vim.api
-local hl = api.nvim_set_hl
-local get_hl_by_name = api.nvim_get_hl_by_name
+local nvim_set_hl, nvim_get_hl = api.nvim_set_hl, api.nvim_get_hl
 local is_color = api.nvim_get_color_by_name
 
 local type = type
 
 local M = {}
--- local cache = {}
-
--- function M.get_cache()
--- 	return cache
--- end
 
 do
 	local counter = 0
 	function M.reset_counter()
 		counter = 0
 	end
-
 	function M.gen_hl_name()
 		counter = counter + 1
 		return "witch-line" .. counter
+	end
+
+	function M.gen_hl_name_by_id(id)
+		return "witch-line" .. id
 	end
 end
 
@@ -38,44 +35,44 @@ M.is_hl_styles = function(hl_styles)
 end
 
 M.get_hl = function(hl_name)
-	local ok, styles = pcall(get_hl_by_name, hl_name, true)
-	return ok and styles or {}
+	return api.nvim_get_hl(0, {
+		name = hl_name,
+	})
 end
 
+---@param group_name string
+---@param hl_styles vim.api.keyset.highlight
 M.hl = function(group_name, hl_styles, force)
-	if (not cache[group_name] or force) and type(hl_styles) == "table" and next(hl_styles) then
-		cache[group_name] = hl_styles
+	local styles = vim.deepcopy(hl_styles)
 
-		local styles = config.merge_config({}, hl_styles, true)
-		styles.foreground = styles.fg
-		styles.background = styles.bg
-		styles.fg = nil
-		styles.bg = nil
+	styles.foreground = styles.fg
+	styles.background = styles.bg
+	styles.fg = nil
+	styles.bg = nil
 
-		if
-			type(styles.foreground) == "string"
-			and styles.foreground ~= "NONE"
-			and is_color(styles.foreground) == -1
-		then
-			styles.foreground = M.get_hl(styles.foreground).foreground
-		end
-
-		if
-			type(styles.background) == "string"
-			and styles.background ~= "NONE"
-			and is_color(styles.background) == -1
-		then
-			styles.background = M.get_hl(hl_styles.bg).background
-		end
-
-		if styles.background == nil then
-			styles.background = M.get_hl("StatusLine").background
-		end
-
-		if not pcall(hl, 0, group_name, styles) then
-			cache[group_name] = nil
-		end
+	if
+		type(styles.foreground) == "string"
+		and styles.foreground ~= "NONE"
+		---@diagnostic disable-next-line: param-type-mismatch
+		and api.nvim_get_color_by_name(styles.foreground) == -1
+	then
+		styles.foreground = M.get_hl(styles.foreground).fg
 	end
+
+	if
+		type(styles.background) == "string"
+		and styles.background ~= "NONE"
+		---@diagnostic disable-next-line: param-type-mismatch
+		and api.nvim_get_color_by_name(styles.background) == -1
+	then
+		styles.background = M.get_hl(hl_styles.bg).bg
+	end
+
+	if styles.background == nil then
+		styles.background = M.get_hl("StatusLine").bg
+	end
+
+	pcall(nvim_set_hl, 0, group_name, styles)
 end
 
 return M

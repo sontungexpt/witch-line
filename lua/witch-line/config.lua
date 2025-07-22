@@ -5,7 +5,7 @@ local M = {}
 
 local default_configs = {
 	-- components
-	-- components = require("witch-line.default"),
+	components = require("witch-line.constant.default"),
 	disabled = {
 		filetypes = {},
 		buftypes = {
@@ -53,11 +53,9 @@ local function merge_user_config(defaults, overrides)
 		return overrides
 	end
 
-	-- Handle array-like tables
-	if defaults[1] ~= nil then
-		for _, value in ipairs(overrides) do
-			defaults[#defaults + 1] = value
-		end
+	--- Utilize the available table
+	if next(defaults) == nil then
+		return overrides
 	end
 
 	-- Deep merge dictionary-like tables
@@ -79,6 +77,10 @@ M.get_config = function()
 			error("Attempt to modify read-only table")
 		end,
 	})
+end
+
+M.get_components = function()
+	return default_configs.components
 end
 
 return M

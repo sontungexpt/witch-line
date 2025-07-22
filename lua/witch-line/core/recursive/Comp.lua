@@ -42,7 +42,7 @@ local function new_node(node, parent, hl_name, cb)
 	elseif node_type == "table" then
 		node._parent = parent
 		if highlight.is_hl_styles(node.styles) then
-			hl_name = highlight.gen_hl_name()
+			hl_name = highlight.gen_hl_name_by_id()
 			node._hl_name = hl_name
 		end
 

@@ -35,7 +35,7 @@ function M.tbl_keys(tbl)
 	local list, size = {}, 0
 	for k, _ in pairs(tbl) do
 		size = size + 1
-		list[size + 1] = k
+		list[size] = k
 	end
 	return list, size
 end
