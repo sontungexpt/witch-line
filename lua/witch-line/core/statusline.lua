@@ -28,9 +28,23 @@ M.push = function(value)
 	return ValuesSize
 end
 
+--- Sets the value for multiple components at once.
+--- @param indices integer[] The indices of the components to set the value for.
+--- @param value string The value to set for the specified components.
 M.bulk_set = function(indices, value)
 	for _, idx in ipairs(indices) do
 		Values[idx] = value
+	end
+end
+
+--- Sets the separator for left or right side of the component.
+--- @param indices integer[]|string[] The indices of the components to set the separator for.
+--- @param value string The separator value to set.
+--- @param is_left boolean If true, sets the separator to the left of the component; otherwise, sets it to the right.
+M.bulk_set_sep = function(indices, value, is_left)
+	for _, idx in ipairs(indices) do
+		local sep_idx = is_left and idx - 1 or idx + 1
+		Values[sep_idx] = value
 	end
 end
 

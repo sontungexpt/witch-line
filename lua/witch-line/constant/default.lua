@@ -19,7 +19,7 @@ local colors = {
 ---@type FlatComponent[]|string[]
 return {
 	{
-		id = "witch-line-mode",
+		id = "WitchLineMode",
 		user_events = { "VeryLazy" },
 		events = { "VimResized", "ModeChanged" },
 		static = {
@@ -274,7 +274,7 @@ return {
 
 	"%=",
 	{
-		id = "witch-line-diagnostics-error",
+		id = "WitchLineDiagnosticsError",
 		style = {
 			fg = "DiagnosticError",
 		},
@@ -299,7 +299,9 @@ return {
 		style = {
 			fg = "DiagnosticWarn",
 		},
-		static = "witch-line-diagnostics-error",
+		-- events = "WitchLineDiagnosticsError",
+
+		static = "WitchLineDiagnosticsError",
 		update = function(self, ctx, static)
 			local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN })
 			---@diagnostic disable-next-line: need-check-nil

@@ -17,14 +17,14 @@ local M = {}
 ---@field style Id|vim.api.keyset.highlight|nil|fun(self: Component, ctx: NotString, static: NotString): vim.api.keyset.highlight a table of styles that will be applied to the component
 ---@field static Id|table|nil a table of static values that will be used in the component
 ---@field context Id|nil|fun(self:FlatComponent, static:NotString): NotString a table that will be passed to the component's update function
----@field init nil|fun(self: FlatComponent, ctx: NotString, static: NotString ) called when the component is initialized, can be used to set up the context
----@field pre_update nil|fun(self: Component, ctx: NotString, static: NotString) called before the component is updated, can be used to set up the context
+---@field init nil|fun(self: FlatComponent) called when the component is initialized, can be used to set up the context
+---@field pre_update nil|fun(self: FlatComponent, ctx: NotString, static: NotString) called before the component is updated, can be used to set up the context
 ---@field update string|fun(self:FlatComponent, ctx: NotString, static: NotString): string called to update the component, should return a string that will be displayed
 ---@field post_update nil|fun(self: FlatComponent,ctx: NotString, static: NotString) called after the component is updated, can be used to clean up the context
 ---@field should_display Id|nil|fun(self: FlatComponent, ctx:NotString, static: NotString): boolean called to check if the component should be displayed, should return true or false
 ---@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
 ---@field _hl_name string|nil the highlight group name for the component
----@field _loaded boolean|nil if true, the component is loaded and ready to be used, used for lazy loading components
+---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 
 M.call_init = function(comp, ctx)
 	ctx = ctx or comp.context
@@ -52,7 +52,7 @@ M.evaluate = function(comp, ctx, static)
 
 	if type(value) ~= "string" then
 		require("utils.notifier").error("Component:update must return a string, got " .. type(value) .. " instead.")
-		return "", nil
+		return ""
 	end
 
 	if type(comp.post_update) == "function" then
