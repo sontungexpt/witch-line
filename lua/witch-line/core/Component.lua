@@ -9,21 +9,33 @@ local SepStyle = {
 	Full = 0, -- use the style of the component
 	SepFg = 1,
 	SepBg = 2,
-	Reverse = 3, -- use the reverse style of the component
+	Reverse = 3, -- use the reverse style of the component }
 }
 
 local LEFT_SUFFIX = "L"
 local RIGHT_SUFFIX = "R"
----
----@alias Id string|number|function
+
+---@alias Id string|number
+
+---@alias RefField Id|nil
+---@alias RefFields Id[]|nil
+---@class RefTable
+---@field events RefField|RefFields a table of events that the component will listen to, used for lazy loading components
+---@field user_events RefField|RefFields a table of user defined events that the component will listen to, used for lazy loading components
+---@field timing RefField|RefFields if true, the component will be updated every time interval, can be a string or an integer
+---@field style RefField id of the style to use for the component, can be a string or a function that returns a style table
+---@field static RefField id of the static values to use for the component, can be a string or a table of static values
+---@field context RefField id of the context to use for the component, can be a string or a function that returns a context table
+---@field should_display RefFields id of the function that will be used to check if the component should be displayed, can be a string or a function that returns a boolean value
 
 ---@class Component
----@field id Id|nil the unique identifier of the component, can be a string or an integer
+---@field id Id the unique identifier of the component, can be a string or an integer
 ---@field inherit Id|nil the id of the component that this component inherits from, can be used to extend the functionality of another component
----@field timing boolean|integer|nil|Id|Id[] if true, the component will be updated every time interval
+---@field timing boolean|integer|nil if true, the component will be updated every time interval
 ---@field lazy boolean|nil if true, the component will be initialized lazily
----@field events string[]|Id[]|nil a table of events that the component will listen to
----@field user_events string[]|Id[]|nil a table of user defined events that the component will listen to
+---@field events string[]|nil a table of events that the component will listen to
+---@field user_events string[]|nil a table of user defined events that the component will listen to
+---@field ref RefTable|nil a table of references to other components, used for lazy loading components
 ---
 ---@field left_style table |nil a table of styles that will be applied to the left part of the component
 ---@field left string|nil the left part of the component, can be a string or another component
@@ -31,15 +43,15 @@ local RIGHT_SUFFIX = "R"
 ---@field right string|nil the right part of the component, can be a string or another component
 ---@field padding integer|nil|{left: integer, right:integer} the padding of the component, can be used to add space around the component
 ---
----@field style Id|vim.api.keyset.highlight|nil|fun(self: Component, ctx: NotString, static: NotString): vim.api.keyset.highlight a table of styles that will be applied to the component
----@field static Id|table|nil a table of static values that will be used in the component
----@field context Id|nil|fun(self:Component, static:any): NotString a table that will be passed to the component's update function
+---@field style vim.api.keyset.highlight|nil|fun(self: Component, ctx: any, static: any): vim.api.keyset.highlight a table of styles that will be applied to the component
+---@field static any a table of static values that will be used in the component
+---@field context nil|fun(self:Component, static:any): any a table that will be passed to the component's update function
 ---
----@field init nil|fun(self: Component) called when the component is initialized, can be used to set up the context
----@field pre_update nil|fun(self: Component, ctx: NotString, static: NotString) called before the component is updated, can be used to set up the context
----@field update string|fun(self:Component, ctx: NotString, static: NotString): string called to update the component, should return a string that will be displayed
----@field post_update nil|fun(self: Component,ctx: NotString, static: NotString) called after the component is updated, can be used to clean up the context
----@field should_display Id|nil|fun(self: Component, ctx:NotString, static: NotString): boolean called to check if the component should be displayed, should return true or false
+---@field init nil|fun(raw_self: Component) called when the component is initialized, can be used to set up the context
+---@field pre_update nil|fun(self: Component, ctx: any, static: any) called before the component is updated, can be used to set up the context
+---@field update string|fun(self:Component, ctx: any, static: any): string|nil called to update the component, should return a string that will be displayed
+---@field post_update nil|fun(self: Component,ctx: any, static: any) called after the component is updated, can be used to clean up the context
+---@field should_display nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
 ---@field min_screen_width integer|nil the minimum screen width required to display the component, used for lazy loading components
 ---
 ---@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
@@ -47,6 +59,7 @@ local RIGHT_SUFFIX = "R"
 ---@field _left_hl_name string|nil the highlight group name for the component
 ---@field _right_hl_name string|nil the highlight group name for the component
 ---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
+---@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
 ---
 
 --- @param comp Component the component to update
@@ -73,7 +86,7 @@ M.update_style = function(comp, ctx, static, session_id)
 		end
 
 		if force or type(comp.style) == "function" then
-			highlight.hl(comp._hl_name, style)
+			highlight.hl(comp._hl_name, style, true)
 		end
 
 		if left_type == "string" then

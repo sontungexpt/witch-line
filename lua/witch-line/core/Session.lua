@@ -26,14 +26,13 @@ end
 
 ---- Retrieves the session data associated with the given session ID and key.
 --- If the key does not exist, it will create an empty table for that key.
---- @param id SessionId
---- @param key any
+--- @param id SessionId id of the session
+--- @param key NotNil key to retrieve session data
+--- @param initial_val any initial value to set if the key does not exist
 Session.get_or_init = function(id, key, initial_val)
 	local session = Cache[id]
 	if not session then
 		error("Session with id " .. tostring(id) .. " does not exist.")
-	elseif not key then
-		error("Key must be provided to retrieve session data.")
 	end
 
 	local value = session[key] or initial_val

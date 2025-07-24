@@ -3,6 +3,7 @@ local opt = vim.opt
 local ipairs, concat = ipairs, table.concat
 
 local M = {}
+local enabled = true
 
 --- @type string[], integer The list of render value of component .
 local Values, ValuesSize = {}, 0
@@ -18,6 +19,11 @@ M.get_size = function()
 end
 
 M.render = function()
+	if not enabled then
+		opt.statusline = " "
+		return
+	end
+
 	local str = concat(Values)
 	opt.statusline = str ~= "" and str or " "
 end
@@ -40,11 +46,10 @@ end
 --- Sets the separator for left or right side of the component.
 --- @param indices integer[]|string[] The indices of the components to set the separator for.
 --- @param value string The separator value to set.
---- @param is_left boolean If true, sets the separator to the left of the component; otherwise, sets it to the right.
-M.bulk_set_sep = function(indices, value, is_left)
+--- @param adjust number If true, sets the separator to the left of the component; otherwise, sets it to the right.
+M.bulk_set_sep = function(indices, value, adjust)
 	for _, idx in ipairs(indices) do
-		local sep_idx = is_left and idx - 1 or idx + 1
-		Values[sep_idx] = value
+		Values[idx + adjust] = value
 	end
 end
 

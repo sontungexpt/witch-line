@@ -10,18 +10,15 @@ local DepStoreKey = {
 	Display = 1,
 	Event = 2,
 	Timer = 3,
-	Inherited = 4,
 }
 
 local statusline = require("witch-line.core.statusline")
-
 local CompManager = require("witch-line.core.CompManager")
 
-local IdHelper, manage, get_comp_by_id, link_dep, get_dep_store, get_context, get_static, should_display =
-	CompManager.Id,
+local manage, get_comp_by_id, link_ref_field, get_dep_store, get_context, get_static, should_display =
 	CompManager.register,
 	CompManager.get_comp_by_id,
-	CompManager.link_dep,
+	CompManager.link_ref_field,
 	CompManager.get_dep_store,
 	CompManager.get_context,
 	CompManager.get_static,
@@ -47,20 +44,19 @@ local TimerStore = {
 	-- Stores component IDs for timers
 	-- Stores component IDs for timers with a specific interval
 	-- [interval] = {
-	-- timer = uv.new_timer(), -- Timer object for the interval
-	-- comp_id1,
-	-- comp_id2,
-	-- ...
-	-- ...
+	--   [timer] = uv.new_timer(), -- Timer object for the interval
+	--   comp_id1,
+	--   comp_id2,
+	--   ...
+	--   ...
 	-- }
-	-- [interval].timer = uv.new_timer() -- Timer object for the interval
-
-	-- Stores component dependencies for other references
-	-- }
-	-- [interval].timer = uv.new_timer() -- Timer object for the interval
-
-	-- Stores component dependencies for other references
 }
+
+M.cache = function(force)
+	local CacheMod = require("witch-line.cache")
+	CacheMod.cache(EventStore, "EventStore", force)
+	CacheMod.cache(TimerStore, "TimerStore", force)
+end
 
 --- Update a component and its dependencies.jj
 --- @param comp Component The component to update.
@@ -82,11 +78,18 @@ local function update_comp(comp, session_id)
 
 	local static = get_static(comp)
 	local ctx = get_context(comp, session_id, static)
+	local displayed = true
 
-	local displayed = should_display(comp, session_id, ctx, static)
+	local min_screen_width = comp.min_screen_width
+	if type(min_screen_width) == "number" and min_screen_width > 0 then
+		displayed = vim.o.columns >= min_screen_width
+	end
+
+	displayed = displayed and should_display(comp, session_id, ctx, static)
 
 	if displayed then
 		local Component = require("witch-line.core.Component")
+
 		Component.update_style(comp, ctx, static, session_id)
 		local value = Component.evaluate(comp, ctx, static)
 
@@ -100,12 +103,11 @@ local function update_comp(comp, session_id)
 			statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
 			if comp._hidden ~= false then
 				local left, right = comp.left, comp.right
-
 				if type(left) == "string" then
-					statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), true)
+					statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
 				end
 				if type(right) == "string" then
-					statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), false)
+					statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
 				end
 			end
 			rawset(comp, "_hidden", false) -- Reset hidden state
@@ -121,10 +123,10 @@ local function update_comp(comp, session_id)
 
 		statusline.bulk_set(indices, "")
 		if type(c.left) == "string" then
-			statusline.bulk_set_sep(indices, "", true)
+			statusline.bulk_set_sep(indices, "", -1)
 		end
 		if type(c.right) == "string" then
-			statusline.bulk_set_sep(indices, "", false)
+			statusline.bulk_set_sep(indices, "", 1)
 		end
 		rawset(c, "_hidden", true) -- Reset hidden state
 	end
@@ -150,48 +152,27 @@ M.update_comp = update_comp
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_ids table<Id,boolean>|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
---- @param inherited_key string|nil Optional. The key to use for inherited dependencies.
+--- @param dep_store DepStore|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_and_deps = function(comp, session_id, dep_ids, inherited_key, seen)
-	if not comp then
-		error("Component is nil or not found in CompIdMap")
-	end
-
+function M.update_comp_graph(comp, session_id, dep_store, seen)
 	seen = seen or {}
-	if not seen[comp.id] then
-		update_comp(comp, session_id)
-		seen[comp.id] = true
+	local id = comp.id
+	if seen[id] then
+		return -- Avoid infinite recursion
 	end
 
-	if dep_ids then
+	update_comp(comp, session_id)
+	---@cast id Id
+	seen[id] = true
+
+	if dep_store then
+		local dep_ids = dep_store[id]
 		for dep_id, _ in pairs(dep_ids) do
 			local dep_comp = get_comp_by_id(dep_id)
-			if dep_comp and not seen[dep_comp.id] then
-				update_comp(dep_comp, session_id)
-			else
+			if not dep_comp then
 				dep_ids[dep_id] = nil -- Clean up if the component is not found
-			end
-		end
-	end
-
-	if inherited_key then
-		local inherited_dep_store = CompManager.get_raw_dep_store(DepStoreKey.Inherited)
-		if not inherited_dep_store then
-			return
-		end
-		local inherited_dep_ids = inherited_dep_store[comp.id]
-		if inherited_dep_ids then
-			for dep_id, _ in pairs(inherited_dep_ids) do
-				local dep_comp = get_comp_by_id(dep_id)
-				if
-					dep_comp
-					and not seen[dep_comp.id]
-					-- no private key already
-					and not rawget(dep_comp, inherited_key)
-				then
-					update_comp(dep_comp, session_id)
-				end
+			elseif not seen[dep_comp.id] then
+				M.update_comp_graph(dep_comp, session_id, dep_store, seen)
 			end
 		end
 	end
@@ -199,16 +180,15 @@ end
 
 --- Update multiple components by their IDs.
 --- @param ids Id[] The IDs of the components to update.
---- @param process_id SessionId The ID of the process to use for this update.
+--- @param session_id SessionId The ID of the process to use for this update.
 --- @param dep_store DepStore Optional. The store to use for dependencies. Defaults to EventStore.refs.
---- @param inherited_key string|nil Optional. The key to use for inherited dependencies.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comps_deps_by_id = function(ids, process_id, dep_store, inherited_key, seen)
+M.update_comp_graphs_by_id = function(ids, session_id, dep_store, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		local comp = get_comp_by_id(id)
-		if comp then
-			M.update_comp_and_deps(comp, process_id, dep_store and dep_store[id] or nil, inherited_key, seen)
+		if comp and not seen[id] then
+			M.update_comp_graph(comp, session_id, dep_store, seen)
 		end
 	end
 end
@@ -218,24 +198,19 @@ end
 ---@param key "events" | "user_events"
 local function registry_events(comp, key)
 	local es = comp[key]
-	local type_es = type(es)
-	if type_es == "table" then
-		if type(es.refs) == "table" then
-			local dep_store = get_dep_store(DepStoreKey.Event)
-			for _, dep in ipairs(es.refs) do
-				link_dep(comp, dep, dep_store)
-			end
-		end
-
-		local store = EventStore[key] or {}
-		EventStore[key] = store
-
-		for _, e in ipairs(es) do
-			local store_e = store[e]
-			if not store_e then
-				store[e] = { comp.id }
-			else
-				store_e[#store_e + 1] = comp.id
+	if type(es) == "table" then
+		local es_size = #es
+		if es_size > 0 then
+			local store = EventStore[key] or {}
+			EventStore[key] = store
+			for i = 1, es_size do
+				local e = es[i]
+				local store_e = store[e]
+				if not store_e then
+					store[e] = { comp.id }
+				else
+					store_e[#store_e + 1] = comp.id
+				end
 			end
 		end
 	end
@@ -246,43 +221,29 @@ end
 local function registry_timer(comp)
 	local timing = comp.timing == true and TIMER_TICK or comp.timing
 
-	local timing_type = type(timing)
-	if timing_type == "number" and timing > 0 then
+	if type(timing) == "number" and timing > 0 then
 		local ids = TimerStore[timing]
-		if not ids then
-			ids = { comp.id }
-			TimerStore[timing] = ids
-
-			---@diagnostic disable-next-line: undefined-field
-			ids.timer = uv.new_timer()
-			ids.timer:start(
-				0,
-				timing,
-				vim.schedule_wrap(function()
-					local Session = require("witch-line.core.Session")
-					local process_id = Session.new()
-					M.update_comps_deps_by_id(
-						ids,
-						process_id,
-						CompManager.get_raw_dep_store(DepStoreKey.Timer),
-						"timing",
-						{}
-					)
-					Session.remove(process_id)
-					statusline.render()
-				end)
-			)
-		else
+		if ids then
 			ids[#ids + 1] = comp.id
+			return
 		end
-	elseif timing_type == "string" or timing_type == "function" then
-		local refs = get_dep_store(DepStoreKey.Timer)
-		link_dep(comp, timing, refs)
-	elseif timing_type == "table" then
-		local refs = get_dep_store(DepStoreKey.Timer)
-		for _, on in ipairs(timing) do
-			link_dep(comp, on, refs)
-		end
+
+		ids = { comp.id }
+		TimerStore[timing] = ids
+
+		---@diagnostic disable-next-line: undefined-field
+		ids.timer = uv.new_timer()
+		ids.timer:start(
+			0,
+			timing,
+			vim.schedule_wrap(function()
+				local Session = require("witch-line.core.Session")
+				local session_id = Session.new()
+				M.update_comp_graphs_by_id(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
+				Session.remove(session_id)
+				statusline.render()
+			end)
+		)
 	end
 end
 
@@ -306,7 +267,7 @@ local function init_autocmd()
 				local Session = require("witch-line.core.Session")
 				local session_id = Session.new()
 				local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
-				M.update_comps_deps_by_id(ids, session_id, refs, key, seen)
+				M.update_comp_graphs_by_id(ids, session_id, refs, seen)
 				Session.remove(session_id)
 			end
 		end
@@ -314,35 +275,90 @@ local function init_autocmd()
 	end, 100)
 
 	local group, id1, id2 = nil, nil, nil
-	if events and next(events) ~= nil then
-		group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
-		local queue = {}
-		id1 = api.nvim_create_autocmd(vim.tbl_keys(events), {
-			group = group,
-			callback = function(e)
-				queue[#queue + 1] = e.event
-				on_event_debounce(queue, "events")
-			end,
-		})
+	local tbl_keys = require("witch-line.utils.tbl").tbl_keys
+
+	if events then
+		events = tbl_keys(events)
+		if events[1] then
+			group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
+			local queue = {}
+			id1 = api.nvim_create_autocmd(events, {
+				group = group,
+				callback = function(e)
+					queue[#queue + 1] = e.event
+					on_event_debounce(queue, "events")
+				end,
+			})
+		end
 	end
 
-	if user_events and next(user_events) ~= nil then
-		group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
-		local queue = {}
-		id2 = api.nvim_create_autocmd("User", {
-			pattern = vim.tbl_keys(user_events),
-			group = group,
-			callback = function(e)
-				queue[#queue + 1] = e.match
-				on_event_debounce(queue, "user_events")
-			end,
-		})
+	if user_events then
+		user_events = tbl_keys(user_events)
+		if user_events[1] then
+			group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
+			local queue = {}
+			id2 = api.nvim_create_autocmd("User", {
+				pattern = user_events,
+				group = group,
+				callback = function(e)
+					queue[#queue + 1] = e.match
+					on_event_debounce(queue, "user_events")
+				end,
+			})
+		end
 	end
 
 	return group, id1, id2
 end
 
---
+--- Link dependencies for a component.
+--- @param comp Component The component to link dependencies for.
+local function link_refs(comp)
+	local ref = comp.ref
+	if type(ref) ~= "table" then
+		return
+	end
+
+	local inherit = comp.inherit
+	if ref.events then
+		link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event))
+	elseif inherit then
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event))
+	end
+
+	if ref.user_events then
+		link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event))
+	elseif inherit then
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event))
+	end
+
+	if ref.timing then
+		link_ref_field(comp, ref.timing, get_dep_store(DepStoreKey.Timer))
+	elseif inherit then
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer))
+	end
+
+	if ref.should_display then
+		link_ref_field(comp, ref.should_display, get_dep_store(DepStoreKey.Display))
+	elseif inherit then
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display))
+	end
+end
+
+---@param comp Component
+local function registry_vim_resized(comp)
+	if type(comp.min_screen_width) == "number" and comp.min_screen_width > 0 then
+		local store = EventStore["events"] or {}
+		EventStore["events"] = store
+		local es = store["VimResized"]
+		if not es then
+			store["VimResized"] = { comp.id }
+		else
+			es[#es + 1] = comp.id
+		end
+	end
+end
+
 --- Register a component in the statusline.
 --- @param comp Component|string
 --- @param id Id|integer The ID to assign to the component.
@@ -362,10 +378,6 @@ local function registry_comp(comp, id, urgents)
 			comp.init(comp)
 		end
 
-		if comp.inherit then
-			link_dep(comp, comp.inherit, get_dep_store(DepStoreKey.Inherited))
-		end
-
 		if comp.left then
 			statusline.push("")
 		end
@@ -383,12 +395,6 @@ local function registry_comp(comp, id, urgents)
 			statusline.push("")
 		end
 
-		local displayed = comp.should_display
-		if displayed and (IdHelper.is_fun_id(displayed) or type(displayed) ~= "function") then
-			---@diagnostic disable-next-line: param-type-mismatch
-			link_dep(comp, displayed, get_dep_store(DepStoreKey.Display))
-		end
-
 		if comp.timing then
 			registry_timer(comp)
 		end
@@ -397,9 +403,51 @@ local function registry_comp(comp, id, urgents)
 			registry_events(comp, "events")
 		end
 
+		if comp.min_screen_width then
+			registry_vim_resized(comp)
+		end
+
 		if comp.user_events then
 			registry_events(comp, "user_events")
 		end
+
+		if comp.ref then
+			link_refs(comp)
+		end
+
+		rawset(comp, "_loaded", true) -- Mark the component as loaded
+	end
+end
+
+--- Register a component in the statusline.
+--- @param comp Component
+--- @param id Id The ID to assign to the component.
+--- @return nil
+local function registry_abstract_comp(comp)
+	CompManager.fast_register(comp)
+
+	if comp.init then
+		comp.init(comp)
+	end
+
+	if comp.timing then
+		registry_timer(comp)
+	end
+
+	if comp.events then
+		registry_events(comp, "events")
+	end
+
+	if comp.min_screen_width then
+		registry_vim_resized(comp)
+	end
+
+	if comp.user_events then
+		registry_events(comp, "user_events")
+	end
+
+	if comp.ref then
+		link_refs(comp)
 	end
 end
 
@@ -410,7 +458,7 @@ M.setup = function(configs)
 	for i = 1, #abstract do
 		local c = abstract[i]
 		if type(c) == "table" and c.id then
-			manage(c, c.id)
+			registry_abstract_comp(c)
 		else
 			error("Abstract component must be a table with an 'id' field: " .. tostring(c))
 		end
@@ -430,7 +478,7 @@ M.setup = function(configs)
 		local session_id = Session.new()
 		for i = 1, #urgents do
 			local comp = urgents[i]
-			M.update_comp_and_deps(comp, session_id, nil, "lazy", {})
+			M.update_comp_graph(comp, session_id, nil, {})
 		end
 		Session.remove(session_id)
 	end

@@ -32,12 +32,11 @@ function M.merge_tbl(to, from, skip_type_check)
 end
 
 function M.tbl_keys(tbl)
-	local list, size = {}, 0
+	local list = {}
 	for k, _ in pairs(tbl) do
-		size = size + 1
-		list[size] = k
+		list[#list + 1] = k
 	end
-	return list, size
+	return list
 end
 
 --- Creates a shallow copy of a table.

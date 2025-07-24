@@ -135,4 +135,9 @@ M.hl = function(group_name, hl_style, force)
 	nvim_set_hl(0, group_name, style)
 end
 
+M.cache = function(force)
+	local CacheMod = require("witch-line.cache")
+	CacheMod.cache(Cache, "Highlight", force)
+end
+
 return M

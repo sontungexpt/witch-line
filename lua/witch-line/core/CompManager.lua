@@ -2,8 +2,20 @@ local type, rawset = type, rawset
 
 local M = {}
 
+---@alias DepStore table<Id, table<Id, true>>
+---@type table<NotNil, DepStore>
+local DepStore = {
+	-- [id] = {}
+}
+
 ---@type table<Id, Component>
 local Comps = {}
+
+M.cache = function(force)
+	local CacheMod = require("witch-line.cache")
+	CacheMod.cache(Comps, "Comps", force)
+	CacheMod.cache(DepStore, "DepStore", force)
+end
 
 --- Get the component manager.
 --- @return table The component manager containing all registered components.
@@ -19,19 +31,34 @@ end
 ---- Register a component with the component manager.
 --- @param comp Component The component to register.
 --- @param alt_id Id Optional. An alternative ID for the component if it does not have one.
---- @return Id The ID of the registered component.
+--- @return Id|nil The ID of the registered component.
 M.register = function(comp, alt_id)
 	local id = comp.id or alt_id
+	local id_type = type(id)
+	if id_type ~= "number" and id_type ~= "string" then
+		error("Component must have a valid ID")
+		return nil
+	end
+
 	Comps[id] = comp
 	rawset(comp, "id", id) -- Ensure the component has an ID field
 	return id
 end
 
----@alias DepStore table<Id, table<Id, true>>
----@type table<NotNil, DepStore>
-local DepStore = {
-	-- [id] = {}
-}
+--- Register a component with the component manager without checking for an ID.
+--- @param comp Component The component to register.
+--- @return Id|nil The ID of the registered component.
+M.fast_register = function(comp)
+	local id = comp.id
+	local type_id = type(id)
+	if type_id ~= "number" and type_id ~= "string" then
+		error("Component must have a valid ID")
+		return nil
+	end
+
+	Comps[id] = comp
+	return id
+end
 
 --- Get the dependency store for a given ID.
 --- @param id NotNil The ID to get the dependency store for.
@@ -52,22 +79,37 @@ M.get_dep_store = get_dep_store
 M.get_raw_dep_store = function(id)
 	return DepStore[id]
 end
-
 M.get_dep_store = get_dep_store
 
 --- Add a dependency for a component.
 --- @param comp Component The component to add the dependency for.
---- @param on Id The event or component ID that this component depends on.
+--- @param ref Id|Id[] The event or component ID that this component depends on.
 --- @param store DepStore Optional. The store to add the dependency to. Defaults to EventRefs.
-local function link_dep(comp, on, store)
-	local deps = store[on] or {}
-	deps[comp.id] = true
-	store[on] = deps
-end
-M.link_dep = link_dep
+local function link_ref_field(comp, ref, store)
+	if type(ref) == "table" then
+		local id = comp.id
+		for i = 1, #ref do
+			local on_i = ref[i]
+			local deps = store[on_i] or {}
+			---@diagnostic disable-next-line: need-check-nil
+			deps[id] = true
+			store[on_i] = deps
+		end
+		return
+	end
 
+	local deps = store[ref] or {}
+	deps[comp.id] = true
+	store[ref] = deps
+end
+M.link_ref_field = link_ref_field
+
+--- Link a component to an event or another component by its ID.
+--- @param comp Component The component to link.
+--- @param on Id|Id[] The event or component ID that this component depends on.
+--- @param id NotNil The ID of the component to link.
 local function link_dep_by_id(comp, on, id)
-	link_dep(comp, on, get_dep_store(id))
+	link_ref_field(comp, on, get_dep_store(id))
 end
 M.link_dep_by_id = link_dep_by_id
 
@@ -83,55 +125,19 @@ M.clear_dep_stores = function()
 	DepStore = {}
 end
 
----@type table<function, Id>
-local FuncIdMap = {
-	-- [function() end] = defined_id, -- Placeholder for empty function
-}
-
---- Generate a unique ID for a component.--- @param id Id The ID to use for the component.--- @return Idas_id = function(id)
---- @param id Id The ID to use for the component.
---- @return Id The generated ID for the component.
-local function as_id(id)
-	local fun_id = function() end
-	FuncIdMap[fun_id] = id
-	return fun_id
-end
 --- Check if a given ID is a valid component ID.
 --- @param id NotNil The ID to check.
 --- @return boolean valid True if the ID is valid, false otherwise.
-local is_id = function(id)
-	return Comps[id] ~= nil or FuncIdMap[id] ~= nil
+M.is_id = function(id)
+	return Comps[id] ~= nil
 end
-
----Check if a given ID is a function ID
----@param id NotNil The ID to check.
-local is_fun_id = function(id)
-	return FuncIdMap[id] ~= nil
-end
-
-M.Id = {
-	as_id = as_id,
-	is_id = is_id,
-	is_fun_id = is_fun_id,
-}
 
 --- Get a component by its ID.
 --- @param id Id The ID of the component to retrieve.
 --- @return Component|nil The component with the given ID, or nil if not found.
-local get_comp_by_id = function(id)
-	if id == nil then
-		return nil
-	end
-	local comp = Comps[id]
-	if comp then
-		return comp
-	elseif type(id) == "function" then
-		id = FuncIdMap[id]
-		return id and Comps[id]
-	end
-	return nil
+M.get_comp_by_id = function(id)
+	return id and Comps[id]
 end
-M.get_comp_by_id = get_comp_by_id
 
 --- Recursively get a value from a component.
 --- @param comp Component The component to get the value from.
@@ -143,28 +149,28 @@ M.get_comp_by_id = get_comp_by_id
 --- @return Component last_ref_comp The component that provided the value, or nil if not found.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
 	local value = comp[key]
-
-	local ref_comp = get_comp_by_id(value)
-	if ref_comp and not seen[value] then
-		seen[value] = true
-		local store = require("witch-line.core.Session").get_or_init(session_id, key, {})
-		if store[value] then
-			return store[value], value
+	if value then
+		if type(value) == "function" then
+			value = value(comp, ...)
 		end
-
-		local ref_value = ref_comp[key]
-		local ref_comp2 = get_comp_by_id(ref_value)
-		if ref_comp2 and not seen[ref_value] then
-			return lookup_ref_value(ref_comp2, key, session_id, seen, ...)
-		elseif type(ref_value) == "function" then
-			ref_value = value(ref_comp, ...)
-		end
-		seen[value] = ref_value
-		return ref_value, ref_comp
-	elseif type(value) == "function" then
-		value = value(comp, ...)
+		require("witch-line.core.Session").get_or_init(session_id, key, {})[comp.id] = value
+		return value, comp
 	end
-	return value, comp
+	local ref = comp.ref
+	if type(ref) ~= "table" then
+		return nil, comp
+	end
+
+	value = ref[key]
+	if not value then
+		return nil, comp
+	end
+
+	local ref_comp = Comps[value]
+	if ref_comp and not seen[value] then
+		return lookup_ref_value(ref_comp, key, session_id, seen, ...)
+	end
+	return nil, comp
 end
 M.lookup_ref_value = lookup_ref_value
 
@@ -181,11 +187,12 @@ end
 --- Get the style for a component.
 --- @param comp Component The component to get the context for.
 --- @param session_id SessionId The ID of the process to use for this retrieval.
---- @param ... any Additional arguments to pass to the style function.
+--- @param ctx any The context to pass to the component's style function.
+--- @param static any Optional. If true, the static value will be used for the style.
 --- @return vim.api.keyset.highlight|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
-M.get_style = function(comp, session_id, ...)
-	return lookup_ref_value(comp, "style", session_id, {}, ...)
+M.get_style = function(comp, session_id, ctx, static)
+	return lookup_ref_value(comp, "style", session_id, {}, ctx, static)
 end
 
 --- Check if a component should be displayed.
@@ -203,21 +210,30 @@ end
 --- Get the static value for a component by recursively checking its dependencies.
 --- @param comp Component The component to get the static value for.
 --- @param key string The key to look for in the component.
+--- @param seen table<Id, boolean> A table to keep track of already seen values to avoid infinite recursion.
 --- @return NotString value The static value of the component.
 --- @return Component inherited The component that provides the static value.
-local function lookup_inherited_value(comp, key)
-	if not comp then
-		error("Component is nil or not found in CompIdMap")
+local function lookup_inherited_value(comp, key, seen)
+	local static = comp[key]
+	if static then
+		return static, comp
 	end
 
-	local static = comp[key]
-	local last_ref_comp, ref_comp = comp, get_comp_by_id(static)
-	while ref_comp do
-		last_ref_comp = ref_comp
-		static = ref_comp[key]
-		ref_comp = get_comp_by_id(static)
+	local ref = comp.ref
+	if type(ref) ~= "table" then
+		return nil, comp
 	end
-	return static, last_ref_comp
+
+	static = ref[key]
+	if not static then
+		return nil, comp
+	end
+
+	local ref_comp = Comps[static]
+	if ref_comp and not seen[static] then
+		return lookup_inherited_value(ref_comp, key, seen)
+	end
+	return nil, comp
 end
 
 M.lookup_inherited_value = lookup_inherited_value
@@ -227,7 +243,7 @@ M.lookup_inherited_value = lookup_inherited_value
 --- @return NotString value The static value of the component.
 --- @return Component|nil inherited The component that provides the static value.
 function M.get_static(comp)
-	return lookup_inherited_value(comp, "static")
+	return lookup_inherited_value(comp, "static", {})
 end
 
 return M

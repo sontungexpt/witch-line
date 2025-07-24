@@ -1,5 +1,6 @@
 local colors = require("witch-line.constant.color")
 
+---@type Component
 return {
 	id = require("witch-line.components.id.enum").Mode,
 	user_events = { "VeryLazy" },
