@@ -1,0 +1,2 @@
+---@alias NotString table|number|boolean|function|nil|thread|userdata
+---@alias NotNil string|table|number|boolean|function|thread|userdata

@@ -3,8 +3,14 @@ local bo = vim.bo
 
 local M = {}
 
+---@class Config
+---@field abstract Component[] Abstract components that are not rendered directly.
+---@field components Component[] Components that are rendered in the statusline.
+---@field disabled {filetypes: string[], buftypes: string[]} A table containing filetypes and buftypes where the statusline is disabled.
+
+---@type Config
 local default_configs = {
-	-- components
+	abstract = {},
 	components = require("witch-line.constant.default"),
 	disabled = {
 		filetypes = {},
@@ -66,10 +72,18 @@ local function merge_user_config(defaults, overrides)
 	return defaults
 end
 
+--- Sets user configurations by merging them with the default configurations.
+--- This function allows users to override the default settings with their own configurations.
+--- It merges the user-provided configurations with the default configurations, ensuring that any missing keys in the user configuration will retain their default values.
+--- @param user_configs Config A table containing user-defined configurations to be merged with the default configurations.
+--- @return Config merged_configs The merged configuration table, which includes both default and user-defined settings.
 M.set_user_config = function(user_configs)
 	return merge_user_config(default_configs, user_configs)
 end
 
+--- Returns a read-only table containing the default configurations.
+--- This table can be used to access the default components and other configurations.
+--- @return Config configurations table
 M.get_config = function()
 	return setmetatable({}, {
 		__index = default_configs,

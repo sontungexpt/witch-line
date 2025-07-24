@@ -22,12 +22,10 @@ do
 end
 
 --- Generates a highlight name based on an ID.
---- @param id number|string The ID to generate the highlight name for.
---- @param sep boolean|nil Is the separator needed?
+--- @param id any The ID to generate the highlight name for.
 --- @return string hl_name The generated highlight name.
-M.gen_hl_name_by_id = function(id, sep)
-	local str = string.gsub("WitchLine" .. id, "[^%w_]", "")
-	return sep and str .. "Sep" or str
+M.gen_hl_name_by_id = function(id)
+	return "WL" .. string.gsub(tostring(id), "[^%w_]", "")
 end
 
 -- Convert color names to 24-bit RGB numbers
@@ -63,10 +61,12 @@ end
 --- Retrieves the highlight information for a given highlight group name.
 ---@param hl_name string
 ---@return vim.api.keyset.get_hl_info|nil
-local get_hlprop = function(hl_name)
+local get_hlprop = function(hl_name, force)
 	local c = Cache.hl_styles[hl_name]
-	if c then
+	if not force and c then
 		return c
+	elseif hl_name == "" then
+		return nil
 	end
 
 	local ok, style = pcall(nvim_get_hl, 0, {
@@ -84,11 +84,16 @@ M.get_hlprop = get_hlprop
 
 ---@param group_name string
 ---@param hl_style vim.api.keyset.highlight
-M.hl = function(group_name, hl_style)
+M.hl = function(group_name, hl_style, force)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return
 	end
-	local style = shallow_copy(hl_style)
+	local style = Cache.hl_styles[group_name]
+	if not force and style then
+		nvim_set_hl(0, group_name, style)
+		return
+	end
+	style = shallow_copy(hl_style)
 
 	local fg = style.foreground or style.fg
 	local bg = style.background or style.bg
