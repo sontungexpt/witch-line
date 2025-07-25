@@ -1,6 +1,7 @@
 local vim, type, ipairs, pairs, rawset, require, setmetatable = vim, type, ipairs, pairs, rawset, require, setmetatable
 local api, uv = vim.api, vim.uv or vim.loop
 
+local CacheMod = require("witch-line.cache")
 local M = {}
 
 local TIMER_TICK = 1000 -- 1 second
@@ -15,16 +16,19 @@ local DepStoreKey = {
 local statusline = require("witch-line.core.statusline")
 local CompManager = require("witch-line.core.CompManager")
 
-local manage, get_comp_by_id, link_ref_field, get_dep_store, get_context, get_static, should_display =
+local manage, get_comp, link_ref_field, get_dep_store, get_raw_dep_store, get_context, get_static, should_display =
 	CompManager.register,
-	CompManager.get_comp_by_id,
+	CompManager.get_comp,
 	CompManager.link_ref_field,
 	CompManager.get_dep_store,
+	CompManager.get_raw_dep_store,
 	CompManager.get_context,
 	CompManager.get_static,
 	CompManager.should_display
 
----@type {events: nil|table<string, Id[]>, user_events: nil|table<string, Id[]>}
+---@alias es nil|table<string, Id[]>
+---@alias EventStore {events: es, user_events: es}
+---@type EventStore
 local EventStore = {
 	-- Stores component dependencies for events
 	-- Only init if needed
@@ -39,7 +43,8 @@ local EventStore = {
 	-- },
 }
 
----@type table<uinteger , Id[]|{timer: any}>
+---@alias TimerStore table<uinteger , Id[] | {timer: any}>
+---@type TimerStore
 local TimerStore = {
 	-- Stores component IDs for timers
 	-- Stores component IDs for timers with a specific interval
@@ -52,18 +57,39 @@ local TimerStore = {
 	-- }
 }
 
-M.cache = function(force)
-	local CacheMod = require("witch-line.cache")
-	CacheMod.cache(EventStore, "EventStore", force)
-	CacheMod.cache(TimerStore, "TimerStore", force)
+M.cache = function()
+	CacheMod.cache(EventStore, "EventStore")
+	CacheMod.cache(TimerStore, "TimerStore")
 end
 
+M.load_cache = function()
+	EventStore = CacheMod.get().EventStore or EventStore
+	TimerStore = CacheMod.get().TimerStore or TimerStore
+end
+
+--- Clear the value of a component in the statusline.
+--- @param c Component The component to clear.
+local clear_comp_value = function(c)
+	local indices = c._indices
+	if not indices then
+		return
+	end
+
+	statusline.bulk_set(indices, "")
+	if type(c.left) == "string" then
+		statusline.bulk_set_sep(indices, "", -1)
+	end
+	if type(c.right) == "string" then
+		statusline.bulk_set_sep(indices, "", 1)
+	end
+	rawset(c, "_hidden", true) -- Reset hidden state
+end
 --- Update a component and its dependencies.jj
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
 local function update_comp(comp, session_id)
 	if comp.inherit then
-		local parent = get_comp_by_id(comp.inherit)
+		local parent = get_comp(comp.inherit)
 		if parent then
 			setmetatable(comp, {
 				__index = function(t, key)
@@ -86,93 +112,88 @@ local function update_comp(comp, session_id)
 	end
 
 	displayed = displayed and should_display(comp, session_id, ctx, static)
-
-	if displayed then
-		local Component = require("witch-line.core.Component")
-
-		Component.update_style(comp, ctx, static, session_id)
-		local value = Component.evaluate(comp, ctx, static)
-
-		if value ~= "" then
-			local indices = comp._indices
-			if not indices then
-				return
-			end
-			local add_hl_name = require("witch-line.utils.highlight").add_hl_name
-
-			statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
-			if comp._hidden ~= false then
-				local left, right = comp.left, comp.right
-				if type(left) == "string" then
-					statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
-				end
-				if type(right) == "string" then
-					statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
-				end
-			end
-			rawset(comp, "_hidden", false) -- Reset hidden state
-			return
-		end
+	if not displayed then
+		return ""
 	end
 
-	local clear_value = function(c)
-		local indices = c._indices
-		if not indices then
-			return
-		end
+	local Component = require("witch-line.core.Component")
 
-		statusline.bulk_set(indices, "")
-		if type(c.left) == "string" then
-			statusline.bulk_set_sep(indices, "", -1)
-		end
-		if type(c.right) == "string" then
-			statusline.bulk_set_sep(indices, "", 1)
-		end
-		rawset(c, "_hidden", true) -- Reset hidden state
+	Component.update_style(comp, ctx, static, session_id)
+	local value = Component.evaluate(comp, ctx, static)
+	if value == "" then
+		return ""
 	end
-	clear_value(comp)
 
-	local refs = CompManager.get_raw_dep_store(DepStoreKey.Display)
-	if refs then
-		local ids = refs[comp.id]
-		if ids then
-			for dep_id, _ in pairs(ids) do
-				local dep_comp = get_comp_by_id(dep_id)
-				if dep_comp then
-					clear_value(dep_comp._indices)
-				else
-					ids[dep_id] = nil -- Clean up if the component is not found
-				end
-			end
+	local indices = comp._indices
+	if not indices then
+		return
+	end
+	local add_hl_name = require("witch-line.utils.highlight").add_hl_name
+
+	statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
+	if comp._hidden ~= false then
+		local left, right = comp.left, comp.right
+		if type(left) == "string" then
+			statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
+		end
+		if type(right) == "string" then
+			statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
 		end
 	end
+	rawset(comp, "_hidden", false) -- Reset hidden state
 end
 M.update_comp = update_comp
 
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_store DepStore|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-function M.update_comp_graph(comp, session_id, dep_store, seen)
+function M.update_comp_graph(comp, session_id, dep_stores, seen)
 	seen = seen or {}
 	local id = comp.id
 	if seen[id] then
 		return -- Avoid infinite recursion
 	end
 
-	update_comp(comp, session_id)
+	local updated_value = update_comp(comp, session_id)
+	if updated_value == "" then
+		clear_comp_value(comp)
+
+		local refs = CompManager.get_raw_dep_store(DepStoreKey.Display)
+		if refs then
+			local ids = refs[id]
+			if ids then
+				for dep_id, _ in pairs(ids) do
+					local dep_comp = get_comp(dep_id)
+					if dep_comp then
+						clear_comp_value(dep_comp._indices)
+					else
+						ids[dep_id] = nil -- Clean up if the component is not found
+					end
+				end
+			end
+		end
+	end
+
 	---@cast id Id
 	seen[id] = true
-
-	if dep_store then
-		local dep_ids = dep_store[id]
-		for dep_id, _ in pairs(dep_ids) do
-			local dep_comp = get_comp_by_id(dep_id)
-			if not dep_comp then
-				dep_ids[dep_id] = nil -- Clean up if the component is not found
-			elseif not seen[dep_comp.id] then
-				M.update_comp_graph(dep_comp, session_id, dep_store, seen)
+	if dep_stores then
+		if not vim.islist(dep_stores) then
+			dep_stores = { dep_stores }
+		end
+		---@cast dep_stores DepStore[]
+		for _, dep_store in ipairs(dep_stores) do
+			local dep_ids = dep_store[id]
+			if dep_ids then
+				for dep_id, _ in pairs(dep_ids) do
+					local dep_comp = get_comp(dep_id)
+					if not dep_comp then
+						dep_ids[dep_id] = nil -- Clean up if the component is not found
+					elseif not seen[dep_comp.id] then
+						M.update_comp_graph(dep_comp, session_id, dep_store, seen)
+					end
+				end
 			end
 		end
 	end
@@ -181,14 +202,14 @@ end
 --- Update multiple components by their IDs.
 --- @param ids Id[] The IDs of the components to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_store DepStore Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_graphs_by_id = function(ids, session_id, dep_store, seen)
+M.update_comp_graphs_by_id = function(ids, session_id, dep_stores, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
-		local comp = get_comp_by_id(id)
+		local comp = get_comp(id)
 		if comp and not seen[id] then
-			M.update_comp_graph(comp, session_id, dep_store, seen)
+			M.update_comp_graph(comp, session_id, dep_stores, seen)
 		end
 	end
 end
@@ -220,30 +241,14 @@ end
 --- @param comp Component The component to register the timer for.
 local function registry_timer(comp)
 	local timing = comp.timing == true and TIMER_TICK or comp.timing
-
 	if type(timing) == "number" and timing > 0 then
 		local ids = TimerStore[timing]
 		if ids then
 			ids[#ids + 1] = comp.id
 			return
+		else
+			TimerStore[timing] = { comp.id }
 		end
-
-		ids = { comp.id }
-		TimerStore[timing] = ids
-
-		---@diagnostic disable-next-line: undefined-field
-		ids.timer = uv.new_timer()
-		ids.timer:start(
-			0,
-			timing,
-			vim.schedule_wrap(function()
-				local Session = require("witch-line.core.Session")
-				local session_id = Session.new()
-				M.update_comp_graphs_by_id(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
-				Session.remove(session_id)
-				statusline.render()
-			end)
-		)
 	end
 end
 
@@ -309,6 +314,28 @@ local function init_autocmd()
 	end
 
 	return group, id1, id2
+end
+
+local function init_timer()
+	local timers = TimerStore
+	if not timers then
+		return
+	end
+
+	for interval, ids in pairs(timers) do
+		ids.timer = uv.new_timer()
+		ids.timer:start(
+			0,
+			interval,
+			vim.schedule_wrap(function()
+				local Session = require("witch-line.core.Session")
+				local session_id = Session.new()
+				M.update_comp_graphs_by_id(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
+				Session.remove(session_id)
+				statusline.render()
+			end)
+		)
+	end
 end
 
 --- Link dependencies for a component.
@@ -380,7 +407,7 @@ local function registry_comp(comp, id, urgents)
 	end
 
 	if comp.lazy == false then
-		urgents[#urgents + 1] = comp
+		urgents[#urgents + 1] = id
 	end
 
 	if comp.init then
@@ -462,39 +489,49 @@ end
 --- Setup the statusline with the given configurations.
 --- @param configs Config  The configurations for the statusline.
 M.setup = function(configs)
-	local abstract = configs.abstract
-	for i = 1, #abstract do
-		local c = abstract[i]
-		if type(c) == "table" and c.id then
-			registry_abstract_comp(c, i)
-		else
-			error("Abstract component must be a table with an 'id' field: " .. tostring(c))
-		end
-	end
+	local urgents = CacheMod.get().Urgents or {}
+	local has_cached = CacheMod.has_cached()
+	if not has_cached then
+		local abstract = configs.abstract
 
-	local urgents = {}
-	local components = configs.components
-	for i = 1, #components do
-		local c = components[i]
-		local type_c = type(c)
-		if type_c == "string" then
-			registry_str_comp(c, i, urgents)
-		elseif type_c == "table" then
-			registry_comp(c, i, urgents)
+		for i = 1, #abstract do
+			local c = abstract[i]
+			if type(c) == "table" and c.id then
+				registry_abstract_comp(c, i)
+			else
+				error("Abstract component must be a table with an 'id' field: " .. tostring(c))
+			end
+		end
+
+		local components = configs.components
+		for i = 1, #components do
+			local c = components[i]
+			local type_c = type(c)
+			if type_c == "string" then
+				registry_str_comp(c, i, urgents)
+			elseif type_c == "table" then
+				registry_comp(c, i, urgents)
+			end
 		end
 	end
 
 	init_autocmd()
+	init_timer()
 
 	if urgents[1] then
+		CacheMod.cache(urgents, "Urgents")
 		local Session = require("witch-line.core.Session")
 		local session_id = Session.new()
-		for i = 1, #urgents do
-			local comp = urgents[i]
-			M.update_comp_graph(comp, session_id, nil, {})
-		end
+		M.update_comp_graphs_by_id(urgents, session_id, {
+			get_raw_dep_store(DepStoreKey.Event),
+			get_raw_dep_store(DepStoreKey.Timer),
+		}, {})
 		Session.remove(session_id)
 	end
+	if has_cached then
+		statusline.hidden_all()
+	end
+
 	statusline.render()
 end
 

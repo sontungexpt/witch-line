@@ -1,12 +1,33 @@
 local vim = vim
 local opt = vim.opt
 local ipairs, concat = ipairs, table.concat
+local CacheMod = require("witch-line.cache")
 
 local M = {}
 local enabled = true
 
---- @type string[], integer The list of render value of component .
-local Values, ValuesSize = {}, 0
+--- @type string[] The list of render value of component .
+local Values = {}
+
+---@type integer
+local ValuesSize = 0
+
+M.cache = function()
+	CacheMod.cache(Values, "Statusline")
+	CacheMod.cache(ValuesSize, "StatuslineSize")
+end
+
+M.load_cache = function()
+	Values = CacheMod.get().Statusline or {}
+	ValuesSize = CacheMod.get().StatuslineSize or 0
+end
+
+--- Hidden all components by setting their values to empty strings.
+M.hidden_all = function()
+	for i = 1, ValuesSize do
+		Values[i] = ""
+	end
+end
 
 M.clear = function()
 	Values = {}

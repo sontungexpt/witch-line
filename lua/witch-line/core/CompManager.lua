@@ -1,20 +1,33 @@
 local type, rawset = type, rawset
+local CacheMod = require("witch-line.cache")
 
 local M = {}
 
 ---@alias DepStore table<Id, table<Id, true>>
+---
 ---@type table<NotNil, DepStore>
 local DepStore = {
-	-- [id] = {}
+	-- [store_id] = {
+	--    [comp_id] = {
+	--      -- [comp_id] = true, -- this component depends on comp_id
+	--   }
+	-- }
+	--
 }
 
 ---@type table<Id, Component>
-local Comps = {}
+local Comps = {
+	--[id] = {}
+}
 
-M.cache = function(force)
-	local CacheMod = require("witch-line.cache")
-	CacheMod.cache(Comps, "Comps", force)
-	CacheMod.cache(DepStore, "DepStore", force)
+M.cache = function()
+	CacheMod.cache(Comps, "Comps")
+	CacheMod.cache(DepStore, "DepStore")
+end
+
+M.load_cache = function()
+	Comps = CacheMod.get().Comps or Comps
+	DepStore = CacheMod.get().DepStore or DepStore
 end
 
 --- Get the component manager.
@@ -135,7 +148,7 @@ end
 --- Get a component by its ID.
 --- @param id Id The ID of the component to retrieve.
 --- @return Component|nil The component with the given ID, or nil if not found.
-M.get_comp_by_id = function(id)
+M.get_comp = function(id)
 	return id and Comps[id]
 end
 

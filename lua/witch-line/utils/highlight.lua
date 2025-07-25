@@ -1,14 +1,27 @@
 local vim, type, next, pcall = vim, type, next, pcall
 local api = vim.api
 local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name = api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
+local CacheMod = require("witch-line.cache")
+
 local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
 local M = {}
 
-local Cache = {
+---@alias HighlightCache {color_nums: table<string, integer>, hl_styles: table<string, vim.api.keyset.highlight>}
+
+---@type HighlightCache
+local HighlightCache = {
 	color_nums = {},
 	hl_styles = {},
 }
+
+M.cache = function()
+	CacheMod.cache(HighlightCache, "HighlightCache")
+end
+
+M.load_cache = function()
+	HighlightCache = CacheMod.get().HighlightCache or HighlightCache
+end
 
 do
 	local counter = nil
@@ -31,14 +44,14 @@ end
 -- Convert color names to 24-bit RGB numbers
 --- @param color string The color name to convert.
 local function color_to_24bit(color)
-	local c = Cache.color_nums[color]
+	local c = HighlightCache.color_nums[color]
 	if c then
 		return c
 	end
 
 	local num = nvim_get_color_by_name(color)
 	if num ~= -1 then
-		Cache.color_nums[color] = num
+		HighlightCache.color_nums[color] = num
 	end
 	return num
 end
@@ -62,7 +75,7 @@ end
 ---@param hl_name string
 ---@return vim.api.keyset.get_hl_info|nil
 local get_hlprop = function(hl_name, force)
-	local c = Cache.hl_styles[hl_name]
+	local c = HighlightCache.hl_styles[hl_name]
 	if not force and c then
 		return c
 	elseif hl_name == "" then
@@ -74,7 +87,7 @@ local get_hlprop = function(hl_name, force)
 	})
 
 	if ok then
-		Cache.hl_styles[hl_name] = style
+		HighlightCache.hl_styles[hl_name] = style
 		return style
 	end
 	return nil
@@ -88,7 +101,7 @@ M.hl = function(group_name, hl_style, force)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return
 	end
-	local style = Cache.hl_styles[group_name]
+	local style = HighlightCache.hl_styles[group_name]
 	if not force and style then
 		nvim_set_hl(0, group_name, style)
 		return
@@ -131,13 +144,8 @@ M.hl = function(group_name, hl_style, force)
 	style.foreground, style.background = fg, bg
 	style.fg, style.bg = nil, nil
 
-	Cache.hl_styles[group_name] = style
+	HighlightCache.hl_styles[group_name] = style
 	nvim_set_hl(0, group_name, style)
-end
-
-M.cache = function(force)
-	local CacheMod = require("witch-line.cache")
-	CacheMod.cache(Cache, "Highlight", force)
 end
 
 return M
