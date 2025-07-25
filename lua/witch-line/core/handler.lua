@@ -359,71 +359,79 @@ local function registry_vim_resized(comp)
 	end
 end
 
+--- Compare two strings for sorting in the registry.
+--- @param comp string The string to compare.
+--- @param i integer The index of the string in the registry.
+---@diagnostic disable-next-line: unused-local
+local function registry_str_comp(comp, i, urgents)
+	statusline.push(comp)
+end
+
 --- Register a component in the statusline.
---- @param comp Component|string
+--- @param comp Component
 --- @param id Id|integer The ID to assign to the component.
 --- @param urgents table<Component> The list of components that should be updated immediately.
 --- @return nil
 local function registry_comp(comp, id, urgents)
-	local comp_type = type(comp)
-	if comp_type == "string" then
-		statusline.push(comp)
-	elseif comp_type == "table" then
-		id = manage(comp, id)
-		if comp.lazy == false then
-			urgents[#urgents + 1] = comp
-		end
-
-		if comp.init then
-			comp.init(comp)
-		end
-
-		if comp.left then
-			statusline.push("")
-		end
-
-		local update = comp.update
-		local st_idx = type(update) == "string" and statusline.push(update) or statusline.push("")
-		local indices = comp._indices
-		if not indices then
-			rawset(comp, "_indices", { st_idx })
-		else
-			indices[#indices + 1] = st_idx
-		end
-
-		if comp.right then
-			statusline.push("")
-		end
-
-		if comp.timing then
-			registry_timer(comp)
-		end
-
-		if comp.events then
-			registry_events(comp, "events")
-		end
-
-		if comp.min_screen_width then
-			registry_vim_resized(comp)
-		end
-
-		if comp.user_events then
-			registry_events(comp, "user_events")
-		end
-
-		if comp.ref then
-			link_refs(comp)
-		end
-
-		rawset(comp, "_loaded", true) -- Mark the component as loaded
+	---@diagnostic disable-next-line: cast-local-type
+	id = manage(comp, id)
+	if not id then
+		return
 	end
+
+	if comp.lazy == false then
+		urgents[#urgents + 1] = comp
+	end
+
+	if comp.init then
+		comp.init(comp)
+	end
+
+	if comp.left then
+		statusline.push("")
+	end
+
+	local update = comp.update
+	local st_idx = type(update) == "string" and statusline.push(update) or statusline.push("")
+	local indices = comp._indices
+	if not indices then
+		rawset(comp, "_indices", { st_idx })
+	else
+		indices[#indices + 1] = st_idx
+	end
+
+	if comp.right then
+		statusline.push("")
+	end
+
+	if comp.timing then
+		registry_timer(comp)
+	end
+
+	if comp.events then
+		registry_events(comp, "events")
+	end
+
+	if comp.min_screen_width then
+		registry_vim_resized(comp)
+	end
+
+	if comp.user_events then
+		registry_events(comp, "user_events")
+	end
+
+	if comp.ref then
+		link_refs(comp)
+	end
+
+	rawset(comp, "_loaded", true) -- Mark the component as loaded
 end
 
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id The ID to assign to the component.
 --- @return nil
-local function registry_abstract_comp(comp)
+local function registry_abstract_comp(comp, id)
 	CompManager.fast_register(comp)
 
 	if comp.init then
@@ -458,7 +466,7 @@ M.setup = function(configs)
 	for i = 1, #abstract do
 		local c = abstract[i]
 		if type(c) == "table" and c.id then
-			registry_abstract_comp(c)
+			registry_abstract_comp(c, i)
 		else
 			error("Abstract component must be a table with an 'id' field: " .. tostring(c))
 		end
@@ -468,7 +476,12 @@ M.setup = function(configs)
 	local components = configs.components
 	for i = 1, #components do
 		local c = components[i]
-		registry_comp(c, i, urgents)
+		local type_c = type(c)
+		if type_c == "string" then
+			registry_str_comp(c, i, urgents)
+		elseif type_c == "table" then
+			registry_comp(c, i, urgents)
+		end
 	end
 
 	init_autocmd()
