@@ -1,12 +1,7 @@
-local vim = vim
-local api = vim.api
-local uv = vim.uv or vim.loop
-local fn = vim.fn
-
 ---@type Component[]|string[]
 return {
-	-- require("witch-line.components.mode"),
-	require("witch-line.components.file").FileName,
+	"mode",
+	"file.filename",
 	-- require("witch-line.components.file").Icon,
 
 	-- {

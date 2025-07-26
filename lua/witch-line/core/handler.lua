@@ -103,17 +103,8 @@ local function update_comp(comp, session_id)
 		end
 	end
 
-	-- local static = get_static(comp)
-
-	local static_schedule = function()
-		return get_static(comp)
-	end
-
-	-- local ctx = get_context(comp, session_id, static)
-	local ctx_schedule = function()
-		return get_context(comp, session_id, static_schedule)
-	end
-
+	local static = get_static(comp)
+	local ctx = get_context(comp, session_id, static)
 	local hidden = false
 
 	local min_screen_width = comp.min_screen_width
@@ -121,7 +112,7 @@ local function update_comp(comp, session_id)
 		hidden = vim.o.columns < min_screen_width
 	end
 	-- hidden = hidden and should_hidden(comp, session_id, ctx, static)
-	hidden = hidden and should_hidden(comp, session_id, ctx_schedule, static_schedule)
+	hidden = hidden and should_hidden(comp, session_id, ctx, static)
 
 	if hidden then
 		clear_comp_value(comp)
@@ -131,14 +122,14 @@ local function update_comp(comp, session_id)
 	local Component = require("witch-line.core.Component")
 
 	-- local value = Component.evaluate(comp, ctx, static)
-	local value = Component.evaluate(comp, ctx_schedule, static_schedule)
+	local value = Component.evaluate(comp, ctx, static)
 	if value == "" then
 		clear_comp_value(comp)
 		return ""
 	end
 
 	-- Component.update_style(comp, ctx, static, session_id)
-	Component.update_style(comp, ctx_schedule, static_schedule, session_id)
+	Component.update_style(comp, ctx, static, session_id)
 
 	local indices = comp._indices
 	if not indices then
@@ -396,14 +387,6 @@ local function registry_vim_resized(comp)
 	end
 end
 
---- Compare two strings for sorting in the registry.
---- @param comp string The string to compare.
---- @param i integer The index of the string in the registry.
----@diagnostic disable-next-line: unused-local
-local function registry_str_comp(comp, i, urgents)
-	statusline.push(comp)
-end
-
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id|integer The ID to assign to the component.
@@ -464,6 +447,26 @@ local function registry_comp(comp, id, urgents)
 	rawset(comp, "_loaded", true) -- Mark the component as loaded
 end
 
+--- Compare two strings for sorting in the registry.
+--- @param comp string The string to compare.
+--- @param i integer The index of the string in the registry.
+--- @param urgents table<Component> The list of components that should be updated immediately.
+---@diagnostic disable-next-line: unused-local
+local function registry_str_comp(comp, i, urgents)
+	if comp == "" then
+		return
+	elseif comp == "%=" then
+		statusline.push(comp)
+	end
+
+	local component = require("witch-line.core.Component").require(comp)
+	-- not fôund then treat as a string component
+	if not component then
+		statusline.push(comp)
+		return
+	end
+	registry_comp(component, i, urgents)
+end
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id The ID to assign to the component.
@@ -505,7 +508,11 @@ M.setup = function(configs)
 		local abstract = configs.abstract
 
 		for i = 1, #abstract do
+			--- @type Component|string|nil
 			local c = abstract[i]
+			if type(c) == "string" then
+				c = require("witch-line.core.Component").require(c)
+			end
 			if type(c) == "table" and c.id then
 				registry_abstract_comp(c, i)
 			else
@@ -523,6 +530,8 @@ M.setup = function(configs)
 				registry_comp(c, i, urgents)
 			end
 		end
+	else
+		statusline.hidden_all()
 	end
 
 	init_autocmd()
@@ -532,6 +541,7 @@ M.setup = function(configs)
 		if not has_cached then
 			CacheMod.cache(urgents, "Urgents")
 		end
+
 		local Session = require("witch-line.core.Session")
 		local session_id = Session.new()
 		M.update_comp_graphs_by_id(urgents, session_id, {
@@ -540,9 +550,6 @@ M.setup = function(configs)
 		}, {})
 		Session.remove(session_id)
 	end
-	-- if has_cached then
-	-- 	statusline.hidden_all()
-	-- end
 
 	statusline.render()
 end

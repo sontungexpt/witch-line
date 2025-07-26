@@ -7,13 +7,27 @@ local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
 local M = {}
 
----@alias HighlightCache {color_nums: table<string, integer>, hl_styles: table<string, vim.api.keyset.highlight>}
+---@alias HighlightCache {color_nums: table<string, integer>, hl_styles: table<string, vim.api.keyset.get_hl_info>}
 
 ---@type HighlightCache
 local HighlightCache = {
 	color_nums = {},
+	comp_styles = {},
 	hl_styles = {},
 }
+
+local function hl_all_comps()
+	for hl_name, style in pairs(HighlightCache.comp_styles) do
+		nvim_set_hl(0, hl_name, style)
+	end
+end
+
+api.nvim_create_autocmd("Colorscheme", {
+	callback = function()
+		HighlightCache.hl_styles = {}
+		hl_all_comps()
+	end,
+})
 
 M.cache = function()
 	CacheMod.cache(HighlightCache, "HighlightCache")
@@ -21,12 +35,7 @@ end
 
 M.load_cache = function()
 	HighlightCache = CacheMod.get().HighlightCache or HighlightCache
-
-	for hl_name, style in pairs(HighlightCache.hl_styles) do
-		if type(style) == "table" and next(style) then
-			nvim_set_hl(0, hl_name, style)
-		end
-	end
+	hl_all_comps()
 end
 
 do
@@ -79,6 +88,7 @@ end
 
 --- Retrieves the highlight information for a given highlight group name.
 ---@param hl_name string
+---@param force boolean? If true, forces retrieval even if cached.
 ---@return vim.api.keyset.get_hl_info|nil
 local get_hlprop = function(hl_name, force)
 	local c = HighlightCache.hl_styles[hl_name]
@@ -107,12 +117,8 @@ M.hl = function(group_name, hl_style, force)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return
 	end
-	local style = HighlightCache.hl_styles[group_name]
-	if not force and style then
-		nvim_set_hl(0, group_name, style)
-		return
-	end
-	style = shallow_copy(hl_style)
+	HighlightCache.comp_styles[group_name] = hl_style
+	local style = shallow_copy(hl_style)
 
 	local fg = style.foreground or style.fg
 	local bg = style.background or style.bg
@@ -149,8 +155,6 @@ M.hl = function(group_name, hl_style, force)
 
 	style.foreground, style.background = fg, bg
 	style.fg, style.bg = nil, nil
-
-	HighlightCache.hl_styles[group_name] = style
 	nvim_set_hl(0, group_name, style)
 end
 

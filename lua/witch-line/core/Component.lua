@@ -2,6 +2,8 @@ local type, str_rep, rawset = type, string.rep, rawset
 local CompManager = require("witch-line.core.CompManager")
 local highlight = require("witch-line.utils.highlight")
 
+local COMP_MODULE_PATH = "witch-line.components."
+
 local M = {}
 
 --- @enum SepStyle
@@ -239,6 +241,27 @@ M.evaluate = function(comp, ctx, static)
 	end
 
 	return result
+end
+
+--- @param path string the path to the component, e.g. "file.name" or "git.status"
+--- @return Component|nil comp the component if it exists, or nil if it does not
+M.require = function(path)
+	local paths = vim.split(path, ".", { plain = true })
+	local size = #paths
+	local module_path = COMP_MODULE_PATH .. paths[1]
+
+	local ok, component = pcall(require, module_path)
+	if not ok then
+		return nil
+	end
+
+	for j = 2, size do
+		component = component[paths[j]]
+		if not component then
+			return nil
+		end
+	end
+	return component
 end
 
 return M

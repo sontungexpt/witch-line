@@ -40,6 +40,9 @@ function M.tbl_keys(tbl)
 end
 
 --- Creates a shallow copy of a table.
+--- @generic T
+--- @param tbl T The table to copy.
+--- @return T A new table that is a shallow copy of the input table.
 M.shallow_copy = function(tbl)
 	local copy = {}
 	for k, v in pairs(tbl) do

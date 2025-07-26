@@ -36,7 +36,6 @@ local FileName = {
 	},
 	context = function(self, static)
 		local fn, api = vim.fn, vim.api
-		local stat = static()
 		local filename = fn.expand("%:t")
 
 		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
@@ -46,7 +45,7 @@ local FileName = {
 		end
 
 		if not icon then
-			local extensions = stat.extensions
+			local extensions = static.extensions
 			local buftype = api.nvim_get_option_value("buftype", {
 				buf = 0,
 			})
@@ -72,9 +71,7 @@ local FileName = {
 	end,
 	padding = { left = 1, right = 0 },
 	update = function(self, context, static)
-		local fn, api = vim.fn, vim.api
-		local ctx = context()
-		return ctx[3]
+		return context[3]
 	end,
 }
 
@@ -83,20 +80,17 @@ local Icon = {
 	id = Id.FileIcon,
 	inherit = Id.FileName,
 	style = function(self, ctx, static)
-		local fn, api = vim.fn, vim.api
-		local ctx = ctx()
 		return {
 			fg = ctx[2],
 		}
 	end,
 
 	update = function(self, ctx, static)
-		local ctx = ctx()
 		return ctx[1]
 	end,
 }
 
 return {
-	FileName = FileName,
-	Icon = Icon,
+	filename = FileName,
+	icon = Icon,
 }
