@@ -1,0 +1,47 @@
+
+-- {
+-- 	id = "WitchLineDiagnosticsError",
+-- 	style = {
+-- 		fg = "DiagnosticError",
+-- 	},
+-- 	events = { "DiagnosticChanged" },
+-- 	static = {
+-- 		ERROR = "",
+-- 		WARN = "",
+-- 		INFO = "",
+-- 		HINT = "",
+-- 	},
+-- 	should_display = function()
+-- 		return api.nvim_buf_get_option(0, "filetype") ~= "lazy" and not api.nvim_buf_get_name(0):match("%.env$")
+-- 	end,
+-- 	update = function(self, ctx, static)
+-- 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR })
+-- 		---@diagnostic disable-next-line: need-check-nil
+-- 		return count > 0 and static.ERROR .. " " .. count or ""
+-- 	end,
+-- },
+
+-- {
+-- 	style = {
+-- 		fg = "DiagnosticWarn",
+-- 	},
+-- 	-- events = "WitchLineDiagnosticsError",
+
+-- 	static = "WitchLineDiagnosticsError",
+-- 	update = function(self, ctx, static)
+-- 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN })
+-- 		---@diagnostic disable-next-line: need-check-nil
+-- 		return count > 0 and static.WARN .. " " .. count or ""
+-- 	end,
+-- },
+-- {
+-- 	styles = {
+-- 		fg = "DiagnosticInfo",
+-- 	},
+-- 	static = "witch-line-diagnostics-error",
+-- 	update = function(self, ctx, static)
+-- 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO })
+-- 		---@diagnostic disable-next-line: need-check-nil
+-- 		return count > 0 and static.INFO .. " " .. count or ""
+-- 	end,
+-- },

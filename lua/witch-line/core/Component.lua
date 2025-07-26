@@ -26,7 +26,7 @@ local RIGHT_SUFFIX = "R"
 ---@field style RefField id of the style to use for the component, can be a string or a function that returns a style table
 ---@field static RefField id of the static values to use for the component, can be a string or a table of static values
 ---@field context RefField id of the context to use for the component, can be a string or a function that returns a context table
----@field should_display RefFields id of the function that will be used to check if the component should be displayed, can be a string or a function that returns a boolean value
+---@field hidden RefFields id of the function that will be used to check if the component should be displayed, can be a string or a function that returns a boolean value
 
 ---@class Component
 ---@field id Id the unique identifier of the component, can be a string or an integer
@@ -60,7 +60,7 @@ local RIGHT_SUFFIX = "R"
 ---@field _right_hl_name string|nil the highlight group name for the component
 ---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 ---@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
----
+---@field _parent boolean|nil if true, the component is a parent component and should not be displayed, used for lazy loading components
 
 --- @param comp Component the component to update
 --- @param ctx any the context to pass to the component's update function

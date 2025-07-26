@@ -1,5 +1,6 @@
 local type, rawset = type, rawset
 local CacheMod = require("witch-line.cache")
+local Id = require("witch-line.constant.id")
 
 local M = {}
 
@@ -44,15 +45,13 @@ end
 ---- Register a component with the component manager.
 --- @param comp Component The component to register.
 --- @param alt_id Id Optional. An alternative ID for the component if it does not have one.
---- @return Id|nil The ID of the registered component.
+--- @return Id The ID of the registered component.
 M.register = function(comp, alt_id)
 	local id = comp.id or alt_id
 	local id_type = type(id)
-	if id_type ~= "number" and id_type ~= "string" then
-		error("Component must have a valid ID")
-		return nil
+	if (id_type == "number" and Id[id] ~= nil) or id_type ~= "string" then
+		id = tostring(id)
 	end
-
 	Comps[id] = comp
 	rawset(comp, "id", id) -- Ensure the component has an ID field
 	return id
@@ -161,12 +160,15 @@ end
 --- @return any value The value retrieved from the component.
 --- @return Component last_ref_comp The component that provided the value, or nil if not found.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
-	local value = comp[key]
-	if value then
+	local id, value = comp.id, comp[key]
+	local store = require("witch-line.core.Session").get_store(session_id, key, {})
+	if store[id] then
+		return store[id], comp
+	elseif value then
 		if type(value) == "function" then
 			value = value(comp, ...)
 		end
-		require("witch-line.core.Session").get_or_init(session_id, key, {})[comp.id] = value
+		store[id] = value
 		return value, comp
 	end
 	local ref = comp.ref
@@ -174,13 +176,12 @@ local function lookup_ref_value(comp, key, session_id, seen, ...)
 		return nil, comp
 	end
 
-	value = ref[key]
-	if not value then
+	local ref_id = ref[key]
+	if not ref_id or seen[ref_id] then
 		return nil, comp
 	end
-
-	local ref_comp = Comps[value]
-	if ref_comp and not seen[value] then
+	local ref_comp = Comps[ref_id]
+	if ref_comp then
 		return lookup_ref_value(ref_comp, key, session_id, seen, ...)
 	end
 	return nil, comp
@@ -215,9 +216,9 @@ end
 --- @param static any Optional. If true, the static value will be used for the check.
 --- @return boolean displayed True if the component should be displayed, false otherwise.
 --- @return Component inherited The component that provides the should_display value, or nil if not found.
-M.should_display = function(comp, session_id, ctx, static)
+M.should_hidden = function(comp, session_id, ctx, static)
 	local displayed, last_comp = lookup_ref_value(comp, "should_display", session_id, {}, ctx, static)
-	return displayed ~= false, last_comp
+	return displayed == true, last_comp
 end
 
 --- Get the static value for a component by recursively checking its dependencies.
@@ -257,6 +258,14 @@ M.lookup_inherited_value = lookup_inherited_value
 --- @return Component|nil inherited The component that provides the static value.
 function M.get_static(comp)
 	return lookup_inherited_value(comp, "static", {})
+end
+
+function M.inspect(key)
+	if key == "Dep" then
+		vim.notify("DepStore: " .. vim.inspect(DepStore))
+		return
+	end
+	vim.notify("Comps: " .. vim.inspect(Comps))
 end
 
 return M

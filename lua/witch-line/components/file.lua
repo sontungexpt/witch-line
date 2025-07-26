@@ -1,9 +1,11 @@
 local fn, api = vim.fn, vim.api
 local colors = require("witch-line.constant.color")
+local Id = require("witch-line.constant.id")
 
 ---@type Component
 local FileName = {
-	id = require("witch-line.components.id.enum").FileName,
+	id = Id.FileName,
+	-- id = require("witch-line.components.id.enum").FileName,
 	user_events = { "VeryLazy" },
 	events = {
 		"BufEnter",
@@ -34,6 +36,7 @@ local FileName = {
 		},
 	},
 	context = function(self, static)
+		local static = static()
 		local filename = fn.expand("%:t")
 
 		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
@@ -70,21 +73,24 @@ local FileName = {
 	padding = { left = 1, right = 0 },
 	---@diagnostic disable-next-line: unused-local
 	update = function(self, ctx, static)
+		local ctx = ctx()
 		return ctx[3]
 	end,
 }
 
 ---@type Component
 local Icon = {
-	id = require("witch-line.components.id.enum").FileIcon,
-	inherit = require("witch-line.components.id.enum").FileName,
+	id = Id.FileIcon,
+	inherit = Id.FileName,
 	style = function(self, ctx, static)
+		local ctx = ctx()
 		return {
 			fg = ctx[2],
 		}
 	end,
 
 	update = function(self, ctx, static)
+		local ctx = ctx()
 		return ctx[1]
 	end,
 }

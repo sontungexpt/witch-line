@@ -16,7 +16,7 @@ local DepStoreKey = {
 local statusline = require("witch-line.core.statusline")
 local CompManager = require("witch-line.core.CompManager")
 
-local manage, get_comp, link_ref_field, get_dep_store, get_raw_dep_store, get_context, get_static, should_display =
+local manage, get_comp, link_ref_field, get_dep_store, get_raw_dep_store, get_context, get_static, should_hidden =
 	CompManager.register,
 	CompManager.get_comp,
 	CompManager.link_ref_field,
@@ -24,7 +24,7 @@ local manage, get_comp, link_ref_field, get_dep_store, get_raw_dep_store, get_co
 	CompManager.get_raw_dep_store,
 	CompManager.get_context,
 	CompManager.get_static,
-	CompManager.should_display
+	CompManager.should_hidden
 
 ---@alias es nil|table<string, Id[]>
 ---@alias EventStore {events: es, user_events: es}
@@ -88,9 +88,10 @@ end
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
 local function update_comp(comp, session_id)
-	if comp.inherit then
+	if comp.inherit and comp._parent then
 		local parent = get_comp(comp.inherit)
 		if parent then
+			rawset(comp, "_parent", true) -- Clear parent reference to avoid circular references
 			setmetatable(comp, {
 				__index = function(t, key)
 					if vim.startswith(key, "_") then
@@ -102,27 +103,42 @@ local function update_comp(comp, session_id)
 		end
 	end
 
-	local static = get_static(comp)
-	local ctx = get_context(comp, session_id, static)
-	local displayed = true
+	-- local static = get_static(comp)
+
+	local static_schedule = function()
+		return get_static(comp)
+	end
+
+	-- local ctx = get_context(comp, session_id, static)
+	local ctx_schedule = function()
+		return get_context(comp, session_id, static_schedule)
+	end
+
+	local hidden = false
 
 	local min_screen_width = comp.min_screen_width
 	if type(min_screen_width) == "number" and min_screen_width > 0 then
-		displayed = vim.o.columns >= min_screen_width
+		hidden = vim.o.columns < min_screen_width
 	end
+	-- hidden = hidden and should_hidden(comp, session_id, ctx, static)
+	hidden = hidden and should_hidden(comp, session_id, ctx_schedule, static_schedule)
 
-	displayed = displayed and should_display(comp, session_id, ctx, static)
-	if not displayed then
+	if hidden then
+		clear_comp_value(comp)
 		return ""
 	end
 
 	local Component = require("witch-line.core.Component")
 
-	Component.update_style(comp, ctx, static, session_id)
-	local value = Component.evaluate(comp, ctx, static)
+	-- local value = Component.evaluate(comp, ctx, static)
+	local value = Component.evaluate(comp, ctx_schedule, static_schedule)
 	if value == "" then
+		clear_comp_value(comp)
 		return ""
 	end
+
+	-- Component.update_style(comp, ctx, static, session_id)
+	Component.update_style(comp, ctx_schedule, static_schedule, session_id)
 
 	local indices = comp._indices
 	if not indices then
@@ -141,6 +157,7 @@ local function update_comp(comp, session_id)
 		end
 	end
 	rawset(comp, "_hidden", false) -- Reset hidden state
+	return value
 end
 M.update_comp = update_comp
 
@@ -158,8 +175,6 @@ function M.update_comp_graph(comp, session_id, dep_stores, seen)
 
 	local updated_value = update_comp(comp, session_id)
 	if updated_value == "" then
-		clear_comp_value(comp)
-
 		local refs = CompManager.get_raw_dep_store(DepStoreKey.Display)
 		if refs then
 			local ids = refs[id]
@@ -207,9 +222,11 @@ end
 M.update_comp_graphs_by_id = function(ids, session_id, dep_stores, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
-		local comp = get_comp(id)
-		if comp and not seen[id] then
-			M.update_comp_graph(comp, session_id, dep_stores, seen)
+		if not seen[id] then
+			local comp = get_comp(id)
+			if comp then
+				M.update_comp_graph(comp, session_id, dep_stores, seen)
+			end
 		end
 	end
 end
@@ -280,37 +297,30 @@ local function init_autocmd()
 	end, 100)
 
 	local group, id1, id2 = nil, nil, nil
-	local tbl_keys = require("witch-line.utils.tbl").tbl_keys
 
-	if events then
-		events = tbl_keys(events)
-		if events[1] then
-			group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
-			local queue = {}
-			id1 = api.nvim_create_autocmd(events, {
-				group = group,
-				callback = function(e)
-					queue[#queue + 1] = e.event
-					on_event_debounce(queue, "events")
-				end,
-			})
-		end
+	if events and next(events) then
+		group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
+		local queue = {}
+		id1 = api.nvim_create_autocmd(vim.tbl_keys(events), {
+			group = group,
+			callback = function(e)
+				queue[#queue + 1] = e.event
+				on_event_debounce(queue, "events")
+			end,
+		})
 	end
 
-	if user_events then
-		user_events = tbl_keys(user_events)
-		if user_events[1] then
-			group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
-			local queue = {}
-			id2 = api.nvim_create_autocmd("User", {
-				pattern = user_events,
-				group = group,
-				callback = function(e)
-					queue[#queue + 1] = e.match
-					on_event_debounce(queue, "user_events")
-				end,
-			})
-		end
+	if user_events and next(user_events) then
+		group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
+		local queue = {}
+		id2 = api.nvim_create_autocmd("User", {
+			pattern = vim.tbl_keys(user_events),
+			group = group,
+			callback = function(e)
+				queue[#queue + 1] = e.match
+				on_event_debounce(queue, "user_events")
+			end,
+		})
 	end
 
 	return group, id1, id2
@@ -365,8 +375,8 @@ local function link_refs(comp)
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer))
 	end
 
-	if ref.should_display then
-		link_ref_field(comp, ref.should_display, get_dep_store(DepStoreKey.Display))
+	if ref.hidden then
+		link_ref_field(comp, ref.hidden, get_dep_store(DepStoreKey.Display))
 	elseif inherit then
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display))
 	end
@@ -515,11 +525,14 @@ M.setup = function(configs)
 		end
 	end
 
+	vim.notify(vim.inspect(EventStore))
 	init_autocmd()
 	init_timer()
 
 	if urgents[1] then
-		CacheMod.cache(urgents, "Urgents")
+		if not has_cached then
+			CacheMod.cache(urgents, "Urgents")
+		end
 		local Session = require("witch-line.core.Session")
 		local session_id = Session.new()
 		M.update_comp_graphs_by_id(urgents, session_id, {
@@ -528,9 +541,9 @@ M.setup = function(configs)
 		}, {})
 		Session.remove(session_id)
 	end
-	if has_cached then
-		statusline.hidden_all()
-	end
+	-- if has_cached then
+	-- 	statusline.hidden_all()
+	-- end
 
 	statusline.render()
 end

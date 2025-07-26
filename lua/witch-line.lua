@@ -2,6 +2,7 @@ local M = {}
 
 M.setup = function(user_configs)
 	local uv = vim.uv or vim.loop
+	local api = vim.api
 	local locked = true
 	local CacheMod = require("witch-line.cache")
 
@@ -26,6 +27,10 @@ M.setup = function(user_configs)
 	-- 	-- end
 	-- end)
 	local struct = CacheMod.read()
+	for _, mod in ipairs(cache_mods) do
+		require(mod).load_cache()
+	end
+
 	local configs = require("witch-line.config").set_user_config(user_configs)
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		callback = function()
@@ -56,6 +61,15 @@ M.setup = function(user_configs)
 	-- end
 
 	require("witch-line.core.handler").setup(configs)
+
+	api.nvim_create_user_command("WitchLineClearCache", function()
+		CacheMod.clear()
+	end, {})
+	api.nvim_create_user_command("WitchLineComps", function(a)
+		require("witch-line.core.CompManager").inspect(a.args)
+	end, {
+		nargs = 1,
+	})
 end
 
 return M

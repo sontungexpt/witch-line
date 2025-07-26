@@ -3,24 +3,11 @@ local api = vim.api
 local uv = vim.uv or vim.loop
 local fn = vim.fn
 
-local colors = {
-	yellow = "#ffc021",
-	cyan = "#56b6c2",
-	green = "#47d864",
-	orange = "#FF8800",
-	magenta = "#c678dd",
-	blue = "#51afef",
-	red = "#ee2c4a",
-	gray = "#5c6370",
-	purple = "#c688eb",
-	pink = "#eb7fdc",
-}
-
 ---@type Component[]|string[]
 return {
-	require("witch-line.components.mode"),
+	-- require("witch-line.components.mode"),
 	require("witch-line.components.file").FileName,
-	require("witch-line.components.file").Icon,
+	-- require("witch-line.components.file").Icon,
 
 	-- {
 	-- 	event = "BufEnter",
@@ -128,53 +115,7 @@ return {
 	-- 	},
 	-- },
 
-	"%=",
-	{
-		id = "WitchLineDiagnosticsError",
-		style = {
-			fg = "DiagnosticError",
-		},
-		events = { "DiagnosticChanged" },
-		static = {
-			ERROR = "",
-			WARN = "",
-			INFO = "",
-			HINT = "",
-		},
-		should_display = function()
-			return api.nvim_buf_get_option(0, "filetype") ~= "lazy" and not api.nvim_buf_get_name(0):match("%.env$")
-		end,
-		update = function(self, ctx, static)
-			local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR })
-			---@diagnostic disable-next-line: need-check-nil
-			return count > 0 and static.ERROR .. " " .. count or ""
-		end,
-	},
-
-	{
-		style = {
-			fg = "DiagnosticWarn",
-		},
-		-- events = "WitchLineDiagnosticsError",
-
-		static = "WitchLineDiagnosticsError",
-		update = function(self, ctx, static)
-			local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN })
-			---@diagnostic disable-next-line: need-check-nil
-			return count > 0 and static.WARN .. " " .. count or ""
-		end,
-	},
-	{
-		styles = {
-			fg = "DiagnosticInfo",
-		},
-		static = "witch-line-diagnostics-error",
-		update = function(self, ctx, static)
-			local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO })
-			---@diagnostic disable-next-line: need-check-nil
-			return count > 0 and static.INFO .. " " .. count or ""
-		end,
-	},
+	-- "%=",
 	-- {
 	-- 	styles = {
 	-- 		fg = "DiagnosticHint",
