@@ -278,10 +278,10 @@ local function init_autocmd()
 
 			if ids then
 				local Session = require("witch-line.core.Session")
-				local session_id = Session.new()
-				local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
-				M.update_comp_graphs_by_id(ids, session_id, refs, seen)
-				Session.remove(session_id)
+				Session.run_once(function(id)
+					local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
+					M.update_comp_graphs_by_id(ids, id, refs, seen)
+				end)
 			end
 		end
 		statusline.render()
@@ -330,10 +330,10 @@ local function init_timer()
 			interval,
 			vim.schedule_wrap(function()
 				local Session = require("witch-line.core.Session")
-				local session_id = Session.new()
-				M.update_comp_graphs_by_id(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
-				Session.remove(session_id)
-				statusline.render()
+				Session.run_once(function(session_id)
+					M.update_comp_graphs_by_id(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
+					statusline.render()
+				end)
 			end)
 		)
 	end
@@ -541,14 +541,13 @@ M.setup = function(configs)
 		if not has_cached then
 			CacheMod.cache(urgents, "Urgents")
 		end
-
 		local Session = require("witch-line.core.Session")
-		local session_id = Session.new()
-		M.update_comp_graphs_by_id(urgents, session_id, {
-			get_raw_dep_store(DepStoreKey.Event),
-			get_raw_dep_store(DepStoreKey.Timer),
-		}, {})
-		Session.remove(session_id)
+		Session.run_once(function(session_id)
+			M.update_comp_graphs_by_id(urgents, session_id, {
+				get_raw_dep_store(DepStoreKey.Event),
+				get_raw_dep_store(DepStoreKey.Timer),
+			}, {})
+		end)
 	end
 
 	statusline.render()

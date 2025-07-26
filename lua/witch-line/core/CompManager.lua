@@ -1,6 +1,5 @@
 local type, rawset = type, rawset
 local CacheMod = require("witch-line.cache")
-local Id = require("witch-line.constant.id")
 
 local M = {}
 
@@ -47,6 +46,7 @@ end
 --- @param alt_id Id Optional. An alternative ID for the component if it does not have one.
 --- @return Id The ID of the registered component.
 M.register = function(comp, alt_id)
+	local Id = require("witch-line.constant.id")
 	local id = comp.id or alt_id
 	local id_type = type(id)
 	if (id_type == "number" and Id[id] ~= nil) or id_type ~= "string" then

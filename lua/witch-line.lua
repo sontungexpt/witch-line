@@ -62,13 +62,76 @@ M.setup = function(user_configs)
 
 	require("witch-line.core.handler").setup(configs)
 
-	api.nvim_create_user_command("WitchLineClearCache", function()
-		CacheMod.clear()
-	end, {})
-	api.nvim_create_user_command("WitchLineComps", function(a)
-		require("witch-line.core.CompManager").inspect(a.args)
+	local options = {
+		uncached = function()
+			CacheMod.clear()
+		end,
+
+		inspect = {
+			cache = function(...)
+				return CacheMod.get()
+			end,
+			comps = function(...)
+				require("witch-line.core.CompManager").inspect(...)
+			end,
+		},
+	}
+
+	local function get_node(words)
+		local node = options
+
+		for _, word in ipairs(words) do
+			node = node[word]
+			if not node then
+				return {}
+			end
+		end
+
+		return node
+	end
+
+	local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
+		local args = vim.split(cmd_line, "%s+")
+		table.remove(args, 1) -- Remove the command name
+
+		if cmd_line:sub(#cmd_line, #cmd_line) ~= "" then
+			table.insert(args, "")
+		end
+
+		local node = get_node(vim.list_slice(args, 1, #args - 1))
+
+		if type(node) ~= "table" then
+			return {}
+		end
+
+		local completions = {}
+		for key, _ in pairs(node) do
+			if key:find("^" .. vim.pesc(arg_lead)) then
+				table.insert(completions, key)
+			end
+		end
+		return completions
+	end
+
+	api.nvim_create_user_command("WitchLine", function(a)
+		local args = a.fargs
+		if #args < 1 then
+			return
+		end
+
+		local work = options[args[1]]
+		for i = 2, #args do
+			work = work[args[i]]
+		end
+
+		if type(work) == "function" then
+			work(a)
+		end
 	end, {
-		nargs = 1,
+		nargs = "*",
+		complete = function(ArgLead, CmdLine, CursorPos)
+			return get_trie_completions(ArgLead, CmdLine, CursorPos)
+		end,
 	})
 end
 

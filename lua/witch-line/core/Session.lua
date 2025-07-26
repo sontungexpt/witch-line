@@ -4,10 +4,9 @@ local Store = setmetatable({}, {
 
 local Session = {}
 
----@alias SessionId function
-
 --- @return SessionId id of new session
 Session.new = function()
+	---@class SessionId
 	local id = function() end
 	Store[id] = {}
 	return id
@@ -47,6 +46,16 @@ end
 --- @param id SessionId
 Session.remove = function(id)
 	Store[id] = nil
+end
+
+--- Wraps a callback function in a new session.
+--- This function creates a new session, calls the callback with the session ID,
+--- and then removes the session when the callback is done.
+--- @param cb fun(id: SessionId) Callback function to call if the session does not exist
+Session.run_once = function(cb)
+	local id = Session.new()
+	cb(id)
+	Session.remove(id)
 end
 
 return Session
