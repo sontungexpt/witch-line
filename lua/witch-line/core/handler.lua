@@ -88,7 +88,7 @@ end
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
 local function update_comp(comp, session_id)
-	if comp.inherit and comp._parent then
+	if comp.inherit and not comp._parent then
 		local parent = get_comp(comp.inherit)
 		if parent then
 			rawset(comp, "_parent", true) -- Clear parent reference to avoid circular references
@@ -525,7 +525,6 @@ M.setup = function(configs)
 		end
 	end
 
-	vim.notify(vim.inspect(EventStore))
 	init_autocmd()
 	init_timer()
 

@@ -1,5 +1,5 @@
 local type, pairs = type, pairs
-local fn, uv, mpack = vim.fn, vim.uv or vim.loop, vim.mpack
+local fn, uv = vim.fn, vim.uv or vim.loop
 local M = {}
 
 local CACHED_DIR = fn.stdpath("cache") .. "/witch-line"
@@ -7,7 +7,6 @@ local CACHED_FILE = CACHED_DIR .. "/cache.luac"
 
 ---Urly name to reduce collision with table key
 local V_REFS = "\0__3[[V_REF_\0 _d{E)))}"
-local K_REFS = "\0__E00}K_REF\0_d{E)))}"
 local TBL_KEYS = "\0__TBL_KEYS\0_d{E)))}"
 
 local has_cached = false
@@ -54,6 +53,18 @@ local set_struct = function(struct)
 	Struct = struct or {}
 	G_REFS = Struct.G_REFS or G_REFS
 	Struct.G_REFS = nil
+end
+
+local benckmark = function(cb, name)
+	local start = vim.loop.hrtime()
+	cb()
+	local elapsed = (vim.loop.hrtime() - start) / 1e6 -- Convert to milliseconds
+	local file = io.open("/home/stilux/Data/Workspace/neovim-plugins/witch-line/lua/benckmark", "a")
+	if file then
+		--- get ms from elapsed
+		file:write(string.format("%s took %.2f ms\n", name, elapsed))
+		file:close()
+	end
 end
 
 --- Encode references in a table recursively
@@ -180,7 +191,11 @@ end
 local function encode_funcs(value, seen)
 	local value_type = type(value)
 	if value_type == "function" then
-		return string.dump(value, true)
+		local nups = debug.getinfo(value).nups
+		if nups > 0 then
+			error("Function with upvalues cannot be cached: " .. debug.getinfo(value).source)
+		end
+		return string.dump(value)
 	elseif value_type == "string" or value_type == "number" or value_type == "boolean" then
 		return value
 	elseif value_type == "thread" or value_type == "userdata" or value_type == "nil" then
@@ -282,12 +297,49 @@ M.save = function(deep, mode)
 		return
 	end
 
-	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438)) -- 438 is 0666 in octal
+	local fd, err_msg, err = uv.fs_open(CACHED_FILE, "w", 438)
+	if err == "ENOENT" then
+		--- No cached file found
+		return nil, nil
+	end
+
+	assert(not err, err_msg and "Failed to open cache file: " .. err_msg .. ". Error name " .. err)
+
 	Struct.G_REFS = G_REFS
-	local encoded = deep and deep_encode_refs(Struct, mode) or encode_funcs(Struct)
-	local binary = mpack.encode(encoded)
+
+	local ok, encoded = pcall(function()
+		if deep then
+			return deep_encode_refs(Struct, mode)
+		end
+
+		--- Can be cached if no upvalues
+		return encode_funcs(Struct)
+	end)
+
+	if not ok then
+		require("witch-line.utils.log").warn("Failed to encode cache: " .. encoded)
+
+		M.clear()
+		assert(uv.fs_close(fd))
+		return nil, nil
+	end
+
+	-- local saved_str = mpack.encode(encoded)
+
+	-- local saved_str = "return " .. vim.inspect(encoded)
+
+	local dumped = loadstring("return " .. vim.inspect(encoded))
+	if not dumped then
+		M.clear()
+		assert(uv.fs_close(fd))
+		return nil, nil
+	end
+
+	local bytecode = string.dump(dumped, true)
+
 	Struct.G_REFS = nil
-	assert(uv.fs_write(fd, binary, 0))
+	-- assert(uv.fs_write(fd, binary, 0))
+	assert(uv.fs_write(fd, bytecode, 0))
 	assert(uv.fs_close(fd))
 end
 
@@ -299,6 +351,7 @@ end
 
 M.read = function(deep, mode)
 	mode = mode or "v"
+
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
 	if err and err == "ENOENT" then
 		return
@@ -311,13 +364,27 @@ M.read = function(deep, mode)
 		return nil, nil
 	end
 
-	local decoded_raw = mpack.decode(data)
-	local struct = decode_funcs(decoded_raw)
+	-- local decoded_raw = dofile(CACHED_FILE)
+
+	-- local decoded_raw = mpack.decode(data)
+
+	--- NOTE: Fastest way
+	local func = loadstring(data)
+	if not func then
+		return nil, nil
+	end
+	local decoded_raw = func()
+	-- local decoded_raw = mpack.decode(data)
+	--
+
+	local struct = deep and deep_decode_refs(decoded_raw, mode) or decode_funcs(decoded_raw)
 
 	set_struct(struct)
 	has_cached = true
+	-- end, "loadstring")
+	return Struct, nil
 
-	return Struct, decoded_raw
+	-- return Struct, decoded_raw or nil
 end
 
 M.read_async = function(callback, deep, mode)
@@ -341,7 +408,16 @@ M.read_async = function(callback, deep, mode)
 						callback(nil, nil)
 						return
 					end
-					local decoded_raw = mpack.decode(data)
+					local func = loadstring(data)
+					if not func then
+						callback(nil, nil)
+						return
+					end
+
+					-- local decoded_raw = mpack.decode(data)
+					-- local struct = deep and deep_decode_refs(decoded_raw, mode) or decode_funcs(decoded_raw)
+
+					local decoded_raw = func()
 					local struct = deep and deep_decode_refs(decoded_raw, mode) or decode_funcs(decoded_raw)
 					set_struct(struct)
 

@@ -21,6 +21,12 @@ end
 
 M.load_cache = function()
 	HighlightCache = CacheMod.get().HighlightCache or HighlightCache
+
+	for hl_name, style in pairs(HighlightCache.hl_styles) do
+		if type(style) == "table" and next(style) then
+			nvim_set_hl(0, hl_name, style)
+		end
+	end
 end
 
 do

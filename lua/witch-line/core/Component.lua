@@ -212,25 +212,24 @@ M.evaluate = function(comp, ctx, static)
 		comp.pre_update(comp, ctx, static)
 	end
 
-	local value = comp.update
-	if type(value) == "function" then
-		value = value(comp, ctx, static)
+	local result = nil
+	if type(comp.update) == "function" then
+		result = comp.update(comp, ctx, static)
 	end
-
-	if type(value) ~= "string" then
-		value = ""
-	elseif value ~= "" then
+	if type(result) ~= "string" then
+		result = ""
+	elseif result ~= "" then
 		local padding = comp.padding or 1
 		if type(padding) == "number" then
-			value = str_rep(" ", padding) .. value .. str_rep(" ", padding)
+			result = str_rep(" ", padding) .. result .. str_rep(" ", padding)
 		elseif type(padding) == "table" then
 			local left, right = padding.left, padding.right
 			if type(left) == "number" and left > 0 then
-				value = str_rep(" ", left) .. value
+				result = str_rep(" ", left) .. result
 			end
 
 			if type(right) == "number" and right > 0 then
-				value = value .. str_rep(" ", right)
+				result = result .. str_rep(" ", right)
 			end
 		end
 	end
@@ -239,7 +238,7 @@ M.evaluate = function(comp, ctx, static)
 		comp.post_update(comp, ctx, static)
 	end
 
-	return value
+	return result
 end
 
 return M

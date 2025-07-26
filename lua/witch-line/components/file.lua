@@ -1,4 +1,3 @@
-local fn, api = vim.fn, vim.api
 local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id")
 
@@ -36,7 +35,8 @@ local FileName = {
 		},
 	},
 	context = function(self, static)
-		local static = static()
+		local fn, api = vim.fn, vim.api
+		local stat = static()
 		local filename = fn.expand("%:t")
 
 		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
@@ -46,7 +46,7 @@ local FileName = {
 		end
 
 		if not icon then
-			local extensions = static.extensions
+			local extensions = stat.extensions
 			local buftype = api.nvim_get_option_value("buftype", {
 				buf = 0,
 			})
@@ -71,9 +71,9 @@ local FileName = {
 		return { icon, color_icon, filename }
 	end,
 	padding = { left = 1, right = 0 },
-	---@diagnostic disable-next-line: unused-local
-	update = function(self, ctx, static)
-		local ctx = ctx()
+	update = function(self, context, static)
+		local fn, api = vim.fn, vim.api
+		local ctx = context()
 		return ctx[3]
 	end,
 }
@@ -83,6 +83,7 @@ local Icon = {
 	id = Id.FileIcon,
 	inherit = Id.FileName,
 	style = function(self, ctx, static)
+		local fn, api = vim.fn, vim.api
 		local ctx = ctx()
 		return {
 			fg = ctx[2],
