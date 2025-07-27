@@ -44,7 +44,7 @@ local InheritField = {
 }
 
 ---@alias RefFieldType Id|nil
----@alias RefFields Id[]|nil
+---@alias RefFieldTypes Id[]|nil
 
 ---@class Component
 ---@field id Id the unique identifier of the component, can be a string or an integer
@@ -53,7 +53,7 @@ local InheritField = {
 ---@field lazy boolean|nil if true, the component will be initialized lazily
 ---@field events string[]|nil a table of events that the component will listen to
 ---@field user_events string[]|nil a table of user defined events that the component will listen to
----@field ref table<RefField,RefFieldType> |nil a table of references to other components, used for lazy loading components
+---@field ref table<RefField, RefFieldType> |nil a table of references to other components, used for lazy loading components
 ---
 ---@field left_style table |nil a table of styles that will be applied to the left part of the component
 ---@field left string|nil the left part of the component, can be a string or another component
@@ -69,7 +69,7 @@ local InheritField = {
 ---@field pre_update nil|fun(self: Component, ctx: any, static: any) called before the component is updated, can be used to set up the context
 ---@field update string|fun(self:Component, ctx: any, static: any): string|nil called to update the component, should return a string that will be displayed
 ---@field post_update nil|fun(self: Component,ctx: any, static: any) called after the component is updated, can be used to clean up the context
----@field should_display nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
+---@field hidden nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
 ---@field min_screen_width integer|nil the minimum screen width required to display the component, used for lazy loading components
 ---
 ---@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
@@ -78,18 +78,31 @@ local InheritField = {
 ---@field _right_hl_name string|nil the highlight group name for the component
 ---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 ---@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
----@field _parent boolean|nil if true, the component inherits from a parent component, used for lazy loading components
+---@field _plug_provided boolean|nil If true, the component is provided by plugin
+
+--- Gets the id of the component, if the id is a number, it will be converted to a string.
+--- @param comp Component the component to get the id from
+--- @param alt_id Id|nil an alternative id to use if the component does not have an id
+--- @return Id the id of the component
+M.valid_id = function(comp, alt_id)
+	local DefaultId = require("witch-line.constant.id")
+	local id = comp.id or alt_id
+	local id_type = type(id)
+	if id_type == "number" then
+		if not comp._plug_provided and DefaultId[id] ~= nil then
+			id = tostring(id)
+		end
+	elseif id_type ~= "string" then
+		id = tostring(id)
+	end
+	rawset(comp, "id", id) -- Ensure the component has an ID field
+	return id
+end
 
 --- Inherits the parent component's fields and methods, allowing for component extension.
 --- @param comp Component the component to inherit from
 --- @param parent Component the parent component to inherit from
---- @param force boolean|nil if true, the parent will be inherited even if the component already has a parent
-M.inherit_parent = function(comp, parent, force)
-	if getmetatable(comp) and not force then
-		return
-	end
-
-	rawset(comp, "_parent", true) -- Clear parent reference to avoid circular references
+M.inherit_parent = function(comp, parent)
 	setmetatable(comp, {
 		---@diagnostic disable-next-line: unused-local
 		__index = function(t, key)
@@ -99,6 +112,10 @@ M.inherit_parent = function(comp, parent, force)
 			return parent[key]
 		end,
 	})
+end
+
+M.has_parent = function(comp)
+	return getmetatable(comp) ~= nil
 end
 
 --- @param comp Component the component to update

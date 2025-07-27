@@ -2,6 +2,9 @@
 return {
 	"mode",
 	"file.filename",
+	"file.icon",
+	"%=",
+	"diagnostic.error",
 	-- require("witch-line.components.file").Icon,
 
 	-- {

@@ -1,5 +1,5 @@
 local vim, concat = vim, table.concat
-local opt = vim.opt
+local o = vim.o
 local CacheMod = require("witch-line.cache")
 
 local M = {}
@@ -10,6 +10,11 @@ local Values = {}
 
 ---@type integer
 local ValuesSize = 0
+
+--- Inspects the current statusline values.
+M.inspect = function()
+	vim.notify(vim.inspect(Values), vim.log.levels.INFO, { title = "Witchline Statusline Values" })
+end
 
 --- Hidden all components by setting their values to empty strings.
 M.empty_values = function()
@@ -28,6 +33,15 @@ M.cache = function()
 	CacheMod.cache(ValuesSize, "StatuslineSize")
 end
 
+--- Resets the statusline values and size.
+--- This function clears the current values and sets the size to zero.
+M.reset_state = function()
+	Values = {}
+	ValuesSize = 0
+	enabled = true
+	o.statusline = " "
+end
+
 M.load_cache = function()
 	local cache = CacheMod.get()
 	Values = cache.Statusline or Values
@@ -37,7 +51,7 @@ end
 M.clear = function()
 	Values = {}
 	ValuesSize = 0
-	opt.statusline = " "
+	o.statusline = " "
 end
 
 M.get_size = function()
@@ -46,12 +60,11 @@ end
 
 M.render = function()
 	if not enabled then
-		opt.statusline = " "
+		o.statusline = " "
 		return
 	end
-
 	local str = concat(Values)
-	opt.statusline = str ~= "" and str or " "
+	o.statusline = str ~= "" and str or " "
 end
 
 M.push = function(value)
@@ -86,5 +99,21 @@ end
 M.get = function(idx)
 	return Values[idx]
 end
+
+---@diagnostic disable-next-line: undefined-field
+vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+	callback = function(e)
+		vim.schedule(function()
+			local ConfMod = require("witch-line.config")
+
+			if ConfMod.is_buf_disabled(e.buf) then
+				enabled = false
+			else
+				enabled = true
+			end
+			M.render()
+		end)
+	end,
+})
 
 return M

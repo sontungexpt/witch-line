@@ -16,6 +16,11 @@ local HighlightCache = {
 	hl_styles = {},
 }
 
+--- Inspects the current highlight cache.
+M.inspect = function()
+	vim.notify(vim.inspect(HighlightCache), vim.log.levels.INFO, { title = "Witchline Highlight Cache" })
+end
+
 local function hl_all_comps()
 	for hl_name, style in pairs(HighlightCache.comp_styles) do
 		nvim_set_hl(0, hl_name, style)
@@ -29,10 +34,20 @@ api.nvim_create_autocmd("Colorscheme", {
 	end,
 })
 
+--- Caches the highlight styles and color numbers.
 M.cache = function()
 	CacheMod.cache(HighlightCache, "HighlightCache")
 end
 
+--- Resets the highlight cache state.
+--- This function clears the cached color numbers, component styles, and highlight styles.
+M.reset_state = function()
+	HighlightCache.color_nums = {}
+	HighlightCache.comp_styles = {}
+	HighlightCache.hl_styles = {}
+end
+
+--- Loads the highlight cache from the persistent storage.
 M.load_cache = function()
 	HighlightCache = CacheMod.get().HighlightCache or HighlightCache
 	hl_all_comps()

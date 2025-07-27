@@ -25,16 +25,22 @@ local G_REFS = {}
 ---| "StatuslineSize"
 ---| "G_REFS"
 ---| "Urgents"
+---| "UserConfigs"
+---| "Disabled"
 
 ---@type table<StructKey, any>
 local Struct = {
-	-- Highlight = {},
-	-- EventStore = {},
-	-- TimerStore = {},
-	-- DepStore = {},
-	-- Comps = {},
-	-- Statusline = {},
-	-- StatuslineSize = 0,
+	-- HighlightCache = nil,
+	-- EventStore = nil,
+	-- TimerStore = nil,
+	-- DepStore = nil,
+	-- Comps = nil,
+	-- Statusline = nil,
+	-- StatuslineSize = nil,
+	-- G_REFS = nil,
+	-- Urgents = nil,
+	-- UserConfigs = nil,
+	-- Disabled = nil
 }
 
 --- Check if the cache has been read
@@ -299,7 +305,7 @@ local encode_cache = function(deep)
 	end)
 
 	if not ok then
-		require("witch-line.utils.log").warn("Failed to encode cache: " .. encoded)
+		require("witch-line.utils.notifier").warn("Failed to encode cache: " .. encoded)
 		return nil
 	end
 
@@ -316,9 +322,9 @@ end
 
 --- Decode the cache from a string
 --- @param data string The data to decode
---- @param deep boolean Whether to decode references deeply or not
---- @return table|nil The decoded struct or nil if decoding failed
---- @return table|nil The raw decoded data, if available
+--- @param deep boolean|nil Whether to decode references deeply or not
+--- @return table<StructKey,any>|nil The decoded struct or nil if decoding failed
+--- @return table<StructKey,any>|nil The raw decoded data, if available
 local decode_cache = function(data, deep)
 	if not data or #data == 0 then
 		return nil, nil
@@ -390,6 +396,9 @@ M.read = function(deep)
 	return struct, decoded_raw
 end
 
+--- Read the cache file asynchronously
+--- @param callback fun(struct: table<StructKey,any>|nil, decoded_raw: table<StructKey,any>|nil  ) The callback to call with the decoded struct and raw data
+--- @param deep boolean|nil Whether to decode references deeply or not
 M.read_async = function(callback, deep)
 	uv.fs_open(CACHED_FILE, "r", 438, function(err, fd)
 		if err and err:find("ENOENT") then
@@ -409,9 +418,9 @@ M.read_async = function(callback, deep)
 				---@diagnostic disable-next-line: redefined-local
 				uv.fs_close(fd, function(err)
 					assert(not err, err and "Failed to close cache file: " .. err)
-					has_cached = true
 					local struct, decoded_raw = decode_cache(data, deep)
 					vim.schedule(function()
+						has_cached = true
 						callback(struct, decoded_raw)
 					end)
 				end)

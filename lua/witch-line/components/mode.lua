@@ -1,9 +1,10 @@
 local colors = require("witch-line.constant.color")
-local Id = require("witch-line.constant.id")
+local Id = require("witch-line.constant.id").Id
 
 ---@type Component
 return {
 	id = Id.Mode,
+	_plug_provided = true,
 	user_events = { "VeryLazy" },
 	events = { "VimResized", "ModeChanged" },
 	static = {

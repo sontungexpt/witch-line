@@ -62,6 +62,13 @@ M.cache = function()
 	CacheMod.cache(TimerStore, "TimerStore")
 end
 
+--- Reset the state of the event and timer stores.
+--- This function clears the EventStore and TimerStore, effectively resetting their state.
+M.reset_state = function()
+	EventStore = {}
+	TimerStore = {}
+end
+
 M.load_cache = function()
 	EventStore = CacheMod.get().EventStore or EventStore
 	TimerStore = CacheMod.get().TimerStore or TimerStore
@@ -84,12 +91,14 @@ local clear_comp_value = function(c)
 	end
 	rawset(c, "_hidden", true) -- Reset hidden state
 end
+
 --- Update a component and its dependencies.jj
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
 local function update_comp(comp, session_id)
 	local Component = require("witch-line.core.Component")
-	if comp.inherit and not comp._parent then
+
+	if comp.inherit and not Component.has_parent(comp) then
 		local parent = get_comp(comp.inherit)
 		if parent then
 			Component.inherit_parent(comp, parent)
@@ -365,12 +374,33 @@ local function registry_vim_resized(comp)
 	if type(comp.min_screen_width) == "number" and comp.min_screen_width > 0 then
 		local store = EventStore["events"] or {}
 		EventStore["events"] = store
-		local es = store["VimResized"]
-		if not es then
-			store["VimResized"] = { comp.id }
-		else
-			es[#es + 1] = comp.id
-		end
+		local es = store["VimResized"] or {}
+		es[#es + 1] = comp.id
+		store["VimResized"] = es
+	end
+end
+
+--- Register conditions for a component.
+--- @param comp Component The component to register conditions for.
+local function registry_update_conditions(comp)
+	if comp.timing then
+		registry_timer(comp)
+	end
+
+	if comp.events then
+		registry_events(comp, "events")
+	end
+
+	if comp.min_screen_width then
+		registry_vim_resized(comp)
+	end
+
+	if comp.user_events then
+		registry_events(comp, "user_events")
+	end
+
+	if comp.ref then
+		link_refs(comp)
 	end
 end
 
@@ -380,11 +410,7 @@ end
 --- @param urgents table<Component> The list of components that should be updated immediately.
 --- @return nil
 local function registry_comp(comp, id, urgents)
-	---@diagnostic disable-next-line: cast-local-type
 	id = manage(comp, id)
-	if not id then
-		return
-	end
 
 	if comp.lazy == false then
 		urgents[#urgents + 1] = id
@@ -411,26 +437,7 @@ local function registry_comp(comp, id, urgents)
 		statusline.push("")
 	end
 
-	if comp.timing then
-		registry_timer(comp)
-	end
-
-	if comp.events then
-		registry_events(comp, "events")
-	end
-
-	if comp.min_screen_width then
-		registry_vim_resized(comp)
-	end
-
-	if comp.user_events then
-		registry_events(comp, "user_events")
-	end
-
-	if comp.ref then
-		link_refs(comp)
-	end
-
+	registry_update_conditions(comp)
 	rawset(comp, "_loaded", true) -- Mark the component as loaded
 end
 
@@ -459,40 +466,24 @@ end
 --- @param id Id The ID to assign to the component.
 --- @return nil
 local function registry_abstract_comp(comp, id)
-	CompManager.fast_register(comp)
+	manage(comp, id)
 
 	if comp.init then
 		comp.init(comp)
 	end
 
-	if comp.timing then
-		registry_timer(comp)
-	end
-
-	if comp.events then
-		registry_events(comp, "events")
-	end
-
-	if comp.min_screen_width then
-		registry_vim_resized(comp)
-	end
-
-	if comp.user_events then
-		registry_events(comp, "user_events")
-	end
-
-	if comp.ref then
-		link_refs(comp)
-	end
+	registry_update_conditions(comp)
 end
 
 --- Setup the statusline with the given configurations.
---- @param configs Config  The configurations for the statusline.
-M.setup = function(configs)
+--- @param configs Config|nil  The configurations for the statusline.
+--- @param cached boolean|nil Whether the setup is from a cached state.
+M.setup = function(configs, cached)
 	local urgents = CacheMod.get().Urgents or {}
-	local has_cached = CacheMod.has_cached()
 
-	if not has_cached then
+	if not cached then
+		configs = configs or require("witch-line.config").get()
+
 		local abstract = configs.abstract
 
 		for i = 1, #abstract do
@@ -509,6 +500,7 @@ M.setup = function(configs)
 		end
 
 		local components = configs.components
+
 		for i = 1, #components do
 			local c = components[i]
 			local type_c = type(c)
@@ -524,7 +516,7 @@ M.setup = function(configs)
 	init_timer()
 
 	if urgents[1] then
-		if not has_cached then
+		if not cached then
 			CacheMod.cache(urgents, "Urgents")
 		end
 

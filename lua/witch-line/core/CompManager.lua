@@ -1,4 +1,4 @@
-local type, rawset = type, rawset
+local type = type
 local CacheMod = require("witch-line.cache")
 
 local M = {}
@@ -25,6 +25,11 @@ M.cache = function()
 	CacheMod.cache(DepStore, "DepStore")
 end
 
+M.reset_state = function()
+	Comps = {}
+	DepStore = {}
+end
+
 M.load_cache = function()
 	Comps = CacheMod.get().Comps or Comps
 	DepStore = CacheMod.get().DepStore or DepStore
@@ -32,7 +37,7 @@ end
 
 --- Get the component manager.
 --- @return table The component manager containing all registered components.
-M.get_comps = function()
+M.get_comps_map = function()
 	return setmetatable({}, {
 		-- prevents a little bit for access raw comps
 		__index = function(_, id)
@@ -41,33 +46,17 @@ M.get_comps = function()
 	})
 end
 
+M.get_comps_list = function()
+	return vim.tbl_values(Comps)
+end
+
 ---- Register a component with the component manager.
 --- @param comp Component The component to register.
 --- @param alt_id Id Optional. An alternative ID for the component if it does not have one.
 --- @return Id The ID of the registered component.
 M.register = function(comp, alt_id)
-	local Id = require("witch-line.constant.id")
-	local id = comp.id or alt_id
-	local id_type = type(id)
-	if (id_type == "number" and Id[id] ~= nil) or id_type ~= "string" then
-		id = tostring(id)
-	end
-	Comps[id] = comp
-	rawset(comp, "id", id) -- Ensure the component has an ID field
-	return id
-end
-
---- Register a component with the component manager without checking for an ID.
---- @param comp Component The component to register.
---- @return Id|nil The ID of the registered component.
-M.fast_register = function(comp)
-	local id = comp.id
-	local type_id = type(id)
-	if type_id ~= "number" and type_id ~= "string" then
-		error("Component must have a valid ID")
-		return nil
-	end
-
+	local Component = require("witch-line.core.Component")
+	local id = Component.valid_id(comp, alt_id)
 	Comps[id] = comp
 	return id
 end
@@ -259,12 +248,14 @@ function M.get_static(comp)
 	return lookup_inherited_value(comp, "static", {})
 end
 
+--- Inspect the component manager or dependency store.
+--- @param key "dep_store"|"comps" The key to inspect.
 function M.inspect(key)
-	if key == "Dep" then
-		vim.notify("DepStore: " .. vim.inspect(DepStore))
-		return
+	if key == "dep_store" then
+		vim.notify(vim.inspect(DepStore or {}))
+	else
+		vim.notify(vim.inspect(Comps or {}))
 	end
-	vim.notify("Comps: " .. vim.inspect(Comps))
 end
 
 return M

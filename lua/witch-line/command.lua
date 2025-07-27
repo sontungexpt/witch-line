@@ -12,8 +12,17 @@ local commands = {
 		cache = function(...)
 			return CacheMod.get()
 		end,
-		comps = function(...)
-			require("witch-line.core.CompManager").inspect(...)
+		comps = function()
+			require("witch-line.core.CompManager").inspect("comps")
+		end,
+		dep_store = function()
+			require("witch-line.core.CompManager").inspect("dep_store")
+		end,
+		highlight = function()
+			require("witch-line.utils.highlight").inspect()
+		end,
+		statusline = function()
+			require("witch-line.core.statusline").inspect()
 		end,
 	},
 }

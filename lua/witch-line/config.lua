@@ -1,3 +1,4 @@
+local CacheMod = require("witch-line.cache")
 local type, ipairs = type, ipairs
 local bo = vim.bo
 
@@ -19,6 +20,100 @@ local default_configs = {
 		},
 	},
 }
+
+--- Converts component objects in a table to their IDs.
+--- @param components Component[] A table of components, which can be either strings or tables with an `id` field.
+--- @return Id[] A table of component IDs.
+local components_to_ids = function(components)
+	local ids = {}
+	for i, comp in ipairs(components) do
+		local comp_type = type(comp)
+		if comp_type == "table" then
+			ids[i] = comp.id
+		elseif comp_type == "string" then
+			ids[i] = comp
+		end
+	end
+	return ids
+end
+
+local simplyfy_configs = function(configs)
+	if type(configs) ~= "table" then
+		return configs
+	end
+
+	local simplified = vim.deepcopy(configs)
+	if type(simplified.components) == "table" then
+		simplified.components = components_to_ids(simplified.components)
+	end
+	if type(simplified.abstract) == "table" then
+		simplified.abstract = components_to_ids(simplified.abstract)
+	end
+	return simplified
+end
+
+M.cache = function()
+	CacheMod.cache(default_configs.disabled, "Disabled")
+end
+
+M.load_cache = function()
+	local cache = require("witch-line.cache").get()
+	default_configs.disabled = cache.Disabled or default_configs.disabled
+end
+
+--- Resets the state of the module.
+M.reset_state = function()
+	default_configs.disabled = {
+		filetypes = {},
+		buftypes = {
+			"terminal",
+		},
+	}
+end
+
+local same_type = function(a, b)
+	return type(a) == type(b)
+end
+
+local same_comps = function(uc_comps, cache_comps)
+	for i, comp in ipairs(uc_comps) do
+		local comp_type = type(comp)
+		if
+			(comp_type == "string" and comp ~= cache_comps[i])
+			or (comp_type == "table" and comp.id ~= cache_comps[i])
+		then
+			return true
+		end
+	end
+end
+
+--- @param cache Config
+--- @param user_configs Config
+M.user_configs_changed = function(cache, user_configs)
+	if not same_type(cache, user_configs) then
+		return false
+	end
+	local tbl_util = require("witch-line.utils.tbl")
+	local uc_disabled, cache_disabled = user_configs.disabled, cache.disabled
+	if
+		not same_type(uc_disabled, cache_disabled)
+		or not tbl_util.is_superset(uc_disabled.buftypes, cache_disabled.buftypes)
+		or not tbl_util.is_superset(uc_disabled.filetypes, cache_disabled.filetypes)
+	then
+		return true
+	end
+	local uc_abstract, cache_abstract = user_configs.abstract, cache.abstract
+	local uc_components, cache_components = user_configs.components, cache.components
+	if
+		not same_type(uc_components, cache_components)
+		or not same_type(uc_abstract, cache_abstract)
+		or not same_comps(uc_abstract, cache_abstract)
+		or not same_comps(uc_components, cache_components)
+		or not same_comps(uc_abstract, cache_abstract)
+	then
+		return true
+	end
+end
 
 function M.is_buf_disabled(bufnr)
 	local buf_o = bo[bufnr]
@@ -78,19 +173,15 @@ end
 --- @param user_configs Config A table containing user-defined configurations to be merged with the default configurations.
 --- @return Config merged_configs The merged configuration table, which includes both default and user-defined settings.
 M.set_user_config = function(user_configs)
+	CacheMod.cache(simplyfy_configs(user_configs or {}), "UserConfigs")
 	return merge_user_config(default_configs, user_configs)
 end
 
 --- Returns a read-only table containing the default configurations.
 --- This table can be used to access the default components and other configurations.
 --- @return Config configurations table
-M.get_config = function()
-	return setmetatable({}, {
-		__index = default_configs,
-		__newindex = function()
-			error("Attempt to modify read-only table")
-		end,
-	})
+M.get = function()
+	return default_configs
 end
 
 M.get_components = function()
