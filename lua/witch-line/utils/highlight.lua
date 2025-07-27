@@ -113,7 +113,7 @@ M.get_hlprop = get_hlprop
 
 ---@param group_name string
 ---@param hl_style vim.api.keyset.highlight
-M.hl = function(group_name, hl_style, force)
+M.hl = function(group_name, hl_style)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return
 	end

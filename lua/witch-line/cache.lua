@@ -1,4 +1,4 @@
-local type, pairs = type, pairs
+local type, pairs, loadstring = type, pairs, loadstring
 local fn, uv = vim.fn, vim.uv or vim.loop
 local M = {}
 
@@ -6,8 +6,9 @@ local CACHED_DIR = fn.stdpath("cache") .. "/witch-line"
 local CACHED_FILE = CACHED_DIR .. "/cache.luac"
 
 ---Urly name to reduce collision with table key
-local V_REFS = "\0__3[[V_REF_\0 _d{E)))}"
-local TBL_KEYS = "\0__TBL_KEYS\0_d{E)))}"
+local ENCODED_FUNC_KEYS = "\0__3[[V_REF_\0 _d{E)))}"
+local ENCODED_TBL_KEYS = "\0_=_TBL_KEYS\0_d{E)))}"
+local ENCODED_META_KEY = "\0_]_META_REF\0_d{E)))}"
 
 local has_cached = false
 
@@ -55,80 +56,75 @@ local set_struct = function(struct)
 	Struct.G_REFS = nil
 end
 
-local benckmark = function(cb, name)
-	local start = vim.loop.hrtime()
-	cb()
-	local elapsed = (vim.loop.hrtime() - start) / 1e6 -- Convert to milliseconds
-	local file = io.open("/home/stilux/Data/Workspace/neovim-plugins/witch-line/lua/benckmark", "a")
-	if file then
-		--- get ms from elapsed
-		file:write(string.format("%s took %.2f ms\n", name, elapsed))
-		file:close()
-	end
-end
+-- local benckmark = function(cb, name)
+-- 	local start = vim.loop.hrtime()
+-- 	cb()
+-- 	local elapsed = (vim.loop.hrtime() - start) / 1e6 -- Convert to milliseconds
+-- 	local file = io.open("/home/stilux/Data/Workspace/neovim-plugins/witch-line/lua/benckmark", "a")
+-- 	if file then
+-- 		--- get ms from elapsed
+-- 		file:write(string.format("%s took %.2f ms\n", name, elapsed))
+-- 		file:close()
+-- 	end
+-- end
 
 --- Encode references in a table recursively
 --- @param value any The value to encode
---- @param mode string The mode of encoding, can be "v" for values, "k" for keys, or "kv" for both
 --- @return string|nil The encoded value or nil if the value is not encodable
-local function deep_encode_refs(value, mode)
-	local value_type = type(value)
-	local str_hash = tostring(value)
+local function deep_encode_refs(value)
+	local encoded_api_key = ("\0\f\t" .. math.random() .. uv.hrtime())
 
-	if value_type == "function" then
-		G_REFS[str_hash] = string.dump(value, true)
-		return str_hash
-	elseif value_type == "string" or value_type == "number" or value_type == "boolean" then
-		return value
-	elseif
-		value == G_REFS
-		or value == Struct
-		or value_type == "thread"
-		or value_type == "userdata"
-		or value_type == "nil"
-	then
-		return nil
-	end
+	local function handle()
+		local value_type = type(value)
+		local str_hash = encoded_api_key .. tostring(value)
 
-	-- table already managed
-	if G_REFS[str_hash] then
-		return value
-	end
-	G_REFS[str_hash] = value
-
-	-- local funs = value[FUN_V_REF] or {}
-	for k, v in pairs(value) do
-		if mode == "v" or mode == "kv" then
-			v = deep_encode_refs(v, mode)
-			value[k] = v
+		if value_type == "function" then
+			G_REFS[str_hash] = string.dump(value, true)
+			return str_hash
+		elseif value_type == "string" or value_type == "number" or value_type == "boolean" then
+			return value
+		elseif
+			value_type == "thread"
+			or value_type == "userdata"
+			or value_type == "nil"
+			or value == G_REFS
+			or value == Struct
+		then
+			return nil
 		end
 
-		local k_type = type(k)
-		if k_type == "function" or k_type == "table" then
-			local new_key = deep_encode_refs(k, mode)
-			if new_key then
-				value[new_key] = v
-			else
-				-- unsupported key type
-				value[k] = nil
+		-- table already managed
+		if G_REFS[str_hash] then
+			return value
+		end
+		G_REFS[str_hash] = value
+
+		for k, v in pairs(value) do
+			v = deep_encode_refs(v)
+			value[k] = v
+
+			local nk = deep_encode_refs(k)
+			value[k] = nil
+			if nk then
+				value[nk] = v
 			end
 		end
-	end
 
-	local metatable = getmetatable(value)
-	if metatable then
-		value[META_REF] = deep_encode_refs(metatable, mode)
-	end
+		local metatable = getmetatable(value)
+		if metatable then
+			value[ENCODED_META_KEY] = deep_encode_refs(metatable)
+		end
 
-	return str_hash
+		return str_hash
+	end
+	handle()
 end
 
 --- Decode references in a table recursively
 --- @param value any The value to decode
---- @param mode string The mode of decoding, can be "v" for values, "k" for keys, or "kv" for both
 --- @param seen table|nil A table to keep track of already seen values to avoid infinite loops
 --- @return any The decoded value
-local function deep_decode_refs(value, mode, seen)
+local function deep_decode_refs(value, seen)
 	if type(value) ~= "table" then
 		return value
 	end
@@ -140,44 +136,41 @@ local function deep_decode_refs(value, mode, seen)
 
 	for k, v in pairs(value) do
 		if type(v) == "string" then
-			if mode == "v" or mode == "kv" then
-				v = G_REFS[v]
-				if type(v) == "table" then
-					v = deep_decode_refs(v, mode, seen)
-				elseif v then
-					-- func
-					v = loadstring(v)
-				end
-				value[k] = v
+			v = G_REFS[v]
+			if type(v) == "table" then
+				v = deep_decode_refs(v, seen)
+			elseif v then
+				-- func
+				v = loadstring(v)
 			end
+			value[k] = v
 		end
 		if type(k) == "string" then
-			if mode == "k" or mode == "kv" then
-				local old_k = G_REFS[k]
-				if type(old_k) == "table" then
-					old_k = deep_decode_refs(old_k, mode, seen)
-				elseif old_k then
-					-- func
-					---@diagnostic disable-next-line: cast-local-type
-					old_k = loadstring(old_k)
-				end
-				if old_k then
-					value[old_k] = v
-					value[k] = nil
-				end
+			local old_k = G_REFS[k]
+			if type(old_k) == "table" then
+				old_k = deep_decode_refs(old_k, seen)
+			elseif old_k then
+				-- func
+				---@diagnostic disable-next-line: cast-local-type
+				old_k = loadstring(old_k)
+			end
+			if old_k then
+				value[old_k] = v
+				value[k] = nil
 			end
 		end
 	end
 
-	local meta_ref = value[META_REF]
+	local meta_ref = value[ENCODED_META_KEY]
 	if not meta_ref or type(meta_ref) ~= "string" then
 		return value
 	end
+
 	local metatable = G_REFS[meta_ref]
 	if type(metatable) == "table" then
 		setmetatable(value, metatable)
-		value[META_REF] = nil
 	end
+	value[ENCODED_META_KEY] = nil
 
 	return value
 end
@@ -191,11 +184,12 @@ end
 local function encode_funcs(value, seen)
 	local value_type = type(value)
 	if value_type == "function" then
-		local nups = debug.getinfo(value).nups
-		if nups > 0 then
-			error("Function with upvalues cannot be cached: " .. debug.getinfo(value).source)
+		local info = debug.getinfo(value)
+		if info.nups > 0 then
+			error("Function has upvalues, cannot encode: " .. vim.inspect(info))
 		end
-		return string.dump(value)
+
+		return string.dump(value, true)
 	elseif value_type == "string" or value_type == "number" or value_type == "boolean" then
 		return value
 	elseif value_type == "thread" or value_type == "userdata" or value_type == "nil" then
@@ -208,20 +202,21 @@ local function encode_funcs(value, seen)
 		return value
 	end
 	seen[value] = true
+	setmetatable(value, nil)
 
-	local funs = value[V_REFS] or {}
-	local tbl_keys = value[TBL_KEYS] or {}
+	local funs = value[ENCODED_FUNC_KEYS] or {}
+	local tbl_keys = value[ENCODED_TBL_KEYS] or {}
 
 	for k, v in pairs(value) do
 		local k_type = type(k)
 		if k_type == "table" or k_type == "function" or k_type == "thread" or k_type == "userdata" then
-			value[k] = nil
+			error("Unsupported key type: " .. k_type .. " for key: " .. vim.inspect(k))
 		elseif type(v) == "function" then
 			funs[#funs + 1] = k
 			value[k] = encode_funcs(v, seen)
 		elseif type(v) == "table" then
 			v = encode_funcs(v, seen)
-			if v[V_REFS] or v[TBL_KEYS] then
+			if v[ENCODED_FUNC_KEYS] or v[ENCODED_TBL_KEYS] then
 				tbl_keys[#tbl_keys + 1] = k
 			end
 			value[k] = v
@@ -229,11 +224,11 @@ local function encode_funcs(value, seen)
 	end
 
 	if next(funs) then
-		value[V_REFS] = funs
+		value[ENCODED_FUNC_KEYS] = funs
 	end
 
 	if next(tbl_keys) then
-		value[TBL_KEYS] = tbl_keys
+		value[ENCODED_TBL_KEYS] = tbl_keys
 	end
 
 	return value
@@ -241,13 +236,13 @@ end
 
 --- Decode functions in a table recursively
 --- @param value any The value to decode
---- @param is_func boolean|nil Whether the value is a function or not
 --- @param seen table|nil A table to keep track of already seen values to avoid infinite loops
 --- @return any The decoded value
-local function decode_funcs(value, is_func, seen)
+local function decode_funcs(value, seen)
 	local value_type = type(value)
-	if is_func and value_type == "string" then
-		return loadstring(value)
+	if value_type == "string" then
+		local func = loadstring(value)
+		return func or value
 	elseif value_type ~= "table" then
 		return value
 	end
@@ -257,30 +252,31 @@ local function decode_funcs(value, is_func, seen)
 		return value
 	end
 
-	local tbl_keys = value[TBL_KEYS]
+	local tbl_keys = value[ENCODED_TBL_KEYS]
 	if tbl_keys then
 		for i = 1, #tbl_keys do
 			local key = tbl_keys[i]
 			local tbl = value[key]
-			value[key] = decode_funcs(tbl, false, seen)
+			value[key] = decode_funcs(tbl, seen)
 		end
 	end
 
-	local funs = value[V_REFS]
-	-- error("decode_funcs: " .. vim.inspect(funs) .. "tbl" .. vim.inspect(value))
+	local funs = value[ENCODED_FUNC_KEYS]
 	if funs then
 		for i = 1, #funs do
 			local k = funs[i]
-			local func = loadstring(value[k])
+			local func, err = loadstring(value[k])
 			if not func then
-				error("Failed to load function from cache: " .. k)
-			else
-				value[k] = func
+				error("Failed to load function from string: " .. err)
 			end
+			value[k] = func
 		end
-		value[V_REFS] = nil
+
+		--- Remove encoded function keys from the value as they are no longer needed
+		value[ENCODED_FUNC_KEYS] = nil
 	end
-	value[TBL_KEYS] = nil
+	--- Remove encoded table keys from the value as they are no longer needed
+	value[ENCODED_TBL_KEYS] = nil
 	return value
 end
 
@@ -290,8 +286,61 @@ M.cache = function(cache, key)
 	Struct[key] = cache
 end
 
-M.save = function(deep, mode)
-	mode = mode or "v"
+--- Encode the cache to a string
+--- @param deep boolean Whether to encode references deeply or not
+--- @return string|nil bytecode The encoded cache as a bytecode string, or nil if encoding failed
+local encode_cache = function(deep)
+	local ok, encoded = pcall(function()
+		if deep then
+			return deep_encode_refs(Struct)
+		end
+		--- Can be cached if no upvalues
+		return encode_funcs(Struct)
+	end)
+
+	if not ok then
+		require("witch-line.utils.log").warn("Failed to encode cache: " .. encoded)
+		return nil
+	end
+
+	-- local saved_str = mpack.encode(encoded)
+	-- local saved_str = "return " .. vim.inspect(encoded)
+
+	local dumped = loadstring("return " .. vim.inspect(encoded))
+	if dumped then
+		local bytecode = string.dump(dumped, true)
+		return bytecode ~= "" and bytecode or nil
+	end
+	return nil
+end
+
+--- Decode the cache from a string
+--- @param data string The data to decode
+--- @param deep boolean Whether to decode references deeply or not
+--- @return table|nil The decoded struct or nil if decoding failed
+--- @return table|nil The raw decoded data, if available
+local decode_cache = function(data, deep)
+	if not data or #data == 0 then
+		return nil, nil
+	end
+
+	--- NOTE: Fastest way
+	local func = loadstring(data)
+	if not func then
+		return nil, nil
+	end
+	-- local decoded_raw = dofile(CACHED_FILE)
+	-- local decoded_raw = mpack.decode(data)
+	-- local decoded_raw = mpack.decode(data)
+	local decoded_raw = func()
+	local struct = deep and deep_decode_refs(decoded_raw) or decode_funcs(decoded_raw)
+	set_struct(struct)
+
+	return struct, decoded_raw
+end
+
+---@diagnostic disable-next-line: unused-local
+M.save = function(deep)
 	local success = fn.mkdir(CACHED_DIR, "p")
 	if success < 0 then
 		return
@@ -307,35 +356,12 @@ M.save = function(deep, mode)
 
 	Struct.G_REFS = G_REFS
 
-	local ok, encoded = pcall(function()
-		if deep then
-			return deep_encode_refs(Struct, mode)
-		end
-
-		--- Can be cached if no upvalues
-		return encode_funcs(Struct)
-	end)
-
-	if not ok then
-		require("witch-line.utils.log").warn("Failed to encode cache: " .. encoded)
-
+	local bytecode = encode_cache(deep)
+	if not bytecode then
 		M.clear()
 		assert(uv.fs_close(fd))
 		return nil, nil
 	end
-
-	-- local saved_str = mpack.encode(encoded)
-
-	-- local saved_str = "return " .. vim.inspect(encoded)
-
-	local dumped = loadstring("return " .. vim.inspect(encoded))
-	if not dumped then
-		M.clear()
-		assert(uv.fs_close(fd))
-		return nil, nil
-	end
-
-	local bytecode = string.dump(dumped, true)
 
 	Struct.G_REFS = nil
 	-- assert(uv.fs_write(fd, binary, 0))
@@ -349,9 +375,7 @@ M.clear = function()
 	G_REFS = {}
 end
 
-M.read = function(deep, mode)
-	mode = mode or "v"
-
+M.read = function(deep)
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
 	if err and err == "ENOENT" then
 		return
@@ -359,38 +383,19 @@ M.read = function(deep, mode)
 	local stat = assert(uv.fs_fstat(fd))
 	local data = assert(uv.fs_read(fd, stat.size, 0))
 	assert(uv.fs_close(fd))
-
-	if not data or #data == 0 then
-		return nil, nil
-	end
-
-	-- local decoded_raw = dofile(CACHED_FILE)
-
-	-- local decoded_raw = mpack.decode(data)
-
-	--- NOTE: Fastest way
-	local func = loadstring(data)
-	if not func then
-		return nil, nil
-	end
-	local decoded_raw = func()
-	-- local decoded_raw = mpack.decode(data)
-	--
-
-	local struct = deep and deep_decode_refs(decoded_raw, mode) or decode_funcs(decoded_raw)
-
-	set_struct(struct)
 	has_cached = true
-	-- end, "loadstring")
-	return Struct, nil
 
-	-- return Struct, decoded_raw or nil
+	local struct, decoded_raw = decode_cache(data, deep)
+
+	return struct, decoded_raw
 end
 
-M.read_async = function(callback, deep, mode)
-	mode = mode or "v"
+M.read_async = function(callback, deep)
 	uv.fs_open(CACHED_FILE, "r", 438, function(err, fd)
-		if not fd and err and err:match("ENOENT") then
+		if err and err:find("ENOENT") then
+			vim.schedule(function()
+				callback(nil, nil)
+			end)
 			return
 		end
 
@@ -404,25 +409,11 @@ M.read_async = function(callback, deep, mode)
 				---@diagnostic disable-next-line: redefined-local
 				uv.fs_close(fd, function(err)
 					assert(not err, err and "Failed to close cache file: " .. err)
-					if not data or #data == 0 then
-						callback(nil, nil)
-						return
-					end
-					local func = loadstring(data)
-					if not func then
-						callback(nil, nil)
-						return
-					end
-
-					-- local decoded_raw = mpack.decode(data)
-					-- local struct = deep and deep_decode_refs(decoded_raw, mode) or decode_funcs(decoded_raw)
-
-					local decoded_raw = func()
-					local struct = deep and deep_decode_refs(decoded_raw, mode) or decode_funcs(decoded_raw)
-					set_struct(struct)
-
 					has_cached = true
-					callback(Struct, decoded_raw)
+					local struct, decoded_raw = decode_cache(data, deep)
+					vim.schedule(function()
+						callback(struct, decoded_raw)
+					end)
 				end)
 			end)
 		end)

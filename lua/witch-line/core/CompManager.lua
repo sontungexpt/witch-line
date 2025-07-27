@@ -120,10 +120,9 @@ M.link_ref_field = link_ref_field
 --- @param comp Component The component to link.
 --- @param on Id|Id[] The event or component ID that this component depends on.
 --- @param id NotNil The ID of the component to link.
-local function link_dep_by_id(comp, on, id)
+M.link_ref_field_by_id = function(comp, on, id)
 	link_ref_field(comp, on, get_dep_store(id))
 end
-M.link_dep_by_id = link_dep_by_id
 
 M.remove_dep_store = function(id)
 	DepStore[id] = nil

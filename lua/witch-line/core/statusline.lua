@@ -1,6 +1,5 @@
-local vim = vim
+local vim, concat = vim, table.concat
 local opt = vim.opt
-local ipairs, concat = ipairs, table.concat
 local CacheMod = require("witch-line.cache")
 
 local M = {}
@@ -12,21 +11,27 @@ local Values = {}
 ---@type integer
 local ValuesSize = 0
 
+--- Hidden all components by setting their values to empty strings.
+M.empty_values = function()
+	for i = 1, ValuesSize do
+		Values[i] = ""
+	end
+end
+
 M.cache = function()
+	--reset the values to empty strings
+	--before caching
+	--because when the plugin is loaded
+	--the statusline must be empty stage
+	M.empty_values()
 	CacheMod.cache(Values, "Statusline")
 	CacheMod.cache(ValuesSize, "StatuslineSize")
 end
 
 M.load_cache = function()
-	Values = CacheMod.get().Statusline or {}
-	ValuesSize = CacheMod.get().StatuslineSize or 0
-end
-
---- Hidden all components by setting their values to empty strings.
-M.hidden_all = function()
-	for i = 1, ValuesSize do
-		Values[i] = ""
-	end
+	local cache = CacheMod.get()
+	Values = cache.Statusline or Values
+	ValuesSize = cache.StatuslineSize or ValuesSize
 end
 
 M.clear = function()
@@ -59,8 +64,8 @@ end
 --- @param indices integer[] The indices of the components to set the value for.
 --- @param value string The value to set for the specified components.
 M.bulk_set = function(indices, value)
-	for _, idx in ipairs(indices) do
-		Values[idx] = value
+	for i = 1, #indices do
+		Values[indices[i]] = value
 	end
 end
 
@@ -69,8 +74,8 @@ end
 --- @param value string The separator value to set.
 --- @param adjust number If true, sets the separator to the left of the component; otherwise, sets it to the right.
 M.bulk_set_sep = function(indices, value, adjust)
-	for _, idx in ipairs(indices) do
-		Values[idx + adjust] = value
+	for i = 1, #indices do
+		Values[indices[i] + adjust] = value
 	end
 end
 

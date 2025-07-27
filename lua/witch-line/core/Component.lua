@@ -19,16 +19,32 @@ local RIGHT_SUFFIX = "R"
 
 ---@alias Id string|number
 
----@alias RefField Id|nil
+---@enum RefField
+local RefField = {
+	events = "events",
+	user_events = "user_events",
+	timing = "timing",
+	style = "style",
+	static = "static",
+	context = "context",
+	hidden = "hidden",
+}
+
+---@enum InheritField
+local InheritField = {
+	timing = "timing",
+	lazy = "lazy",
+	events = "events",
+	user_events = "user_events",
+	ref = "ref",
+	style = "style",
+	static = "static",
+	context = "context",
+	min_screen_width = "min_screen_width",
+}
+
+---@alias RefFieldType Id|nil
 ---@alias RefFields Id[]|nil
----@class RefTable
----@field events RefField|RefFields a table of events that the component will listen to, used for lazy loading components
----@field user_events RefField|RefFields a table of user defined events that the component will listen to, used for lazy loading components
----@field timing RefField|RefFields if true, the component will be updated every time interval, can be a string or an integer
----@field style RefField id of the style to use for the component, can be a string or a function that returns a style table
----@field static RefField id of the static values to use for the component, can be a string or a table of static values
----@field context RefField id of the context to use for the component, can be a string or a function that returns a context table
----@field hidden RefFields id of the function that will be used to check if the component should be displayed, can be a string or a function that returns a boolean value
 
 ---@class Component
 ---@field id Id the unique identifier of the component, can be a string or an integer
@@ -37,7 +53,7 @@ local RIGHT_SUFFIX = "R"
 ---@field lazy boolean|nil if true, the component will be initialized lazily
 ---@field events string[]|nil a table of events that the component will listen to
 ---@field user_events string[]|nil a table of user defined events that the component will listen to
----@field ref RefTable|nil a table of references to other components, used for lazy loading components
+---@field ref table<RefField,RefFieldType> |nil a table of references to other components, used for lazy loading components
 ---
 ---@field left_style table |nil a table of styles that will be applied to the left part of the component
 ---@field left string|nil the left part of the component, can be a string or another component
@@ -62,14 +78,36 @@ local RIGHT_SUFFIX = "R"
 ---@field _right_hl_name string|nil the highlight group name for the component
 ---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 ---@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
----@field _parent boolean|nil if true, the component is a parent component and should not be displayed, used for lazy loading components
+---@field _parent boolean|nil if true, the component inherits from a parent component, used for lazy loading components
+
+--- Inherits the parent component's fields and methods, allowing for component extension.
+--- @param comp Component the component to inherit from
+--- @param parent Component the parent component to inherit from
+--- @param force boolean|nil if true, the parent will be inherited even if the component already has a parent
+M.inherit_parent = function(comp, parent, force)
+	if getmetatable(comp) and not force then
+		return
+	end
+
+	rawset(comp, "_parent", true) -- Clear parent reference to avoid circular references
+	setmetatable(comp, {
+		---@diagnostic disable-next-line: unused-local
+		__index = function(t, key)
+			if not InheritField[key] then
+				return nil
+			end
+			return parent[key]
+		end,
+	})
+end
 
 --- @param comp Component the component to update
+--- @param session_id SessionId the session id to use for the component, used for lazy loading components
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
---- @param session_id SessionId the session id to use for the component, used for lazy loading components
-M.update_style = function(comp, ctx, static, session_id)
+M.update_style = function(comp, session_id, ctx, static)
 	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+
 	local left_type, right_type = type(comp.left), type(comp.right)
 
 	if type(style) == "table" then
@@ -88,7 +126,7 @@ M.update_style = function(comp, ctx, static, session_id)
 		end
 
 		if force or type(comp.style) == "function" then
-			highlight.hl(comp._hl_name, style, true)
+			highlight.hl(comp._hl_name, style)
 		end
 
 		if left_type == "string" then

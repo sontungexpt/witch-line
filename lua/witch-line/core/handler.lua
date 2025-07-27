@@ -88,18 +88,11 @@ end
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
 local function update_comp(comp, session_id)
+	local Component = require("witch-line.core.Component")
 	if comp.inherit and not comp._parent then
 		local parent = get_comp(comp.inherit)
 		if parent then
-			rawset(comp, "_parent", true) -- Clear parent reference to avoid circular references
-			setmetatable(comp, {
-				__index = function(t, key)
-					if vim.startswith(key, "_") then
-						return rawget(t, key)
-					end
-					return parent[key]
-				end,
-			})
+			Component.inherit_parent(comp, parent)
 		end
 	end
 
@@ -119,8 +112,6 @@ local function update_comp(comp, session_id)
 		return ""
 	end
 
-	local Component = require("witch-line.core.Component")
-
 	-- local value = Component.evaluate(comp, ctx, static)
 	local value = Component.evaluate(comp, ctx, static)
 	if value == "" then
@@ -129,7 +120,7 @@ local function update_comp(comp, session_id)
 	end
 
 	-- Component.update_style(comp, ctx, static, session_id)
-	Component.update_style(comp, ctx, static, session_id)
+	Component.update_style(comp, session_id, ctx, static)
 
 	local indices = comp._indices
 	if not indices then
@@ -234,12 +225,9 @@ local function registry_events(comp, key)
 			EventStore[key] = store
 			for i = 1, es_size do
 				local e = es[i]
-				local store_e = store[e]
-				if not store_e then
-					store[e] = { comp.id }
-				else
-					store_e[#store_e + 1] = comp.id
-				end
+				local store_e = store[e] or {}
+				store_e[#store_e + 1] = comp.id
+				store[e] = store_e
 			end
 		end
 	end
@@ -250,13 +238,9 @@ end
 local function registry_timer(comp)
 	local timing = comp.timing == true and TIMER_TICK or comp.timing
 	if type(timing) == "number" and timing > 0 then
-		local ids = TimerStore[timing]
-		if ids then
-			ids[#ids + 1] = comp.id
-			return
-		else
-			TimerStore[timing] = { comp.id }
-		end
+		local ids = TimerStore[timing] or {}
+		ids[#ids + 1] = comp.id
+		TimerStore[timing] = ids
 	end
 end
 
@@ -266,50 +250,53 @@ end
 --- @return integer|nil user_events_id The ID of the autocmd for user events.
 local function init_autocmd()
 	local events, user_events = EventStore.events, EventStore.user_events
-	local on_event_debounce = require("witch-line.utils").debounce(function(queue, key)
+	local on_event_debounce = require("witch-line.utils").debounce(function(stack, key)
 		local store = EventStore[key]
 		if not store then
 			return
 		end
 		local seen = {}
-		for i = 1, #queue do
-			local ids = store[queue[i]]
-			queue[i] = nil
+		local stack_size = #stack
+		if stack_size > 0 then
+			local Session = require("witch-line.core.Session")
+			Session.run_once(function(id)
+				for i = stack_size, 1, -1 do
+					local ids = store[stack[i]]
+					stack[i] = nil
 
-			if ids then
-				local Session = require("witch-line.core.Session")
-				Session.run_once(function(id)
-					local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
-					M.update_comp_graphs_by_id(ids, id, refs, seen)
-				end)
-			end
+					if ids then
+						local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
+						M.update_comp_graphs_by_id(ids, id, refs, seen)
+					end
+				end
+			end)
+			statusline.render()
 		end
-		statusline.render()
 	end, 100)
 
 	local group, id1, id2 = nil, nil, nil
 
 	if events and next(events) then
 		group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
-		local queue = {}
+		local stack = {}
 		id1 = api.nvim_create_autocmd(vim.tbl_keys(events), {
 			group = group,
 			callback = function(e)
-				queue[#queue + 1] = e.event
-				on_event_debounce(queue, "events")
+				stack[#stack + 1] = e.event
+				on_event_debounce(stack, "events")
 			end,
 		})
 	end
 
 	if user_events and next(user_events) then
 		group = group or api.nvim_create_augroup("WitchLineUserEvents", { clear = true })
-		local queue = {}
+		local stack = {}
 		id2 = api.nvim_create_autocmd("User", {
 			pattern = vim.tbl_keys(user_events),
 			group = group,
 			callback = function(e)
-				queue[#queue + 1] = e.match
-				on_event_debounce(queue, "user_events")
+				stack[#stack + 1] = e.match
+				on_event_debounce(stack, "user_events")
 			end,
 		})
 	end
@@ -504,6 +491,7 @@ end
 M.setup = function(configs)
 	local urgents = CacheMod.get().Urgents or {}
 	local has_cached = CacheMod.has_cached()
+
 	if not has_cached then
 		local abstract = configs.abstract
 
@@ -530,8 +518,6 @@ M.setup = function(configs)
 				registry_comp(c, i, urgents)
 			end
 		end
-	else
-		statusline.hidden_all()
 	end
 
 	init_autocmd()
@@ -541,6 +527,7 @@ M.setup = function(configs)
 		if not has_cached then
 			CacheMod.cache(urgents, "Urgents")
 		end
+
 		local Session = require("witch-line.core.Session")
 		Session.run_once(function(session_id)
 			M.update_comp_graphs_by_id(urgents, session_id, {
@@ -549,7 +536,6 @@ M.setup = function(configs)
 			}, {})
 		end)
 	end
-
 	statusline.render()
 end
 
