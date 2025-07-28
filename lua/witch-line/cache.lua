@@ -25,7 +25,7 @@ local G_REFS = {}
 ---| "StatuslineSize"
 ---| "G_REFS"
 ---| "Urgents"
----| "UserConfigs"
+---| "UserConfigHashs"
 ---| "Disabled"
 
 ---@type table<StructKey, any>
@@ -39,7 +39,6 @@ local Struct = {
 	-- StatuslineSize = nil,
 	-- G_REFS = nil,
 	-- Urgents = nil,
-	-- UserConfigs = nil,
 	-- Disabled = nil
 }
 
@@ -368,10 +367,7 @@ end
 
 M.clear = function()
 	uv.fs_unlink(CACHED_FILE)
-	-- fn.delete(CACHED_FILE)
-	Struct = {}
-	G_REFS = {}
-	loaded = false
+	Struct, G_REFS = {}, {}
 end
 
 M.read = function(deep)

@@ -1,11 +1,10 @@
----@type Component[]|string[]
+---@type Component[]| string[]
 return {
 	"mode",
 	"file.filename",
 	"file.icon",
 	"%=",
 	"diagnostic.error",
-	-- require("witch-line.components.file").Icon,
 
 	-- {
 	-- 	event = "BufEnter",

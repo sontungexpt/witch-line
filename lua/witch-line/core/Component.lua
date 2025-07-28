@@ -47,6 +47,7 @@ local InheritField = {
 ---@alias RefFieldTypes Id[]|nil
 
 ---@class Component
+---@field [integer] string|Component a table of childs, can be used to create a list of components
 ---@field id Id the unique identifier of the component, can be a string or an integer
 ---@field inherit Id|nil the id of the component that this component inherits from, can be used to extend the functionality of another component
 ---@field timing boolean|integer|nil if true, the component will be updated every time interval
@@ -301,11 +302,8 @@ end
 M.require_by_id = function(id)
 	local Id = require("witch-line.constant.id").Id
 	local path = Id[id]
-	if not path then
-		return nil
-	end
 	---@cast path string
-	return M.require(path)
+	return path and M.require(path)
 end
 
 --- @param path string the path to the component, e.g. "file.name" or "git.status"

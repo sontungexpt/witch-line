@@ -1,4 +1,4 @@
-local vim, type, ipairs, pairs, rawset, require, setmetatable = vim, type, ipairs, pairs, rawset, require, setmetatable
+local vim, type, ipairs, pairs, rawset, require = vim, type, ipairs, pairs, rawset, require
 local api, uv = vim.api, vim.uv or vim.loop
 
 local CacheMod = require("witch-line.cache")
@@ -374,7 +374,7 @@ local function registry_refs(comp)
 
 	-- Pull missing dependencies from the component's ref field
 	local Component = require("witch-line.core.Component")
-	for _, id in ipairs(ref_ids) do
+	for id, _ in pairs(ref_ids) do
 		if not CompManager.id_exists(id) then
 			local c = Component.require_by_id(id)
 			if c then
@@ -419,6 +419,37 @@ local function registry_update_conditions(comp)
 	end
 end
 
+--- Register a component by its type.
+--- @param comp Component|string The component to register.
+--- @param i integer The index of the component in the registry.
+--- @param urgents Id[] The list of components that should be updated immediately.
+--- @param inherit_comp_id Id|nil The ID of the component to inherit from, if any.
+function M.registry_comp_by_type(comp, i, urgents, inherit_comp_id)
+	local type_c = type(comp)
+	if type_c == "string" then
+		-- special case for string components
+		if comp == "%=" then
+			M.registry_str_comp(comp, i, urgents)
+			return
+		elseif comp == "" then
+			return
+		end
+		local c = require("witch-line.core.Component").require(comp)
+		if not c then
+			M.registry_str_comp(comp, i, urgents)
+			return
+		elseif inherit_comp_id and not c.inherit then
+			rawset(c, "inherit", inherit_comp_id)
+		end
+		M.registry_comp(c, i, urgents)
+	elseif type_c == "table" and next(comp) then
+		if inherit_comp_id and not comp.inherit then
+			rawset(comp, "inherit", inherit_comp_id)
+		end
+		M.registry_comp(comp, i, urgents)
+	end
+end
+
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id|integer The ID to assign to the component.
@@ -459,18 +490,8 @@ function M.registry_comp(comp, id, urgents)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
 
-	-- Why not support string comp
-	-- Because inherit component should be created by user
-	-- String component is just use to call default component or just a string
-	-- So it make hard to manage the component
-	-- May be in the future we can support string component
 	for i, child in ipairs(comp) do
-		if type(child) == "table" and next(child) then
-			if not child.inherit then
-				rawset(child, "inherit", comp.id)
-			end
-			M.registry_comp(child, i, urgents)
-		end
+		M.registry_comp_by_type(child, i, urgents, comp.id)
 	end
 
 	return comp.id
@@ -482,19 +503,10 @@ end
 --- @param urgents table<Component> The list of components that should be updated immediately.
 ---@diagnostic disable-next-line: unused-local
 function M.registry_str_comp(comp, i, urgents)
-	if comp == "" then
-		return
-	elseif comp == "%=" then
+	if comp ~= "" then
 		statusline.push(comp)
 	end
-
-	local component = require("witch-line.core.Component").require(comp)
-	-- not fôund then treat as a string component
-	if not component then
-		statusline.push(comp)
-		return
-	end
-	M.registry_comp(component, i, urgents)
+	return comp
 end
 --- Register a component in the statusline.
 --- @param comp Component
@@ -532,6 +544,7 @@ M.setup = function(configs, cached)
 			if type(c) == "string" then
 				c = require("witch-line.core.Component").require(c)
 			end
+
 			if type(c) == "table" and c.id then
 				M.registry_abstract_component(c, i)
 			else
@@ -539,16 +552,9 @@ M.setup = function(configs, cached)
 			end
 		end
 
-		local components = configs.components
-
-		for i = 1, #components do
-			local c = components[i]
-			local type_c = type(c)
-			if type_c == "string" then
-				M.registry_str_comp(c, i, urgents)
-			elseif type_c == "table" and next(c) then
-				M.registry_comp(c, i, urgents)
-			end
+		local comps = configs.components
+		for i = 1, #comps do
+			M.registry_comp_by_type(comps[i], i, urgents)
 		end
 	end
 

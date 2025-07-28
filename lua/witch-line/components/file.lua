@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
 ---@type Component
-local FileName = {
+local Name = {
 	id = Id["file.name"],
 	_plug_provided = true,
 	-- id = require("witch-line.components.id.enum").FileName,
@@ -40,6 +40,7 @@ local FileName = {
 		local extension = static.extensions
 		local filetype = api.nvim_get_option_value("filetype", { buf = 0 })
 		local buftype = api.nvim_get_option_value("buftype", { buf = 0 })
+
 		filename = extension.filetypes[filetype] or filename
 		filename = extension.buftypes[buftype] or filename
 
@@ -122,6 +123,6 @@ local Icon = {
 }
 
 return {
-	filename = FileName,
+	name = Name,
 	icon = Icon,
 }

@@ -16,6 +16,10 @@ local function create_enum(list)
 	return enum, id
 end
 
+local is_int = function(value)
+	return type(value) == "number" and math.floor(value) == value
+end
+
 ---@class DefaultId
 ---@field [integer] string
 ---@field ["mode"] 1

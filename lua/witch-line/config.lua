@@ -67,25 +67,15 @@ M.load_cache = function()
 	end
 end
 
-local same_type = function(a, b)
-	return type(a) == type(b)
-end
-
-local same_comps = function(uc_comps, cache_comps)
-	for i, comp in ipairs(uc_comps) do
-		local comp_type = type(comp)
-		if
-			(comp_type == "string" and comp ~= cache_comps[i])
-			or (comp_type == "table" and comp.id ~= cache_comps[i])
-		then
+--- @param user_configs Config
+M.user_configs_changed = function(user_configs)
+	local cache_hashs = require("witch-line.cache").get("UserConfigHashs")
+	local tbl_util = require("witch-line.utils.tbl")
+	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs) do
+		if hash ~= cache_hashs[i] then
 			return true
 		end
 	end
-end
-
---- @param cache Config
---- @param user_configs Config
-M.user_configs_changed = function(cache, user_configs)
 	return false
 end
 
@@ -147,7 +137,14 @@ end
 --- @param user_configs Config A table containing user-defined configurations to be merged with the default configurations.
 --- @return Config merged_configs The merged configuration table, which includes both default and user-defined settings.
 M.set_user_config = function(user_configs)
-	CacheMod.cache(simplyfy_configs(user_configs or {}), "UserConfigs")
+	local tbl_util = require("witch-line.utils.tbl")
+	local hashs = {}
+
+	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs, 10) do
+		hashs[i] = hash
+	end
+	CacheMod.cache(hashs, "UserConfigHashs")
+
 	return merge_user_config(default_configs, user_configs)
 end
 

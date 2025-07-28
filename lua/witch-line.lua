@@ -3,6 +3,11 @@ local M = {}
 
 --- @param user_configs Config user_configs
 M.setup = function(user_configs)
+	-- temp for test user_configs
+	if not user_configs or (type(user_configs) == "table" and not next(user_configs)) then
+		user_configs = {}
+	end
+
 	local CacheMod = require("witch-line.cache")
 
 	local CACHE_MODS = {
@@ -27,7 +32,7 @@ M.setup = function(user_configs)
 				local ConfMod = require("witch-line.config")
 
 				-- check if user_configs is changed
-				if ConfMod.user_configs_changed(struct.UserConfigs, user_configs) then
+				if ConfMod.user_configs_changed(user_configs) then
 					CacheMod.clear()
 					for i = 1, #undos do
 						undos[i]()
@@ -50,10 +55,13 @@ M.setup = function(user_configs)
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		callback = function()
-			for i = 1, #CACHE_MODS do
-				require(CACHE_MODS[i]).on_vim_leave_pre()
+			if not CacheMod.loaded() then
+				for i = 1, #CACHE_MODS do
+					require(CACHE_MODS[i]).on_vim_leave_pre()
+				end
+
+				CacheMod.save()
 			end
-			CacheMod.save()
 		end,
 	})
 
