@@ -1,4 +1,4 @@
-local type, pairs, loadstring = type, pairs, loadstring
+local type, pairs, loadstring, mpack, json = type, pairs, loadstring, vim.mpack, vim.json
 local fn, uv = vim.fn, vim.uv or vim.loop
 local M = {}
 
@@ -10,7 +10,7 @@ local ENCODED_FUNC_KEYS = "\0__3[[V_REF_\0 _d{E)))}"
 local ENCODED_TBL_KEYS = "\0_=_TBL_KEYS\0_d{E)))}"
 local ENCODED_META_KEY = "\0_]_META_REF\0_d{E)))}"
 
-local has_cached = false
+local loaded = false
 
 --- @type table<string, table|string>
 local G_REFS = {}
@@ -44,14 +44,25 @@ local Struct = {
 }
 
 --- Check if the cache has been read
-M.has_cached = function()
-	return has_cached
+M.loaded = function()
+	return loaded
+end
+
+--- Check if the cache file exists and is readable
+--- @return boolean|nil true if the cache file is readable, false otherwise
+M.cache_readable = function()
+	return uv.fs_access(CACHED_FILE, 4)
 end
 
 --- Get the Struct table
---- @return table<StructKey, any>
-M.get = function()
-	return Struct
+--- @param key StructKey The key to get from the Struct table
+--- @return any The value associated with the key in the Struct table
+M.get = function(key)
+	return Struct[key]
+end
+
+M.inspect = function()
+	vim.notify(vim.inspect(Struct), vim.log.levels.INFO, { title = "Witch Line Struct" })
 end
 
 --- Set the Struct table from cache
@@ -62,17 +73,17 @@ local set_struct = function(struct)
 	Struct.G_REFS = nil
 end
 
--- local benckmark = function(cb, name)
--- 	local start = vim.loop.hrtime()
--- 	cb()
--- 	local elapsed = (vim.loop.hrtime() - start) / 1e6 -- Convert to milliseconds
--- 	local file = io.open("/home/stilux/Data/Workspace/neovim-plugins/witch-line/lua/benckmark", "a")
--- 	if file then
--- 		--- get ms from elapsed
--- 		file:write(string.format("%s took %.2f ms\n", name, elapsed))
--- 		file:close()
--- 	end
--- end
+local benckmark = function(cb, name)
+	local start = vim.loop.hrtime()
+	cb()
+	local elapsed = (vim.loop.hrtime() - start) / 1e6 -- Convert to milliseconds
+	local file = io.open("/home/stilux/Data/Workspace/neovim-plugins/witch-line/lua/benckmark", "a")
+	if file then
+		--- get ms from elapsed
+		file:write(string.format("%s took %.2f ms\n", name, elapsed))
+		file:close()
+	end
+end
 
 --- Encode references in a table recursively
 --- @param value any The value to encode
@@ -85,7 +96,7 @@ local function deep_encode_refs(value)
 		local str_hash = encoded_api_key .. tostring(value)
 
 		if value_type == "function" then
-			G_REFS[str_hash] = string.dump(value, true)
+			G_REFS[str_hash] = string.dump(value)
 			return str_hash
 		elseif value_type == "string" or value_type == "number" or value_type == "boolean" then
 			return value
@@ -190,12 +201,7 @@ end
 local function encode_funcs(value, seen)
 	local value_type = type(value)
 	if value_type == "function" then
-		local info = debug.getinfo(value)
-		if info.nups > 0 then
-			error("Function has upvalues, cannot encode: " .. vim.inspect(info))
-		end
-
-		return string.dump(value, true)
+		return string.dump(value)
 	elseif value_type == "string" or value_type == "number" or value_type == "boolean" then
 		return value
 	elseif value_type == "thread" or value_type == "userdata" or value_type == "nil" then
@@ -305,19 +311,12 @@ local encode_cache = function(deep)
 	end)
 
 	if not ok then
-		require("witch-line.utils.notifier").warn("Failed to encode cache: " .. encoded)
+		require("witch-line.utils.notifier").error("Failed to encode cache: " .. encoded)
 		return nil
 	end
-
-	-- local saved_str = mpack.encode(encoded)
-	-- local saved_str = "return " .. vim.inspect(encoded)
-
-	local dumped = loadstring("return " .. vim.inspect(encoded))
-	if dumped then
-		local bytecode = string.dump(dumped, true)
-		return bytecode ~= "" and bytecode or nil
-	end
-	return nil
+	local binary = mpack.encode(encoded)
+	-- local binary = mpack.encode(encoded)
+	return binary ~= "" and binary or nil
 end
 
 --- Decode the cache from a string
@@ -330,17 +329,14 @@ local decode_cache = function(data, deep)
 		return nil, nil
 	end
 
-	--- NOTE: Fastest way
-	local func = loadstring(data)
-	if not func then
-		return nil, nil
-	end
-	-- local decoded_raw = dofile(CACHED_FILE)
-	-- local decoded_raw = mpack.decode(data)
-	-- local decoded_raw = mpack.decode(data)
-	local decoded_raw = func()
-	local struct = deep and deep_decode_refs(decoded_raw) or decode_funcs(decoded_raw)
-	set_struct(struct)
+	local struct, decoded_raw
+	benckmark(function()
+		decoded_raw = mpack.decode(data)
+
+		-- local decoded_raw = mpack.decode(data)
+		struct = deep and deep_decode_refs(decoded_raw) or decode_funcs(decoded_raw)
+		set_struct(struct)
+	end)
 
 	return struct, decoded_raw
 end
@@ -349,20 +345,15 @@ end
 M.save = function(deep)
 	local success = fn.mkdir(CACHED_DIR, "p")
 	if success < 0 then
+		error("Failed to create cache directory: " .. CACHED_DIR)
 		return
 	end
 
-	local fd, err_msg, err = uv.fs_open(CACHED_FILE, "w", 438)
-	if err == "ENOENT" then
-		--- No cached file found
-		return nil, nil
-	end
-
-	assert(not err, err_msg and "Failed to open cache file: " .. err_msg .. ". Error name " .. err)
-
+	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
 	Struct.G_REFS = G_REFS
 
 	local bytecode = encode_cache(deep)
+
 	if not bytecode then
 		M.clear()
 		assert(uv.fs_close(fd))
@@ -377,8 +368,10 @@ end
 
 M.clear = function()
 	uv.fs_unlink(CACHED_FILE)
+	-- fn.delete(CACHED_FILE)
 	Struct = {}
 	G_REFS = {}
+	loaded = false
 end
 
 M.read = function(deep)
@@ -389,7 +382,7 @@ M.read = function(deep)
 	local stat = assert(uv.fs_fstat(fd))
 	local data = assert(uv.fs_read(fd, stat.size, 0))
 	assert(uv.fs_close(fd))
-	has_cached = true
+	loaded = true
 
 	local struct, decoded_raw = decode_cache(data, deep)
 
@@ -419,8 +412,8 @@ M.read_async = function(callback, deep)
 				uv.fs_close(fd, function(err)
 					assert(not err, err and "Failed to close cache file: " .. err)
 					local struct, decoded_raw = decode_cache(data, deep)
+					loaded = true
 					vim.schedule(function()
-						has_cached = true
 						callback(struct, decoded_raw)
 					end)
 				end)

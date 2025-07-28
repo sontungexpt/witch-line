@@ -69,15 +69,17 @@ local InheritField = {
 ---@field pre_update nil|fun(self: Component, ctx: any, static: any) called before the component is updated, can be used to set up the context
 ---@field update string|fun(self:Component, ctx: any, static: any): string|nil called to update the component, should return a string that will be displayed
 ---@field post_update nil|fun(self: Component,ctx: any, static: any) called after the component is updated, can be used to clean up the context
----@field hidden nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
+---@field hide nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
 ---@field min_screen_width integer|nil the minimum screen width required to display the component, used for lazy loading components
 ---
 ---@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
 ---@field _hl_name string|nil the highlight group name for the component
 ---@field _left_hl_name string|nil the highlight group name for the component
 ---@field _right_hl_name string|nil the highlight group name for the component
+---@field _parent boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
 ---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 ---@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
+---@field _abstract boolean|nil if true, the component is an abstract component and should not be displayed, used for lazy loading components
 ---@field _plug_provided boolean|nil If true, the component is provided by plugin
 
 --- Gets the id of the component, if the id is a number, it will be converted to a string.
@@ -85,15 +87,10 @@ local InheritField = {
 --- @param alt_id Id|nil an alternative id to use if the component does not have an id
 --- @return Id the id of the component
 M.valid_id = function(comp, alt_id)
-	local DefaultId = require("witch-line.constant.id")
+	local Id = require("witch-line.constant.id")
 	local id = comp.id or alt_id
-	local id_type = type(id)
-	if id_type == "number" then
-		if not comp._plug_provided and DefaultId[id] ~= nil then
-			id = tostring(id)
-		end
-	elseif id_type ~= "string" then
-		id = tostring(id)
+	if not comp._plug_provided then
+		id = Id.id(id)
 	end
 	rawset(comp, "id", id) -- Ensure the component has an ID field
 	return id
@@ -296,6 +293,19 @@ M.evaluate = function(comp, ctx, static)
 	end
 
 	return result
+end
+
+--- Requires a default component by its id.
+--- @param id Id the path to the component, e.g. "file.name" or "git.status"
+--- @return Component|nil comp the component if it exists, or nil if it does not
+M.require_by_id = function(id)
+	local Id = require("witch-line.constant.id").Id
+	local path = Id[id]
+	if not path then
+		return nil
+	end
+	---@cast path string
+	return M.require(path)
 end
 
 --- @param path string the path to the component, e.g. "file.name" or "git.status"

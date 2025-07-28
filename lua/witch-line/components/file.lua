@@ -3,7 +3,7 @@ local Id = require("witch-line.constant.id").Id
 
 ---@type Component
 local FileName = {
-	id = Id.FileName,
+	id = Id["file.name"],
 	_plug_provided = true,
 	-- id = require("witch-line.components.id.enum").FileName,
 	user_events = { "VeryLazy" },
@@ -35,11 +35,11 @@ local FileName = {
 	},
 	padding = { left = 1, right = 0 },
 	update = function(self, context, static)
-		local vim = vim
-		local filename = vim.fn.expand("%:t")
+		local fn, api = vim.fn, vim.api
+		local filename = fn.expand("%:t")
 		local extension = static.extensions
-		local filetype = vim.api.nvim_get_option_value("filetype", { buf = 0 })
-		local buftype = vim.api.nvim_get_option_value("buftype", { buf = 0 })
+		local filetype = api.nvim_get_option_value("filetype", { buf = 0 })
+		local buftype = api.nvim_get_option_value("buftype", { buf = 0 })
 		filename = extension.filetypes[filetype] or filename
 		filename = extension.buftypes[buftype] or filename
 
@@ -52,11 +52,11 @@ local FileName = {
 
 ---@type Component
 local Icon = {
-	id = Id.FileIcon,
+	id = Id["file.icon"],
 	_plug_provided = true,
 	ref = {
-		events = Id.FileName,
-		user_events = Id.FileName,
+		events = Id["file.name"],
+		user_events = Id["file.name"],
 	},
 	static = {
 		extensions = {

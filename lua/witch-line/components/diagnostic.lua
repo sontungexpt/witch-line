@@ -1,11 +1,13 @@
-local colors = require("witch-line.constant.color")
+-- local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
+--- @type Component
 local Error = {
-	id = Id.DiagnosticError,
-	style = {
-		fg = "DiagnosticError",
-	},
+	id = Id["diagnostic.error"],
+	_plug_provided = true,
+	-- style = {
+	-- 	fg = "DiagnosticError",
+	-- },
 	events = { "DiagnosticChanged" },
 	static = {
 		ERROR = "",

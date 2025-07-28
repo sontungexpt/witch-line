@@ -57,21 +57,24 @@ local TimerStore = {
 	-- }
 }
 
-M.cache = function()
+M.on_vim_leave_pre = function()
 	CacheMod.cache(EventStore, "EventStore")
 	CacheMod.cache(TimerStore, "TimerStore")
 end
 
---- Reset the state of the event and timer stores.
---- This function clears the EventStore and TimerStore, effectively resetting their state.
-M.reset_state = function()
-	EventStore = {}
-	TimerStore = {}
-end
-
+--- Load the event and timer stores from the persistent storage.
+--- @return function undo function to restore the previous state of the stores
 M.load_cache = function()
-	EventStore = CacheMod.get().EventStore or EventStore
-	TimerStore = CacheMod.get().TimerStore or TimerStore
+	local before_event_store = EventStore
+	local before_timer_store = TimerStore
+
+	EventStore = CacheMod.get("EventStore") or EventStore
+	TimerStore = CacheMod.get("TimerStore") or TimerStore
+
+	return function()
+		EventStore = before_event_store
+		TimerStore = before_timer_store
+	end
 end
 
 --- Clear the value of a component in the statusline.
@@ -337,35 +340,47 @@ end
 
 --- Link dependencies for a component.
 --- @param comp Component The component to link dependencies for.
-local function link_refs(comp)
+local function registry_refs(comp)
 	local ref = comp.ref
 	if type(ref) ~= "table" then
 		return
 	end
 
 	local inherit = comp.inherit
+	local ref_ids = {}
 	if ref.events then
-		link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event))
+		link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event), ref_ids)
 	elseif inherit then
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event))
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
 	end
 
 	if ref.user_events then
-		link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event))
+		link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event), ref_ids)
 	elseif inherit then
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event))
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
 	end
 
 	if ref.timing then
-		link_ref_field(comp, ref.timing, get_dep_store(DepStoreKey.Timer))
+		link_ref_field(comp, ref.timing, get_dep_store(DepStoreKey.Timer), ref_ids)
 	elseif inherit then
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer))
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer), ref_ids)
 	end
 
 	if ref.hidden then
-		link_ref_field(comp, ref.hidden, get_dep_store(DepStoreKey.Display))
+		link_ref_field(comp, ref.hidden, get_dep_store(DepStoreKey.Display), ref_ids)
 	elseif inherit then
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display))
+		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display), ref_ids)
+	end
+
+	-- Pull missing dependencies from the component's ref field
+	local Component = require("witch-line.core.Component")
+	for _, id in ipairs(ref_ids) do
+		if not CompManager.id_exists(id) then
+			local c = Component.require_by_id(id)
+			if c then
+				M.registry_abstract_component(c, id)
+			end
+		end
 	end
 end
 
@@ -400,45 +415,65 @@ local function registry_update_conditions(comp)
 	end
 
 	if comp.ref then
-		link_refs(comp)
+		registry_refs(comp)
 	end
 end
 
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id|integer The ID to assign to the component.
---- @param urgents table<Component> The list of components that should be updated immediately.
+--- @param urgents Id[] The list of components that should be updated immediately.
 --- @return nil
-local function registry_comp(comp, id, urgents)
-	id = manage(comp, id)
+function M.registry_comp(comp, id, urgents)
+	if comp._loaded then
+		return comp.id
+	end
+	-- If is a list it just a wrapper for a list components
+	if not vim.islist(comp) then
+		-- Every component is treat as an abstract component
+		-- The difference is that abstract components are not registered in the statusline
+		id = M.registry_abstract_component(comp, id)
 
-	if comp.lazy == false then
-		urgents[#urgents + 1] = id
+		local update = comp.update
+		if update then
+			if comp.lazy == false then
+				urgents[#urgents + 1] = id
+			end
+
+			if comp.left then
+				statusline.push("")
+			end
+
+			local st_idx = type(update) == "string" and statusline.push(update) or statusline.push("")
+			local indices = comp._indices
+			if not indices then
+				rawset(comp, "_indices", { st_idx })
+			else
+				indices[#indices + 1] = st_idx
+			end
+
+			if comp.right then
+				statusline.push("")
+			end
+		end
+		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
 
-	if comp.init then
-		comp.init(comp)
+	-- Why not support string comp
+	-- Because inherit component should be created by user
+	-- String component is just use to call default component or just a string
+	-- So it make hard to manage the component
+	-- May be in the future we can support string component
+	for i, child in ipairs(comp) do
+		if type(child) == "table" and next(child) then
+			if not child.inherit then
+				rawset(child, "inherit", comp.id)
+			end
+			M.registry_comp(child, i, urgents)
+		end
 	end
 
-	if comp.left then
-		statusline.push("")
-	end
-
-	local update = comp.update
-	local st_idx = type(update) == "string" and statusline.push(update) or statusline.push("")
-	local indices = comp._indices
-	if not indices then
-		rawset(comp, "_indices", { st_idx })
-	else
-		indices[#indices + 1] = st_idx
-	end
-
-	if comp.right then
-		statusline.push("")
-	end
-
-	registry_update_conditions(comp)
-	rawset(comp, "_loaded", true) -- Mark the component as loaded
+	return comp.id
 end
 
 --- Compare two strings for sorting in the registry.
@@ -446,7 +481,7 @@ end
 --- @param i integer The index of the string in the registry.
 --- @param urgents table<Component> The list of components that should be updated immediately.
 ---@diagnostic disable-next-line: unused-local
-local function registry_str_comp(comp, i, urgents)
+function M.registry_str_comp(comp, i, urgents)
 	if comp == "" then
 		return
 	elseif comp == "%=" then
@@ -459,27 +494,32 @@ local function registry_str_comp(comp, i, urgents)
 		statusline.push(comp)
 		return
 	end
-	registry_comp(component, i, urgents)
+	M.registry_comp(component, i, urgents)
 end
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id The ID to assign to the component.
---- @return nil
-local function registry_abstract_comp(comp, id)
-	manage(comp, id)
+--- @return Id The ID of the registered component.
+function M.registry_abstract_component(comp, id)
+	if not comp._abstract then
+		id = manage(comp, id)
 
-	if comp.init then
-		comp.init(comp)
+		if comp.init then
+			comp.init(comp)
+		end
+
+		registry_update_conditions(comp)
+		rawset(comp, "_abstract", true)
 	end
 
-	registry_update_conditions(comp)
+	return comp.id
 end
 
 --- Setup the statusline with the given configurations.
 --- @param configs Config|nil  The configurations for the statusline.
 --- @param cached boolean|nil Whether the setup is from a cached state.
 M.setup = function(configs, cached)
-	local urgents = CacheMod.get().Urgents or {}
+	local urgents = CacheMod.get("Urgents") or {}
 
 	if not cached then
 		configs = configs or require("witch-line.config").get()
@@ -493,7 +533,7 @@ M.setup = function(configs, cached)
 				c = require("witch-line.core.Component").require(c)
 			end
 			if type(c) == "table" and c.id then
-				registry_abstract_comp(c, i)
+				M.registry_abstract_component(c, i)
 			else
 				error("Abstract component must be a table with an 'id' field: " .. tostring(c))
 			end
@@ -505,9 +545,9 @@ M.setup = function(configs, cached)
 			local c = components[i]
 			local type_c = type(c)
 			if type_c == "string" then
-				registry_str_comp(c, i, urgents)
-			elseif type_c == "table" then
-				registry_comp(c, i, urgents)
+				M.registry_str_comp(c, i, urgents)
+			elseif type_c == "table" and next(c) then
+				M.registry_comp(c, i, urgents)
 			end
 		end
 	end
@@ -516,10 +556,6 @@ M.setup = function(configs, cached)
 	init_timer()
 
 	if urgents[1] then
-		if not cached then
-			CacheMod.cache(urgents, "Urgents")
-		end
-
 		local Session = require("witch-line.core.Session")
 		Session.run_once(function(session_id)
 			M.update_comp_graphs_by_id(urgents, session_id, {
@@ -527,6 +563,10 @@ M.setup = function(configs, cached)
 				get_raw_dep_store(DepStoreKey.Timer),
 			}, {})
 		end)
+	end
+
+	if not cached then
+		CompManager.cache_ugent_comps(urgents)
 	end
 	statusline.render()
 end

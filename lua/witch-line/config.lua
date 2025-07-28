@@ -52,23 +52,19 @@ local simplyfy_configs = function(configs)
 	return simplified
 end
 
-M.cache = function()
+M.on_vim_leave_pre = function()
 	CacheMod.cache(default_configs.disabled, "Disabled")
 end
 
 M.load_cache = function()
-	local cache = require("witch-line.cache").get()
-	default_configs.disabled = cache.Disabled or default_configs.disabled
-end
+	local before_configs = default_configs
 
---- Resets the state of the module.
-M.reset_state = function()
-	default_configs.disabled = {
-		filetypes = {},
-		buftypes = {
-			"terminal",
-		},
-	}
+	local DisabledCache = require("witch-line.cache").get("Disabled")
+	default_configs.disabled = DisabledCache or default_configs.disabled
+
+	return function()
+		default_configs = before_configs
+	end
 end
 
 local same_type = function(a, b)
@@ -90,29 +86,7 @@ end
 --- @param cache Config
 --- @param user_configs Config
 M.user_configs_changed = function(cache, user_configs)
-	if not same_type(cache, user_configs) then
-		return false
-	end
-	local tbl_util = require("witch-line.utils.tbl")
-	local uc_disabled, cache_disabled = user_configs.disabled, cache.disabled
-	if
-		not same_type(uc_disabled, cache_disabled)
-		or not tbl_util.is_superset(uc_disabled.buftypes, cache_disabled.buftypes)
-		or not tbl_util.is_superset(uc_disabled.filetypes, cache_disabled.filetypes)
-	then
-		return true
-	end
-	local uc_abstract, cache_abstract = user_configs.abstract, cache.abstract
-	local uc_components, cache_components = user_configs.components, cache.components
-	if
-		not same_type(uc_components, cache_components)
-		or not same_type(uc_abstract, cache_abstract)
-		or not same_comps(uc_abstract, cache_abstract)
-		or not same_comps(uc_components, cache_components)
-		or not same_comps(uc_abstract, cache_abstract)
-	then
-		return true
-	end
+	return false
 end
 
 function M.is_buf_disabled(bufnr)

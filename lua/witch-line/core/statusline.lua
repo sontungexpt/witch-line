@@ -1,6 +1,5 @@
 local vim, concat = vim, table.concat
 local o = vim.o
-local CacheMod = require("witch-line.cache")
 
 local M = {}
 local enabled = true
@@ -23,7 +22,8 @@ M.empty_values = function()
 	end
 end
 
-M.cache = function()
+M.on_vim_leave_pre = function()
+	local CacheMod = require("witch-line.cache")
 	--reset the values to empty strings
 	--before caching
 	--because when the plugin is loaded
@@ -33,19 +33,20 @@ M.cache = function()
 	CacheMod.cache(ValuesSize, "StatuslineSize")
 end
 
---- Resets the statusline values and size.
---- This function clears the current values and sets the size to zero.
-M.reset_state = function()
-	Values = {}
-	ValuesSize = 0
-	enabled = true
-	o.statusline = " "
-end
-
+--- Loads the statusline cache.
+--- @return function undo function to restore the previous state
 M.load_cache = function()
-	local cache = CacheMod.get()
-	Values = cache.Statusline or Values
-	ValuesSize = cache.StatuslineSize or ValuesSize
+	local CacheMod = require("witch-line.cache")
+	local before_values = Values
+	local before_values_size = ValuesSize
+
+	Values = CacheMod.get("Statusline") or Values
+	ValuesSize = CacheMod.get("StatuslineSize") or ValuesSize
+
+	return function()
+		Values = before_values
+		ValuesSize = before_values_size
+	end
 end
 
 M.clear = function()

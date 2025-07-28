@@ -1,5 +1,4 @@
 local type = type
-local CacheMod = require("witch-line.cache")
 
 local M = {}
 
@@ -20,19 +19,51 @@ local Comps = {
 	--[id] = {}
 }
 
-M.cache = function()
+M.cache_ugent_comps = function(urgents)
+	assert(type(urgents) == "table" and vim.isarray(urgents), "Urgents must be a table")
+	local CacheMod = require("witch-line.cache")
+
+	-- cache the value loaded in fast events
+	vim.defer_fn(function()
+		local map = {}
+		for _, id in ipairs(urgents) do
+			map[id] = true
+		end
+
+		for id, comp in pairs(Comps) do
+			if comp._hidden == false and not map[id] then
+				urgents[#urgents + 1] = id
+			end
+		end
+		-- error(vim.inspect(urgents))
+
+		if next(urgents) then
+			CacheMod.cache(urgents, "Urgents")
+		end
+	end, 200)
+end
+
+M.on_vim_leave_pre = function()
+	local CacheMod = require("witch-line.cache")
 	CacheMod.cache(Comps, "Comps")
 	CacheMod.cache(DepStore, "DepStore")
 end
 
-M.reset_state = function()
-	Comps = {}
-	DepStore = {}
-end
-
+--- Load the cache for components and dependency stores.
+--- @return function undo Function to restore the previous state of Comps and DepStore.
 M.load_cache = function()
-	Comps = CacheMod.get().Comps or Comps
-	DepStore = CacheMod.get().DepStore or DepStore
+	local CacheMod = require("witch-line.cache")
+
+	local before_comps = Comps
+	local before_dep_store = DepStore
+
+	Comps = CacheMod.get("Comps") or Comps
+	DepStore = CacheMod.get("DepStore") or DepStore
+
+	return function()
+		Comps = before_comps
+		DepStore = before_dep_store
+	end
 end
 
 --- Get the component manager.
@@ -61,6 +92,12 @@ M.register = function(comp, alt_id)
 	return id
 end
 
+---- Register a component with the component manager.
+--- @param id Id The component to register.
+M.id_exists = function(id)
+	return Comps[id] ~= nil
+end
+
 --- Get the dependency store for a given ID.
 --- @param id NotNil The ID to get the dependency store for.
 --- @return DepStore The dependency store for the given ID.
@@ -86,22 +123,24 @@ M.get_dep_store = get_dep_store
 --- @param comp Component The component to add the dependency for.
 --- @param ref Id|Id[] The event or component ID that this component depends on.
 --- @param store DepStore Optional. The store to add the dependency to. Defaults to EventRefs.
-local function link_ref_field(comp, ref, store)
-	if type(ref) == "table" then
-		local id = comp.id
-		for i = 1, #ref do
-			local on_i = ref[i]
-			local deps = store[on_i] or {}
-			---@diagnostic disable-next-line: need-check-nil
-			deps[id] = true
-			store[on_i] = deps
-		end
-		return
+--- @param ref_id_collector table<Id, true>|nil Optional. A collector to track dependencies.
+local function link_ref_field(comp, ref, store, ref_id_collector)
+	if type(ref) ~= "table" then
+		ref = { ref }
 	end
 
-	local deps = store[ref] or {}
-	deps[comp.id] = true
-	store[ref] = deps
+	local id = comp.id
+	for i = 1, #ref do
+		local ref_id = ref[i]
+		if ref_id_collector then
+			ref_id_collector[ref_id] = true
+		end
+
+		local deps = store[ref_id] or {}
+		---@diagnostic disable-next-line: need-check-nil
+		deps[id] = true
+		store[ref_id] = deps
+	end
 end
 M.link_ref_field = link_ref_field
 

@@ -1,16 +1,14 @@
 local api = vim.api
 local M = {}
 
-local CacheMod = require("witch-line.cache")
-
 local commands = {
 	uncached = function()
-		CacheMod.clear()
+		require("witch-line.cache").clear()
 	end,
 
 	inspect = {
 		cache = function(...)
-			return CacheMod.get()
+			require("witch-line.cache").inspect()
 		end,
 		comps = function()
 			require("witch-line.core.CompManager").inspect("comps")

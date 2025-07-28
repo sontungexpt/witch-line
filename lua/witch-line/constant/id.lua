@@ -17,31 +17,32 @@ local function create_enum(list)
 end
 
 ---@class DefaultId
----@field Mode 1
----@field FileName 2
----@field FileIcon 3
----@field Copilot 4
----@field DiagnosticError 5
----@field DiagnosticWarn 6
----@field DiagnosticInfo 7
----@field DiagnosticHint 8
+---@field [integer] string
+---@field ["mode"] 1
+---@field ["file.name"] 2
+---@field ["file.icon"] 3
+---@field ["copilot"] 4
+---@field ["diagnostic.error"] 5
+---@field ["diagnostic.warn"] 6
+---@field ["diagnostic.info"] 7
+---@field ["diagnostic.hint"] 8
 ---@field GitBranch 9
 ---@field GitAdd 10
 ---@field GitChange 11
 local Id, Size = create_enum({
-	"Mode",
-	"FileName",
-	"FileIcon",
-	"Copilot",
-	"DiagnosticError",
-	"DiagnosticWarn",
-	"DiagnosticInfo",
-	"DiagnosticHint",
-	"GitBranch",
-	"GitAdd",
-	"GitChange",
-	"GitDelete",
-	"GitModified",
+	"mode",
+	"file.name",
+	"file.icon",
+	"copilot",
+	"diagnostic.error",
+	"diagnostic.warn",
+	"diagnostic.info",
+	"diagnostic.hint",
+	-- "git.branch",
+	-- "GitAdd",
+	-- "GitChange",
+	-- "GitDelete",
+	-- "GitModified",
 })
 
 return {
@@ -49,9 +50,9 @@ return {
 	-- helper function to generate an ID based on a number or an enum name
 	-- make sure to use this function to avoid conflicts with the enum values
 	id = function(id)
-		if type(id) ~= "number" or not Id[id] then
-			return id
+		if type(id) == "number" then
+			return Id[id] and Size + id or id
 		end
-		return Size + id
+		return tostring(id)
 	end,
 }

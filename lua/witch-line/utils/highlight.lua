@@ -35,22 +35,22 @@ api.nvim_create_autocmd("Colorscheme", {
 })
 
 --- Caches the highlight styles and color numbers.
-M.cache = function()
+M.on_vim_leave_pre = function()
 	CacheMod.cache(HighlightCache, "HighlightCache")
 end
 
 --- Resets the highlight cache state.
---- This function clears the cached color numbers, component styles, and highlight styles.
-M.reset_state = function()
-	HighlightCache.color_nums = {}
-	HighlightCache.comp_styles = {}
-	HighlightCache.hl_styles = {}
-end
 
 --- Loads the highlight cache from the persistent storage.
+--- @return function undo function to restore the previous cache state
 M.load_cache = function()
-	HighlightCache = CacheMod.get().HighlightCache or HighlightCache
+	local before_hilight_cache = HighlightCache
+	HighlightCache = CacheMod.get("HighlightCache") or HighlightCache
 	hl_all_comps()
+
+	return function()
+		HighlightCache = before_hilight_cache
+	end
 end
 
 do
