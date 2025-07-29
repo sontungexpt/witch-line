@@ -6,10 +6,11 @@ local enabled = true
 
 --- @type string[] The list of render value of component .
 local Values = {}
-local StaticPos = {}
-
 ---@type integer
 local ValuesSize = 0
+
+--- @type table<integer, true>
+local StaticPos = {}
 
 --- Inspects the current statusline values.
 M.inspect = function()
@@ -23,10 +24,10 @@ M.empty_values = function()
 	end
 end
 
-M.empty_value_exclude_statics = function()
+-- Only empty values that are not static
+M.empty_non_statics = function()
 	for i = 1, ValuesSize do
 		if not StaticPos[i] then
-			-- Only empty values that are not static
 			Values[i] = ""
 		end
 	end
@@ -38,7 +39,7 @@ M.on_vim_leave_pre = function()
 	--before caching
 	--because when the plugin is loaded
 	--the statusline must be empty stage
-	M.empty_value_exclude_statics()
+	M.empty_non_statics()
 	CacheMod.cache(Values, "Statusline")
 	CacheMod.cache(ValuesSize, "StatuslineSize")
 end
@@ -120,15 +121,9 @@ vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 	callback = function(e)
 		local buf = e.buf
 		vim.schedule(function()
-			if vim.api.nvim_buf_is_valid(buf) then
-				local ConfMod = require("witch-line.config")
-				if ConfMod.is_buf_disabled(buf) then
-					enabled = false
-				else
-					enabled = true
-				end
-				M.render()
-			end
+			local ConfMod = require("witch-line.config")
+			enabled = not ConfMod.is_buf_disabled(buf)
+			M.render()
 		end)
 	end,
 })

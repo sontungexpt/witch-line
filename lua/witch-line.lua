@@ -12,7 +12,7 @@ M.setup = function(user_configs)
 	local ConfMod = require("witch-line.config")
 
 	local CACHE_MODS = {
-		"witch-line.core.handler",
+		"witch-line.core",
 		"witch-line.core.statusline",
 		"witch-line.core.CompManager",
 		"witch-line.utils.highlight",
@@ -27,17 +27,17 @@ M.setup = function(user_configs)
 						require(CACHE_MODS[i]).load_cache()
 					end
 					-- use cache first
-					require("witch-line.core.handler").setup(nil, true)
+					require("witch-line.core").setup(nil, true)
 					return
 				end
 				CacheMod.clear()
 			end
 			local configs = ConfMod.set_user_config(user_configs)
-			require("witch-line.core.handler").setup(configs, false)
+			require("witch-line.core").setup(configs, false)
 		end)
 	else
 		local configs = ConfMod.set_user_config(user_configs)
-		require("witch-line.core.handler").setup(configs, false)
+		require("witch-line.core").setup(configs, false)
 	end
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {

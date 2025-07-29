@@ -87,16 +87,21 @@ local InheritField = {
 ---@field _plug_provided true If true, the component is provided by plugin
 
 --- Gets the id of the component, if the id is a number, it will be converted to a string.
---- @param comp Component the component to get the id from
+--- @param comp Component|DefaultComponent the component to get the id from
 --- @param alt_id Id|nil an alternative id to use if the component does not have an id
---- @return Id the id of the component
+--- @return Id id the id of the component
 M.valid_id = function(comp, alt_id)
 	local Id = require("witch-line.constant.id")
 	local id = comp.id or alt_id
 	if not comp._plug_provided then
 		id = Id.id(id)
 	end
+	if id == nil then
+		require("witch-line.utils.notifier").error("Component id is nil" .. vim.inspect(comp))
+	end
 	rawset(comp, "id", id) -- Ensure the component has an ID field
+
+	---@diagnostic disable-next-line: return-type-mismatch
 	return id
 end
 
@@ -123,8 +128,9 @@ end
 --- @param session_id SessionId the session id to use for the component, used for lazy loading components
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
-M.update_style = function(comp, session_id, ctx, static)
-	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+--- @param ... any additional arguments to pass to the component's update function
+M.update_style = function(comp, session_id, ctx, static, ...)
+	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static, ...)
 
 	local left_type, right_type = type(comp.left), type(comp.right)
 
@@ -264,8 +270,11 @@ M.update_style = function(comp, session_id, ctx, static)
 end
 
 --- @param comp Component the component to evaluate
+--- @param ctx any the context to pass to the component's update function
+--- @param static any the static values to pass to the component's update function
+--- @param ... any additional arguments to pass to the component's update function
 --- @return string value the new value of the component
-M.evaluate = function(comp, ctx, static)
+M.evaluate = function(comp, ctx, static, ...)
 	if type(comp.pre_update) == "function" then
 		comp.pre_update(comp, ctx, static)
 	end

@@ -79,7 +79,7 @@ end
 
 --- Clear the value of a component in the statusline.
 --- @param c Component The component to clear.
-local clear_comp_value = function(c)
+local clear_comp_value = function(c, ...)
 	local indices = c._indices
 	if not indices then
 		return
@@ -98,7 +98,8 @@ end
 --- Update a component and its dependencies.jj
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
-local function update_comp(comp, session_id)
+--- @param ... any Additional arguments to pass to the update function.
+local function update_comp(comp, session_id, ...)
 	local Component = require("witch-line.core.Component")
 
 	if comp.inherit and not Component.has_parent(comp) then
@@ -108,8 +109,8 @@ local function update_comp(comp, session_id)
 		end
 	end
 
-	local static = get_static(comp)
-	local ctx = get_context(comp, session_id, static)
+	local static = get_static(comp, ...)
+	local ctx = get_context(comp, session_id, static, ...)
 	local hidden = false
 
 	local min_screen_width = comp.min_screen_width
@@ -117,7 +118,7 @@ local function update_comp(comp, session_id)
 		hidden = vim.o.columns < min_screen_width
 	end
 	-- hidden = hidden and should_hidden(comp, session_id, ctx, static)
-	hidden = hidden and should_hidden(comp, session_id, ctx, static)
+	hidden = hidden and should_hidden(comp, session_id, ctx, static, ...)
 
 	if hidden then
 		clear_comp_value(comp)
@@ -125,14 +126,14 @@ local function update_comp(comp, session_id)
 	end
 
 	-- local value = Component.evaluate(comp, ctx, static)
-	local value = Component.evaluate(comp, ctx, static)
+	local value = Component.evaluate(comp, ctx, static, ...)
 	if value == "" then
 		clear_comp_value(comp)
 		return ""
 	end
 
 	-- Component.update_style(comp, ctx, static, session_id)
-	Component.update_style(comp, session_id, ctx, static)
+	Component.update_style(comp, session_id, ctx, static, ...)
 
 	local indices = comp._indices
 	if not indices then
@@ -160,14 +161,15 @@ M.update_comp = update_comp
 --- @param session_id SessionId The ID of the process to use for this update.
 --- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-function M.update_comp_graph(comp, session_id, dep_stores, seen)
+--- @param ... any Additional arguments to pass to the update function.
+function M.update_comp_graph(comp, session_id, dep_stores, seen, ...)
 	seen = seen or {}
 	local id = comp.id
 	if seen[id] then
 		return -- Avoid infinite recursion
 	end
 
-	local updated_value = update_comp(comp, session_id)
+	local updated_value = update_comp(comp, session_id, ...)
 	if updated_value == "" then
 		local refs = CompManager.get_raw_dep_store(DepStoreKey.Display)
 		if refs then
@@ -316,6 +318,7 @@ local function init_autocmd()
 	return group, id1, id2
 end
 
+--- Initialize the timer for components that have timers registered.
 local function init_timer()
 	local timers = TimerStore
 	if not timers then
@@ -555,6 +558,12 @@ M.setup = function(configs, cached)
 		local comps = configs.components
 		for i = 1, #comps do
 			M.registry_comp_by_type(comps[i], i, urgents)
+		end
+	else
+		for _, comp in CompManager.iterate_comps() do
+			if comp.init then
+				comp.init(comp)
+			end
 		end
 	end
 

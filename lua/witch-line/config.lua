@@ -12,7 +12,7 @@ local M = {}
 ---@type Config
 local default_configs = {
 	abstract = {},
-	components = require("witch-line.constant.default"),
+	components = {},
 	disabled = {
 		filetypes = {},
 		buftypes = {
@@ -20,37 +20,6 @@ local default_configs = {
 		},
 	},
 }
-
---- Converts component objects in a table to their IDs.
---- @param components Component[] A table of components, which can be either strings or tables with an `id` field.
---- @return Id[] A table of component IDs.
-local components_to_ids = function(components)
-	local ids = {}
-	for i, comp in ipairs(components) do
-		local comp_type = type(comp)
-		if comp_type == "table" then
-			ids[i] = comp.id
-		elseif comp_type == "string" then
-			ids[i] = comp
-		end
-	end
-	return ids
-end
-
-local simplyfy_configs = function(configs)
-	if type(configs) ~= "table" then
-		return configs
-	end
-
-	local simplified = vim.deepcopy(configs)
-	if type(simplified.components) == "table" then
-		simplified.components = components_to_ids(simplified.components)
-	end
-	if type(simplified.abstract) == "table" then
-		simplified.abstract = components_to_ids(simplified.abstract)
-	end
-	return simplified
-end
 
 M.on_vim_leave_pre = function()
 	CacheMod.cache(default_configs.disabled, "Disabled")
@@ -80,6 +49,10 @@ M.user_configs_changed = function(user_configs)
 end
 
 function M.is_buf_disabled(bufnr)
+	if vim.api.nvim_buf_is_valid(bufnr) == false then
+		return false
+	end
+
 	local buf_o = bo[bufnr]
 	local filetype = buf_o.filetype
 	local buftype = buf_o.buftype
@@ -121,6 +94,8 @@ local function merge_user_config(defaults, overrides)
 	--- Utilize the available table
 	if next(defaults) == nil then
 		return overrides
+	elseif vim.islist(defaults) and vim.islist(overrides) then
+		return vim.list_extend(defaults, overrides)
 	end
 
 	-- Deep merge dictionary-like tables
@@ -139,13 +114,16 @@ end
 M.set_user_config = function(user_configs)
 	local tbl_util = require("witch-line.utils.tbl")
 	local hashs = {}
-
 	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs, 10) do
 		hashs[i] = hash
 	end
 	CacheMod.cache(hashs, "UserConfigHashs")
 
-	return merge_user_config(default_configs, user_configs)
+	local configs = merge_user_config(default_configs, user_configs)
+	if not next(configs.components) then
+		configs.components = require("witch-line.constant.default")
+	end
+	return configs
 end
 
 --- Returns a read-only table containing the default configurations.

@@ -66,6 +66,12 @@ M.load_cache = function()
 	end
 end
 
+--- @return fun(): Id, Component Iterator iterator over all components.
+--- @return Component[] comps The list of all components.
+M.iterate_comps = function()
+	return pairs(Comps)
+end
+
 --- Get the component manager.
 --- @return table The component manager containing all registered components.
 M.get_comps_map = function()
@@ -232,8 +238,8 @@ end
 --- @param static any Optional. If true, the static value will be used for the style.
 --- @return vim.api.keyset.highlight|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
-M.get_style = function(comp, session_id, ctx, static)
-	return lookup_ref_value(comp, "style", session_id, {}, ctx, static)
+M.get_style = function(comp, session_id, ctx, static, ...)
+	return lookup_ref_value(comp, "style", session_id, {}, ctx, static, ...)
 end
 
 --- Check if a component should be displayed.
