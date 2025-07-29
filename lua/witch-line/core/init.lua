@@ -440,6 +440,18 @@ function M.registry_comp_by_type(comp, i, urgents, inherit_comp_id)
 		end
 		M.registry_comp(c, i, urgents)
 	elseif type_c == "table" and next(comp) then
+		-- support user configs
+		local comp_path = comp[0]
+		if type(comp_path) == "string" then
+			local c = require("witch-line.core.Component").require(comp_path)
+			if not c then
+				return
+			else
+				---@diagnostic disable-next-line: param-type-mismatch
+				comp = require("witch-line.core.Component").overrides(c, comp[1])
+			end
+		end
+
 		if inherit_comp_id and not comp.inherit then
 			rawset(comp, "inherit", inherit_comp_id)
 		end

@@ -402,7 +402,14 @@ M.remove_state_before_cache = function(comp)
 end
 
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
-M.custom_stat = function(comp, override)
+--- @param comp Component the component to create the statistic for
+--- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
+--- @return Component stat_comp the statistic component with the necessary fields set
+M.overides = function(comp, override)
+	if type(override) ~= "table" then
+		return comp
+	end
+
 	local accepted = {
 		padding = { "number", "table" },
 		static = { "any" },
