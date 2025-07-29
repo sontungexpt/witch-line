@@ -17,6 +17,7 @@ local function create_enum(list)
 end
 
 ---@class DefaultId
+---@field [integer] string
 ---@field ["mode"] 1
 ---@field ["file.interface"] 2
 ---@field ["file.name"] 3

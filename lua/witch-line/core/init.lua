@@ -138,19 +138,18 @@ local function update_comp(comp, session_id)
 
 	local indices = comp._indices
 	if not indices then
+		error("Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
 		return
 	end
-	local add_hl_name = require("witch-line.utils.highlight").add_hl_name
 
+	local add_hl_name = require("witch-line.utils.highlight").add_hl_name
 	statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
-	if comp._hidden ~= false then
-		local left, right = comp.left, comp.right
-		if type(left) == "string" then
-			statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
-		end
-		if type(right) == "string" then
-			statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
-		end
+	local left, right = Component.evaluate_left_right(comp, ctx, static)
+	if left then
+		statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
+	end
+	if right then
+		statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
 	end
 	rawset(comp, "_hidden", false) -- Reset hidden state
 	return value
@@ -551,6 +550,7 @@ M.setup = function(configs, cached)
 		end
 
 		local comps = configs.components
+		---@cast comps ConfigComps
 		for i = 1, #comps do
 			M.registry_comp_by_type(comps[i], i, urgents)
 		end

@@ -40,6 +40,9 @@ end
 --- @param user_configs Config
 M.user_configs_changed = function(user_configs)
 	local cache_hashs = require("witch-line.cache").get("UserConfigHashs")
+	if not cache_hashs then
+		return true
+	end
 	local tbl_util = require("witch-line.utils.tbl")
 	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs) do
 		if hash ~= cache_hashs[i] then

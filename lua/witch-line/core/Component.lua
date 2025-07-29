@@ -43,6 +43,7 @@ local InheritField = {
 
 ---@alias RefFieldType Id|nil
 ---@alias RefFieldTypes Id[]|nil
+---
 
 ---@class Component
 ---@field [integer] string|Component a table of childs, can be used to create a list of components
@@ -55,14 +56,14 @@ local InheritField = {
 ---@field ref Ref|nil a table of references to other components, used for lazy loading components
 ---
 ---@field left_style table |nil a table of styles that will be applied to the left part of the component
----@field left string|nil the left part of the component, can be a string or another component
+---@field left string|nil|fun(self: Component, ctx: any, static: any) the left part of the component, can be a string or another component
 ---@field right_style table |nil a table of styles that will be applied to the right part of the component
----@field right string|nil the right part of the component, can be a string or another component
----@field padding integer|nil|{left: integer, right:integer} the padding of the component, can be used to add space around the component
+---@field right string|nil|fun(self: Component, ctx: any, static: any) the right part of the component, can be a string or another component
+---@field padding integer|nil|{left: integer|nil, right:integer|nil}|fun(self: Component, ctx: any, static: any): number|{left: integer|nil, right:integer|nil} the padding of the component, can be used to add space around the component
 ---
 ---@field style vim.api.keyset.highlight|nil|fun(self: Component, ctx: any, static: any): vim.api.keyset.highlight a table of styles that will be applied to the component
 ---@field static any a table of static values that will be used in the component
----@field context nil|fun(self:Component, static:any): any a table that will be passed to the component's update function
+---@field context nil|fun(self: Component, static:any): any a table that will be passed to the component's update function
 ---
 ---@field init nil|fun(raw_self: Component) called when the component is initialized, can be used to set up the context
 ---@field pre_update nil|fun(self: Component, ctx: any, static: any) called before the component is updated, can be used to set up the context
@@ -71,6 +72,7 @@ local InheritField = {
 ---@field hide nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
 ---@field min_screen_width integer|nil the minimum screen width required to display the component, used for lazy loading components
 ---
+---@private
 ---@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
 ---@field _hl_name string|nil the highlight group name for the component
 ---@field _left_hl_name string|nil the highlight group name for the component
@@ -281,18 +283,22 @@ M.evaluate = function(comp, ctx, static, ...)
 	if type(comp.update) == "function" then
 		result = comp.update(comp, ctx, static)
 	end
+
 	if type(result) ~= "string" then
 		result = ""
 	elseif result ~= "" then
 		local padding = comp.padding or 1
-		if type(padding) == "number" and padding > 0 then
+		if type(padding) == "function" then
+			padding = padding(comp, ctx, static)
+		end
+		local padding_type = type(padding)
+		if padding_type == "number" and padding > 0 then
 			result = str_rep(" ", padding) .. result .. str_rep(" ", padding)
-		elseif type(padding) == "table" then
+		elseif padding_type == "table" then
 			local left, right = padding.left, padding.right
 			if type(left) == "number" and left > 0 then
 				result = str_rep(" ", left) .. result
 			end
-
 			if type(right) == "number" and right > 0 then
 				result = result .. str_rep(" ", right)
 			end
@@ -304,6 +310,56 @@ M.evaluate = function(comp, ctx, static, ...)
 	end
 
 	return result
+end
+
+--- Evaluates the left and right parts of the component, returning their values.
+--- @param comp Component the component to evaluate
+--- @param ctx any the context to pass to the component's update function
+--- @param static any the static values to pass to the component's update function
+--- @return string|nil left the left part of the component, or an empty string if it is not defined
+--- @return string|nil right the right part of the component, or an empty string if it is not defined
+M.evaluate_left_right = function(comp, ctx, static)
+	local left, right = comp.left, comp.right
+
+	--- All are hided or uninitialized
+	--- So need to compare the left and right accurate
+	if comp._hidden ~= false then
+		if left then
+			if type(left) == "function" then
+				left = left(comp, ctx, static)
+			end
+			if type(left) ~= "string" then
+				left = ""
+			end
+		end
+		if right then
+			if type(right) == "function" then
+				right = right(comp, ctx, static)
+			end
+			if type(right) ~= "string" then
+				right = ""
+			end
+		end
+	else
+		-- nil means no need to update
+		-- Why?
+		-- Because in case the left or right is string type
+		-- It never update so we don't need to set statusline again
+		left, right = nil, nil
+		if type(left) == "function" then
+			left = left(comp, ctx, static)
+			if type(left) ~= "string" then
+				left = nil
+			end
+		end
+		if type(right) == "function" then
+			right = right(comp, ctx, static)
+			if type(right) ~= "string" then
+				right = nil
+			end
+		end
+	end
+	return left, right
 end
 
 --- Requires a default component by its id.
@@ -335,6 +391,44 @@ M.require = function(path)
 		end
 	end
 	return component
+end
+
+--- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
+--- @param comp Component the component to remove the state from
+M.remove_state_before_cache = function(comp)
+	rawset(comp, "_parent", nil)
+	rawset(comp, "_hidden", nil)
+	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
+end
+
+--- Creates a custom statistic component, which can be used to display custom statistics in the status line.
+M.custom_stat = function(comp, override)
+	local accepted = {
+		padding = { "number", "table" },
+		static = { "any" },
+		timing = { "boolean", "number" },
+		style = { "function", "table" },
+		min_screen_width = { "number" },
+		hide = { "function", "boolean" },
+		left_style = { "function", "table" },
+		left = { "string", "function" },
+		right_style = { "function", "table" },
+		right = { "string", "function" },
+	}
+	for k, v in pairs(override or {}) do
+		if accepted[k] then
+			local type_v = type(v)
+			if vim.tbl_contains(accepted[k], type_v) then
+				if type_v == "table" then
+					rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
+				else
+					rawset(comp, k, v)
+				end
+			end
+		end
+	end
+
+	return comp
 end
 
 return M

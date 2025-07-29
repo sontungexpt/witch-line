@@ -329,13 +329,13 @@ local decode_cache = function(data, deep)
 	end
 
 	local struct, decoded_raw
-	benckmark(function()
-		decoded_raw = mpack.decode(data)
+	-- benckmark(function()
+	decoded_raw = mpack.decode(data)
 
-		-- local decoded_raw = mpack.decode(data)
-		struct = deep and deep_decode_refs(decoded_raw) or decode_funcs(decoded_raw)
-		set_struct(struct)
-	end)
+	-- local decoded_raw = mpack.decode(data)
+	struct = deep and deep_decode_refs(decoded_raw) or decode_funcs(decoded_raw)
+	set_struct(struct)
+	-- end)
 
 	return struct, decoded_raw
 end

@@ -43,16 +43,13 @@ M.cache_ugent_comps = function(urgents)
 	end, 200)
 end
 
-local function reset_state_before_cache()
-	for _, comp in pairs(Comps) do
-		rawset(comp, "_hidden", nil)
-		rawset(comp, "_parent", nil)
-	end
-end
-
 M.on_vim_leave_pre = function()
 	local CacheMod = require("witch-line.cache")
-	reset_state_before_cache()
+	local Component = require("witch-line.core.Component")
+
+	for _, comp in pairs(Comps) do
+		Component.remove_state_before_cache(comp)
+	end
 	CacheMod.cache(Comps, "Comps")
 	CacheMod.cache(DepStore, "DepStore")
 end
@@ -86,11 +83,13 @@ M.get_comps_map = function()
 	return setmetatable({}, {
 		-- prevents a little bit for access raw comps
 		__index = function(_, id)
-			return Comps[id] or rawget(Comps, id)
+			return Comps[id]
 		end,
 	})
 end
 
+--- Get a list of all components.
+--- @return Component[] The list of all components.
 M.get_comps_list = function()
 	return vim.tbl_values(Comps)
 end
