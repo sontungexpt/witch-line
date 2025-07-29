@@ -504,7 +504,7 @@ end
 ---@diagnostic disable-next-line: unused-local
 function M.registry_str_comp(comp, i, urgents)
 	if comp ~= "" then
-		statusline.push(comp)
+		statusline.static(statusline.push(comp))
 	end
 	return comp
 end

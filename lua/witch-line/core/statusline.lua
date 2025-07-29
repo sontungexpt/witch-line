@@ -6,6 +6,7 @@ local enabled = true
 
 --- @type string[] The list of render value of component .
 local Values = {}
+local StaticPos = {}
 
 ---@type integer
 local ValuesSize = 0
@@ -22,13 +23,22 @@ M.empty_values = function()
 	end
 end
 
+M.empty_value_exclude_statics = function()
+	for i = 1, ValuesSize do
+		if not StaticPos[i] then
+			-- Only empty values that are not static
+			Values[i] = ""
+		end
+	end
+end
+
 M.on_vim_leave_pre = function()
 	local CacheMod = require("witch-line.cache")
 	--reset the values to empty strings
 	--before caching
 	--because when the plugin is loaded
 	--the statusline must be empty stage
-	M.empty_values()
+	M.empty_value_exclude_statics()
 	CacheMod.cache(Values, "Statusline")
 	CacheMod.cache(ValuesSize, "StatuslineSize")
 end
@@ -74,6 +84,10 @@ M.push = function(value)
 	return ValuesSize
 end
 
+M.static = function(idx)
+	StaticPos[idx] = true
+end
+
 --- Sets the value for multiple components at once.
 --- @param indices integer[] The indices of the components to set the value for.
 --- @param value string The value to set for the specified components.
@@ -104,15 +118,17 @@ end
 ---@diagnostic disable-next-line: undefined-field
 vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 	callback = function(e)
+		local buf = e.buf
 		vim.schedule(function()
-			local ConfMod = require("witch-line.config")
-
-			if ConfMod.is_buf_disabled(e.buf) then
-				enabled = false
-			else
-				enabled = true
+			if vim.api.nvim_buf_is_valid(buf) then
+				local ConfMod = require("witch-line.config")
+				if ConfMod.is_buf_disabled(buf) then
+					enabled = false
+				else
+					enabled = true
+				end
+				M.render()
 			end
-			M.render()
 		end)
 	end,
 })

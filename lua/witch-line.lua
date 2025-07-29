@@ -9,6 +9,7 @@ M.setup = function(user_configs)
 	end
 
 	local CacheMod = require("witch-line.cache")
+	local ConfMod = require("witch-line.config")
 
 	local CACHE_MODS = {
 		"witch-line.core.handler",
@@ -21,34 +22,20 @@ M.setup = function(user_configs)
 	if CacheMod.cache_readable() then
 		CacheMod.read_async(function(struct)
 			if struct then
-				local undos = {}
-				for i = 1, #CACHE_MODS do
-					undos[i] = require(CACHE_MODS[i]).load_cache()
-				end
-
-				-- use cache first
-				require("witch-line.core.handler").setup(nil, true)
-
-				local ConfMod = require("witch-line.config")
-
-				-- check if user_configs is changed
-				if ConfMod.user_configs_changed(user_configs) then
-					CacheMod.clear()
-					for i = 1, #undos do
-						undos[i]()
+				if not ConfMod.user_configs_changed(user_configs) then
+					for i = 1, #CACHE_MODS do
+						require(CACHE_MODS[i]).load_cache()
 					end
-					local configs = ConfMod.set_user_config(user_configs)
-					require("witch-line.core.handler").setup(configs, false)
+					-- use cache first
+					require("witch-line.core.handler").setup(nil, true)
+					return
 				end
-				return
+				CacheMod.clear()
 			end
-
-			local ConfMod = require("witch-line.config")
 			local configs = ConfMod.set_user_config(user_configs)
 			require("witch-line.core.handler").setup(configs, false)
 		end)
 	else
-		local ConfMod = require("witch-line.config")
 		local configs = ConfMod.set_user_config(user_configs)
 		require("witch-line.core.handler").setup(configs, false)
 	end
@@ -59,7 +46,6 @@ M.setup = function(user_configs)
 				for i = 1, #CACHE_MODS do
 					require(CACHE_MODS[i]).on_vim_leave_pre()
 				end
-
 				CacheMod.save()
 			end
 		end,

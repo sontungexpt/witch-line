@@ -5,10 +5,10 @@ local M = {}
 local CACHED_DIR = fn.stdpath("cache") .. "/witch-line"
 local CACHED_FILE = CACHED_DIR .. "/cache.luac"
 
----Urly name to reduce collision with table key
-local ENCODED_FUNC_KEYS = "\0__3[[V_REF_\0 _d{E)))}"
-local ENCODED_TBL_KEYS = "\0_=_TBL_KEYS\0_d{E)))}"
-local ENCODED_META_KEY = "\0_]_META_REF\0_d{E)))}"
+---Urly name to reduce collision with t==able key
+local ENCODED_FUNC_KEYS = "V_REF@@__q@@$$whaw2EWdjDSldkvj23@@19"
+local ENCODED_TBL_KEYS = "TBL_KEYS__dcjvlwkiwEEW3df2df ##S"
+local ENCODED_META_KEY = "META_REF__df dfdjlDDW@@$__dfjowdfdadj2940"
 
 local loaded = false
 

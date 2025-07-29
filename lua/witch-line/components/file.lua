@@ -108,7 +108,7 @@ local Icon = {
 
 		return {
 			icon = icon or "",
-			color = color_icon or colors.white,
+			color = color_icon or "#ffffff",
 		}
 	end,
 	style = function(self, ctx, static)

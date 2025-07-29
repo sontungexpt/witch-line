@@ -68,52 +68,53 @@ end
 
 -- Iterator function: returns next hash every bulk_size elements
 function M.hash_fnv1a32_iter(tbl, bulk_size)
-	local loop_time = 0
+	-- Serialize value for hashing
+	local function simple_serialize(v)
+		local t = type(v)
+		if t == "string" then
+			return v
+		elseif t == "number" then
+			return tostring(v)
+		elseif t == "boolean" then
+			return v and "1" or "0"
+		end
+		return t
+	end
+
+	local iteration = 0
 
 	if type(tbl) ~= "table" or next(tbl) == nil then
 		return function()
-			if loop_time > 0 then
+			if iteration > 0 then
 				return nil, nil -- No more items to process
 			end
-			loop_time = loop_time + 1
-			return loop_time, require("witch-line.utils.hash").fnv1a32(type(tbl))
+			iteration = iteration + 1
+			return iteration, require("witch-line.utils.hash").fnv1a32(simple_serialize(tbl))
 		end
 	end
 
-	-- Serialize value for hashing
-	local function serialize(v)
-		local t = type(v)
-		if t == "string" then
-			return "s:" .. v
-		elseif t == "number" then
-			return "n:" .. tostring(v)
-		elseif t == "boolean" then
-			return "b:" .. tostring(v)
-		elseif t == "nil" then
-			return "nil"
-		else
-			return "u:" .. tostring(v) -- unsupported
-		end
-	end
-
-	local sort, remove, concat = table.sort, table.remove, table.concat
-	local fnv1a_32 = require("witch-line.utils.hash").fnv1a32
+	local sort, remove = table.sort, table.remove
+	local fnv1a_32_concat = require("witch-line.utils.hash").fnv1a32_concat
 	bulk_size = bulk_size or 10
-	local queue = { tbl }
 	local current = nil
 	local keys, keys_size, key_idx = {}, 0, 1
 	local buf, buf_size = {}, 0
-	local seen = {
-		[tbl] = true,
-	}
+
+	local queue = { tbl }
+	local seen = { [tbl] = true }
+
 	return function()
-		loop_time = loop_time + 1
+		iteration = iteration + 1
 		while true do
 			if not current then
 				current = remove(queue)
 				if not current then
+					if buf_size > 0 then
+						return iteration, fnv1a_32_concat(buf, 1, buf_size)
+					end
 					return nil, nil -- No more items to process
 				end
+
 				keys, keys_size, key_idx = {}, 0, 1
 				for k in pairs(tbl) do
 					keys_size = keys_size + 1
@@ -121,37 +122,34 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 				end
 				sort(keys)
 			end
+
 			while key_idx <= keys_size do
 				local k = keys[key_idx]
 				local v = current[k]
 
-				-- Add key
+				--- Add key
 				buf_size = buf_size + 1
-				if type(k) == "table" then
-					if not seen[k] then
-						queue[#queue + 1] = k
-					end
-					buf[buf_size] = "table_key"
-				else
-					buf[buf_size] = serialize(k)
-				end
+				buf[buf_size] = simple_serialize(k)
 
 				-- Add value
 				buf_size = buf_size + 1
 				if type(v) == "table" then
 					if not seen[v] then
 						queue[#queue + 1] = v
+						seen[v] = true
 					end
+
 					buf[buf_size] = "table_value"
 				else
-					buf[buf_size] = serialize(v)
+					buf[buf_size] = simple_serialize(v)
 				end
 				key_idx = key_idx + 1
 
+				-- *2 because one for key and one for value
 				if buf_size >= bulk_size * 2 then
-					local hash = fnv1a_32(concat(buf))
+					local hash = fnv1a_32_concat(buf)
 					buf_size = 0
-					return loop_time, hash
+					return iteration, hash
 				end
 			end
 			current = nil
