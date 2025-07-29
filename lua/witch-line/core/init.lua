@@ -73,6 +73,14 @@ M.load_cache = function()
 
 	return function()
 		EventStore = before_event_store
+
+		for _, ids in pairs(TimerStore) do
+			if ids.timer then
+				ids.timer:stop() -- Stop the timer if it exists
+				ids.timer:close() -- Close the timer to free resources
+			end
+		end
+
 		TimerStore = before_timer_store
 	end
 end
