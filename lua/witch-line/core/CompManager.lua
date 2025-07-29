@@ -202,6 +202,7 @@ end
 --- @return Component last_ref_comp The component that provided the value, or nil if not found.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
 	local id, value = comp.id, comp[key]
+
 	local store = require("witch-line.core.Session").get_store(session_id, key, {})
 	if store[id] then
 		return store[id], comp

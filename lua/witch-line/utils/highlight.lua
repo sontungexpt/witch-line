@@ -1,4 +1,4 @@
-local vim, type, next, pcall = vim, type, next, pcall
+local vim, type, next, pcall, pairs = vim, type, next, pcall, pairs
 local api = vim.api
 local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name = api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
 local CacheMod = require("witch-line.cache")
@@ -23,7 +23,7 @@ end
 
 local function hl_all_comps()
 	for hl_name, style in pairs(HighlightCache.comp_styles) do
-		nvim_set_hl(0, hl_name, style)
+		M.hl(hl_name, style)
 	end
 end
 

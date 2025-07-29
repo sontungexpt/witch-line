@@ -25,11 +25,12 @@ local Error = {
 	style = {
 		fg = "DiagnosticError",
 	},
-	ref = {
-		events = Id["diagnostic.interface"],
-		static = Id["diagnostic.interface"],
-		hide = Id["diagnostic.interface"],
-	},
+	inherit = Id["diagnostic.interface"],
+	-- ref = {
+	-- 	events = Id["diagnostic.interface"],
+	-- 	static = Id["diagnostic.interface"],
+	-- 	hide = Id["diagnostic.interface"],
+	-- },
 	update = function(self, ctx, static)
 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR })
 		return count > 0 and static.ERROR .. " " .. count or ""
@@ -40,31 +41,34 @@ local Error = {
 local Warn = {
 	id = Id["diagnostic.warn"],
 	_plug_provided = true,
+	inherit = Id["diagnostic.interface"],
 	style = {
 		fg = "DiagnosticWarn",
 	},
-	ref = {
-		events = Id["diagnostic.interface"],
-		static = Id["diagnostic.interface"],
-		hide = Id["diagnostic.interface"],
-	},
+	-- ref = {
+	-- 	events = Id["diagnostic.interface"],
+	-- 	static = Id["diagnostic.interface"],
+	-- 	hide = Id["diagnostic.interface"],
+	-- },
 	update = function(self, ctx, static)
 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN })
 		return count > 0 and static.WARN .. " " .. count or ""
 	end,
 }
 
+---@type DefaultComponent
 local Info = {
-	id = Id["diagnostic.warn"],
+	id = Id["diagnostic.info"],
 	_plug_provided = true,
+	inherit = Id["diagnostic.interface"],
 	style = {
 		fg = "DiagnosticInfo",
 	},
-	ref = {
-		events = Id["diagnostic.interface"],
-		static = Id["diagnostic.interface"],
-		hide = Id["diagnostic.interface"],
-	},
+	-- ref = {
+	-- 	events = Id["diagnostic.interface"],
+	-- 	static = Id["diagnostic.interface"],
+	-- 	hide = Id["diagnostic.interface"],
+	-- },
 	update = function(self, ctx, static)
 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO })
 		return count > 0 and static.INFO .. " " .. count or ""

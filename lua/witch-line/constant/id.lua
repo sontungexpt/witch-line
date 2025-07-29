@@ -17,7 +17,6 @@ local function create_enum(list)
 end
 
 ---@class DefaultId
----@field [integer] string
 ---@field ["mode"] 1
 ---@field ["file.interface"] 2
 ---@field ["file.name"] 3
@@ -25,23 +24,23 @@ end
 ---@field ["copilot"] 5
 ---@field ["diagnostic.interface"] 6
 ---@field ["diagnostic.error"] 7
----@field ["diagnostic.warn"] 9
----@field ["diagnostic.info"] 10
----@field ["diagnostic.hint"] 11
+---@field ["diagnostic.warn"] 8
+---@field ["diagnostic.info"] 9
+---@field ["diagnostic.hint"] 10
 ---@field GitBranch 11
 ---@field GitAdd 12
 ---@field GitChange 13
 local Id, Size = create_enum({
-	"mode",
-	"file.interface",
-	"file.name",
-	"file.icon",
-	"copilot",
-	"diagnostic.interface",
-	"diagnostic.error",
-	"diagnostic.warn",
-	"diagnostic.info",
-	"diagnostic.hint",
+	[1] = "mode",
+	[2] = "file.interface",
+	[3] = "file.name",
+	[4] = "file.icon",
+	[5] = "copilot",
+	[6] = "diagnostic.interface",
+	[7] = "diagnostic.error",
+	[8] = "diagnostic.warn",
+	[9] = "diagnostic.info",
+	[10] = "diagnostic.hint",
 	-- "git.branch",
 	-- "GitAdd",
 	-- "GitChange",

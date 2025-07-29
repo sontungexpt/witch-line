@@ -338,33 +338,30 @@ end
 --- @param comp Component The component to link dependencies for.
 local function registry_refs(comp)
 	local ref = comp.ref
-	if type(ref) ~= "table" then
-		return
+	local ref_ids = {}
+	if type(ref) == "table" then
+		if ref.events then
+			link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event), ref_ids)
+		end
+
+		if ref.user_events then
+			link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event), ref_ids)
+		end
+
+		if ref.timing then
+			link_ref_field(comp, ref.timing, get_dep_store(DepStoreKey.Timer), ref_ids)
+		end
+
+		if ref.hide then
+			link_ref_field(comp, ref.hide, get_dep_store(DepStoreKey.Display), ref_ids)
+		end
 	end
 
 	local inherit = comp.inherit
-	local ref_ids = {}
-	if ref.events then
-		link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event), ref_ids)
-	elseif inherit then
+	if inherit then
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
-	end
-
-	if ref.user_events then
-		link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event), ref_ids)
-	elseif inherit then
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
-	end
-
-	if ref.timing then
-		link_ref_field(comp, ref.timing, get_dep_store(DepStoreKey.Timer), ref_ids)
-	elseif inherit then
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer), ref_ids)
-	end
-
-	if ref.hidden then
-		link_ref_field(comp, ref.hidden, get_dep_store(DepStoreKey.Display), ref_ids)
-	elseif inherit then
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display), ref_ids)
 	end
 
@@ -410,9 +407,7 @@ local function registry_update_conditions(comp)
 		registry_events(comp, "user_events")
 	end
 
-	if comp.ref then
-		registry_refs(comp)
-	end
+	registry_refs(comp)
 end
 
 --- Register a component by its type.

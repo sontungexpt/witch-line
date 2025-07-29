@@ -19,16 +19,14 @@ local RIGHT_SUFFIX = "R"
 
 ---@alias Id string|number
 
----@enum RefField
-local RefField = {
-	events = "events",
-	user_events = "user_events",
-	timing = "timing",
-	style = "style",
-	static = "static",
-	context = "context",
-	hidden = "hidden",
-}
+--- @class Ref
+--- @field events Id[]|nil a table of events that the component will listen to
+--- @field user_events Id[]|nil a table of user defined events that the component will listen to
+--- @field timing Id[]|nil if true, the component will be updated every time interval
+--- @field style Id|nil a table of styles that will be applied to the component
+--- @field static Id|nil a table of static values that will be used in the component
+--- @field context Id|nil a table that will be passed to the component's update function
+--- @field hide Id[]|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 
 ---@enum InheritField
 local InheritField = {
@@ -54,7 +52,7 @@ local InheritField = {
 ---@field lazy boolean|nil if true, the component will be initialized lazily
 ---@field events string[]|nil a table of events that the component will listen to
 ---@field user_events string[]|nil a table of user defined events that the component will listen to
----@field ref table<RefField, RefFieldType> |nil a table of references to other components, used for lazy loading components
+---@field ref Ref|nil a table of references to other components, used for lazy loading components
 ---
 ---@field left_style table |nil a table of styles that will be applied to the left part of the component
 ---@field left string|nil the left part of the component, can be a string or another component
@@ -287,7 +285,7 @@ M.evaluate = function(comp, ctx, static, ...)
 		result = ""
 	elseif result ~= "" then
 		local padding = comp.padding or 1
-		if type(padding) == "number" then
+		if type(padding) == "number" and padding > 0 then
 			result = str_rep(" ", padding) .. result .. str_rep(" ", padding)
 		elseif type(padding) == "table" then
 			local left, right = padding.left, padding.right
