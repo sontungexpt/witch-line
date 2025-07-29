@@ -98,8 +98,7 @@ end
 --- Update a component and its dependencies.jj
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param ... any Additional arguments to pass to the update function.
-local function update_comp(comp, session_id, ...)
+local function update_comp(comp, session_id)
 	local Component = require("witch-line.core.Component")
 
 	if comp.inherit and not Component.has_parent(comp) then
@@ -109,16 +108,10 @@ local function update_comp(comp, session_id, ...)
 		end
 	end
 
-	local static = get_static(comp, ...)
-	local ctx = get_context(comp, session_id, static, ...)
-	local hidden = false
-
-	local min_screen_width = comp.min_screen_width
-	if type(min_screen_width) == "number" and min_screen_width > 0 then
-		hidden = vim.o.columns < min_screen_width
-	end
-	-- hidden = hidden and should_hidden(comp, session_id, ctx, static)
-	hidden = hidden and should_hidden(comp, session_id, ctx, static, ...)
+	local static = get_static(comp)
+	local ctx = get_context(comp, session_id, static)
+	local hidden = type(comp.min_screen_width) == "number" and vim.o.columns > comp.min_screen_width
+		or should_hidden(comp, session_id, ctx, static)
 
 	if hidden then
 		clear_comp_value(comp)
@@ -126,14 +119,14 @@ local function update_comp(comp, session_id, ...)
 	end
 
 	-- local value = Component.evaluate(comp, ctx, static)
-	local value = Component.evaluate(comp, ctx, static, ...)
+	local value = Component.evaluate(comp, ctx, static)
 	if value == "" then
 		clear_comp_value(comp)
 		return ""
 	end
 
 	-- Component.update_style(comp, ctx, static, session_id)
-	Component.update_style(comp, session_id, ctx, static, ...)
+	Component.update_style(comp, session_id, ctx, static)
 
 	local indices = comp._indices
 	if not indices then

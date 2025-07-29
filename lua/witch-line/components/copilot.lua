@@ -103,6 +103,7 @@ local Copilot = {
 			end)
 		end
 	end,
+
 	update = function(self, ctx, static)
 		if package.loaded["copilot"] then
 			static.check_status()

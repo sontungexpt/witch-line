@@ -1,4 +1,4 @@
----@type Component[]| string[]
+---@type ConfigComps
 return {
 	"mode",
 	"file.name",
@@ -6,6 +6,8 @@ return {
 	"%=",
 	"copilot",
 	"diagnostic.error",
+	"diagnostic.warn",
+	"diagnostic.info",
 
 	-- {
 	-- 	event = "BufEnter",

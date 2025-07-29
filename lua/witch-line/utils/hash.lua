@@ -24,7 +24,6 @@ end
 --- @return number hash The resulting hash value as a 32-bit integer.
 M.fnv1a32_concat = function(strs, i, j)
 	local hash = FNV_OFFSET_32
-
 	for l = i or 1, j or #strs do
 		local str = strs[l]
 		for h = 1, #str do

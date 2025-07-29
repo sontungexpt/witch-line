@@ -4,10 +4,11 @@ local bo = vim.bo
 
 local M = {}
 
+---@alias ConfigComps table<integer, Component|string|Component[]|string[]>
 ---@class Config
----@field abstract Component[] Abstract components that are not rendered directly.
----@field components Component[] Components that are rendered in the statusline.
----@field disabled {filetypes: string[], buftypes: string[]} A table containing filetypes and buftypes where the statusline is disabled.
+---@field abstract ConfigComps|nil Abstract components that are not rendered directly.
+---@field components ConfigComps|nil Components that are rendered in the statusline.
+---@field disabled nil|{filetypes: string[], buftypes: string[]} A table containing filetypes and buftypes where the statusline is disabled.
 
 ---@type Config
 local default_configs = {

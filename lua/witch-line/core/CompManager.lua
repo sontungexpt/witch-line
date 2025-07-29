@@ -43,8 +43,16 @@ M.cache_ugent_comps = function(urgents)
 	end, 200)
 end
 
+local function reset_state_before_cache()
+	for _, comp in pairs(Comps) do
+		rawset(comp, "_hidden", nil)
+		rawset(comp, "_parent", nil)
+	end
+end
+
 M.on_vim_leave_pre = function()
 	local CacheMod = require("witch-line.cache")
+	reset_state_before_cache()
 	CacheMod.cache(Comps, "Comps")
 	CacheMod.cache(DepStore, "DepStore")
 end

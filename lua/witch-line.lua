@@ -1,11 +1,22 @@
 local require = require
 local M = {}
 
---- @param user_configs Config user_configs
+--- @param user_configs Config|nil user_configs
 M.setup = function(user_configs)
 	-- temp for test user_configs
 	if not user_configs or (type(user_configs) == "table" and not next(user_configs)) then
-		user_configs = {}
+		user_configs = {
+			components = {
+				"mode",
+				"file.name",
+				"file.icon",
+				"%=",
+				"copilot",
+				"diagnostic.error",
+				"diagnostic.warn",
+				"diagnostic.info",
+			},
+		}
 	end
 
 	local CacheMod = require("witch-line.cache")

@@ -1,13 +1,10 @@
 -- local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
---- @type Component
-local Error = {
-	id = Id["diagnostic.error"],
+--- @type DefaultComponent
+local Interface = {
+	id = Id["diagnostic.interface"],
 	_plug_provided = true,
-	-- style = {
-	-- 	fg = "DiagnosticError",
-	-- },
 	events = { "DiagnosticChanged" },
 	static = {
 		ERROR = "",
@@ -15,40 +12,67 @@ local Error = {
 		INFO = "",
 		HINT = "",
 	},
-	hidden = function()
-		return vim.api.nvim_buf_get_option(0, "filetype") ~= "lazy" and not api.nvim_buf_get_name(0):match("%.env$")
+	hide = function()
+		local filetype = vim.api.nvim_get_option_value("filetype", { buf = 0 })
+		return filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 	end,
+}
+
+--- @type DefaultComponent
+local Error = {
+	id = Id["diagnostic.error"],
+	_plug_provided = true,
+	style = {
+		fg = "DiagnosticError",
+	},
+	ref = {
+		events = Id["diagnostic.interface"],
+		static = Id["diagnostic.interface"],
+		hide = Id["diagnostic.interface"],
+	},
 	update = function(self, ctx, static)
 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR })
-		---@diagnostic disable-next-line: need-check-nil
 		return count > 0 and static.ERROR .. " " .. count or ""
 	end,
 }
 
+--- @type DefaultComponent
 local Warn = {
+	id = Id["diagnostic.warn"],
+	_plug_provided = true,
 	style = {
 		fg = "DiagnosticWarn",
 	},
-	static = "WitchLineDiagnosticsError",
+	ref = {
+		events = Id["diagnostic.interface"],
+		static = Id["diagnostic.interface"],
+		hide = Id["diagnostic.interface"],
+	},
 	update = function(self, ctx, static)
 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN })
-		---@diagnostic disable-next-line: need-check-nil
 		return count > 0 and static.WARN .. " " .. count or ""
 	end,
 }
 
 local Info = {
-	styles = {
+	id = Id["diagnostic.warn"],
+	_plug_provided = true,
+	style = {
 		fg = "DiagnosticInfo",
+	},
+	ref = {
+		events = Id["diagnostic.interface"],
+		static = Id["diagnostic.interface"],
+		hide = Id["diagnostic.interface"],
 	},
 	update = function(self, ctx, static)
 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO })
-		---@diagnostic disable-next-line: need-check-nil
 		return count > 0 and static.INFO .. " " .. count or ""
 	end,
 }
 
 return {
+	interface = Interface,
 	error = Error,
 	warn = Warn,
 	info = Info,

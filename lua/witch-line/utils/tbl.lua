@@ -85,10 +85,10 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 
 	if type(tbl) ~= "table" or next(tbl) == nil then
 		return function()
-			if iteration > 0 then
+			iteration = iteration + 1
+			if iteration == 1 then
 				return nil, nil -- No more items to process
 			end
-			iteration = iteration + 1
 			return iteration, require("witch-line.utils.hash").fnv1a32(simple_serialize(tbl))
 		end
 	end
@@ -96,27 +96,29 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 	local sort, remove = table.sort, table.remove
 	local fnv1a_32_concat = require("witch-line.utils.hash").fnv1a32_concat
 	bulk_size = bulk_size or 10
-	local current = nil
 	local keys, keys_size, key_idx = {}, 0, 1
 	local buf, buf_size = {}, 0
 
 	local queue = { tbl }
 	local seen = { [tbl] = true }
-
+	local current = nil
 	return function()
 		iteration = iteration + 1
 		while true do
 			if not current then
 				current = remove(queue)
 				if not current then
+					-- last hash
 					if buf_size > 0 then
-						return iteration, fnv1a_32_concat(buf, 1, buf_size)
+						local hash = fnv1a_32_concat(buf, 1, buf_size)
+						buf_size = 0
+						return iteration, hash
 					end
 					return nil, nil -- No more items to process
 				end
 
 				keys, keys_size, key_idx = {}, 0, 1
-				for k in pairs(tbl) do
+				for k in pairs(current) do
 					keys_size = keys_size + 1
 					keys[keys_size] = k
 				end

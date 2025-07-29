@@ -121,7 +121,7 @@ M.inherit_parent = function(comp, parent)
 end
 
 M.has_parent = function(comp)
-	return getmetatable(comp) ~= nil
+	return comp._parent == true
 end
 
 --- @param comp Component the component to update
