@@ -87,7 +87,7 @@ end
 
 --- Clear the value of a component in the statusline.
 --- @param c Component The component to clear.
-local clear_comp_value = function(c, ...)
+local clear_comp_value = function(c)
 	local indices = c._indices
 	if not indices then
 		return
@@ -162,15 +162,14 @@ M.update_comp = update_comp
 --- @param session_id SessionId The ID of the process to use for this update.
 --- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
---- @param ... any Additional arguments to pass to the update function.
-function M.update_comp_graph(comp, session_id, dep_stores, seen, ...)
+function M.update_comp_graph(comp, session_id, dep_stores, seen)
 	seen = seen or {}
 	local id = comp.id
 	if seen[id] then
 		return -- Avoid infinite recursion
 	end
 
-	local updated_value = update_comp(comp, session_id, ...)
+	local updated_value = update_comp(comp, session_id)
 	if updated_value == "" then
 		local refs = CompManager.get_raw_dep_store(DepStoreKey.Display)
 		if refs then
@@ -216,7 +215,7 @@ end
 --- @param session_id SessionId The ID of the process to use for this update.
 --- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_graphs_by_id = function(ids, session_id, dep_stores, seen)
+M.update_comp_graph_by_ids = function(ids, session_id, dep_stores, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
@@ -281,7 +280,7 @@ local function init_autocmd()
 
 					if ids then
 						local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
-						M.update_comp_graphs_by_id(ids, id, refs, seen)
+						M.update_comp_graph_by_ids(ids, id, refs, seen)
 					end
 				end
 			end)
@@ -334,7 +333,7 @@ local function init_timer()
 			vim.schedule_wrap(function()
 				local Session = require("witch-line.core.Session")
 				Session.run_once(function(session_id)
-					M.update_comp_graphs_by_id(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
+					M.update_comp_graph_by_ids(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
 					statusline.render()
 				end)
 			end)
@@ -569,7 +568,7 @@ M.setup = function(configs, cached)
 	if urgents[1] then
 		local Session = require("witch-line.core.Session")
 		Session.run_once(function(session_id)
-			M.update_comp_graphs_by_id(urgents, session_id, {
+			M.update_comp_graph_by_ids(urgents, session_id, {
 				get_raw_dep_store(DepStoreKey.Event),
 				get_raw_dep_store(DepStoreKey.Timer),
 			}, {})
