@@ -75,9 +75,29 @@ local Info = {
 	end,
 }
 
+--- @type DefaultComponent
+local Hint = {
+	id = Id["diagnostic.hint"],
+	_plug_provided = true,
+	inherit = Id["diagnostic.interface"],
+	style = {
+		fg = "DiagnosticHint",
+	},
+	-- ref = {
+	-- 	events = Id["diagnostic.interface"],
+	-- 	static = Id["diagnostic.interface"],
+	-- 	hide = Id["diagnostic.interface"],
+	-- },
+	update = function(self, ctx, static)
+		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.HINT })
+		return count > 0 and static.HINT .. " " .. count or ""
+	end,
+}
+
 return {
 	interface = Interface,
 	error = Error,
 	warn = Warn,
 	info = Info,
+	hint = Hint,
 }
