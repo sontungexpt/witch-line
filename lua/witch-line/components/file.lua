@@ -1,11 +1,10 @@
 local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
----@type Component
-local Name = {
-	id = Id["file.name"],
+--- @type DefaultComponent
+local Interface = {
+	id = Id["file.interface"],
 	_plug_provided = true,
-	-- id = require("witch-line.components.id.enum").FileName,
 	user_events = { "VeryLazy" },
 	events = {
 		"BufEnter",
@@ -13,13 +12,23 @@ local Name = {
 		"BufWinEnter",
 		"WinEnter",
 	},
+}
+
+---@type DefaultComponent
+local Name = {
+	id = Id["file.name"],
+	_plug_provided = true,
+	ref = {
+		events = Id["file.interface"],
+		user_events = Id["file.interface"],
+	},
+	-- id = require("witch-line.components.id.enum").FileName,
 	style = {
 		fg = colors.orange,
 	},
 	static = {
-		extensions = {
-			-- filetypes = { icon, color, filename(optional) },
-			filetypes = {
+		formatter = {
+			filetype = {
 				["NvimTree"] = "NvimTree",
 				["TelescopePrompt"] = "Telescope",
 				["mason"] = "Mason",
@@ -27,37 +36,37 @@ local Name = {
 				["checkhealth"] = "CheckHealth",
 			},
 
-			-- buftypes = { icon, color, filename(optional) },
-			buftypes = {
+			buftype = {
 				["terminal"] = "Terminal",
 			},
 		},
 	},
 	padding = { left = 1, right = 0 },
 	update = function(self, context, static)
-		local fn, api = vim.fn, vim.api
-		local filename = fn.expand("%:t")
-		local extension = static.extensions
-		local filetype = api.nvim_get_option_value("filetype", { buf = 0 })
-		local buftype = api.nvim_get_option_value("buftype", { buf = 0 })
+		local api = vim.api
+		local formatter = static.formatter
 
-		filename = extension.filetypes[filetype] or filename
-		filename = extension.buftypes[buftype] or filename
-
-		if filename == "" then
-			filename = "No File"
+		local filename = formatter.filetype[api.nvim_get_option_value("filetype", { buf = 0 })]
+		if filename then
+			return filename
 		end
-		return filename
+		filename = formatter.buftype[api.nvim_get_option_value("buftype", { buf = 0 })]
+		if filename then
+			return filename
+		end
+
+		filename = vim.fs.basename(vim.api.nvim_buf_get_name(0))
+		return filename ~= "" and filename or "No File"
 	end,
 }
 
----@type Component
+---@type DefaultComponent
 local Icon = {
 	id = Id["file.icon"],
 	_plug_provided = true,
 	ref = {
-		events = Id["file.name"],
-		user_events = Id["file.name"],
+		events = Id["file.interface"],
+		user_events = Id["file.interface"],
 	},
 	static = {
 		extensions = {
@@ -72,7 +81,6 @@ local Icon = {
 				["dashboard"] = { "", colors.red },
 			},
 
-			-- buftypes = { icon, color, filename(optional) },
 			buftypes = {
 				["terminal"] = { "", colors.red },
 			},
@@ -81,6 +89,7 @@ local Icon = {
 	context = function(self, static)
 		local fn, api = vim.fn, vim.api
 		local filename = fn.expand("%:t")
+		-- local filename = vim.fs.basename(vim.api.nvim_buf_get_name(0))
 
 		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
 		local icon, color_icon = nil, nil
@@ -116,13 +125,13 @@ local Icon = {
 			fg = ctx.color,
 		}
 	end,
-
 	update = function(self, ctx, static)
 		return ctx.icon
 	end,
 }
 
 return {
+	interface = Interface,
 	name = Name,
 	icon = Icon,
 }

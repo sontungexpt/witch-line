@@ -1,10 +1,11 @@
 local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
----@type Component
+---@type DefaultComponent
 return {
 	id = Id["mode"],
 	_plug_provided = true,
+
 	user_events = { "VeryLazy" },
 	events = { "VimResized", "ModeChanged" },
 	static = {
@@ -85,8 +86,7 @@ return {
 	hide = function(self)
 		if self.static.auto_hide_on_vim_resized then
 			vim.opt.showmode = not (vim.o.columns > 70)
-			---@diagnostic disable-next-line: undefined-field
-			return vim.opt.showmode:get()
+			return vim.opt.showmode
 		end
 		return false
 	end,

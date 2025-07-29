@@ -68,7 +68,7 @@ local InheritField = {
 ---
 ---@field init nil|fun(raw_self: Component) called when the component is initialized, can be used to set up the context
 ---@field pre_update nil|fun(self: Component, ctx: any, static: any) called before the component is updated, can be used to set up the context
----@field update string|fun(self:Component, ctx: any, static: any): string|nil called to update the component, should return a string that will be displayed
+---@field update nil|string|fun(self:Component, ctx: any, static: any): string|nil called to update the component, should return a string that will be displayed
 ---@field post_update nil|fun(self: Component,ctx: any, static: any) called after the component is updated, can be used to clean up the context
 ---@field hide nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
 ---@field min_screen_width integer|nil the minimum screen width required to display the component, used for lazy loading components
@@ -81,7 +81,10 @@ local InheritField = {
 ---@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 ---@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
 ---@field _abstract boolean|nil if true, the component is an abstract component and should not be displayed, used for lazy loading components
----@field _plug_provided boolean|nil If true, the component is provided by plugin
+---
+
+---@class DefaultComponent : Component
+---@field _plug_provided true If true, the component is provided by plugin
 
 --- Gets the id of the component, if the id is a number, it will be converted to a string.
 --- @param comp Component the component to get the id from

@@ -16,28 +16,28 @@ local function create_enum(list)
 	return enum, id
 end
 
-local is_int = function(value)
-	return type(value) == "number" and math.floor(value) == value
-end
-
 ---@class DefaultId
 ---@field [integer] string
 ---@field ["mode"] 1
----@field ["file.name"] 2
----@field ["file.icon"] 3
----@field ["copilot"] 4
----@field ["diagnostic.error"] 5
----@field ["diagnostic.warn"] 6
----@field ["diagnostic.info"] 7
----@field ["diagnostic.hint"] 8
----@field GitBranch 9
----@field GitAdd 10
----@field GitChange 11
+---@field ["file.interface"] 2
+---@field ["file.name"] 3
+---@field ["file.icon"] 4
+---@field ["copilot"] 5
+---@field ["diagnostic.interface"] 6
+---@field ["diagnostic.error"] 7
+---@field ["diagnostic.warn"] 9
+---@field ["diagnostic.info"] 10
+---@field ["diagnostic.hint"] 11
+---@field GitBranch 11
+---@field GitAdd 12
+---@field GitChange 13
 local Id, Size = create_enum({
 	"mode",
+	"file.interface",
 	"file.name",
 	"file.icon",
 	"copilot",
+	"diagnostic.interface",
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",

@@ -1,7 +1,7 @@
 ---@type Component[]| string[]
 return {
 	"mode",
-	"file.filename",
+	"file.name",
 	"file.icon",
 	"%=",
 	"diagnostic.error",
