@@ -24,4 +24,14 @@ M.debounce = function(func, delay)
 	end
 end
 
+--- Calls a function or returns a value.
+--- If the value is a function, it calls it with the provided arguments.
+--- If the value is not a function, it simply returns the value.
+--- @param value any The value to call or return.
+--- @param ... any Additional arguments to pass to the function if `value` is a function.
+--- @return any The result of calling the function or the value itself.
+M.call_or_get = function(value, ...)
+	return type(value) == "function" and value(...) or value
+end
+
 return M
