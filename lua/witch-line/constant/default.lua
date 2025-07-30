@@ -3,12 +3,17 @@ return {
 	"mode",
 	"file.name",
 	"file.icon",
+
 	"%=",
+
 	"copilot",
+
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",
 
+	"cursor.pos",
+	"cursor.progress",
 	-- {
 	-- 	event = "BufEnter",
 	-- 		{
@@ -243,29 +248,6 @@ return {
 	-- 		update = function(configs)
 	-- 			local enc = vim.bo.fenc ~= "" and vim.bo.fenc or vim.o.enc
 	-- 			return configs[enc] or enc
-	-- 		end,
-	-- 	},
-	-- },
-	-- {
-	-- 	event = { "CursorMoved", "CursorMovedI" },
-	-- 	{
-	-- 		name = "pos-cursor",
-	-- 		styles = { fg = colors.fg },
-	-- 		update = function()
-	-- 			local pos = api.nvim_win_get_cursor(0)
-	-- 			return pos[1] .. ":" .. pos[2]
-	-- 		end,
-	-- 	},
-	-- 	{
-	-- 		name = "pos-cursor-progress",
-	-- 		configs = {
-	-- 			chars = { "_", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" },
-	-- 		},
-	-- 		padding = 0,
-	-- 		styles = { fg = colors.orange },
-	-- 		update = function(configs)
-	-- 			local line = fn.line
-	-- 			return configs.chars[math.ceil(line(".") / line("$") * #configs.chars)] or ""
 	-- 		end,
 	-- 	},
 	-- },

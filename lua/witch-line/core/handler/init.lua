@@ -1,5 +1,4 @@
 local vim, type, ipairs, pairs, rawset, require = vim, type, ipairs, pairs, rawset, require
-local api, uv = vim.api, vim.uv or vim.loop
 
 local CacheMod = require("witch-line.cache")
 local M = {}
@@ -16,15 +15,7 @@ local DepStoreKey = {
 local statusline = require("witch-line.core.statusline")
 local CompManager = require("witch-line.core.CompManager")
 
-local manage, get_comp, link_ref_field, get_dep_store, get_raw_dep_store, get_context, get_static, should_hidden =
-	CompManager.register,
-	CompManager.get_comp,
-	CompManager.link_ref_field,
-	CompManager.get_dep_store,
-	CompManager.get_raw_dep_store,
-	CompManager.get_context,
-	CompManager.get_static,
-	CompManager.should_hidden
+local get_dep_store = CompManager.get_dep_store
 
 ---@alias es nil|table<string, Id[]>
 ---@alias EventStore {events: es, user_events: es}
@@ -59,6 +50,14 @@ local TimerStore = {
 
 M.on_vim_leave_pre = function()
 	CacheMod.cache(EventStore, "EventStore")
+	for _, ids in pairs(TimerStore) do
+		if ids.timer then
+			ids.timer:stop() -- Stop the timer if it exists
+			ids.timer:close() -- Close the timer to free resources
+			ids.timer = nil -- Clear the timer reference
+		end
+	end
+
 	CacheMod.cache(TimerStore, "TimerStore")
 end
 
@@ -110,16 +109,17 @@ local function update_comp(comp, session_id)
 	local Component = require("witch-line.core.Component")
 
 	if comp.inherit and not Component.has_parent(comp) then
-		local parent = get_comp(comp.inherit)
+		local parent = CompManager.get_comp(comp.inherit)
 		if parent then
 			Component.inherit_parent(comp, parent)
 		end
 	end
 
-	local static = get_static(comp)
-	local ctx = get_context(comp, session_id, static)
+	local static = CompManager.get_static(comp)
+	local ctx = CompManager.get_context(comp, session_id, static)
 	local min_screen_width = Component.min_screen_width(comp, ctx, static)
-	local hidden = min_screen_width and vim.o.columns > min_screen_width or should_hidden(comp, session_id, ctx, static)
+	local hidden = min_screen_width and vim.o.columns > min_screen_width
+		or CompManager.should_hidden(comp, session_id, ctx, static)
 
 	if hidden then
 		clear_comp_value(comp)
@@ -200,7 +200,7 @@ M.update_comp_graph_by_ids = function(ids, session_id, ds_ids, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
-			local comp = get_comp(id)
+			local comp = CompManager.get_comp(id)
 			if comp then
 				M.update_comp_graph(comp, session_id, ds_ids, seen)
 			end
@@ -268,6 +268,7 @@ local function init_autocmd()
 		end
 	end, 100)
 
+	local api = vim.api
 	local group, id1, id2 = nil, nil, nil
 
 	if events and next(events) then
@@ -300,12 +301,11 @@ end
 
 --- Initialize the timer for components that have timers registered.
 local function init_timer()
-	local timers = TimerStore
-	if not timers then
+	if not next(TimerStore) then
 		return
 	end
-
-	for interval, ids in pairs(timers) do
+	local uv = vim.uv or vim.loop
+	for interval, ids in pairs(TimerStore) do
 		ids.timer = uv.new_timer()
 		ids.timer:start(
 			0,
@@ -324,6 +324,7 @@ end
 --- Link dependencies for a component.
 --- @param comp Component The component to link dependencies for.
 local function registry_refs(comp)
+	local link_ref_field = CompManager.link_ref_field
 	local ref = comp.ref
 	local ref_ids = {}
 	if type(ref) == "table" then
@@ -506,7 +507,7 @@ end
 --- @return Id The ID of the registered component.
 function M.registry_abstract_component(comp, id)
 	if not comp._abstract then
-		id = manage(comp, id)
+		id = CompManager.register(comp, id)
 
 		if comp.init then
 			comp.init(comp)

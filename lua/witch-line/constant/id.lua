@@ -28,9 +28,8 @@ end
 ---@field ["diagnostic.warn"] 8
 ---@field ["diagnostic.info"] 9
 ---@field ["diagnostic.hint"] 10
----@field GitBranch 11
----@field GitAdd 12
----@field GitChange 13
+---@field ["cursor.pos"] 11
+---@field ["cursor.progress"] 12
 local Id, Size = create_enum({
 	[1] = "mode",
 	[2] = "file.interface",
@@ -42,6 +41,8 @@ local Id, Size = create_enum({
 	[8] = "diagnostic.warn",
 	[9] = "diagnostic.info",
 	[10] = "diagnostic.hint",
+	[11] = "cursor.pos",
+	[12] = "cursor.progress",
 	-- "git.branch",
 	-- "GitAdd",
 	-- "GitChange",

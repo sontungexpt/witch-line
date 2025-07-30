@@ -21,14 +21,14 @@ local RIGHT_SUFFIX = "R"
 ---@alias Id string|number
 
 --- @class Ref
---- @field events Id[]|nil a table of events that the component will listen to
---- @field user_events Id[]|nil a table of user defined events that the component will listen to
---- @field timing Id[]|nil if true, the component will be updated every time interval
+--- @field events Id|Id[]|nil a table of events that the component will listen to
+--- @field user_events Id|Id[]|nil a table of user defined events that the component will listen to
+--- @field timing Id|Id[]|nil if true, the component will be updated every time interval
 --- @field style Id|nil a table of styles that will be applied to the component
 --- @field static Id|nil a table of static values that will be used in the component
 --- @field context Id|nil a table that will be passed to the component's update function
---- @field hide Id[]|nil if true, the component is hidden and should not be displayed, used for lazy loading components
---- @field min_screen_width Id[]|nil the minimum screen width required to display the component, used for lazy loading components
+--- @field hide Id|Id[]|nil if true, the component is hidden and should not be displayed, used for lazy loading components
+--- @field min_screen_width Id|Id[]|nil the minimum screen width required to display the component, used for lazy loading components
 
 local InheritField = {
 	timing = true,
