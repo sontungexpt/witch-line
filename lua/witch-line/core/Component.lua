@@ -345,18 +345,21 @@ M.evaluate_left_right = function(comp, ctx, static)
 		-- Why?
 		-- Because in case the left or right is string type
 		-- It never update so we don't need to set statusline again
-		left, right = nil, nil
 		if type(left) == "function" then
 			left = left(comp, ctx, static)
 			if type(left) ~= "string" then
 				left = nil
 			end
+		else
+			left = nil
 		end
 		if type(right) == "function" then
 			right = right(comp, ctx, static)
 			if type(right) ~= "string" then
 				right = nil
 			end
+		else
+			right = nil
 		end
 	end
 	return left, right
@@ -405,7 +408,7 @@ end
 --- @param comp Component the component to create the statistic for
 --- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
 --- @return Component stat_comp the statistic component with the necessary fields set
-M.overides = function(comp, override)
+M.overrides = function(comp, override)
 	if type(override) ~= "table" then
 		return comp
 	end
