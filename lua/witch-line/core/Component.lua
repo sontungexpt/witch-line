@@ -28,6 +28,7 @@ local RIGHT_SUFFIX = "R"
 --- @field static Id|nil a table of static values that will be used in the component
 --- @field context Id|nil a table that will be passed to the component's update function
 --- @field hide Id[]|nil if true, the component is hidden and should not be displayed, used for lazy loading components
+--- @field min_screen_width Id[]|nil the minimum screen width required to display the component, used for lazy loading components
 
 local InheritField = {
 	timing = true,
@@ -53,24 +54,23 @@ local InheritField = {
 ---@field lazy boolean|nil if true, the component will be initialized lazily
 ---@field events string[]|nil a table of events that the component will listen to
 ---@field user_events string[]|nil a table of user defined events that the component will listen to
+---@field min_screen_width integer|nil|fun(self: Component, ctx: any, static: any):number|nil the minimum screen width required to display the component, used for lazy loading components
 ---@field ref Ref|nil a table of references to other components, used for lazy loading components
 ---
----@field left_style table |nil a table of styles that will be applied to the left part of the component
----@field left string|nil|fun(self: Component, ctx: any, static: any) the left part of the component, can be a string or another component
----@field right_style table |nil a table of styles that will be applied to the right part of the component
----@field right string|nil|fun(self: Component, ctx: any, static: any) the right part of the component, can be a string or another component
+---@field left_style table|nil|fun(self: Component, ctx: any, static: any):table|nil a table of styles that will be applied to the left part of the component
+---@field left string|nil|fun(self: Component, ctx: any, static: any):string|nil the left part of the component, can be a string or another component
+---@field right_style table|nil|fun(self: Component, ctx: any, static: any):table|nil a table of styles that will be applied to the right part of the component
+---@field right string|nil|fun(self: Component, ctx: any, static: any):string|nil the right part of the component, can be a string or another component
 ---@field padding integer|nil|{left: integer|nil, right:integer|nil}|fun(self: Component, ctx: any, static: any): number|{left: integer|nil, right:integer|nil} the padding of the component, can be used to add space around the component
 ---
+---@field init nil|fun(raw_self: Component) called when the component is initialized, can be used to set up the context
 ---@field style vim.api.keyset.highlight|nil|fun(self: Component, ctx: any, static: any): vim.api.keyset.highlight a table of styles that will be applied to the component
 ---@field static any a table of static values that will be used in the component
 ---@field context nil|fun(self: Component, static:any): any a table that will be passed to the component's update function
----
----@field init nil|fun(raw_self: Component) called when the component is initialized, can be used to set up the context
 ---@field pre_update nil|fun(self: Component, ctx: any, static: any) called before the component is updated, can be used to set up the context
 ---@field update nil|string|fun(self:Component, ctx: any, static: any): string|nil called to update the component, should return a string that will be displayed
 ---@field post_update nil|fun(self: Component,ctx: any, static: any) called after the component is updated, can be used to clean up the context
 ---@field hide nil|fun(self: Component, ctx:any, static: any): boolean|nil called to check if the component should be displayed, should return true or false
----@field min_screen_width integer|nil the minimum screen width required to display the component, used for lazy loading components
 ---
 ---@private
 ---@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
@@ -131,6 +131,7 @@ end
 ---@param comp Component the component to check
 ---@param style_field "left_style"|"right_style" the field name of the side style, used for left or right styles
 ---@param hl_name_field "_left_hl_name"|"_right_hl_name" the field name of the side highlight group, used for left or right styles
+---@param main_style table|nil the main style of the component, used to determine the side style
 ---@param suffix string the suffix to append to the main highlight group name, used for left or right styles
 ---@param ctx any the context to pass to the component's update function
 ---@param static any the static values to pass to the component's update function
@@ -192,11 +193,11 @@ end
 --- @param ... any additional arguments to pass to the component's update function
 M.update_style = function(comp, session_id, ctx, static, ...)
 	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static, ...)
-	local force = false
+	local force_update = false
 
 	if type(style) == "table" then
 		if not comp._hl_name then
-			force = true
+			force_update = true
 			if comp ~= ref_comp then
 				rawset(ref_comp, "_hl_name", ref_comp._hl_name or highlight.gen_hl_name_by_id(ref_comp.id))
 				rawset(comp, "_hl_name", ref_comp._hl_name)
@@ -205,16 +206,34 @@ M.update_style = function(comp, session_id, ctx, static, ...)
 			end
 			highlight.hl(comp._hl_name, style)
 		elseif type(ref_comp.style) == "function" then
-			force = true
+			force_update = true
 			highlight.hl(comp._hl_name, style)
 		end
 	end
 
 	if comp.left then
-		update_side_style(comp, "left_style", "_left_hl_name", force and style, LEFT_SUFFIX, ctx, static, ...)
+		update_side_style(
+			comp,
+			"left_style",
+			"_left_hl_name",
+			force_update and style or nil,
+			LEFT_SUFFIX,
+			ctx,
+			static,
+			...
+		)
 	end
 	if comp.right then
-		update_side_style(comp, "right_style", "_right_hl_name", force and style, RIGHT_SUFFIX, ctx, static, ...)
+		update_side_style(
+			comp,
+			"right_style",
+			"_right_hl_name",
+			force_update and style or nil,
+			RIGHT_SUFFIX,
+			ctx,
+			static,
+			...
+		)
 	end
 end
 
@@ -271,17 +290,13 @@ M.evaluate_left_right = function(comp, ctx, static)
 	--- So need to compare the left and right accurate
 	if comp._hidden ~= false then
 		if left then
-			if type(left) == "function" then
-				left = left(comp, ctx, static)
-			end
+			left = call_or_get(left, comp, ctx, static)
 			if type(left) ~= "string" then
 				left = ""
 			end
 		end
 		if right then
-			if type(right) == "function" then
-				right = right(comp, ctx, static)
-			end
+			right = call_or_get(right, comp, ctx, static)
 			if type(right) ~= "string" then
 				right = ""
 			end
@@ -385,6 +400,16 @@ M.overrides = function(comp, override)
 	end
 
 	return comp
+end
+
+--- Gets the minimum screen width required to display the component.
+--- @param comp Component the component to get the minimum screen width from
+--- @param ctx any the context to pass to the component's update function
+--- @param static any the static values to pass to the component's update function
+--- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
+M.min_screen_width = function(comp, ctx, static)
+	local min_screen_width = call_or_get(comp.min_screen_width, comp, ctx, static)
+	return type(min_screen_width) == "number" and min_screen_width or nil
 end
 
 return M

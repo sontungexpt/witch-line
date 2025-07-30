@@ -124,6 +124,43 @@ local get_dep_store = function(id)
 end
 M.get_dep_store = get_dep_store
 
+--- A iterator to loop all key, value in the depstore has id
+--- @param id NotNil id of the depstore
+--- @generic T: table, K, V
+--- @return fun(table: table<K, V>, index?: K):K, V iterator
+--- @return T store the store with id
+M.dep_store_iter = function(id)
+	local store = DepStore[id]
+	if not store then
+		return function() end, store
+	end
+	return pairs(store)
+end
+
+M.dep_iter = function(dep_store_id, root_id)
+	local store = DepStore[dep_store_id]
+	if not store then
+		return function() end, {}
+	end
+	local ids = store[root_id]
+	if not ids then
+		return function() end, {}
+	end
+	local id = nil
+	return function()
+		id = next(ids, id)
+		while id do
+			local comp = Comps[id]
+			if comp then
+				return id, comp
+			end
+			id = next(ids, id)
+		end
+		return nil, nil
+	end,
+		ids
+end
+
 --- Get the raw dependency store for a given ID.
 --- @param id NotNil The ID to get the raw dependency store for.
 --- @return DepStore The raw dependency store for the given ID.

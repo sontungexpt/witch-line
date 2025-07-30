@@ -4,7 +4,7 @@ local bo = vim.bo
 
 local M = {}
 
----@alias ConfigComps table<integer, Component|string|Component[]|string[]>
+---@alias ConfigComps table<integer, Component|string|ConfigComps>
 ---@class Config
 ---@field abstract ConfigComps|nil Abstract components that are not rendered directly.
 ---@field components ConfigComps|nil Components that are rendered in the statusline.
@@ -53,14 +53,16 @@ M.user_configs_changed = function(user_configs)
 end
 
 function M.is_buf_disabled(bufnr)
-	if vim.api.nvim_buf_is_valid(bufnr) == false then
+	if not vim.api.nvim_buf_is_valid(bufnr) then
 		return false
 	end
-
+	local disabled = default_configs.disabled
+	if not disabled then
+		return false
+	end
 	local buf_o = bo[bufnr]
 	local filetype = buf_o.filetype
 	local buftype = buf_o.buftype
-	local disabled = default_configs.disabled
 
 	for _, ft in ipairs(disabled.filetypes) do
 		if filetype == ft then
@@ -93,10 +95,12 @@ local function merge_user_config(defaults, overrides)
 	-- Handle non-tables
 	elseif default_type ~= "table" then
 		return overrides
-	end
 
-	--- Utilize the available table
-	if next(defaults) == nil then
+	-- both are table from here
+	elseif next(overrides) == nil then
+		return defaults
+	elseif next(defaults) == nil then
+		--- Utilize the available table
 		return overrides
 	elseif vim.islist(defaults) and vim.islist(overrides) then
 		return vim.list_extend(defaults, overrides)

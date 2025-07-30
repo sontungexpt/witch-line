@@ -118,8 +118,8 @@ local function update_comp(comp, session_id)
 
 	local static = get_static(comp)
 	local ctx = get_context(comp, session_id, static)
-	local hidden = type(comp.min_screen_width) == "number" and vim.o.columns > comp.min_screen_width
-		or should_hidden(comp, session_id, ctx, static)
+	local min_screen_width = Component.min_screen_width(comp, ctx, static)
+	local hidden = min_screen_width and vim.o.columns > min_screen_width or should_hidden(comp, session_id, ctx, static)
 
 	if hidden then
 		clear_comp_value(comp)
@@ -350,6 +350,10 @@ local function registry_refs(comp)
 			link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event), ref_ids)
 		end
 
+		if ref.min_screen_width then
+			link_ref_field(comp, ref.min_screen_width, get_dep_store(DepStoreKey.Event), ref_ids)
+		end
+
 		if ref.user_events then
 			link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event), ref_ids)
 		end
@@ -365,7 +369,6 @@ local function registry_refs(comp)
 
 	local inherit = comp.inherit
 	if inherit then
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer), ref_ids)
 		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display), ref_ids)
@@ -383,15 +386,14 @@ local function registry_refs(comp)
 	end
 end
 
+--- Register the component for VimResized event if it has a minimum screen width.
 ---@param comp Component
 local function registry_vim_resized(comp)
-	if type(comp.min_screen_width) == "number" and comp.min_screen_width > 0 then
-		local store = EventStore["events"] or {}
-		EventStore["events"] = store
-		local es = store["VimResized"] or {}
-		es[#es + 1] = comp.id
-		store["VimResized"] = es
-	end
+	local store = EventStore["events"] or {}
+	EventStore["events"] = store
+	local es = store["VimResized"] or {}
+	es[#es + 1] = comp.id
+	store["VimResized"] = es
 end
 
 --- Register conditions for a component.
