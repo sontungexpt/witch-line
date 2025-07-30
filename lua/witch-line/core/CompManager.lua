@@ -129,36 +129,32 @@ M.get_dep_store = get_dep_store
 --- @generic T: table, K, V
 --- @return fun(table: table<K, V>, index?: K):K, V iterator
 --- @return T store the store with id
-M.dep_store_iter = function(id)
+M.iter_dep_store = function(id)
 	local store = DepStore[id]
-	if not store then
-		return function() end, store
-	end
-	return pairs(store)
+	return store and pairs(store) or function() end, store
 end
 
-M.dep_iter = function(dep_store_id, root_id)
-	local store = DepStore[dep_store_id]
-	if not store then
-		return function() end, {}
+--- Iterate over all dependents of a given component ID.
+--- @param ds_id NotNil The ID of the dependency store to iterate over.
+--- @param ref_id NotNil The ID of the component to find dependents for.
+--- @return fun()|fun(): Id, Component An iterator function that returns the next dependent ID and its component.
+--- @return table<Id, true>|nil id_map The map of IDs that depend on the given component ID, or nil if none exist.
+M.iter_dependents = function(ds_id, ref_id)
+	assert(ds_id and ref_id, "Both ds_id and ref_id must be provided")
+	local store = DepStore[ds_id]
+	local id_map = store and store[ref_id]
+	if not id_map then
+		return function() end, nil
 	end
-	local ids = store[root_id]
-	if not ids then
-		return function() end, {}
-	end
-	local id = nil
+
+	local key = nil
 	return function()
-		id = next(ids, id)
-		while id do
-			local comp = Comps[id]
-			if comp then
-				return id, comp
-			end
-			id = next(ids, id)
-		end
-		return nil, nil
+		repeat
+			key, _ = next(id_map, key)
+		until key == nil or Comps[key]
+		return key, Comps[key]
 	end,
-		ids
+		id_map
 end
 
 --- Get the raw dependency store for a given ID.

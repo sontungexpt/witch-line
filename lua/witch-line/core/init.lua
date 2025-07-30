@@ -159,9 +159,9 @@ M.update_comp = update_comp
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies.
+--- @param ds_ids NotNil|NotNil[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-function M.update_comp_graph(comp, session_id, dep_stores, seen)
+function M.update_comp_graph(comp, session_id, ds_ids, seen)
 	seen = seen or {}
 	local id = comp.id
 	if seen[id] then
@@ -170,39 +170,21 @@ function M.update_comp_graph(comp, session_id, dep_stores, seen)
 
 	local updated_value = update_comp(comp, session_id)
 	if updated_value == "" then
-		local refs = CompManager.get_raw_dep_store(DepStoreKey.Display)
-		if refs then
-			local ids = refs[id]
-			if ids then
-				for dep_id, _ in pairs(ids) do
-					local dep_comp = get_comp(dep_id)
-					if dep_comp then
-						clear_comp_value(dep_comp._indices)
-					else
-						ids[dep_id] = nil -- Clean up if the component is not found
-					end
-				end
-			end
+		for _, dep_comp in CompManager.iter_dependents(DepStoreKey.Display, id) do
+			clear_comp_value(dep_comp._indices)
 		end
 	end
 
 	---@cast id Id
 	seen[id] = true
-	if dep_stores then
-		if not vim.islist(dep_stores) then
-			dep_stores = { dep_stores }
+	if ds_ids then
+		if type(ds_ids) ~= "table" then
+			ds_ids = { ds_ids }
 		end
-		---@cast dep_stores DepStore[]
-		for _, dep_store in ipairs(dep_stores) do
-			local dep_ids = dep_store[id]
-			if dep_ids then
-				for dep_id, _ in pairs(dep_ids) do
-					local dep_comp = get_comp(dep_id)
-					if not dep_comp then
-						dep_ids[dep_id] = nil -- Clean up if the component is not found
-					elseif not seen[dep_comp.id] then
-						M.update_comp_graph(dep_comp, session_id, dep_store, seen)
-					end
+		for _, ds_id in ipairs(ds_ids) do
+			for _, dep_comp in CompManager.iter_dependents(ds_id, id) do
+				if not seen[dep_comp.id] then
+					M.update_comp_graph(dep_comp, session_id, ds_ids, seen)
 				end
 			end
 		end
@@ -212,15 +194,15 @@ end
 --- Update multiple components by their IDs.
 --- @param ids Id[] The IDs of the components to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_stores DepStore|DepStore[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param ds_ids NotNil|NotNil[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
 --- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_graph_by_ids = function(ids, session_id, dep_stores, seen)
+M.update_comp_graph_by_ids = function(ids, session_id, ds_ids, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
 			local comp = get_comp(id)
 			if comp then
-				M.update_comp_graph(comp, session_id, dep_stores, seen)
+				M.update_comp_graph(comp, session_id, ds_ids, seen)
 			end
 		end
 	end
@@ -278,8 +260,7 @@ local function init_autocmd()
 					stack[i] = nil
 
 					if ids then
-						local refs = CompManager.get_raw_dep_store(DepStoreKey.Event)
-						M.update_comp_graph_by_ids(ids, id, refs, seen)
+						M.update_comp_graph_by_ids(ids, id, DepStoreKey.Event, seen)
 					end
 				end
 			end)
@@ -332,7 +313,7 @@ local function init_timer()
 			vim.schedule_wrap(function()
 				local Session = require("witch-line.core.Session")
 				Session.run_once(function(session_id)
-					M.update_comp_graph_by_ids(ids, session_id, CompManager.get_raw_dep_store(DepStoreKey.Timer), {})
+					M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Timer, {})
 					statusline.render()
 				end)
 			end)
@@ -583,8 +564,8 @@ M.setup = function(configs, cached)
 		local Session = require("witch-line.core.Session")
 		Session.run_once(function(session_id)
 			M.update_comp_graph_by_ids(urgents, session_id, {
-				get_raw_dep_store(DepStoreKey.Event),
-				get_raw_dep_store(DepStoreKey.Timer),
+				DepStoreKey.Event,
+				DepStoreKey.Timer,
 			}, {})
 		end)
 	end
