@@ -12,6 +12,7 @@ return {
 	"diagnostic.warn",
 	"diagnostic.info",
 
+	"encoding",
 	"cursor.pos",
 	"cursor.progress",
 	-- {
@@ -232,22 +233,6 @@ return {
 	-- 		styles = { fg = colors.cyan },
 	-- 		update = function()
 	-- 			return "Tab: " .. api.nvim_buf_get_option(0, "shiftwidth") .. ""
-	-- 		end,
-	-- 	},
-	-- 	{
-	-- 		name = "encoding",
-	-- 		configs = {
-	-- 			["utf-8"] = "󰉿",
-	-- 			["utf-16"] = "󰊀",
-	-- 			["utf-32"] = "󰊁",
-	-- 			["utf-8mb4"] = "󰊂",
-	-- 			["utf-16le"] = "󰊃",
-	-- 			["utf-16be"] = "󰊄",
-	-- 		},
-	-- 		styles = { fg = colors.yellow },
-	-- 		update = function(configs)
-	-- 			local enc = vim.bo.fenc ~= "" and vim.bo.fenc or vim.o.enc
-	-- 			return configs[enc] or enc
 	-- 		end,
 	-- 	},
 	-- },

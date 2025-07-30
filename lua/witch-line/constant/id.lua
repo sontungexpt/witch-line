@@ -30,6 +30,7 @@ end
 ---@field ["diagnostic.hint"] 10
 ---@field ["cursor.pos"] 11
 ---@field ["cursor.progress"] 12
+---@field ["encoding"] 13
 local Id, Size = create_enum({
 	[1] = "mode",
 	[2] = "file.interface",
@@ -43,6 +44,8 @@ local Id, Size = create_enum({
 	[10] = "diagnostic.hint",
 	[11] = "cursor.pos",
 	[12] = "cursor.progress",
+	[13] = "encoding",
+
 	-- "git.branch",
 	-- "GitAdd",
 	-- "GitChange",

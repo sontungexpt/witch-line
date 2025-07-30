@@ -15,6 +15,7 @@ M.setup = function(user_configs)
 				"diagnostic.error",
 				"diagnostic.warn",
 				"diagnostic.info",
+				"encoding",
 				"cursor.pos",
 				"cursor.progress",
 			},
