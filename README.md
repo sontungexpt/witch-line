@@ -97,29 +97,35 @@ You should set `laststatus` by yourself. I recommend you set `laststatus` to `3`
 vim.opt.laststatus = 3
 ```
 
-### Components
+# ✨ Default Components Reference
 
-We provide you some default component:
+This section describes the built-in components available in the plugin, their structure, and how to use them.  
+Each component is referenced by name and can be composed to build a flexible and performant statusline.
 
-| **Component**         | **Description**                                              |
-| --------------------- | ------------------------------------------------------------ |
-| `datetime`            | Show datetime                                                |
-| `mode`                | Show current mode                                            |
-| `filename`            | Show current filename                                        |
-| `git-branch`          | Show git branch                                              |
-| `git-diff`            | Show git diff                                                |
-| `diagnostics`         | Show diagnostics                                             |
-| `lsps-formatters`     | Show lsps, formatters(support for null-ls and conform)       |
-| `copilot`             | Show copilot status                                          |
-| `copilot-loading`     | Show copilot loading                                         |
-| `indent`              | Show indent                                                  |
-| `encoding`            | Show encoding                                                |
-| `pos-cursor`          | Show position of cursor                                      |
-| `pos-cursor-progress` | Show position of cursor with progress                        |
-| `os-uname`            | Show os name                                                 |
-| `filesize`            | Show filesize                                                |
-| `battery`             | Show battery (support for linux only because i'm linux user) |
+---
 
+## 🔖 Table of Default Components
+
+| Name                    | Module File       | Description                                |
+|-------------------------|-------------------|--------------------------------------------|
+| `mode`                  | `mode.lua`        | Shows the current Neovim mode              |
+| `file.name`             | `file.lua`        | Displays the filename                      |
+| `file.icon`             | `file.lua`        | Displays an icon for the file              |
+| `%=`                    | _(builtin)_       | Separator to align left/right components   |
+| `copilot`               | `copilot.lua`     | Shows Copilot status (if available)        |
+| `diagnostic.error`      | `diagnostic.lua`  | Shows number of errors in current buffer   |
+| `diagnostic.warn`       | `diagnostic.lua`  | Shows number of warnings                   |
+| `diagnostic.info`       | `diagnostic.lua`  | Shows info-level diagnostics               |
+| `encoding`              | `encoding.lua`    | Displays file encoding (e.g., utf-8)       |
+| `cursor.pos`            | `cursor.lua`      | Shows the current cursor line/column       |
+| `cursor.progress`       | `cursor.lua`      | Shows the cursor position as a % progress  |
+
+---
+
+## 📂 Hierarchical Component Structure
+
+Some components are grouped using a `.` dot notation.  
+This represents logical grouping in code and file/module layout.
 
  ## 🔧 Component Reference
 
