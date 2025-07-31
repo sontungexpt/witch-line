@@ -325,36 +325,37 @@ end
 --- Link dependencies for a component.
 --- @param comp Component The component to link dependencies for.
 local function registry_refs(comp)
-	local link_ref_field = CompManager.link_ref_field
+	local link_ref_field = CompManager.link_ref_field_in_store_id
 	local ref = comp.ref
+
 	local ref_ids = {}
 	if type(ref) == "table" then
 		if ref.events then
-			link_ref_field(comp, ref.events, get_dep_store(DepStoreKey.Event), ref_ids)
-		end
-
-		if ref.min_screen_width then
-			link_ref_field(comp, ref.min_screen_width, get_dep_store(DepStoreKey.Event), ref_ids)
+			link_ref_field(comp, ref.events, DepStoreKey.Event, ref_ids)
 		end
 
 		if ref.user_events then
-			link_ref_field(comp, ref.user_events, get_dep_store(DepStoreKey.Event), ref_ids)
+			link_ref_field(comp, ref.user_events, DepStoreKey.Event, ref_ids)
 		end
 
 		if ref.timing then
-			link_ref_field(comp, ref.timing, get_dep_store(DepStoreKey.Timer), ref_ids)
+			link_ref_field(comp, ref.timing, DepStoreKey.Timer, ref_ids)
 		end
 
 		if ref.hide then
-			link_ref_field(comp, ref.hide, get_dep_store(DepStoreKey.Display), ref_ids)
+			link_ref_field(comp, ref.hide, DepStoreKey.Display, ref_ids)
+		end
+
+		if ref.min_screen_width then
+			link_ref_field(comp, ref.min_screen_width, DepStoreKey.Display, ref_ids)
 		end
 	end
 
 	local inherit = comp.inherit
 	if inherit then
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Event), ref_ids)
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Timer), ref_ids)
-		link_ref_field(comp, inherit, get_dep_store(DepStoreKey.Display), ref_ids)
+		link_ref_field(comp, inherit, DepStoreKey.Event, ref_ids)
+		link_ref_field(comp, inherit, DepStoreKey.Timer, ref_ids)
+		link_ref_field(comp, inherit, DepStoreKey.Display, ref_ids)
 	end
 
 	-- Pull missing dependencies from the component's ref field
