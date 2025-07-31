@@ -1,15 +1,8 @@
-## witch=line
+## witch-line
 
 The best statusline plugin for neovim. It's very lightweight and super fast.
 
-Best choice to replace lualine for me with small size and fast speed.
-
-This plugin lazy load all components and only update each component when needed.
-
-Because this plugin aim to be fast and small as possible. I don't focus on
-overriding default component. I focus on creating your custom component. But,
-you can fully customize all aspects of the component's configuration,
-including its core functions, if you have a basic understanding of Lua.
+This plugin lazy load as much as possible 
 
 ## Table of Contents
 
@@ -27,43 +20,45 @@ including its core functions, if you have a basic understanding of Lua.
 
 ## A few words to say
 
-🎉 As you can see, this plugin is very small and fast. But maybe it't not perfect
-because I'm not a lua expert. So if you have any idea to improve this plugin,
-please open an issue or pull request. I'm very happy to hear from you.
-
-🍕 The default component is written for my personal use. So maybe you need to
+🎉 The default component is written for my personal use. So maybe you need to
 create your own component. I'm very happy to see your component. So if you have
 any idea to create a new component, please open an issue or pull request.
 
 ## Preview
 
-![preview1](./docs/readme/preview1.png)
+## ✨ Features
 
-Copilot loading
+`witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
 
-https://github.com/sontungexpt/sttusline/assets/92097639/36dcc9fa-f1d3-44b5-80f9-5c4c584b2156
+- ⚡ **Blazing Fast**: Optimized with internal caching and minimal redraws to keep your statusline snappy and efficient. Just config for first time and **every thing** will be cache and run super fast  later.
 
-Dynamic Battery
+- 🧩 **Modular Components**: Define reusable and nested components using a simple configuration format.
 
-https://github.com/sontungexpt/sttusline/assets/92097639/f06fd331-9546-4046-ab88-037176f0b8dd
+- 🎛 **Abstract Components**: Support for abstract components that can be composed and reused without rendering directly.
 
-## Features
+- 🎨 **Flexible Layouts**: Arrange statusline components in any order, across multiple layers or segments.
 
-🎉 Lightweight and super fast.
+- 🔁 **Reactive Updates**: Smart detection of buffer/file changes to update only when necessary.
 
-🛠️ Lazy load all components
+- 📁 **Context-Aware Disabling**: Automatically disable the statusline for specific `filetypes` or `buftypes` (e.g. terminal, help, etc).
 
-🍕 Only update each component when needed, not update all statusline
+- 🧠 **Config Hashing**: Detect if user config has changed via FNV-1a hashing, ensuring minimal reinitialization.
 
-🔥 Easy to create your component with lua
+- 💾 **Persistent Caching**: Cache user configurations and state across sessions using a simple key-value system.
+
+- 🧪 **Testable &  Maintainable**: Designed with testability and clear API boundaries in mind.
+
+- 🛠 **Extensible**: Easily extend with custom components.
+
+This plugin is ideal for developers who want full control over the look and feel of their statusline, without sacrificing performance or flexibility.
+
 
 ## Installation
 
 ```lua
     -- lazy
     {
-        "sontungexpt/sttusline",
-        branch = "table_version",
+        "sontungexpt/witch-line",
         dependencies = {
             "nvim-tree/nvim-web-devicons",
         },
@@ -77,38 +72,19 @@ https://github.com/sontungexpt/sttusline/assets/92097639/f06fd331-9546-4046-ab88
 ## Options
 
 ```lua
-    require("sttusline").setup {
-        on_attach = function(create_update_group) end
 
-        -- the colors of statusline will be set follow the colors of the active buffer
-        -- statusline_color = "#fdff00",
-        statusline_color = "StatusLine",
-        disabled = {
-            filetypes = {
-                -- "NvimTree",
-                -- "lazy",
-            },
-            buftypes = {
-                "terminal",
-            },
-        },
-        components = {
-            "mode",
-            "os-uname",
-            "filename",
-            "git-branch",
-            "git-diff",
-            "%=",
-            "diagnostics",
-            "lsps-formatters",
-            "copilot",
-            "copilot-loading",
-            "indent",
-            "encoding",
-            "pos-cursor",
-            "pos-cursor-progress",
-        },
-    }
+require("witch-line").setup({
+  components = {
+     "mode" ,
+     "file.name", 
+     "file.icon",
+  },
+  disabled = {
+    filetypes = { "help", "TelescopePrompt" },
+    buftypes = { "nofile", "terminal" },
+  },
+})
+
 ```
 
 ## Usage
