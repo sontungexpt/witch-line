@@ -122,6 +122,40 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ---
 
+## ⚙️ Customizable Fields for Components
+
+Each component accepts a set of customization fields to control its behavior, style, visibility, and layout.  
+Below is a table of all supported fields and their expected types:
+
+| Field              | Type(s)                  | Description                                                                 |
+|-------------------|--------------------------|-----------------------------------------------------------------------------|
+| `padding`         | `number`, `table`         | Adds padding around the component. Can be a single number or `{ left, right }`. |
+| `static`          | `any`                     | Any static value or metadata the component wants to keep.                  |
+| `timing`          | `boolean`, `number`       | Enables timing or sets a custom update interval for the component.        |
+| `style`           | `function`, `table`       | Style override for the entire component output (e.g., color, bold).       |
+| `min_screen_width`| `number`                  | Hides the component if the screen width is below this threshold.          |
+| `hide`            | `function`, `boolean`     | Hide condition. If `true` or a function that returns `true`, hides the component. |
+| `left_style`      | `function`, `table`       | Style override applied to the left part of the component.                 |
+| `left`            | `string`, `function`      | Left content to be rendered. Can be a string or a generator function.     |
+| `right_style`     | `function`, `table`       | Style override applied to the right part of the component.                |
+| `right`           | `string`, `function`      | Right content to be rendered. Can be a string or a generator function.    |
+
+---
+
+### 🛠 Example usage with `override_comp(path, override)`
+
+```lua
+local override_comp = require("your_module").override_comp
+
+local my_component = override_comp("file.name", {
+  padding = { 1, 2 },
+  min_screen_width = 60,
+  hide = function()
+    return vim.bo.buftype == "nofile"
+  end,
+  style = { fg = "#ffffff", bg = "#222222", bold = true },
+})
+
 ## 📂 Hierarchical Component Structure
 
 Some components are grouped using a `.` dot notation.  
