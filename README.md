@@ -252,383 +252,68 @@ Example: If you do this, the statusline will become
     }
 ```
 
-| **Keys**                      | Type of args                          | **Description**                                                                                                                                                                             |
-| ----------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [name](#name)                 | string                                | The name of component                                                                                                                                                                       |
-| [update_group](#update_group) | string                                | The update group of component                                                                                                                                                               |
-| [event](#event)               | table or string                       | The component will be update when the [event](https://neovim.io/doc/user/autocmd.html) is triggered                                                                                         |
-| [user_event](#user_event)     | table or string                       | Same as event buf for [User](https://neovim.io/doc/user/autocmd.html) autocmd                                                                                                               |
-| [timing](#timing)             | boolean or number                     | If true, component will update after 1 second, If set to a number it will create a sub timer for that component                                                                             |
-| [padding](#padding)           | number or table                       | The number of spaces to add before and after the component                                                                                                                                  |
-| [lazy](#lazy)                 | boolean                               | Load component on startup(not recommended)                                                                                                                                                  |
-| [configs](#configs)           | table                                 | The configs of components, it will be pass to the first parameter of each function                                                                                                          |
-| [space](#space)               | table or function                     | If space is the table it will be pass to the second parameter of each function, if it is a function the return value of that function will be pass to the second parameter of each function |
-| [init](#init)                 | function                              | The function will call on the first time component load                                                                                                                                     |
-| [colors](#colors)             | table                                 | Colors highlight                                                                                                                                                                            |
-| [separator](#separator)       | table                                 | The separator of component                                                                                                                                                                  |
-| [update](#update)             | function(must return string or table) | The function will return the value of the component to display on the statusline                                                                                                            |
-| [condition](#condition)       | function(must return boolean)         | The function will return the condition to display the component when the component is update                                                                                                |
-| [on_highlight](#on_highlight) | function                              | The function will call when the component is set highlight                                                                                                                                  |
+ ## 🔧 Component Reference
 
-### Detail of each key
+Each component in `witch-line` is a table with powerful customization capabilities. Here's a complete reference of available fields (excluding internal/private ones):
 
-- <a name="name">`name`</a>: The name of component(optional). If you set it will be better for logging message. Default is `nil`
+| **Field**           | **Type**                                                                 | **Description**                                                                                         |
+|---------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `id`                | `string | number`                                                        | Unique identifier for the component.                                                                   |
+| `inherit`           | `string | number | nil`                                                  | Inherit fields from another component by ID.                                                           |
+| `init`              | `fun(raw_self: Component)`                                               | Called once when the component is initialized.                                                         |
+| `pre_update`        | `fun(self, ctx, static)`                                                 | Called before the update method.                                                                       |
+| `update`            | `string | fun(self, ctx, static): string | nil`                            | Called to update the component. Should return the display string.                                      |
+| `post_update`       | `fun(self, ctx, static)`                                                 | Called after the update, used for cleanup or state updates.                                            |
+| `hide`              | `fun(self, ctx, static): boolean`                                        | Return `true` to hide the component dynamically.                                                       |
+| `left`              | `string | fun(self, ctx, static): string | nil`                            | Left content of the component (static or dynamic).                                                     |
+| `right`             | `string | fun(self, ctx, static): string | nil`                            | Right content of the component (static or dynamic).                                                    |
+| `left_style`        | `table | fun(self, ctx, static): table | nil`                            | Style for the left section (foreground, background, bold, etc.).                                       |
+| `right_style`       | `table | fun(self, ctx, static): table | nil`                            | Style for the right section.                                                                           |
+| `padding`           | `integer | {left, right} | fun(...)`                                     | Padding around the component. Supports static or dynamic values.                                       |
+| `style`             | `highlight | fun(self, ctx, static): highlight`                          | Main style applied to the whole component. Uses Neovim highlight options.                              |
+| `static`            | `any`                                                                    | A static table available during all lifecycle methods.                                                 |
+| `context`           | `fun(self, static): any`                                                 | Function to generate the `ctx` passed to `update` and lifecycle functions.                             |
+| `timing`            | `boolean | integer`                                                      | If `true` or a number, the component updates on a time interval.                                       |
+| `lazy`              | `boolean`                                                                | If `true`, component is lazily initialized.                                                            |
+| `min_screen_width`  | `number | fun(self, ctx, static): number | nil`                          | Minimum screen width required to render the component.                                                 |
+| `events`            | `string[]`                                                               | List of Neovim events that will trigger updates.                                                       |
+| `user_events`       | `string[]`                                                               | List of user-defined events to trigger updates.                                                        |
+| `ref`               | `Ref`                                                                    | A reference table for reusing logic and values across multiple components.                             |
 
-```lua
-    {
-        name = "component_name",
-    }
-```
+---
 
-- <a name="update_group">`update_group`</a>: The update group of component(optional). Default is `nil`
+### 🔗 Ref Table Subfields
 
-If you set it, then all the components in the same group will be update in the same time
+The `ref` field supports the following subfields for deferred configuration:
 
-NOTE: If group is set, then the event, user_event, timing will be ignored
+- `events`
+- `user_events`
+- `timing`
+- `style`
+- `static`
+- `context`
+- `min_screen_width`
+- `hide`
 
-Please make sure that you create group by using:
+These allow reusing logic/configuration between components or lazily loading behavior.
 
-```lua
-    require("sttusline").setup {
-        on_attach = function(create_update_group)
-            create_update_group("GROUP_NAME", {
-                event = { "BufEnter" },
-                user_event = { "VeryLazy" },
-                timing = false,
-            })
-        end
-    }
-```
+---
 
-We provide you some default group:
-
-| **Group**       | **Description**                                                                   |
-| --------------- | --------------------------------------------------------------------------------- |
-| `CURSOR_MOVING` | event = {"CursorMoved", "CursorMoveI"}, user_event = {"VeryLazy"}, timing = false |
-| `BUF_WIN_ENTER` | event = {"BufEnter", "WinEnter"}, user_event = {"VeryLazy"}, timing = false       |
+### 📚 Example
 
 ```lua
-    {
-        update_group = "CURSOR_MOVING",
-    }
-```
-
-- <a name="event">`event`</a>: The component will be update when the event is triggered(optional). Default is `nil`
-
-```lua
-    {
-        event = { "BufEnter" },
-    }
-    -- or
-    {
-        event = "BufEnter",
-    }
-```
-
-- <a name="user_event">`user_event`</a>: Same as event buf for `User` autocmd(optional). You should set it
-  to `VeryLazy` to load when open neovim if you use `lazy.nvim` plugin. Default is `nil`
-
-```lua
-    {
-        user_event = { "VeryLazy" },
-    }
-    -- or
-    {
-        user_event = "VeryLazy",
-    }
-```
-
-- <a name="timing">`timing`</a>: The component will be update every time interval(optional). Default is `nil`
-
-```lua
-    {
-        -- If timing is true, the component will be updated after 1 second, following the global timer.
-        timing = true,
-
-        -- or
-
-        timing = 200, -- 200ms
-        -- This will create a sub timer for the component that will be update every 200ms
-        -- Please make sure that you don't create too many sub timers because it will affect the performance
-
-    }
-```
-
-- <a name="padding">`padding`</a>: The number of spaces to add before and after the component(optional). Default is 1
-
-```lua
-    {
-        padding = 1, -- { left = 1, right = 1 }
-    }
-    -- or
-    {
-        padding = { left = 1, right = 1 },
-    }
-    -- or
-    {
-        padding = { left = 1 }, -- right = 1
-    }
-    -- or
-    {
-        padding = { right = 1 }, -- left = 1
-    }
-```
-
-- <a name="lazy">`lazy`</a>: If lazy = false then the component will be loaded on startup(not recommended). Default is true
-
-```lua
-    {
-        lazy = true,
-    }
-```
-
-<a name="configs">`configs`</a>: The configs of components, it will be pass to the first parameter of each function(optional). Default is nil
-
-```lua
-    {
-        configs = {},
-    }
-```
-
-- <a name="init">`init`</a>: The function will call on the first time component load(optional). Default is nil
-
-  - configs is the [configs](#configs) table
-  - space is the [space](#space) table
-
-```lua
-    {
-        init = function(configs, space) end,
-    }
-```
-
-- <a name="space">`space`</a>: The space is the table or function(optional) and will be pass to the second parameter of each function. Default is nil
-  If it is a function the return value of that function will be pass to the second parameter of each function(optional).
-  You should use it to add the algorithm function for your component or constant variables
-
-  - configs is the [configs](#configs) table
-
-```lua
-    {
-        space = {}
-    }
-    -- or
-    {
-        space = function(configs)
-            return {}
-        end,
-    }
-```
-
-Example
-
-```lua
-    {
-        name = "git-branch",
-        event = { "BufEnter" }, -- The component will be update when the event is triggered
-        user_event = { "VeryLazy", "GitSignsUpdate" },
-        configs = {
-            icon = "",
-        },
-        colors = { fg = colors.pink, bg = colors.bg }, -- { fg = colors.black, bg = colors.white }
-        space = {
-            get_branch = function()
-                local git_dir = vim.fn.finddir(".git", ".;")
-                if git_dir ~= "" then
-                    local head_file = io.open(git_dir .. "/HEAD", "r")
-                    if head_file then
-                        local content = head_file:read("*all")
-                        head_file:close()
-                        return content:match("ref: refs/heads/(.-)%s*$")
-                    end
-                    return ""
-                end
-                return ""
-            end,
-        },
-        update = function(configs, space)
-            local branch = space.get_branch()
-            return branch ~= "" and configs.icon .. " " .. branch or ""
-        end,
-        condition = function() return vim.api.nvim_buf_get_option(0, "buflisted") end,
-    },
-
-```
-
-OR
-
-```lua
-    {
-        name = "git-branch",
-        event = { "BufEnter" }, -- The component will be update when the event is triggered
-        user_event = { "VeryLazy", "GitSignsUpdate" },
-        configs = {
-            icon = "",
-        },
-        colors = { fg = colors.pink, bg = colors.bg }, -- { fg = colors.black, bg = colors.white }
-        space = function(configs,colors)
-            local get_branch = function()
-                local git_dir = vim.fn.finddir(".git", ".;")
-                if git_dir ~= "" then
-                    local head_file = io.open(git_dir .. "/HEAD", "r")
-                    if head_file then
-                        local content = head_file:read("*all")
-                        head_file:close()
-                        return content:match("ref: refs/heads/(.-)%s*$")
-                    end
-                    return ""
-                end
-                return ""
-            end,
-            return {
-                get_branch = get_branch,
-            }
-        end,
-        update = function(configs, space)
-            local branch = space.get_branch()
-            return branch ~= "" and configs.icon .. " " .. branch or ""
-        end,
-        condition = function() return vim.api.nvim_buf_get_option(0, "buflisted") end,
-    },
-
-```
-
-- <a name="update">`update`</a>: The function will return the value of the component to display on the statusline(required).
-  Return value must be string or table
-
-  - configs is the [configs](#configs) table
-  - space is the [space](#space) table
-
-Return string
-
-```lua
-    {
-        update = function(configs, space)return "" end,
-    }
-```
-
-Return the table with all values is string
-
-```lua
-    {
-        update = function(configs, space)return { "string1", "string2" } end,
-    }
-```
-
-If you return the table that contains the table with the first value is string and second value is the colors options or highlight name then
-This element will be highlight with new colors options or highlight name when the component is update
-
-```lua
-    -- you can use the colors options
-    {
-        update = function(configs, space)return { { "string1", {fg = "#000000", bg ="#fdfdfd"} },  "string3", "string4"  } end,
-    }
-```
-
-OR
-
-```lua
-    -- only use the foreground color of the DiagnosticsSignError highlight
-    {
-        update = function(configs, space)return { { "string1", {fg = "DiagnosticsSignError", bg ="#000000"} },  "string3", "string4"  } end,
-    }
-```
-
-OR
-
-```lua
-    -- use same colors options of the DiagnosticsSignError highlight
-    {
-        update = function(configs, space)return { { "string1", "DiagnosticsSignError" },  "string3", "string4"  } end,
-    }
-```
-
-- <a name="colors"> `colors`</a>: Colors highlight(optional). Default is `nil`
-  Rely on the return value of the [update](#update) function, you have 3 ways to set the colors
-
-If the return value is string
-
-```lua
-    {
-        colors = { fg = colors.black, bg = colors.white },
-    }
-```
-
-If the return value is table so each element will correspond to its color according to its position in the table
-
-```lua
-    {
-        colors = {
-            { fg = "#009900", bg = "#ffffff" },
-            { fg = "#000000", bg = "#ffffff" }
-        },
-
-        -- so if the return value is { "string1", "string2" }
-        -- then the string1 will be highlight with { fg = "#009900", bg = "#ffffff" }
-        -- and the string2 will be highlight with { fg = "#000000", bg = "#ffffff" }
-
-        -- if you don't want to add highlight for the string1  you can add a empty table in the first element
-        {
-            colors = {
-                {},
-                { fg = "#000000", bg = "#ffffff" }
-            },
-        }
-    }
-```
-
-NOTE: The colors options can be the colors name or the colors options
-
-```lua
-    {
-        colors = {
-            { fg = "#009900", bg = "#ffffff" },
-            "DiagnosticsSignError",
-        },
-
-        -- so if the return value is { "string1", "string2" }
-        -- then the string1 will be highlight with { fg = "#009900", bg = "#ffffff" }
-        -- and the string2 will be highlight with the colors options of the DiagnosticsSignError highlight
-
-        -- or you can set the fg(bg) follow the colors options of the DiagnosticsSignError highlight
-        {
-            colors = {
-                { fg = "DiagnosticsSignError", bg = "#ffffff" },
-                "DiagnosticsSignError",
-            },
-        }
-    }
-```
-
-- <a name="separator">`separator`</a>: The separator of component(optional). Default is `nil`
-
-```lua
-    {
-        separator = { left = "", right = "" },
-    }
-```
-
-- <a name="condition">`condition`</a>: The function will return the condition to display the component when the component is update(optional).
-  Return value must be boolean
-
-  - configs is the [configs](#configs) table
-  - space is the [space](#space) table
-
-```lua
-    {
-        condition = function(configs, space)return true end,
-    }
-```
-
-- <a name="on_highlight">`on_highlight`</a>: The function will call when the component is set highlight(optional).
-
-  - configs is the [configs](#configs) table
-  - space is the [space](#space) table
-
-```lua
-    {
-        on_highlight= function(configs, space) end,
-    }
-```
+{
+  id = "mode",
+  events = { "ModeChanged" },
+  update = function()
+    return vim.fn.mode()
+  end,
+  style = { fg = "#ffffff", bg = "#005f87", bold = true },
+  padding = { left = 1, right = 1 },
+  hide = function()
+    return vim.bo.filetype == "NvimTree"
+  end,
+}
 
 ## Contributing
 
