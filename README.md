@@ -254,28 +254,28 @@ Example: If you do this, the statusline will become
 
  ## 🔧 Component Reference
 
-Each component in `witch-line` is a table with powerful customization capabilities. Here's a complete reference of available fields (excluding internal/private ones):
+Each component in `witch-line` is a table with powerful customization capabilities. Here's a complete reference of available fields:
 
 | **Field**           | **Type**                                                                 | **Description**                                                                                         |
 |---------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `id`                | `string | number`                                                        | Unique identifier for the component.                                                                   |
-| `inherit`           | `string | number | nil`                                                  | Inherit fields from another component by ID.                                                           |
+| `id`                | `string`, `number`                                                       | Unique identifier for the component.                                                                   |
+| `inherit`           | `string`, `number`, `nil`                                                | Inherit fields from another component by ID.                                                           |
 | `init`              | `fun(raw_self: Component)`                                               | Called once when the component is initialized.                                                         |
 | `pre_update`        | `fun(self, ctx, static)`                                                 | Called before the update method.                                                                       |
-| `update`            | `string | fun(self, ctx, static): string | nil`                            | Called to update the component. Should return the display string.                                      |
+| `update`            | `string`, `fun(self, ctx, static): string`, `nil`                        | Called to update the component. Should return the display string.                                      |
 | `post_update`       | `fun(self, ctx, static)`                                                 | Called after the update, used for cleanup or state updates.                                            |
 | `hide`              | `fun(self, ctx, static): boolean`                                        | Return `true` to hide the component dynamically.                                                       |
-| `left`              | `string | fun(self, ctx, static): string | nil`                            | Left content of the component (static or dynamic).                                                     |
-| `right`             | `string | fun(self, ctx, static): string | nil`                            | Right content of the component (static or dynamic).                                                    |
-| `left_style`        | `table | fun(self, ctx, static): table | nil`                            | Style for the left section (foreground, background, bold, etc.).                                       |
-| `right_style`       | `table | fun(self, ctx, static): table | nil`                            | Style for the right section.                                                                           |
-| `padding`           | `integer | {left, right} | fun(...)`                                     | Padding around the component. Supports static or dynamic values.                                       |
-| `style`             | `highlight | fun(self, ctx, static): highlight`                          | Main style applied to the whole component. Uses Neovim highlight options.                              |
+| `left`              | `string`, `fun(self, ctx, static): string`, `nil`                        | Left content of the component (static or dynamic).                                                     |
+| `right`             | `string`, `fun(self, ctx, static): string`, `nil`                        | Right content of the component (static or dynamic).                                                    |
+| `left_style`        | `table`, `fun(self, ctx, static): table`, `nil`                          | Style for the left section (foreground, background, bold, etc.).                                       |
+| `right_style`       | `table`, `fun(self, ctx, static): table`, `nil`                          | Style for the right section.                                                                           |
+| `padding`           | `integer`, `{left, right}`, `fun(...)`                                   | Padding around the component. Supports static or dynamic values.                                       |
+| `style`             | `highlight`, `fun(self, ctx, static): highlight`                         | Main style applied to the whole component. Uses Neovim highlight options.                              |
 | `static`            | `any`                                                                    | A static table available during all lifecycle methods.                                                 |
 | `context`           | `fun(self, static): any`                                                 | Function to generate the `ctx` passed to `update` and lifecycle functions.                             |
-| `timing`            | `boolean | integer`                                                      | If `true` or a number, the component updates on a time interval.                                       |
+| `timing`            | `boolean`, `integer`                                                     | If `true` or a number, the component updates on a time interval.                                       |
 | `lazy`              | `boolean`                                                                | If `true`, component is lazily initialized.                                                            |
-| `min_screen_width`  | `number | fun(self, ctx, static): number | nil`                          | Minimum screen width required to render the component.                                                 |
+| `min_screen_width`  | `number`, `fun(self, ctx, static): number`, `nil`                        | Minimum screen width required to render the component.                                                 |
 | `events`            | `string[]`                                                               | List of Neovim events that will trigger updates.                                                       |
 | `user_events`       | `string[]`                                                               | List of user-defined events to trigger updates.                                                        |
 | `ref`               | `Ref`                                                                    | A reference table for reusing logic and values across multiple components.                             |
@@ -296,6 +296,24 @@ The `ref` field supports the following subfields for deferred configuration:
 - `hide`
 
 These allow reusing logic/configuration between components or lazily loading behavior.
+
+---
+
+### 📚 Example
+
+```lua
+{
+  id = "mode",
+  events = { "ModeChanged" },
+  update = function()
+    return vim.fn.mode()
+  end,
+  style = { fg = "#ffffff", bg = "#005f87", bold = true },
+  padding = { left = 1, right = 1 },
+  hide = function()
+    return vim.bo.filetype == "NvimTree"
+  end,
+}.
 
 ---
 
