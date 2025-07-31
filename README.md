@@ -148,13 +148,14 @@ Below is a table of all supported fields and their expected types:
 local override_comp = require("your_module").override_comp
 
 local my_component = override_comp("file.name", {
-  padding = { 1, 2 },
+  padding = { left = 2 },
   min_screen_width = 60,
   hide = function()
     return vim.bo.buftype == "nofile"
   end,
   style = { fg = "#ffffff", bg = "#222222", bold = true },
 })
+```
 
 ## 📂 Hierarchical Component Structure
 
