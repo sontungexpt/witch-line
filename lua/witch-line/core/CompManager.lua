@@ -55,15 +55,14 @@ M.on_vim_leave_pre = function()
 end
 
 --- Load the cache for components and dependency stores.
+--- @param Cache Cache The cache to load.
 --- @return function undo Function to restore the previous state of Comps and DepStore.
-M.load_cache = function()
-	local CacheMod = require("witch-line.cache")
-
+M.load_cache = function(Cache)
 	local before_comps = Comps
 	local before_dep_store = DepStore
 
-	Comps = CacheMod.get("Comps") or Comps
-	DepStore = CacheMod.get("DepStore") or DepStore
+	Comps = Cache.get("Comps") or Comps
+	DepStore = Cache.get("DepStore") or DepStore
 
 	return function()
 		Comps = before_comps

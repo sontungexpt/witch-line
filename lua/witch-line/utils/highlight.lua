@@ -1,7 +1,6 @@
 local vim, type, next, pcall, pairs = vim, type, next, pcall, pairs
 local api = vim.api
 local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name = api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
-local CacheMod = require("witch-line.cache")
 
 local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
@@ -35,17 +34,18 @@ api.nvim_create_autocmd("Colorscheme", {
 })
 
 --- Caches the highlight styles and color numbers.
-M.on_vim_leave_pre = function()
-	CacheMod.cache(HighlightCache, "HighlightCache")
+M.on_vim_leave_pre = function(Cache)
+	Cache.cache(HighlightCache, "HighlightCache")
 end
 
 --- Resets the highlight cache state.
 
 --- Loads the highlight cache from the persistent storage.
+--- @param Cache Cache The cache module to use for loading the highlight cache.
 --- @return function undo function to restore the previous cache state
-M.load_cache = function()
+M.load_cache = function(Cache)
 	local before_hilight_cache = HighlightCache
-	HighlightCache = CacheMod.get("HighlightCache") or HighlightCache
+	HighlightCache = Cache.get("HighlightCache") or HighlightCache
 	hl_all_comps()
 
 	return function()

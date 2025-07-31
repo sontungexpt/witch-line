@@ -1,5 +1,7 @@
 local type, pairs, loadstring, mpack, json = type, pairs, loadstring, vim.mpack, vim.json
 local fn, uv = vim.fn, vim.uv or vim.loop
+
+---@class Cache
 local M = {}
 
 local CACHED_DIR = fn.stdpath("cache") .. "/witch-line"

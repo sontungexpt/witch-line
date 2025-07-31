@@ -122,7 +122,7 @@ end
 M.set_user_config = function(user_configs)
 	local tbl_util = require("witch-line.utils.tbl")
 	local hashs = {}
-	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs, 10) do
+	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs, 20) do
 		hashs[i] = hash
 	end
 	CacheMod.cache(hashs, "UserConfigHashs")

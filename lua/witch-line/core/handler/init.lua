@@ -62,13 +62,14 @@ M.on_vim_leave_pre = function()
 end
 
 --- Load the event and timer stores from the persistent storage.
+--- @param Cache Cache The cache module to use for loading the stores.
 --- @return function undo function to restore the previous state of the stores
-M.load_cache = function()
+M.load_cache = function(Cache)
 	local before_event_store = EventStore
 	local before_timer_store = TimerStore
 
-	EventStore = CacheMod.get("EventStore") or EventStore
-	TimerStore = CacheMod.get("TimerStore") or TimerStore
+	EventStore = Cache.get("EventStore") or EventStore
+	TimerStore = Cache.get("TimerStore") or TimerStore
 
 	return function()
 		EventStore = before_event_store
@@ -404,8 +405,8 @@ end
 --- @param comp Component|string The component to register.
 --- @param i integer The index of the component in the registry.
 --- @param urgents Id[] The list of components that should be updated immediately.
---- @param inherit_comp_id Id|nil The ID of the component to inherit from, if any.
-function M.registry_comp_by_type(comp, i, urgents, inherit_comp_id)
+--- @param parent_id Id|nil The ID of the component to inherit from, if any.
+function M.registry_comp_by_type(comp, i, urgents, parent_id)
 	local type_c = type(comp)
 	if type_c == "string" then
 		-- special case for string components
@@ -419,8 +420,8 @@ function M.registry_comp_by_type(comp, i, urgents, inherit_comp_id)
 		if not c then
 			M.registry_str_comp(comp, i, urgents)
 			return
-		elseif inherit_comp_id and not c.inherit then
-			rawset(c, "inherit", inherit_comp_id)
+		elseif parent_id and not c.inherit then
+			rawset(c, "inherit", parent_id)
 		end
 		M.registry_comp(c, i, urgents)
 	elseif type_c == "table" and next(comp) then
@@ -436,9 +437,10 @@ function M.registry_comp_by_type(comp, i, urgents, inherit_comp_id)
 			end
 		end
 
-		if inherit_comp_id and not comp.inherit then
-			rawset(comp, "inherit", inherit_comp_id)
+		if parent_id and not comp.inherit then
+			rawset(comp, "inherit", parent_id)
 		end
+
 		M.registry_comp(comp, i, urgents)
 	end
 end
@@ -452,6 +454,7 @@ function M.registry_comp(comp, id, urgents)
 	if comp._loaded then
 		return comp.id
 	end
+
 	-- If is a list it just a wrapper for a list components
 	if not vim.islist(comp) then
 		-- Every component is treat as an abstract component
@@ -485,6 +488,7 @@ function M.registry_comp(comp, id, urgents)
 
 	for i, child in ipairs(comp) do
 		M.registry_comp_by_type(child, i, urgents, comp.id)
+		comp[i] = nil -- Clear the child to avoid memory leaks
 	end
 
 	return comp.id

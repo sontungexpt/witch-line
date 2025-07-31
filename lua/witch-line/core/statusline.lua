@@ -45,14 +45,14 @@ M.on_vim_leave_pre = function()
 end
 
 --- Loads the statusline cache.
+--- @param Cache Cache The cache module to use for loading the statusline.
 --- @return function undo function to restore the previous state
-M.load_cache = function()
-	local CacheMod = require("witch-line.cache")
+M.load_cache = function(Cache)
 	local before_values = Values
 	local before_values_size = ValuesSize
 
-	Values = CacheMod.get("Statusline") or Values
-	ValuesSize = CacheMod.get("StatuslineSize") or ValuesSize
+	Values = Cache.get("Statusline") or Values
+	ValuesSize = Cache.get("StatuslineSize") or ValuesSize
 
 	return function()
 		Values = before_values
