@@ -27,6 +27,7 @@ M.setup = function(user_configs)
 
 	local CACHE_MODS = {
 		"witch-line.core.handler",
+		"witch-line.core.handler.timer",
 		"witch-line.core.statusline",
 		"witch-line.core.CompManager",
 		"witch-line.utils.highlight",
