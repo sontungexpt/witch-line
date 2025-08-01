@@ -3,8 +3,7 @@ local type = type
 local M = {}
 
 ---@alias DepStore table<Id, table<Id, true>>
----
----@type table<NotNil, DepStore>
+---@type table<Id, DepStore>
 local DepStore = {
 	-- [store_id] = {
 	--    [comp_id] = {
@@ -111,9 +110,12 @@ M.id_exists = function(id)
 end
 
 --- Get the dependency store for a given ID.
---- @param id NotNil The ID to get the dependency store for.
+--- @param id Id The ID to get the dependency store for.
 --- @return DepStore The dependency store for the given ID.
 local get_dep_store = function(id)
+	local id_type = type(id)
+	assert(id_type == "number" or id_type == "string", "id must be a number or string, got: " .. id_type)
+
 	local dep_store = DepStore[id]
 	if not dep_store then
 		dep_store = {}

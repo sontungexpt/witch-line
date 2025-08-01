@@ -9,33 +9,31 @@ local M = {}
 ---@alias HighlightCache {color_nums: table<string, integer>, hl_styles: table<string, vim.api.keyset.get_hl_info>}
 
 ---@type HighlightCache
-local HighlightCache = {
-	color_nums = {},
-	comp_styles = {},
-	hl_styles = {},
+local HLCache = {
+	color_rgb_map = {},
+	styles = {},
 }
 
 --- Inspects the current highlight cache.
 M.inspect = function()
-	vim.notify(vim.inspect(HighlightCache), vim.log.levels.INFO, { title = "Witchline Highlight Cache" })
+	vim.notify(vim.inspect(HLCache), vim.log.levels.INFO, { title = "Witchline Highlight Cache" })
 end
 
 local function hl_all_comps()
-	for hl_name, style in pairs(HighlightCache.comp_styles) do
+	for hl_name, style in pairs(HLCache.styles) do
 		M.hl(hl_name, style)
 	end
 end
-
 api.nvim_create_autocmd("Colorscheme", {
 	callback = function()
-		HighlightCache.hl_styles = {}
+		HLCache.hl_styles = {}
 		hl_all_comps()
 	end,
 })
 
 --- Caches the highlight styles and color numbers.
 M.on_vim_leave_pre = function(Cache)
-	Cache.cache(HighlightCache, "HighlightCache")
+	Cache.cache(HLCache, "HighlightCache")
 end
 
 --- Resets the highlight cache state.
@@ -44,12 +42,12 @@ end
 --- @param Cache Cache The cache module to use for loading the highlight cache.
 --- @return function undo function to restore the previous cache state
 M.load_cache = function(Cache)
-	local before_hilight_cache = HighlightCache
-	HighlightCache = Cache.get("HighlightCache") or HighlightCache
+	local before_hilight_cache = HLCache
+	HLCache = Cache.get("HighlightCache") or HLCache
 	hl_all_comps()
 
 	return function()
-		HighlightCache = before_hilight_cache
+		HLCache = before_hilight_cache
 	end
 end
 
@@ -74,14 +72,14 @@ end
 -- Convert color names to 24-bit RGB numbers
 --- @param color string The color name to convert.
 local function color_to_24bit(color)
-	local c = HighlightCache.color_nums[color]
+	local c = HLCache.color_rgb_map[color]
 	if c then
 		return c
 	end
-
 	local num = nvim_get_color_by_name(color)
+
 	if num ~= -1 then
-		HighlightCache.color_nums[color] = num
+		HLCache.color_rgb_map[color] = num
 	end
 	return num
 end
@@ -103,13 +101,9 @@ end
 
 --- Retrieves the highlight information for a given highlight group name.
 ---@param hl_name string
----@param force boolean? If true, forces retrieval even if cached.
 ---@return vim.api.keyset.get_hl_info|nil
-local get_hlprop = function(hl_name, force)
-	local c = HighlightCache.hl_styles[hl_name]
-	if not force and c then
-		return c
-	elseif hl_name == "" then
+local get_hlprop = function(hl_name)
+	if hl_name == "" then
 		return nil
 	end
 
@@ -117,11 +111,7 @@ local get_hlprop = function(hl_name, force)
 		name = hl_name,
 	})
 
-	if ok then
-		HighlightCache.hl_styles[hl_name] = style
-		return style
-	end
-	return nil
+	return ok and style or nil
 end
 
 M.get_hlprop = get_hlprop
@@ -132,7 +122,7 @@ M.hl = function(group_name, hl_style)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return
 	end
-	HighlightCache.comp_styles[group_name] = hl_style
+	HLCache.styles[group_name] = hl_style
 	local style = shallow_copy(hl_style)
 
 	local fg = style.foreground or style.fg
