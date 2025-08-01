@@ -77,6 +77,8 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 			return tostring(v)
 		elseif t == "boolean" then
 			return v and "1" or "0"
+		elseif t == "function" then
+			return string.dump(v)
 		end
 		return t
 	end

@@ -18,8 +18,6 @@ local SepStyle = {
 local LEFT_SUFFIX = "L"
 local RIGHT_SUFFIX = "R"
 
----@alias Id string|number
-
 --- @class Ref
 --- @field events Id|Id[]|nil a table of events that the component will listen to
 --- @field user_events Id|Id[]|nil a table of user defined events that the component will listen to
@@ -41,10 +39,6 @@ local InheritField = {
 	context = true,
 	min_screen_width = true,
 }
-
----@alias RefFieldType Id|nil
----@alias RefFieldTypes Id[]|nil
----
 
 ---@class Component
 ---@field [integer] string|Component a table of childs, can be used to create a list of components
