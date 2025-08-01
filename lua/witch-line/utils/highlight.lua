@@ -19,16 +19,14 @@ M.inspect = function()
 	vim.notify(vim.inspect(HLCache), vim.log.levels.INFO, { title = "Witchline Highlight Cache" })
 end
 
-local function hl_all_comps()
+local function hl_all()
 	for hl_name, style in pairs(HLCache.styles) do
 		M.hl(hl_name, style)
 	end
 end
+
 api.nvim_create_autocmd("Colorscheme", {
-	callback = function()
-		HLCache.hl_styles = {}
-		hl_all_comps()
-	end,
+	callback = hl_all,
 })
 
 --- Caches the highlight styles and color numbers.
@@ -44,7 +42,7 @@ end
 M.load_cache = function(Cache)
 	local before_hilight_cache = HLCache
 	HLCache = Cache.get("HighlightCache") or HLCache
-	hl_all_comps()
+	hl_all()
 
 	return function()
 		HLCache = before_hilight_cache
