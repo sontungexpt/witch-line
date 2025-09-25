@@ -95,6 +95,21 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 		end
 	end
 
+   -- Comparator for only number + string
+    local function less(a, b)
+        local ta, tb = type(a), type(b)
+        if ta == tb then
+            return a < b
+        elseif ta == "number" and tb == "string" then
+            return true   -- numbers come before strings
+        elseif ta == "string" and tb == "number" then
+            return false
+        else
+            -- fallback: compare tostring (in case weird types slip in)
+            return tostring(a) < tostring(b)
+        end
+
+
 	local sort, remove = table.sort, table.remove
 	local fnv1a_32_concat = require("witch-line.utils.hash").fnv1a32_concat
 	bulk_size = bulk_size or 10
@@ -122,9 +137,15 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 				keys, keys_size, key_idx = {}, 0, 1
 				for k in pairs(current) do
 					keys_size = keys_size + 1
-					keys[keys_size] = k
+local i = keys_size
+                    while i > 1 and less(k, keys[i - 1]) do
+                        keys[i] = keys[i - 1]
+                        i = i - 1
+                    end
+                    keys[i] = k
+
 				end
-				sort(keys)
+				
 			end
 
 			while key_idx <= keys_size do
