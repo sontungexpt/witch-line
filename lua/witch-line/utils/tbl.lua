@@ -108,6 +108,7 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
             -- fallback: compare tostring (in case weird types slip in)
             return tostring(a) < tostring(b)
         end
+end
 
 
 	local sort, remove = table.sort, table.remove
