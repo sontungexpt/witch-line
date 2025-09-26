@@ -4,10 +4,10 @@ local bo = vim.bo
 
 local M = {}
 
----@alias ConfigComps table<integer, Component|string|ConfigComps>
+---@alias NestedComponent table<integer, Component|string|NestedComponent>
 ---@class Config
----@field abstract ConfigComps|nil Abstract components that are not rendered directly.
----@field components ConfigComps|nil Components that are rendered in the statusline.
+---@field abstract NestedComponent|nil Abstract components that are not rendered directly.
+---@field components NestedComponent|nil Components that are rendered in the statusline.
 ---@field disabled nil|{filetypes: string[], buftypes: string[]} A table containing filetypes and buftypes where the statusline is disabled.
 
 ---@type Config
@@ -92,11 +92,11 @@ local function merge_user_config(defaults, overrides)
 	-- Handle type mismatch
 	if default_type ~= override_type then
 		return defaults
-	-- Handle non-tables
+		-- Handle non-tables
 	elseif default_type ~= "table" then
 		return overrides
 
-	-- both are table from here
+		-- both are table from here
 	elseif next(overrides) == nil then
 		return defaults
 	elseif next(defaults) == nil then

@@ -6,11 +6,11 @@ local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
 local M = {}
 
----@alias HighlightCache {color_nums: table<string, integer>, hl_styles: table<string, vim.api.keyset.get_hl_info>}
+---@alias HighlightCache {color_rgb_map: table<string, integer>, styles: table<string, vim.api.keyset.get_hl_info>}
 
 ---@type HighlightCache
 local HLCache = {
-	color_rgb_map = {},
+==	color_rgb_map = {},
 	styles = {},
 }
 
@@ -54,6 +54,7 @@ do
 	function M.reset_counter()
 		counter = nil
 	end
+
 	function M.gen_hl_name()
 		counter = (counter or 0) + 1
 		return "Witchline" .. counter

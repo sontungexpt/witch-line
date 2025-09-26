@@ -107,7 +107,7 @@ local function update_comp(comp, session_id)
 		return
 	end
 
-	local add_hl_name = require("witch-line.utils.highlight").add_hl_name
+	local add_hl_name = require("witch-line.core.highlight").add_hl_name
 	statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
 	local left, right = Component.evaluate_left_right(comp, ctx, static)
 	if left then
@@ -437,6 +437,7 @@ function M.registry_str_comp(comp, i, urgents)
 	end
 	return comp
 end
+
 --- Register a component in the statusline.
 --- @param comp Component
 --- @param id Id The ID to assign to the component.
@@ -482,7 +483,7 @@ M.setup = function(configs, cached)
 		end
 
 		local comps = configs.components
-		---@cast comps ConfigComps
+		---@cast comps NestedComponent
 		for i = 1, #comps do
 			M.registry_comp_by_type(comps[i], i, urgents)
 		end
@@ -495,7 +496,7 @@ M.setup = function(configs, cached)
 	end
 
 	init_autocmd()
-	Timer.init_timer(function(session_id, ids)
+	Timer.on_timer_trigger(function(session_id, ids)
 		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Timer, {})
 		statusline.render()
 	end)

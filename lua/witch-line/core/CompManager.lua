@@ -137,24 +137,24 @@ end
 
 --- Iterate over all dependents of a given component ID.
 --- @param ds_id NotNil The ID of the dependency store to iterate over.
---- @param ref_id NotNil The ID of the component to find dependents for.
+--- @param id NotNil The ID of the component to find dependents for.
 --- @return fun()|fun(): Id, Component An iterator function that returns the next dependent ID and its component.
 --- @return table<Id, true>|nil id_map The map of IDs that depend on the given component ID, or nil if none exist.
-M.iter_dependents = function(ds_id, ref_id)
-	assert(ds_id and ref_id, "Both ds_id and ref_id must be provided")
+M.iter_dependents = function(ds_id, id)
+	assert(ds_id and id, "Both ds_id and ref_id must be provided")
 	local store = DepStore[ds_id]
-	local id_map = store and store[ref_id]
+	local id_map = store and store[id]
 	if not id_map then
 		return function() end, nil
 	end
 
 	local key = nil
 	return function()
-		repeat
-			key, _ = next(id_map, key)
-		until key == nil or Comps[key]
-		return key, Comps[key]
-	end,
+			repeat
+				key, _ = next(id_map, key)
+			until key == nil or Comps[key]
+			return key, Comps[key]
+		end,
 		id_map
 end
 

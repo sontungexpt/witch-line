@@ -17,7 +17,7 @@ local commands = {
 			require("witch-line.core.CompManager").inspect("dep_store")
 		end,
 		highlight = function()
-			require("witch-line.utils.highlight").inspect()
+			require("lua.witch-line.core.highlight").inspect()
 		end,
 		statusline = function()
 			require("witch-line.core.statusline").inspect()

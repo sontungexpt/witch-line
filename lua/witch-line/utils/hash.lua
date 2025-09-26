@@ -26,7 +26,7 @@ end
 
 --- Calculates the FNV-1a 32-bit hash of concatenated strings.
 --- Accepts an array of strings and optional i..j range.
-M.fnv1a32_concat = function(strs, i, j)
+M.fnv1a32_fold = function(strs, i, j)
     local hash = ffi.new("fnv32_t", FNV_OFFSET_32)
     local bxor = bit.bxor
     for l = i or 1, j or #strs do

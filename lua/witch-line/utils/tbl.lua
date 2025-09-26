@@ -101,27 +101,31 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 
 	bulk_size = bulk_size or 10
 	local remove = table.remove
-	local fnv1a_32_concat = require("witch-line.utils.hash").fnv1a32_concat
-	local keys, keys_size, key_idx -- instance
+	local fvn1a32_fold = require("witch-line.utils.hash").fnv1a32_fold
 	local buf, buf_size = {}, 0
 
-	local queue = { tbl }
+	local stack, stack_size = { tbl }, 1
 	local seen = { [tbl] = true }
-	local current = nil
+	local current, keys, keys_size, key_idx -- instance
+
 	return function()
 		iteration = iteration + 1
 		while true do
 			if not current then
-				current = remove(queue)
-				if not current then
+				if stack_size < 1 then
 					-- last hash
 					if buf_size > 0 then
-						local hash = fnv1a_32_concat(buf, 1, buf_size)
+						local hash = fvn1a32_fold(buf, 1, buf_size)
 						buf_size = 0
 						return iteration, hash
 					end
 					return nil, nil -- No more items to process
 				end
+				-- get and remove last positions
+				-- we don't really remove last element but we decrease the size by 1 and
+				-- then if we add new element we just asign new value for more performance
+				current = stack[stack_size]
+				stack_size = stack_size - 1
 
 				-- asign the default values
 				keys, keys_size, key_idx = {}, 0, 1
@@ -148,7 +152,8 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 				buf_size = buf_size + 1
 				if type(v) == "table" then
 					if not seen[v] then
-						queue[#queue + 1] = v
+						stack_size = stack_size + 1
+						stack[stack_size] = v
 						seen[v] = true
 					end
 
@@ -160,7 +165,7 @@ function M.hash_fnv1a32_iter(tbl, bulk_size)
 
 				-- *2 because one for key and one for value
 				if buf_size >= bulk_size * 2 then
-					local hash = fnv1a_32_concat(buf, 1, buf_size)
+					local hash = fvn1a32_fold(buf, 1, buf_size)
 					buf_size = 0
 					return iteration, hash
 				end

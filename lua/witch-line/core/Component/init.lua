@@ -1,6 +1,6 @@
 local type, str_rep, rawset = type, string.rep, rawset
 local CompManager = require("witch-line.core.CompManager")
-local highlight = require("witch-line.utils.highlight")
+local highlight = require("witch-line.core.highlight")
 local call_or_get = require("witch-line.utils").call_or_get
 
 local COMP_MODULE_PATH = "witch-line.components."
@@ -28,20 +28,9 @@ local RIGHT_SUFFIX = "R"
 --- @field hide Id|Id[]|nil if true, the component is hidden and should not be displayed, used for lazy loading components
 --- @field min_screen_width Id|Id[]|nil the minimum screen width required to display the component, used for lazy loading components
 
-local InheritField = {
-	timing = true,
-	lazy = true,
-	events = true,
-	user_events = true,
-	ref = true,
-	style = true,
-	static = true,
-	context = true,
-	min_screen_width = true,
-}
 
 ---@class Component
----@field [integer] string|Component a table of childs, can be used to create a list of components
+---@field [integer] NestedComponent a table of childs, can be used to create a list of components
 ---@field id Id the unique identifier of the component, can be a string or an integer
 ---@field inherit Id|nil the id of the component that this component inherits from, can be used to extend the functionality of another component
 ---@field timing boolean|integer|nil if true, the component will be updated every time interval
@@ -78,24 +67,23 @@ local InheritField = {
 ---
 
 ---@class DefaultComponent : Component
----@field _plug_provided true If true, the component is provided by plugin
+---@field id DefaultID the id of default component
+
+
+--- Check if is default component
+--- @param comp Component|DefaultComponent the component to get the id from
+M.is_default = function(comp)
+	local Id = require("witch-line.constant.id").Id
+	return Id[comp.id] ~= nil
+end
 
 --- Gets the id of the component, if the id is a number, it will be converted to a string.
 --- @param comp Component|DefaultComponent the component to get the id from
 --- @param alt_id Id|nil an alternative id to use if the component does not have an id
 --- @return Id id the id of the component
 M.valid_id = function(comp, alt_id)
-	local Id = require("witch-line.constant.id")
-	local id = comp.id or alt_id
-	if not comp._plug_provided then
-		id = Id.id(id)
-	end
-	if id == nil then
-		require("witch-line.utils.notifier").error("Component id is nil" .. vim.inspect(comp))
-	end
+	local id = require("witch-line.constant.id").validate(comp.id or alt_id)
 	rawset(comp, "id", id) -- Ensure the component has an ID field
-
-	---@diagnostic disable-next-line: return-type-mismatch
 	return id
 end
 
@@ -106,7 +94,7 @@ M.inherit_parent = function(comp, parent)
 	setmetatable(comp, {
 		---@diagnostic disable-next-line: unused-local
 		__index = function(t, key)
-			if not InheritField[key] then
+			if not require("witch-line.core.Component.inheritable_fields")[key] then
 				return nil
 			end
 			return parent[key]
@@ -368,19 +356,8 @@ M.overrides = function(comp, override)
 		return comp
 	end
 
-	local accepted = {
-		padding = { "number", "table" },
-		static = { "any" },
-		timing = { "boolean", "number" },
-		style = { "function", "table" },
-		min_screen_width = { "number" },
-		hide = { "function", "boolean" },
-		left_style = { "function", "table" },
-		left = { "string", "function" },
-		right_style = { "function", "table" },
-		right = { "string", "function" },
-	}
-	for k, v in pairs(override or {}) do
+	local accepted = require("witch-line.core.Component.overridable_types")
+	for k, v in pairs(override) do
 		if accepted[k] then
 			local type_v = type(v)
 			if vim.tbl_contains(accepted[k], type_v) then

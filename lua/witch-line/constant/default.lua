@@ -1,4 +1,4 @@
----@type ConfigComps
+---@type NestedComponent
 return {
 	"mode",
 	"file.name",

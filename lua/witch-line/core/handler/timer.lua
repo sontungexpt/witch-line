@@ -8,23 +8,17 @@ local TimerStore = {
 	-- Stores component IDs for timers
 	-- Stores component IDs for timers with a specific interval
 	-- [interval] = {
-	--   [timer] = uv.new_timer(), -- Timer object for the interval
 	--   comp_id1,
 	--   comp_id2,
 	--   ...
 	--   ...
 	-- }
 }
+local timers = {
+	-- [interval] = uv.new_timer(), -- Timer object for the component
+}
 
 M.on_vim_leave_pre = function(Cache)
-	for _, ids in pairs(TimerStore) do
-		if ids.timer then
-			ids.timer:stop() -- Stop the timer if it exists
-			ids.timer:close() -- Close the timer to free resources
-			ids.timer = nil -- Clear the timer reference
-		end
-	end
-
 	Cache.cache(TimerStore, "TimerStore")
 end
 
@@ -37,13 +31,11 @@ M.load_cache = function(Cache)
 	TimerStore = Cache.get("TimerStore") or TimerStore
 
 	return function()
-		for _, ids in pairs(TimerStore) do
-			if ids.timer then
-				ids.timer:stop() -- Stop the timer if it exists
-				ids.timer:close() -- Close the timer to free resources
-			end
+		for interval, timer in pairs(timers) do
+			timer:stop() -- Stop the timer if it exists
+			timer:close() -- Close the timer to free resources
 		end
-
+		timers = {}
 		TimerStore = before_timer_store
 	end
 end
@@ -60,15 +52,16 @@ M.registry_timer = function(comp)
 end
 
 --- Initialize the timer for components that have timers registered.
-M.init_timer = function(work)
+M.on_timer_trigger = function(work)
 	if not next(TimerStore) then
 		return
 	end
 
 	local uv = vim.uv or vim.loop
 	for interval, ids in pairs(TimerStore) do
-		ids.timer = uv.new_timer()
-		ids.timer:start(
+		local timer = uv.new_timer()
+		timer = uv.new_timer()
+		timer:start(
 			0,
 			interval,
 			vim.schedule_wrap(function()
@@ -78,6 +71,7 @@ M.init_timer = function(work)
 				end)
 			end)
 		)
+		timers[interval] = timer
 	end
 end
 
