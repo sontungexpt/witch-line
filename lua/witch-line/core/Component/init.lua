@@ -91,13 +91,11 @@ end
 --- @param comp Component the component to inherit from
 --- @param parent Component the parent component to inherit from
 M.inherit_parent = function(comp, parent)
+	local inheritable_fields = require("witch-line.core.Component.inheritable_fields")
 	setmetatable(comp, {
 		---@diagnostic disable-next-line: unused-local
 		__index = function(t, key)
-			if not require("witch-line.core.Component.inheritable_fields")[key] then
-				return nil
-			end
-			return parent[key]
+			return inheritable_fields[key] and parent[key] or nil
 		end,
 	})
 end

@@ -18,8 +18,8 @@ local EventStore   = {
     -- },
 }
 
-M.on_vim_leave_pre = function()
-    CacheMod.cache(EventStore, "EventStore")
+M.on_vim_leave_pre = function(cache)
+    cache.cache(EventStore, "EventStore")
 end
 --- Load the event and timer stores from the persistent storage.
 --- @param Cache Cache The cache module to use for loading the stores.
@@ -58,33 +58,16 @@ end
 --- @return integer|nil group The ID of the autocmd group created.
 --- @return integer|nil events_id The ID of the autocmd for events.
 --- @return integer|nil user_events_id The ID of the autocmd for user events.
-M.on_event         = function(work)
+M.on_event         = function(work, event_info_store_name)
     local events, user_events = EventStore.events, EventStore.user_events
-    local equeue = {}
+    local id_map = {}
 
-    local on_event_debounce = require("witch-line.utils").debounce(function(stack, key)
+    local debounce = require("witch-line.utils").debounce(function()
         local Session = require("witch-line.core.Session")
-        Session.run_once(function(id)
-            for etype, es in pairs(equeue) do
-                local store = EventStore[etype]
-                if store then
-                    for i = 1, #es do
-                        local e = es[i]
-                        local ids = store[e]
-                        if ids then
-                            for i = stack_size, 1, -1 do
-                                local ids = store[stack[i]]
-                                stack[i] = nil
-
-                                if ids then
-                                    M.update_comp_graph_by_ids(ids, id, DepStoreKey.Event, seen)
-                                end
-                            end
-                            statusline.render()
-                        end
-                    end
-                end
-            end
+        Session.run_once(function(session_id)
+            Session.get_store(session_id, event_info_store_name, id_map)
+            work(session_id, vim.tbl_keys(id_map), id_map)
+            id_map = {}
         end)
     end, 100)
 
@@ -93,25 +76,27 @@ M.on_event         = function(work)
 
     if events and next(events) then
         group = group or api.nvim_create_augroup("WitchLineEvents", { clear = true })
-        equeue.events = {}
         id1 = api.nvim_create_autocmd(vim.tbl_keys(events), {
             group = group,
             callback = function(e)
-                table.insert(equeue.events, e.event)
-                on_event_debounce(equeue.events, "events")
+                for i, id in ipairs(events[e.event]) do
+                    id_map[id] = e
+                end
+                debounce()
             end,
         })
     end
 
     if user_events and next(user_events) then
         group = group or api.nvim_create_augroup("WitchLineEvents", { clear = true })
-        equeue.user_events = {}
         id2 = api.nvim_create_autocmd("User", {
             pattern = vim.tbl_keys(user_events),
             group = group,
             callback = function(e)
-                table.insert(equeue.user_events, e.match)
-                on_event_debounce(equeue.user_events, "user_events")
+                for i, id in ipairs(user_events[e.match]) do
+                    id_map[id] = e
+                end
+                debounce()
             end,
         })
     end

@@ -42,12 +42,12 @@ end
 --- Register a timer for a component.
 --- @param comp Component The component to register the timer for.
 M.registry_timer = function(comp)
-	local timing = comp.timing == true and TIMER_TICK or comp.timing
+	local interval = comp.timing == true and TIMER_TICK or comp.timing
 
-	if type(timing) == "number" and timing > 0 then
-		local ids = TimerStore[timing] or {}
+	if type(interval) == "number" and interval > 0 then
+		local ids = TimerStore[interval] or {}
 		ids[#ids + 1] = comp.id
-		TimerStore[timing] = ids
+		TimerStore[interval] = ids
 	end
 end
 
@@ -67,7 +67,7 @@ M.on_timer_trigger = function(work)
 			vim.schedule_wrap(function()
 				local Session = require("witch-line.core.Session")
 				Session.run_once(function(session_id)
-					work(session_id, ids)
+					work(session_id, ids, interval)
 				end)
 			end)
 		)

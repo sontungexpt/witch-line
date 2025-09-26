@@ -10,7 +10,7 @@ local M = {}
 
 ---@type HighlightCache
 local HLCache = {
-==	color_rgb_map = {},
+	color_rgb_map = {},
 	styles = {},
 }
 
