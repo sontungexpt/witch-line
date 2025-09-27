@@ -41,20 +41,14 @@ Session.get_store = function(session_id, store_id, initial)
 	store[store_id] = value
 	return value
 end
----- Retrieves the session data associated with the given session ID and key.
---- If the key does not exist, it will create an empty table for that key.
+
+--- Sets the session data associated with the given session ID and key.
 --- @param session_id SessionId id of the session
 --- @param store_id NotNil key to retrieve session data
---- @param initial any initial value to set if the key does not exist
-Session.new_store = function(session_id, store_id, initial)
+Session.new_store = function(session_id, store_id, value)
 	local store = Store[session_id]
 	if not store then
 		error("Session with id " .. tostring(session_id) .. " does not exist.")
-	end
-
-	local value = store[store_id] or initial
-	if not value then
-		error("You must provide an initial value for the store_id: " .. tostring(store_id))
 	end
 	store[store_id] = value
 	return value

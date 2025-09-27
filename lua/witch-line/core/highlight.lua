@@ -6,60 +6,68 @@ local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
 local M = {}
 
----@alias HighlightCache {color_rgb_map: table<string, integer>, styles: table<string, vim.api.keyset.get_hl_info>}
 
----@type HighlightCache
-local HLCache = {
-	color_rgb_map = {},
-	styles = {},
-}
+---@type table<string, integer>
+local ColorRgb24Bit = {}
+
+---@type table<string, vim.api.keyset.get_hl_info>
+local Styles = {}
 
 --- Inspects the current highlight cache.
-M.inspect = function()
-	vim.notify(vim.inspect(HLCache), vim.log.levels.INFO, { title = "Witchline Highlight Cache" })
+--- @param target "rgb24bit"|"styles"|nil target to inspect
+M.inspect = function(target)
+	local notifier = require("witch-line.utils.notifier")
+	if target == "rgb24bit" then
+		notifier.info(vim.inspect(ColorRgb24Bit))
+	elseif target == "styles" then
+		notifier.info(vim.inspect(Styles))
+	else
+		notifier.info(vim.inspect({
+			ColorRgb24Bit = ColorRgb24Bit,
+			Styles = Styles,
+		}))
+	end
 end
 
-local function hl_all()
-	for hl_name, style in pairs(HLCache.styles) do
-		M.hl(hl_name, style)
+--- Highlight all styles in the Styles table.
+local function highlight_all()
+	for hl_name, style in pairs(Styles) do
+		M.highlight(hl_name, style)
 	end
 end
 
 api.nvim_create_autocmd("Colorscheme", {
-	callback = hl_all,
+	callback = highlight_all,
 })
 
---- Caches the highlight styles and color numbers.
-M.on_vim_leave_pre = function(Cache)
-	Cache.cache(HLCache, "HighlightCache")
+
+--- The function to be called before Vim exits to save the highlight cache.
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the highlight cache.
+M.on_vim_leave_pre = function(CacheDataAccessor)
+	CacheDataAccessor.set("ColorRgb24Bit", ColorRgb24Bit)
+	CacheDataAccessor.set("HighlightStyles", Styles)
 end
 
---- Resets the highlight cache state.
 
---- Loads the highlight cache from the persistent storage.
---- @param Cache Cache The cache module to use for loading the highlight cache.
---- @return function undo function to restore the previous cache state
-M.load_cache = function(Cache)
-	local before_hilight_cache = HLCache
-	HLCache = Cache.get("HighlightCache") or HLCache
-	hl_all()
+--- Loads the data from cache  from the persistent storage.
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the highlight cache.
+--- @return function undo function to restore the previous state
+M.load_cache = function(CacheDataAccessor)
+	local color_rgb_24bit_before = ColorRgb24Bit
+	local styles_before = Styles
+
+	ColorRgb24Bit = CacheDataAccessor.get("ColorRgb24Bit") or {}
+	Styles = CacheDataAccessor.get("HighlightStyles")
+
+
+	highlight_all()
 
 	return function()
-		HLCache = before_hilight_cache
+		ColorRgb24Bit = color_rgb_24bit_before
+		Styles = styles_before
 	end
 end
 
-do
-	local counter = nil
-	function M.reset_counter()
-		counter = nil
-	end
-
-	function M.gen_hl_name()
-		counter = (counter or 0) + 1
-		return "Witchline" .. counter
-	end
-end
 
 --- Generates a highlight name based on an ID.
 --- @param id any The ID to generate the highlight name for.
@@ -71,14 +79,14 @@ end
 -- Convert color names to 24-bit RGB numbers
 --- @param color string The color name to convert.
 local function color_to_24bit(color)
-	local c = HLCache.color_rgb_map[color]
+	local c = ColorRgb24Bit[color]
 	if c then
 		return c
 	end
 	local num = nvim_get_color_by_name(color)
 
 	if num ~= -1 then
-		HLCache.color_rgb_map[color] = num
+		ColorRgb24Bit[color] = num
 	end
 	return num
 end
@@ -117,11 +125,11 @@ M.get_hlprop = get_hlprop
 
 ---@param group_name string
 ---@param hl_style vim.api.keyset.highlight
-M.hl = function(group_name, hl_style)
+M.highlight = function(group_name, hl_style)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return
 	end
-	HLCache.styles[group_name] = hl_style
+	Styles[group_name] = hl_style
 	local style = shallow_copy(hl_style)
 
 	local fg = style.foreground or style.fg

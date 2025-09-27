@@ -5,7 +5,7 @@ local bo = vim.bo
 local M = {}
 
 ---@alias NestedComponent table<integer, Component|string|NestedComponent>
----@class Config
+---@class Config : table
 ---@field abstract NestedComponent|nil Abstract components that are not rendered directly.
 ---@field components NestedComponent|nil Components that are rendered in the statusline.
 ---@field disabled nil|{filetypes: string[], buftypes: string[]} A table containing filetypes and buftypes where the statusline is disabled.
@@ -22,8 +22,9 @@ local default_configs = {
 	},
 }
 
-M.on_vim_leave_pre = function()
-	CacheMod.cache(default_configs.disabled, "Disabled")
+---
+M.on_vim_leave_pre = function(DataAccessor)
+	DataAccessor.set(default_configs.disabled, "Disabled")
 end
 
 M.load_cache = function()
@@ -44,7 +45,7 @@ M.user_configs_changed = function(user_configs)
 		return true
 	end
 	local tbl_util = require("witch-line.utils.tbl")
-	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs) do
+	for i, hash in tbl_util.fnv1a32_hash_gradually(user_configs) do
 		if hash ~= cache_hashs[i] then
 			return true
 		end
@@ -122,10 +123,10 @@ end
 M.set_user_config = function(user_configs)
 	local tbl_util = require("witch-line.utils.tbl")
 	local hashs = {}
-	for i, hash in tbl_util.hash_fnv1a32_iter(user_configs, 20) do
+	for i, hash in tbl_util.fnv1a32_hash_gradually(user_configs, 20) do
 		hashs[i] = hash
 	end
-	CacheMod.cache(hashs, "UserConfigHashs")
+	CacheMod.set(hashs, "UserConfigHashs")
 
 	local configs = merge_user_config(default_configs, user_configs)
 	if not next(configs.components) then

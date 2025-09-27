@@ -36,7 +36,7 @@ local clear_comp_value = function(c)
 	rawset(c, "_hidden", true) -- Reset hidden state
 end
 
---- Update a component and its dependencies.jj
+--- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
 local function update_comp(comp, session_id)
@@ -51,8 +51,13 @@ local function update_comp(comp, session_id)
 
 	local static = CompManager.get_static(comp)
 	local ctx = CompManager.get_context(comp, session_id, static)
-	local min_screen_width = Component.min_screen_width(comp, ctx, static)
-	local hidden = min_screen_width and vim.o.columns > min_screen_width
+
+	if type(comp.pre_update) == "function" then
+		comp.pre_update(comp, ctx, static, session_id)
+	end
+
+	local min_screen_width = CompManager.get_min_screen_width(comp, session_id, ctx, static)
+	local hidden = type(min_screen_width) == "number" and vim.o.columns > min_screen_width
 		or CompManager.should_hidden(comp, session_id, ctx, static)
 
 	if hidden then
@@ -60,24 +65,24 @@ local function update_comp(comp, session_id)
 		return ""
 	end
 
-	-- local value = Component.evaluate(comp, ctx, static)
 	local value = Component.evaluate(comp, ctx, static)
 	if value == "" then
 		clear_comp_value(comp)
 		return ""
 	end
 
-	-- Component.update_style(comp, ctx, static, session_id)
 	Component.update_style(comp, session_id, ctx, static)
 
 	local indices = comp._indices
 	if not indices then
-		error("Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
+		require("witch-line.utils.notifier").
+			error("Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
 		return
 	end
 
 	local add_hl_name = require("witch-line.core.highlight").add_hl_name
 	statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
+
 	local left, right = Component.evaluate_left_right(comp, ctx, static)
 	if left then
 		statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
@@ -86,6 +91,10 @@ local function update_comp(comp, session_id)
 		statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
 	end
 	rawset(comp, "_hidden", false) -- Reset hidden state
+
+	if type(comp.post_update) == "function" then
+		comp.post_update(comp, ctx, static, session_id)
+	end
 	return value
 end
 M.update_comp = update_comp
@@ -93,32 +102,32 @@ M.update_comp = update_comp
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param ds_ids NotNil|NotNil[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
---- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-function M.update_comp_graph(comp, session_id, ds_ids, seen)
+--- @param dep_store_ids DepStoreId|DepStoreId[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
+function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 	seen = seen or {}
 	local id = comp.id
 	if seen[id] then
 		return -- Avoid infinite recursion
 	end
-
+	seen[id] = true
 	local updated_value = update_comp(comp, session_id)
+
 	if updated_value == "" then
-		for _, dep_comp in CompManager.iter_dependents(DepStoreKey.Display, id) do
-			clear_comp_value(dep_comp._indices)
+		for dep_id, dep_comp in CompManager.iterate_dependencies(DepStoreKey.Display, id) do
+			seen[dep_id] = true
+			clear_comp_value(dep_comp)
 		end
 	end
 
-	---@cast id Id
-	seen[id] = true
-	if ds_ids then
-		if type(ds_ids) ~= "table" then
-			ds_ids = { ds_ids }
+	if dep_store_ids then
+		if type(dep_store_ids) ~= "table" then
+			dep_store_ids = { dep_store_ids }
 		end
-		for _, ds_id in ipairs(ds_ids) do
-			for _, dep_comp in CompManager.iter_dependents(ds_id, id) do
-				if not seen[dep_comp.id] then
-					M.update_comp_graph(dep_comp, session_id, ds_ids, seen)
+		for _, ds_id in ipairs(dep_store_ids) do
+			for dep_id, dep_comp in CompManager.iterate_dependencies(ds_id, id) do
+				if not seen[dep_id] then
+					M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
 				end
 			end
 		end
@@ -126,30 +135,26 @@ function M.update_comp_graph(comp, session_id, ds_ids, seen)
 end
 
 --- Update multiple components by their IDs.
---- @param ids Id[] The IDs of the components to update.
+--- @param ids CompId[] The IDs of the components to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param ds_ids NotNil|NotNil[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
---- @param seen table<Id, boolean>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_graph_by_ids = function(ids, session_id, ds_ids, seen)
+--- @param dep_store_ids DepStoreId|DepStoreId[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
+M.update_comp_graph_by_ids = function(ids, session_id, dep_store_ids, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
 			local comp = CompManager.get_comp(id)
 			if comp then
-				M.update_comp_graph(comp, session_id, ds_ids, seen)
+				M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 			end
 		end
 	end
 end
 
-
-
-
-
---- Link dependencies for a component.
+--- Link dependencies for a component based on its ref and inherit fields.
 --- @param comp Component The component to link dependencies for.
 local function registry_refs(comp)
-	local link_ref_field = CompManager.link_ref_field_in_store_id
+	local link_ref_field = CompManager.link_ref_field
 	local ref = comp.ref
 
 	local ref_ids = {}
@@ -185,23 +190,13 @@ local function registry_refs(comp)
 	-- Pull missing dependencies from the component's ref field
 	local Component = require("witch-line.core.Component")
 	for id, _ in pairs(ref_ids) do
-		if not CompManager.id_exists(id) then
+		if not CompManager.is_existed(id) then
 			local c = Component.require_by_id(id)
 			if c then
 				M.registry_abstract_component(c, id)
 			end
 		end
 	end
-end
-
---- Register the component for VimResized event if it has a minimum screen width.
----@param comp Component
-local function registry_vim_resized(comp)
-	local store = EventStore["events"] or {}
-	EventStore["events"] = store
-	local es = store["VimResized"] or {}
-	es[#es + 1] = comp.id
-	store["VimResized"] = es
 end
 
 --- Register conditions for a component.
@@ -216,7 +211,7 @@ local function registry_update_conditions(comp)
 	end
 
 	if comp.min_screen_width then
-		registry_vim_resized(comp)
+		Event.registry_vim_resized(comp)
 	end
 
 	if comp.user_events then
@@ -326,7 +321,7 @@ end
 ---@diagnostic disable-next-line: unused-local
 function M.registry_str_comp(comp, i, urgents)
 	if comp ~= "" then
-		statusline.static(statusline.push(comp))
+		statusline.freeze(statusline.push(comp))
 	end
 	return comp
 end

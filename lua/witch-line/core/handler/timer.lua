@@ -2,24 +2,36 @@ local M = {}
 
 local TIMER_TICK = 1000 -- 1 second
 
----@alias TimerStore table<uinteger , Id[] | {timer: uv.uv_timer_t}>
+---@alias TimerStore table<uinteger , Id[] >
 ---@type TimerStore
 local TimerStore = {
-	-- Stores component IDs for timers
 	-- Stores component IDs for timers with a specific interval
 	-- [interval] = {
 	--   comp_id1,
 	--   comp_id2,
 	--   ...
-	--   ...
 	-- }
 }
-local timers = {
+
+--- @type table<uinteger, uv.uv_timer_t>
+local Timers = {
 	-- [interval] = uv.new_timer(), -- Timer object for the component
 }
 
+
+--- Stops and clears all active timers.
+M.stop_all_timers = function()
+	for interval, timer in pairs(Timers) do
+		timer:stop() -- Stop the timer if it exists
+		timer:close() -- Close the timer to free resources
+	end
+	Timers = {}
+end
+
+--- Cache the timer store before exiting Neovim.
+--- @param Cache Cache The cache module to use for caching the timer store.
 M.on_vim_leave_pre = function(Cache)
-	Cache.cache(TimerStore, "TimerStore")
+	Cache.set(TimerStore, "TimerStore")
 end
 
 --- Load the event and timer stores from the persistent storage.
@@ -31,11 +43,7 @@ M.load_cache = function(Cache)
 	TimerStore = Cache.get("TimerStore") or TimerStore
 
 	return function()
-		for interval, timer in pairs(timers) do
-			timer:stop() -- Stop the timer if it exists
-			timer:close() -- Close the timer to free resources
-		end
-		timers = {}
+		M.stop_all_timers()
 		TimerStore = before_timer_store
 	end
 end
@@ -60,7 +68,6 @@ M.on_timer_trigger = function(work)
 	local uv = vim.uv or vim.loop
 	for interval, ids in pairs(TimerStore) do
 		local timer = uv.new_timer()
-		timer = uv.new_timer()
 		timer:start(
 			0,
 			interval,
@@ -71,7 +78,7 @@ M.on_timer_trigger = function(work)
 				end)
 			end)
 		)
-		timers[interval] = timer
+		Timers[interval] = timer
 	end
 end
 

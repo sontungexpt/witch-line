@@ -25,6 +25,7 @@ local commands = {
 	},
 }
 
+--- Retrieves completions for a given command line.
 ---@diagnostic disable-next-line: unused-local
 local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
 	local args = vim.split(cmd_line, "%s+")

@@ -2,6 +2,12 @@ local M = {}
 local vim = vim
 local uv = vim.uv or vim.loop
 
+
+--- Debounces a function, ensuring it is only called after a specified delay
+--- since the last invocation.
+--- @param func function The function to debounce.
+--- @param delay number The delay in milliseconds.
+--- @return function A debounced version of the input function.
 M.debounce = function(func, delay)
 	local timer, is_running = uv.new_timer(), false
 	return function(...)

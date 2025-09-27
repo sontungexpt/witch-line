@@ -4,7 +4,7 @@ local M = {}
 ---@alias es nil|table<string, Id[]>
 ---@alias EventStore {events: es, user_events: es}
 ---@type EventStore
-local EventStore   = {
+local EventStore       = {
     -- Stores component dependencies for events
     -- Only init if needed
     -- events = {
@@ -18,13 +18,13 @@ local EventStore   = {
     -- },
 }
 
-M.on_vim_leave_pre = function(cache)
+M.on_vim_leave_pre     = function(cache)
     cache.cache(EventStore, "EventStore")
 end
 --- Load the event and timer stores from the persistent storage.
 --- @param Cache Cache The cache module to use for loading the stores.
 --- @return function undo function to restore the previous state of the stores
-M.load_cache       = function(Cache)
+M.load_cache           = function(Cache)
     local before_event_store = EventStore
 
     EventStore = Cache.get("EventStore") or EventStore
@@ -37,7 +37,7 @@ end
 --- Register events for components.
 ---@param comp Component
 ---@param etype "events" | "user_events"
-M.registry_events  = function(comp, etype)
+M.registry_events      = function(comp, etype)
     local es = comp[etype]
     if type(es) == "table" then
         local es_size = #es
@@ -54,18 +54,28 @@ M.registry_events  = function(comp, etype)
     end
 end
 
+--- Register the component for VimResized event if it has a minimum screen width.
+--- @param comp Component The component to register for VimResized event.
+M.registry_vim_resized = function(comp)
+    local store = EventStore["events"] or {}
+    EventStore["events"] = store
+    local es = store["VimResized"] or {}
+    es[#es + 1] = comp.id
+    store["VimResized"] = es
+end
+
 --- Initialize the autocmd for events and user events.
 --- @return integer|nil group The ID of the autocmd group created.
 --- @return integer|nil events_id The ID of the autocmd for events.
 --- @return integer|nil user_events_id The ID of the autocmd for user events.
-M.on_event         = function(work, event_info_store_name)
+M.on_event             = function(work, event_info_store_name)
     local events, user_events = EventStore.events, EventStore.user_events
     local id_map = {}
 
-    local debounce = require("witch-line.utils").debounce(function()
+    local emit = require("witch-line.utils").debounce(function()
         local Session = require("witch-line.core.Session")
         Session.run_once(function(session_id)
-            Session.get_store(session_id, event_info_store_name, id_map)
+            Session.new_store(session_id, event_info_store_name, id_map)
             work(session_id, vim.tbl_keys(id_map), id_map)
             id_map = {}
         end)
@@ -82,7 +92,7 @@ M.on_event         = function(work, event_info_store_name)
                 for i, id in ipairs(events[e.event]) do
                     id_map[id] = e
                 end
-                debounce()
+                emit()
             end,
         })
     end
@@ -96,7 +106,7 @@ M.on_event         = function(work, event_info_store_name)
                 for i, id in ipairs(user_events[e.match]) do
                     id_map[id] = e
                 end
-                debounce()
+                emit()
             end,
         })
     end

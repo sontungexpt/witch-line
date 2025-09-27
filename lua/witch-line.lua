@@ -22,7 +22,7 @@ M.setup = function(user_configs)
 		}
 	end
 
-	local CacheMod = require("witch-line.cache")
+	local Cache = require("witch-line.cache")
 	local ConfMod = require("witch-line.config")
 
 	local CACHE_MODS = {
@@ -30,44 +30,32 @@ M.setup = function(user_configs)
 		"witch-line.core.handler.timer",
 		"witch-line.core.statusline",
 		"witch-line.core.CompManager",
-		"witch-line.utils.highlight",
+		"witch-line.core.highlight",
 		"witch-line.config",
 	}
+	local tbl_utils = require("witch-line.utils.tbl")
+	local checksum = tostring(tbl_utils.fnv1a32_hash(user_configs))
 
-	if CacheMod.cache_readable() then
-		CacheMod.read_async(function(struct)
-			if struct then
-				local undos = {}
-				for i = 1, #CACHE_MODS do
-					undos[i] = require(CACHE_MODS[i]).load_cache(CacheMod)
-				end
-				-- use cache first
-				require("witch-line.core.handler").setup(nil, true)
-				if not ConfMod.user_configs_changed(user_configs) then
-					return
-				end
-
-				-- if user_configs is changed, clear cache and run undos
-				CacheMod.clear()
-				for i = 1, #undos do
-					undos[i]()
-				end
+	if Cache.cache_file_readable() then
+		local DataAccessor = Cache.read(checksum)
+		if DataAccessor then
+			for i = 1, #CACHE_MODS do
+				require(CACHE_MODS[i]).load_cache(DataAccessor)
 			end
+			require("witch-line.core.handler").setup(nil, true)
+		else
 			local configs = ConfMod.set_user_config(user_configs)
 			require("witch-line.core.handler").setup(configs, false)
-		end)
-	else
-		local configs = ConfMod.set_user_config(user_configs)
-		require("witch-line.core.handler").setup(configs, false)
+		end
 	end
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		callback = function()
-			if not CacheMod.loaded() then
+			if not Cache.loaded() then
 				for i = 1, #CACHE_MODS do
-					require(CACHE_MODS[i]).on_vim_leave_pre(CacheMod)
+					require(CACHE_MODS[i]).on_vim_leave_pre(Cache.DataAccessor)
 				end
-				CacheMod.save()
+				Cache.save(checksum)
 			end
 		end,
 	})
