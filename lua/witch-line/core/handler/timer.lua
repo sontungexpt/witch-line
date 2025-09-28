@@ -29,18 +29,18 @@ M.stop_all_timers = function()
 end
 
 --- Cache the timer store before exiting Neovim.
---- @param Cache Cache The cache module to use for caching the timer store.
-M.on_vim_leave_pre = function(Cache)
-	Cache.set(TimerStore, "TimerStore")
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for caching the timer store.
+M.on_vim_leave_pre = function(CacheDataAccessor)
+	CacheDataAccessor.set("TimerStore", TimerStore)
 end
 
 --- Load the event and timer stores from the persistent storage.
---- @param Cache Cache The cache module to use for loading the stores.
+--- @param 	CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 --- @return function undo function to restore the previous state of the stores
-M.load_cache = function(Cache)
+M.load_cache = function(CacheDataAccessor)
 	local before_timer_store = TimerStore
 
-	TimerStore = Cache.get("TimerStore") or TimerStore
+	TimerStore = CacheDataAccessor.get("TimerStore") or TimerStore
 
 	return function()
 		M.stop_all_timers()
@@ -49,7 +49,7 @@ M.load_cache = function(Cache)
 end
 --- Register a timer for a component.
 --- @param comp Component The component to register the timer for.
-M.registry_timer = function(comp)
+M.register_timer = function(comp)
 	local interval = comp.timing == true and TIMER_TICK or comp.timing
 
 	if type(interval) == "number" and interval > 0 then

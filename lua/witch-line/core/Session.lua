@@ -22,8 +22,19 @@ end
 -- 	end
 -- 	return session
 -- end
+--- Sets the session data associated with the given session ID and key.
+--- @param session_id SessionId id of the session
+--- @param store_id NotNil key to retrieve session data
+Session.new_store = function(session_id, store_id, value)
+	local store = Store[session_id]
+	if not store then
+		error("Session with id " .. tostring(session_id) .. " does not exist.")
+	end
+	store[store_id] = value
+	return value
+end
 
----- Retrieves the session data associated with the given session ID and key.
+--- Retrieves the session data associated with the given session ID and key.
 --- If the key does not exist, it will create an empty table for that key.
 --- @param session_id SessionId id of the session
 --- @param store_id NotNil key to retrieve session data
@@ -42,17 +53,7 @@ Session.get_store = function(session_id, store_id, initial)
 	return value
 end
 
---- Sets the session data associated with the given session ID and key.
---- @param session_id SessionId id of the session
---- @param store_id NotNil key to retrieve session data
-Session.new_store = function(session_id, store_id, value)
-	local store = Store[session_id]
-	if not store then
-		error("Session with id " .. tostring(session_id) .. " does not exist.")
-	end
-	store[store_id] = value
-	return value
-end
+
 --- Clears the session data associated with the given session ID.
 --- @param id SessionId
 Session.remove = function(id)

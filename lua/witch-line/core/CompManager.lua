@@ -2,11 +2,11 @@ local type = type
 
 local M = {}
 
----@alias DepStoreId Id
----@alias Deps table<Id, true>
----@alias DepStore table<Id, Deps>
----@type table<DepStoreId, DepStore>
-local DepStore = {
+---@alias DepGraphId Id
+---@alias DepMap table<CompId, true>
+---@alias DepGraph table<CompId, DepMap>
+---@type table<DepGraphId, DepGraph>
+local DepGraphMap = {
 	-- [store_id] = {
 	--    [comp_id] = {
 	--      -- [comp_id] = true, -- this component depends on comp_id
@@ -15,71 +15,114 @@ local DepStore = {
 	--
 }
 
----@type table<Id, Component>
+
+---@type table<CompId, ManagedComponent>
 local Comps = {
 	--[id] = {}
 }
 
-M.cache_ugent_comps = function(urgents)
-	assert(type(urgents) == "table" and vim.isarray(urgents), "Urgents must be a table")
-	local CacheMod = require("witch-line.cache")
 
-	-- cache the value loaded in fast events
-	vim.defer_fn(function()
-		local map = {}
-		for _, id in ipairs(urgents) do
-			map[id] = true
-		end
+--- @type CompId[]
+local InitializePendingIds = {}
 
-		for id, comp in pairs(Comps) do
-			if comp._hidden == false and not map[id] then
-				urgents[#urgents + 1] = id
-			end
-		end
-		-- error(vim.inspect(urgents))
-
-		if next(urgents) then
-			CacheMod.set(urgents, "Urgents")
-		end
-	end, 200)
+--- Queue the `init` method of a component to be called in the next render cycle.
+--- @param id CompId The ID of the component to initialize.
+M.queue_initialization = function(id)
+	InitializePendingIds[#InitializePendingIds + 1] = id
 end
 
-M.on_vim_leave_pre = function()
-	local CacheMod = require("witch-line.cache")
-	local Component = require("witch-line.core.Component")
+--- Iterate over the queue of components pending initialization (FIFO).
+--- @return fun(): CompId|nil, Component iterator A function that returns the next component ID in the queue
+M.iter_pending_init_components = function()
+	local index = 0
+	return function()
+		index = index + 1
+		local id = InitializePendingIds[index]
+		if not id then
+			return nil
+		end
+		return id, Comps[id]
+	end
+end
 
+--- @type CompId[]
+local EmergencyIds = {}
+
+--- Get the list of component IDs marked as urgent.
+--- @return CompId[] The list of component IDs marked as urgent.
+M.get_emergency_ids = function()
+	return EmergencyIds
+end
+
+--- Mark a component as urgent to be updated in the next render cycle.
+--- @param id CompId The ID of the component to mark as urgent.
+M.mark_emergency = function(id)
+	EmergencyIds[#EmergencyIds + 1] = id
+end
+
+--- Iterate over the queue of urgent components (FIFO).
+--- @return fun(): CompId|nil iterator A function that returns the next component ID in the queue
+M.iter_emergency_components = function()
+	local index = 0
+	return function()
+		index = index + 1
+		local id = EmergencyIds[index]
+		if not id then
+			return nil
+		end
+		return id, Comps[id]
+	end
+end
+
+
+--- The function to be called before Vim exits.
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.	
+M.on_vim_leave_pre = function(CacheDataAccessor)
+	local Component = require("witch-line.core.Component")
 	for _, comp in pairs(Comps) do
 		Component.remove_state_before_cache(comp)
 	end
-	CacheMod.set(Comps, "Comps")
-	CacheMod.set(DepStore, "DepStore")
+	CacheDataAccessor.set("Comps", Comps)
+	CacheDataAccessor.set("DepGraph", DepGraphMap)
+	CacheDataAccessor.set("Urgents", EmergencyIds)
+	CacheDataAccessor.set("PendingInit", InitializePendingIds)
 end
 
 --- Load the cache for components and dependency stores.
---- @param Cache Cache The cache to load.
---- @return function undo Function to restore the previous state of Comps and DepStore.
-M.load_cache = function(Cache)
-	local before_comps = Comps
-	local before_dep_store = DepStore
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
+--- @return function undo Function to restore the previous state of Comps and DepGraph.
+M.load_cache = function(CacheDataAccessor)
+	local before_comps,
+	before_dep_store,
+	before_pending_inits,
+	before_urgents =
+		Comps,
+		DepGraphMap,
+		InitializePendingIds,
+		EmergencyIds
 
-	Comps = Cache.get("Comps") or Comps
-	DepStore = Cache.get("DepStore") or DepStore
 
+	Comps = CacheDataAccessor.get("Comps") or Comps
+	DepGraphMap = CacheDataAccessor.get("DepGraph") or DepGraphMap
+	InitializePendingIds = CacheDataAccessor.get("PendingInit") or InitializePendingIds
+	EmergencyIds = CacheDataAccessor.get("Urgents") or EmergencyIds
 	return function()
 		Comps = before_comps
-		DepStore = before_dep_store
+		DepGraphMap = before_dep_store
+		InitializePendingIds = before_pending_inits
+		EmergencyIds = before_urgents
 	end
 end
 
 --- Iterate over all registered components.
---- @return fun(): Id, Component Iterator iterator over all components.
---- @return Component[] comps The list of all components.
+--- @return fun(): CompId, ManagedComponent iterator Iterator over all components.
+--- @return ManagedComponent[] comps The list of all components.
 M.iterate_comps = function()
 	return pairs(Comps)
 end
 
 --- Get the component manager containing all registered components.
---- @return table<Id, Component> A proxy table to access components by their IDs.
+--- @return table<CompId, ManagedComponent> A proxy table to access components by their IDs.
 M.get_comp_manager = function()
 	-- return a proxy table to prevent direct access to Comps
 	return setmetatable({}, {
@@ -91,96 +134,137 @@ M.get_comp_manager = function()
 end
 
 --- Get a list of all registered components.
---- @return Component[] The list of all components.
+--- @return ManagedComponent[] The list of all components.
 M.get_list_comps = function()
 	return vim.tbl_values(Comps)
 end
 
 --- Register a component with the component manager.
 --- @param comp Component The component to register.
---- @param alt_id Id An alternative ID for the component if it does not have one.
---- @return Id The ID of the registered component.
-M.register = function(comp, alt_id)
-	local Component = require("witch-line.core.Component")
-	local id = Component.valid_id(comp, alt_id)
+--- @return CompId The ID of the registered component.
+M.register = function(comp)
+	local id = require("witch-line.core.Component").valid_id(comp)
 	Comps[id] = comp
 	return id
 end
 
 
 --- Check if a component with the given ID exists.
---- @param id NotNil The ID to check.
---- @return boolean exists True if the component exists, false otherwise.
+--- @param id CompId ID to check.
+--- @return boolean existed True if the component exists, false otherwise.
 M.is_existed = function(id)
 	return Comps[id] ~= nil
 end
 
 --- Get the dependency store for a given ID, creating it if it does not exist.
---- @param id DepStoreId The ID to get the dependency store for.
---- @return DepStore The dependency store for the given ID.
-local get_dep_store = function(id)
+--- @param id DepGraphId The ID to get the dependency store for.
+--- @param raw boolean|nil If true, return the raw store without creating it if it doesn't exist.
+--- @return DepGraph depstore The dependency store for the given ID.
+local get_dependency_graph = function(id, raw)
 	local id_type = type(id)
 	assert(id_type == "number" or id_type == "string", "id must be a number or string, got: " .. id_type)
 
-	local dep_store = DepStore[id]
+	local dep_store = DepGraphMap[id]
+	if raw then
+		return dep_store
+	end
+
 	if not dep_store then
 		dep_store = {}
-		DepStore[id] = dep_store
+		DepGraphMap[id] = dep_store
 	end
 	return dep_store
 end
-M.get_dep_store = get_dep_store
+M.get_dependency_graph = get_dependency_graph
 
 --- A iterator to loop all key, value in the depstore has id
---- @param id DepStoreId The ID of the dependency store to iterate over.
---- @generic T: table, K, V -- T is the type of the store, K is the type of the key, V is the type of the values
---- @return fun(table: table<K, V>, index?: K):K, V iterator An iterator function that returns the next key and value in the store.
---- @return T store  The dependency store for the given ID, or an empty table if none exist.
-M.iterate_dep_store = function(id)
-	local store = DepStore[id]
+--- @param id DepGraphId The ID of the dependency store to iterate over.
+--- @return fun()|fun(): CompId, DepMap An iterator function that returns the next ID and its dependencies.
+--- @return DepGraph|nil The dependency store for the given ID, or nil if it doesn't exist.
+M.iterate_dependency_map = function(id)
+	local store = DepGraphMap[id]
 	return store and pairs(store) or function() end, store
 end
 
+--- Iterate over all dependency stores.
+--- @return fun()|fun(): DepGraphId, DepGraph iterator An iterator function that returns
+--- @return table<DepGraphId, DepGraph> dep_graph_map The dependency graph map.
+M.iterate_dependency_graph = function()
+	return pairs(DepGraphMap)
+end
 
 --- Iterate over all components that depend on a given component ID in a specific dependency store.
---- @param dep_store_id DepStoreId The ID of the dependency store to search in.
+--- Must sure that all components are registered before call this function including dependencies components.
+--- @param dep_graph_id DepGraphId The ID of the dependency store to search in.
 --- @param id CompId The ID of the component to find dependencies for.
 --- @return fun()|fun(): CompId, Component An iterator function that returns the next dependent ID and its component.
---- @return Deps|nil The dependencies map for the given ID, or nil if none exist.
-M.iterate_dependencies = function(dep_store_id, id)
-	assert(dep_store_id and id, "Both dep_store_id and ref_id must be provided")
-	local store = DepStore[dep_store_id]
+--- @return DepMap|nil The dependencies map for the given ID, or nil if none exist.
+M.iterate_dependencies = function(dep_graph_id, id)
+	assert(dep_graph_id and id, "Both dep_graph_id and ref_id must be provided")
+	local store = DepGraphMap[dep_graph_id]
 	local id_map = store and store[id]
 	if not id_map then
-		return function()
-		end, nil
+		return function() end, nil
+	end
+	local curr_id = nil
+	return function()
+		curr_id = next(id_map, curr_id)
+		if curr_id then
+			return curr_id, Comps[curr_id]
+		end
+	end, id_map
+end
+
+--- Iterate over all dependency IDs that a given component ID depends on in a specific dependency store
+--- @param dep_graph_id DepGraphId The ID of the dependency store to search in
+--- @param id CompId The ID of the component to find dependencies for
+--- @return fun()|fun(): CompId An iterator function that returns the next dependent ID
+M.iterate_dependency_ids = function(dep_graph_id, id)
+	assert(dep_graph_id and id, "Both dep_graph_id and ref_id must be provided")
+	local store = DepGraphMap[dep_graph_id]
+	local id_map = store and store[id]
+	if not id_map then
+		return function() end
+	end
+	local curr_id = nil
+	return function()
+		curr_id = next(id_map, curr_id)
+		return curr_id
+	end
+end
+
+--- Iterate over all dependency IDs that a given component ID depends on in a specific dependency store
+--- @param id CompId The ID of the component to find dependencies for
+--- @return fun()|fun(): CompId An iterator function that returns the next dependent ID
+M.iterate_all_dependency_ids = function(id)
+	assert(id, "id must be provided")
+
+	local deps = {}
+	for _, graph in pairs(DepGraphMap) do
+		local id_map = graph[id]
+		if id_map then
+			for dep_id, _ in pairs(id_map) do
+				deps[dep_id] = true
+			end
+		end
 	end
 
-	local dep_id = nil
+	local id = nil
 	return function()
-			repeat
-				dep_id, _ = next(id_map, dep_id)
-			until dep_id == nil or Comps[dep_id]
-			return dep_id, Comps[dep_id]
-		end,
-		id_map
+		id = next(deps, id)
+		return id
+	end
 end
 
---- Get the raw dependency store for a given ID.
---- @param id NotNil The ID to get the raw dependency store for.
---- @return DepStore The raw dependency store for the given ID.
-M.get_raw_dep_store = function(id)
-	return DepStore[id]
-end
-M.get_dep_store = get_dep_store
+
+
 
 --- Add a dependency for a component.
 --- @param comp Component The component to add the dependency for.
 --- @param ref CompId|CompId[] The ID or IDs that this component depends on.
---- @param store_id DepStoreId The ID of the dependency store to use.
---- @param ref_id_collector table<CompId, true>|nil Optional. A collector to track dependencies.
-M.link_ref_field = function(comp, ref, store_id, ref_id_collector)
-	local store = get_dep_store(store_id)
+--- @param store_id DepGraphId The ID of the dependency store to use.
+M.link_ref_field = function(comp, ref, store_id)
+	local store = get_dependency_graph(store_id)
 
 	if type(ref) ~= "table" then
 		ref = { ref }
@@ -189,10 +273,6 @@ M.link_ref_field = function(comp, ref, store_id, ref_id_collector)
 	local id = comp.id
 	for i = 1, #ref do
 		local ref_id = ref[i]
-		if ref_id_collector then
-			ref_id_collector[ref_id] = true
-		end
-
 		local deps = store[ref_id] or {}
 		---@diagnostic disable-next-line: need-check-nil
 		deps[id] = true
@@ -200,29 +280,28 @@ M.link_ref_field = function(comp, ref, store_id, ref_id_collector)
 	end
 end
 
-
+--- Remove a dependency store by its ID.
+--- @param id DepGraphId The ID of the dependency store to remove.
 M.remove_dep_store = function(id)
-	DepStore[id] = nil
+	DepGraphMap[id] = nil
 end
 
-M.clear_dep_store_by_id = function(id)
-	DepStore[id] = {}
+--- Remove all dependency stores.
+M.remove_all_dep_store = function()
+	DepGraphMap = {}
 end
 
-M.clear_dep_stores = function()
-	DepStore = {}
+--- Clear all dependencies for a given ID in the dependency store.
+--- @param id DepGraphId The ID of the dependency store to clear.
+M.clear_dep_store = function(id)
+	DepGraphMap[id] = {}
 end
 
---- Check if a given ID is a valid component ID.
---- @param id NotNil The ID to check.
---- @return boolean valid True if the ID is valid, false otherwise.
-M.is_id = function(id)
-	return Comps[id] ~= nil
-end
+
 
 --- Get a component by its ID.
---- @param id Id The ID of the component to retrieve.
---- @return Component|nil The component with the given ID, or nil if not found.
+--- @param id CompId The ID of the component to retrieve.
+--- @return Component|nil comp The component with the given ID, or nil if not found.
 M.get_comp = function(id)
 	return id and Comps[id]
 end
@@ -278,7 +357,7 @@ M.lookup_ref_value = lookup_ref_value
 --- If the context is not found in the component, it will look up the reference chain.
 --- @param comp Component The component to get the context for.
 --- @param session_id SessionId The ID of the process to use for this retrieval.
---- @param static any Optional. If true, the context will be retrieved from the static value.
+--- @param static any The `static` field value of the component from this component or its references.
 --- @return any context The context of the component.
 --- @return Component inherited The component that provides the context, or nil if not found.
 M.get_context = function(comp, session_id, static)
@@ -293,8 +372,9 @@ end
 --- If the style is not found in the component, it will look up the reference chain.
 --- @param comp Component The component to get the style for.
 --- @param session_id SessionId The ID of the process to use for this retrieval.
---- @param ctx any The context to pass to the component's style function.
---- @param static any Optional. If true, the static value will be used for the style.
+--- @param ctx any The `context` field value of the component from this component or its references.
+--- @param static any The `static` field value of the component from this component or its references.
+--- @param ... any Additional arguments to pass to the style function.
 --- @return vim.api.keyset.highlight|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
 M.get_style = function(comp, session_id, ctx, static, ...)
@@ -307,22 +387,23 @@ end
 --- The result will be cached in the session store to avoid redundant computations.
 --- @param comp Component The component to check.
 --- @param session_id SessionId The ID of the process to use for this check.
---- @param ctx any The context to pass to the component's should_display function.
---- @param static any Optional. If true, the static value will be used for the check.
+--- @param ctx any The `context` field value of the component from this component or its references.
+--- @param static any The `static` field value of the component from this component or its
 --- @return boolean displayed True if the component should be displayed, false otherwise.
---- @return Component inherited The component that provides the should_display value, or nil if not found.
+--- @return Component inherited The component that provides the `should_display` value, or nil if not found.
 M.should_hidden = function(comp, session_id, ctx, static)
 	local displayed, last_comp = lookup_ref_value(comp, "should_display", session_id, {}, ctx, static)
 	return displayed == true, last_comp
 end
+
 --- Check if a component should be displayed.
 --- This function checks the `should_display` field of the component, which can be a boolean or a function.
 --- If it is a function, it will be called with the component and the provided context.
 --- The result will be cached in the session store to avoid redundant computations.
 --- @param comp Component The component to check.
 --- @param session_id SessionId The ID of the process to use for this check.
---- @param ctx any The context to pass to the component's should_display function.
---- @param static any Optional. If true, the static value will be used for the check.
+--- @param ctx any The `context` field value of the component from this component or its references.
+--- @param static any The `static` field value of the component from this component or its references.
 --- @return boolean displayed True if the component should be displayed, false otherwise.
 --- @return Component inherited The component that provides the should_display value, or nil if not found.
 M.get_min_screen_width = function(comp, session_id, ctx, static)
@@ -335,7 +416,7 @@ end
 --- This function does not call functions or cache results; it only looks for static values.
 --- @param comp Component The component to start the lookup from.
 --- @param key string The key to look for in the component.
---- @param seen table<Id, boolean> A table to keep track of already seen values to avoid infinite recursion.
+--- @param seen table<CompId, boolean> A table to keep track of already seen values to avoid infinite recursion.
 --- @return any value The static value of the component.
 --- @return Component inheritted The component that provides the static value
 --- @note
@@ -375,21 +456,28 @@ M.lookup_inherited_value = lookup_inherited_value
 --- @param comp Component The component to get the static value for.
 --- @return any value The static value of the component.
 --- @return Component|nil inherited The component that provides the static value.
-function M.get_static(comp)
+M.get_static = function(comp)
 	return lookup_inherited_value(comp, "static", {})
 end
 
 --- Inspect the current state of the component manager.
---- @param key "dep_store"|"comps" The key to inspect.
-function M.inspect(key)
+--- @param target "dep_store"|"comps"|nil The key to inspect.
+M.inspect = function(target)
 	local notifier = require("witch-line.utils.notifier")
-	if key == "dep_store" then
+	if target == "dep_store" then
 		notifier.info(
-			"Inspecting DepStore\n" .. vim.inspect(DepStore or {})
+			"Inspecting DepGraph\n" .. vim.inspect(DepGraphMap or {})
+		)
+	elseif target == "comps" then
+		notifier.info(
+			"Inspecting Comps\n" .. vim.inspect(Comps or {})
 		)
 	else
 		notifier.info(
-			"Inspecting Comps\n" .. vim.inspect(Comps or {})
+			"Inspecting dep_store and comps: \n" .. vim.inspect({
+				DepGraph = DepGraphMap or {},
+				Comps = Comps or {},
+			})
 		)
 	end
 end

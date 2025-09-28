@@ -22,9 +22,16 @@ local Id = {
 }
 
 return {
+
 	Id = Id,
-	--- @param id Id|nil id to validate
-	--- @return Id id the id of the component
+	--- Check if the id already exists in the default ids.
+	--- @param id CompId id to check
+	--- @return boolean true if the id exists, false otherwise
+	existed = function(id)
+		return Id[id] ~= nil
+	end,
+	--- @param id CompId|nil id to validate
+	--- @return CompId id the id of the component
 	validate = function(id)
 		if not id then
 			require("witch-line.utils.notifier").error("Id must not be null")

@@ -6,10 +6,10 @@ local enabled = true
 
 --- @type string[] The list of render value of component .
 local Values = {}
----@type integer
+---@type integer The size of the Values list.
 local ValuesSize = 0
 
---- @type table<integer, true>
+--- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit).
 local Frozens = {}
 
 --- Inspects the current statusline values.
@@ -35,7 +35,7 @@ end
 
 --- Handles necessary operations before Vim exits.
 ---
---- @param CacheDataAccessor Cache.CacheDataAccessor The data accessor module to use for caching the statusline.
+--- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
 	M.empty_values(function(idx)
@@ -69,10 +69,14 @@ M.clear = function()
 end
 
 
+--- Gets the current size of the statusline values.
+--- @return integer size The current size of the statusline values.
 M.get_size = function()
 	return ValuesSize
 end
 
+--- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
+--- If the statusline is disabled, it sets `o.statusline` to a single space.
 M.render = function()
 	if not enabled then
 		o.statusline = " "
@@ -82,6 +86,10 @@ M.render = function()
 	o.statusline = str ~= "" and str or " "
 end
 
+
+--- Appends a new value to the statusline values list.
+--- @param value string The value to append.
+--- @return integer new_idx The index of the newly added value.
 M.push = function(value)
 	ValuesSize = ValuesSize + 1
 	Values[ValuesSize] = value

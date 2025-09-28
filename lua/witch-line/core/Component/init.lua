@@ -18,9 +18,9 @@ local SepStyle = {
 local LEFT_SUFFIX = "L"
 local RIGHT_SUFFIX = "R"
 
----@alias CompId Id
+--- @class CompId : Id
 
---- @class Ref
+--- @class Ref : table
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field user_events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field timing CompId|CompId[]|nil A table of ids of components that this component references
@@ -30,48 +30,58 @@ local RIGHT_SUFFIX = "R"
 --- @field hide CompId|CompId[]|nil A table of ids of components that this component references for its hide function
 --- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
 
----@class Component : table
----@field [integer] NestedComponent a table of childs, can be used to create a list of components
----@field id CompId The unique identifier for the component, can be a string or a number
----@field inherit CompId|nil The id of the component to inherit from, can be used to extend a component
----@field timing boolean|integer|nil If true the component will be updated on every tick, if a number it will be updated every n ticks
----@field lazy boolean|nil If true the component will be loaded only when it is needed, used for lazy loading components
----@field events string[]|nil A table of events that the component will listen to
----@field user_events string[]|nil A table of user events that the component will listen to
----@field min_screen_width integer|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId):number|nil
----The minimum screen width required to display the component
----(can be used to hide components on smaller screens).
----If the screen width is less than this value, the component will be hidden.
----If nil, the component will always be displayed. If a function, it will be called with the component, context, static values, and session id as arguments and should return a number or nil.
----@field ref Ref|nil A table of references to other components that this component depends on
----@field left_style table|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId):table|nil A table of styles that will be applied to the left part of the component
----@field left string|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId):string|nil The left part of the component, can be a string or another component
----@field right_style table|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId):table|nil a table of styles that will be applied to the right part of the component
----@field right string|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId):string|nil the right part of the component, can be a string or another component
----@field padding integer|nil|{left: integer|nil, right:integer|nil}|fun(self: Component, ctx: any, static: any, session_id: SessionId): number|{left: integer|nil, right:integer|nil} the padding of the component, can be used to add space around the component
+--- @class LiteralComponent : string
+--- @class NestedComponent : Component, LiteralComponent
+--- @field [integer] NestedComponent a table of childs, can be used to create a list of components
+
+--- @class Component : table
+--- @field id CompId The unique identifier for the component, can be a string or a number
+--- @field inherit CompId|nil The id of the component to inherit from, can be used to extend a component
+--- @field timing boolean|integer|nil If true the component will be updated on every tick, if a number it will be updated every n ticks
+--- @field lazy boolean|nil If true the component will be loaded only when it is needed, used for lazy loading components
+--- @field events string[]|nil A table of events that the component will listen to
+--- @field user_events string[]|nil A table of user events that the component will listen to
+--- @field min_screen_width integer|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):number|nil
+--- The minimum screen width required to display the component
+--- (can be used to hide components on smaller screens).
+--- If the screen width is less than this value, the component will be hidden.
+--- If nil, the component will always be displayed. If a function, it will be called with the component, context, static values, and session id as arguments and should return a number or nil.
+--- @field ref Ref|nil A table of references to other components that this component depends on
+--- @field left_style table|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId):table|nil A table of styles that will be applied to the left part of the component
+--- @field left string|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):string|nil The left part of the component, can be a string or another component
+--- @field right_style table|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):table|nil a table of styles that will be applied to the right part of the component
+--- @field right string|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):string|nil the right part of the component, can be a string or another component
+--- @field padding integer|nil|{left: integer|nil, right:integer|nil}|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): number|{left: integer|nil, right:integer|nil} the padding of the component, can be used to add space around the component
 ---
----@field init nil|fun(raw_self: Component) called when the component is initialized, can be used to set up the context
----@field style vim.api.keyset.highlight|nil|fun(self: Component, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight a table of styles that will be applied to the component
----@field static any a table of static values that will be used in the component
----@field context nil|fun(self: Component, static:any, session_id: SessionId): any a table that will be passed to the component's update function
----@field pre_update nil|fun(self: Component, ctx: any, static: any, session_id: SessionId) called before the component is updated, can be used to set up the context
----@field update nil|string|fun(self:Component, ctx: any, static: any, session_id: SessionId): string|nil called to update the component, should return a string that will be displayed
----@field post_update nil|fun(self: Component,ctx: any, static: any, session_id: SessionId) called after the component is updated, can be used to clean up the context
----@field hide nil|fun(self: Component, ctx:any, static: any, session_id: SessionId): boolean|nil called to check if the component should be displayed, should return true or false
+--- @field init nil|fun(raw_self: ManagedComponent) called when the component is initialized, can be used to set up the context
+--- @field style vim.api.keyset.highlight|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight a table of styles that will be applied to the component
+--- @field static any a table of static values that will be used in the component
+--- @field context nil|fun(self: ManagedComponent, static:any, session_id: SessionId): any a table that will be passed to the component's update function
+--- @field pre_update nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId) called before the component is updated, can be used to set up the context
+--- @field update nil|string|fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil called to update the component, should return a string that will be displayed
+--- @field post_update nil|fun(self: ManagedComponent,ctx: any, static: any, session_id: SessionId) called after the component is updated, can be used to clean up the context
+--- @field hide nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId): boolean|nil called to check if the component should be displayed, should return true or false
 ---
----@private
----@field _indices integer[]|nil A list of indices of the component in the Values table, used for rendering the component (only the root component had)
----@field _hl_name string|nil the highlight group name for the component
----@field _left_hl_name string|nil the highlight group name for the component
----@field _right_hl_name string|nil the highlight group name for the component
----@field _parent boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
----@field _hidden boolean|nil if true, the component is hidden and should not be displayed, used for lazy loading components
----@field _loaded boolean|nil if true, the component is loaded and should be displayed, used for lazy loading components
----@field _abstract boolean|nil if true, the component is an abstract component and should not be displayed, used for lazy loading components
+--- @private
+--- @field _loaded boolean|nil If true, the component is loaded
+--- @field _indices integer[]|nil The render index of the component in the statusline
+--- @field _hl_name string|nil The highlight group name for the component
+--- @field _left_hl_name string|nil The highlight group name for the left part of the component
+--- @field _right_hl_name string|nil The highlight group name for the right part of the component
+--- @field _parent boolean|nil If true, the component has a parent and should inherit from it
+--- @field _hidden boolean|nil If true, the component is hidden and should not be displayed
+--- @field _abstract boolean|nil If true, the component is abstract and should not be displayed directly (all component are abstract)
 
 
----@class DefaultComponent : Component
+---@class DefaultComponent : Component, NestedComponent The default components provided by witch-line
 ---@field id DefaultID the id of default component
+
+--- @class ManagedComponent : Component, DefaultComponent, NestedComponent
+--- @field [integer] CompId -- Child components by their IDs
+--- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
+--- @field _loaded true Always true, indicates that the component has been loaded
+
+
 
 --- Check if is default component
 --- @param comp Component|DefaultComponent the component to get the id from
@@ -82,12 +92,10 @@ end
 
 --- Gets the id of the component, if the id is a number, it will be converted to a string.
 --- @param comp Component|DefaultComponent the component to get the id from
---- @return Id id the id of the component
+--- @return CompId id the id of the component
 M.valid_id = function(comp)
-	local id = comp.id
-	id = id and require("witch-line.constant.id").validate(id)
-		or
-		(tostring(comp) .. tostring(math.random(1, 1000000)))
+	local id = comp.id and require("witch-line.constant.id").validate(comp.id)
+		or (tostring(comp) .. tostring(math.random(1, 1000000)))
 	rawset(comp, "id", id) -- Ensure the component has an ID field
 	return id
 end
@@ -307,22 +315,24 @@ end
 
 --- Requires a default component by its id.
 --- @param id Id the path to the component, e.g. "file.name" or "git.status"
---- @return Component|nil comp the component if it exists, or nil if it does not
+--- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 M.require_by_id = function(id)
-	local Id = require("witch-line.constant.id").Id
-	local path = Id[id]
-	---@cast path string
-	return path and M.require(path)
+	return M.require(id)
 end
 
---- @param path string the path to the component, e.g. "file.name" or "git.status"
---- @return Component|nil comp the component if it exists, or nil if it does not
+--- @param path DefaultID|string the path to the component, e.g. "file.name" or "git.status"
+--- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 M.require = function(path)
+	local Id = require("witch-line.constant.id").Id
+	if not Id[path] then
+		return nil
+	end
+
 	local paths = vim.split(path, ".", { plain = true })
 	local size = #paths
 	local module_path = COMP_MODULE_PATH .. paths[1]
 
-	local ok, component = pcall(require, module_path)
+	local ok, component = require(module_path)
 	if not ok then
 		return nil
 	end

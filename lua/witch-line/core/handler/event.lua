@@ -18,16 +18,18 @@ local EventStore       = {
     -- },
 }
 
-M.on_vim_leave_pre     = function(cache)
-    cache.cache(EventStore, "EventStore")
+--- The function to be called before Vim exits.
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
+M.on_vim_leave_pre     = function(CacheDataAccessor)
+    CacheDataAccessor.set("EventStore", EventStore)
 end
 --- Load the event and timer stores from the persistent storage.
---- @param Cache Cache The cache module to use for loading the stores.
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 --- @return function undo function to restore the previous state of the stores
-M.load_cache           = function(Cache)
+M.load_cache           = function(CacheDataAccessor)
     local before_event_store = EventStore
 
-    EventStore = Cache.get("EventStore") or EventStore
+    EventStore = CacheDataAccessor.get("EventStore") or EventStore
 
     return function()
         EventStore = before_event_store
@@ -37,7 +39,7 @@ end
 --- Register events for components.
 ---@param comp Component
 ---@param etype "events" | "user_events"
-M.registry_events      = function(comp, etype)
+M.register_events      = function(comp, etype)
     local es = comp[etype]
     if type(es) == "table" then
         local es_size = #es
@@ -56,7 +58,7 @@ end
 
 --- Register the component for VimResized event if it has a minimum screen width.
 --- @param comp Component The component to register for VimResized event.
-M.registry_vim_resized = function(comp)
+M.register_vim_resized = function(comp)
     local store = EventStore["events"] or {}
     EventStore["events"] = store
     local es = store["VimResized"] or {}

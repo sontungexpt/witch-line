@@ -4,10 +4,9 @@ local bo = vim.bo
 
 local M = {}
 
----@alias NestedComponent table<integer, Component|string|NestedComponent>
 ---@class Config : table
----@field abstract NestedComponent|nil Abstract components that are not rendered directly.
----@field components NestedComponent|nil Components that are rendered in the statusline.
+---@field abstract Component[] Abstract components that are not rendered directly.
+---@field components Component[] Components that are rendered in the statusline.
 ---@field disabled nil|{filetypes: string[], buftypes: string[]} A table containing filetypes and buftypes where the statusline is disabled.
 
 ---@type Config
@@ -22,35 +21,27 @@ local default_configs = {
 	},
 }
 
----
+---  Called before Vim exits.
+---  This function sets the disabled configurations in the DataAccessor to ensure that the statusline is
+---  disabled for the specified filetypes and buftypes when Vim is closed.
+---  @param DataAccessor Cache.DataAccessor An object that provides access to configuration data.
 M.on_vim_leave_pre = function(DataAccessor)
-	DataAccessor.set(default_configs.disabled, "Disabled")
+	DataAccessor.set("Disabled", default_configs.disabled)
 end
 
-M.load_cache = function()
+--- Loads cached configurations and updates the default configurations accordingly.
+--- This function retrieves the cached disabled configurations and updates the default configurations.
+--- It returns a function that, when called, restores the default configurations to their state before loading the cache.
+--- @param DataAccessor Cache.DataAccessor An object that provides access to configuration data.
+--- @return function undo A function that restores the default configurations to their previous state.
+M.load_cache = function(DataAccessor)
 	local before_configs = default_configs
 
-	local DisabledCache = require("witch-line.cache").get("Disabled")
-	default_configs.disabled = DisabledCache or default_configs.disabled
+	default_configs.disabled = DataAccessor.get("Disabled") or default_configs.disabled
 
 	return function()
 		default_configs = before_configs
 	end
-end
-
---- @param user_configs Config
-M.user_configs_changed = function(user_configs)
-	local cache_hashs = require("witch-line.cache").get("UserConfigHashs")
-	if not cache_hashs then
-		return true
-	end
-	local tbl_util = require("witch-line.utils.tbl")
-	for i, hash in tbl_util.fnv1a32_hash_gradually(user_configs) do
-		if hash ~= cache_hashs[i] then
-			return true
-		end
-	end
-	return false
 end
 
 function M.is_buf_disabled(bufnr)
@@ -121,13 +112,6 @@ end
 --- @param user_configs Config A table containing user-defined configurations to be merged with the default configurations.
 --- @return Config merged_configs The merged configuration table, which includes both default and user-defined settings.
 M.set_user_config = function(user_configs)
-	local tbl_util = require("witch-line.utils.tbl")
-	local hashs = {}
-	for i, hash in tbl_util.fnv1a32_hash_gradually(user_configs, 20) do
-		hashs[i] = hash
-	end
-	CacheMod.set(hashs, "UserConfigHashs")
-
 	local configs = merge_user_config(default_configs, user_configs)
 	if not next(configs.components) then
 		configs.components = require("witch-line.constant.default")
