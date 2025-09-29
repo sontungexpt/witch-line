@@ -19,27 +19,24 @@ local CompManager = require("witch-line.core.CompManager")
 
 
 --- Clear the value of a component in the statusline.
---- @param c Component The component to clear.
-local clear_comp_value = function(c)
-	local indices = c._indices
-	if not indices then
-		return
-	end
+--- @param comp Component The component to clear.
+local hide_component = function(comp)
+	local indices = assert(comp._indices, "Component has no indices to clear")
 
 	statusline.bulk_set(indices, "")
-	if type(c.left) == "string" then
+	if type(comp.left) == "string" then
 		statusline.bulk_set_sep(indices, "", -1)
 	end
-	if type(c.right) == "string" then
+	if type(comp.right) == "string" then
 		statusline.bulk_set_sep(indices, "", 1)
 	end
-	rawset(c, "_hidden", true) -- Reset hidden state
+	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
-local function update_comp(comp, session_id)
+local function update_component(comp, session_id)
 	local Component = require("witch-line.core.Component")
 
 	if comp.inherit and not Component.has_parent(comp) then
@@ -52,52 +49,65 @@ local function update_comp(comp, session_id)
 	local static = CompManager.get_static(comp)
 	local ctx = CompManager.get_context(comp, session_id, static)
 
-	if type(comp.pre_update) == "function" then
-		comp.pre_update(comp, ctx, static, session_id)
-	end
+	Component.emit_pre_update(comp, session_id, ctx, static)
 
 	local min_screen_width = CompManager.get_min_screen_width(comp, session_id, ctx, static)
 	local hidden = type(min_screen_width) == "number" and vim.o.columns > min_screen_width
 		or CompManager.should_hidden(comp, session_id, ctx, static)
 
+
+	local value = ""
+
 	if hidden then
-		clear_comp_value(comp)
-		return ""
+		hide_component(comp)
+		goto FINALIZE
 	end
 
-	local value = Component.evaluate(comp, ctx, static)
+	value = Component.evaluate(comp, ctx, static, session_id)
 	if value == "" then
-		clear_comp_value(comp)
-		return ""
+		hide_component(comp)
+		goto FINALIZE
 	end
 
-	Component.update_style(comp, session_id, ctx, static)
 
-	local indices = comp._indices
-	if not indices then
-		require("witch-line.utils.notifier").
-			error("Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
-		return
+	local indices = assert(comp._indices,
+		"Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
+
+	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
+
+	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+	local need_style_update = Component.needs_style_update(comp, style, ref_comp)
+	if need_style_update then
+		Component.ensure_hl_name(comp, ref_comp)
+		Component.update_style(comp, style)
 	end
 
-	local add_hl_name = require("witch-line.core.highlight").add_hl_name
-	statusline.bulk_set(indices, add_hl_name(value, comp._hl_name))
+	statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
 
 	local left, right = Component.evaluate_left_right(comp, ctx, static)
 	if left then
-		statusline.bulk_set_sep(indices, add_hl_name(left, comp._left_hl_name), -1)
+		if need_style_update or Component.needs_side_style_update(comp, "left") then
+			Component.ensure_side_hl_name(comp, "left")
+			Component.update_side_style(comp, "left", style, session_id, ctx, static)
+		end
+		statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
 	end
+
 	if right then
-		statusline.bulk_set_sep(indices, add_hl_name(right, comp._right_hl_name), 1)
+		if need_style_update or Component.needs_side_style_update(comp, "right") then
+			Component.ensure_side_hl_name(comp, "right")
+			Component.update_side_style(comp, "right", style, session_id, ctx, static)
+		end
+		statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
 	end
 	rawset(comp, "_hidden", false) -- Reset hidden state
 
-	if type(comp.post_update) == "function" then
-		comp.post_update(comp, ctx, static, session_id)
-	end
+	::FINALIZE::
+	Component.emit_post_update(comp, session_id, ctx, static)
+
 	return value
 end
-M.update_comp = update_comp
+M.update_comp = update_component
 
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
@@ -111,12 +121,12 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 		return -- Avoid infinite recursion
 	end
 	seen[id] = true
-	local updated_value = update_comp(comp, session_id)
+	local updated_value = update_component(comp, session_id)
 
 	if updated_value == "" then
 		for dep_id, dep_comp in CompManager.iterate_dependencies(DepStoreKey.Display, id) do
 			seen[dep_id] = true
-			clear_comp_value(dep_comp)
+			hide_component(dep_comp)
 		end
 	end
 

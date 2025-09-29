@@ -7,10 +7,8 @@ M.override_comp = function(path, override)
 	assert(type(path) == "string", "Path must be a string")
 	assert(type(override) == "table", "Override must be a table")
 
-	return {
-		[0] = path,
-		override = override,
-	}
+	override[0] = path
+	return override
 end
 
 return M

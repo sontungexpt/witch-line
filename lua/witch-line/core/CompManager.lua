@@ -61,7 +61,7 @@ M.mark_emergency = function(id)
 end
 
 --- Iterate over the queue of urgent components (FIFO).
---- @return fun(): CompId|nil iterator A function that returns the next component ID in the queue
+--- @return fun(): CompId|, Component iterator A function that returns the next component ID in the queue
 M.iter_emergency_components = function()
 	local index = 0
 	return function()
@@ -121,17 +121,6 @@ M.iterate_comps = function()
 	return pairs(Comps)
 end
 
---- Get the component manager containing all registered components.
---- @return table<CompId, ManagedComponent> A proxy table to access components by their IDs.
-M.get_comp_manager = function()
-	-- return a proxy table to prevent direct access to Comps
-	return setmetatable({}, {
-		-- prevents a little bit for access raw comps
-		__index = function(_, id)
-			return Comps[id]
-		end,
-	})
-end
 
 --- Get a list of all registered components.
 --- @return ManagedComponent[] The list of all components.

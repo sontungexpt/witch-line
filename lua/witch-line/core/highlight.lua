@@ -13,6 +13,16 @@ local ColorRgb24Bit = {}
 ---@type table<string, vim.api.keyset.get_hl_info>
 local Styles = {}
 
+--- Retrieves the style for a given component.
+--- @param comp Component The component to retrieve the style for.
+--- @return table|nil style The style of the component or nil if not found.
+M.get_style = function(comp)
+	if comp._hl_name then
+		return Styles[comp._hl_name]
+	end
+	return nil
+end
+
 --- Inspects the current highlight cache.
 --- @param target "rgb24bit"|"styles"|nil target to inspect
 M.inspect = function(target)
@@ -30,14 +40,14 @@ M.inspect = function(target)
 end
 
 --- Highlight all styles in the Styles table.
-local function highlight_all()
+local function restore_highlight_styles()
 	for hl_name, style in pairs(Styles) do
 		M.highlight(hl_name, style)
 	end
 end
 
 api.nvim_create_autocmd("Colorscheme", {
-	callback = highlight_all,
+	callback = restore_highlight_styles,
 })
 
 
@@ -59,8 +69,7 @@ M.load_cache = function(CacheDataAccessor)
 	ColorRgb24Bit = CacheDataAccessor.get("ColorRgb24Bit") or {}
 	Styles = CacheDataAccessor.get("HighlightStyles")
 
-
-	highlight_all()
+	restore_highlight_styles()
 
 	return function()
 		ColorRgb24Bit = color_rgb_24bit_before
@@ -69,10 +78,10 @@ M.load_cache = function(CacheDataAccessor)
 end
 
 
---- Generates a highlight name based on an ID.
---- @param id any The ID to generate the highlight name for.
+--- Generates a valid highlight group name from an ID.
+--- @param id CompId The ID to generate the highlight name for.
 --- @return string hl_name The generated highlight name.
-M.gen_hl_name_by_id = function(id)
+M.make_hl_name_from_id = function(id)
 	return "WL" .. string.gsub(tostring(id), "[^%w_]", "")
 end
 
@@ -94,7 +103,7 @@ end
 --- Adds a highlight name to a string.
 --- @param str string The string to which the highlight name will be added.
 --- @param hl_name string The highlight name to add.
-M.add_hl_name = function(str, hl_name)
+M.assign_highlight_name = function(str, hl_name)
 	return hl_name and str ~= "" and "%#" .. hl_name .. "#" .. str .. "%*" or str
 end
 
@@ -107,8 +116,8 @@ M.is_hl_styles = function(hl_styles)
 end
 
 --- Retrieves the highlight information for a given highlight group name.
----@param hl_name string
----@return vim.api.keyset.get_hl_info|nil
+--- @param hl_name string The highlight group name.
+--- @return vim.api.keyset.get_hl_info|nil props The highlight properties or nil if not found.
 local get_hlprop = function(hl_name)
 	if hl_name == "" then
 		return nil
@@ -123,7 +132,7 @@ end
 
 M.get_hlprop = get_hlprop
 
----@param group_name string
+---@param group_name string The highlight group name.
 ---@param hl_style vim.api.keyset.highlight
 M.highlight = function(group_name, hl_style)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then

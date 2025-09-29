@@ -1,4 +1,4 @@
----@enum DefaultID
+---@enum DefaultId
 local Id = {
 	["mode"] = "mode",
 	["file.interface"] = "file.interface",
@@ -31,7 +31,7 @@ return {
 		return Id[id] ~= nil
 	end,
 	--- @param id CompId|nil id to validate
-	--- @return CompId id the id of the component
+	--- @return CompId? id the id of the component
 	validate = function(id)
 		if not id then
 			require("witch-line.utils.notifier").error("Id must not be null")

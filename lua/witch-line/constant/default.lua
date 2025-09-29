@@ -1,4 +1,4 @@
----@type NestedComponent
+---@type CombinedComponent
 return {
 	"mode",
 	"file.name",

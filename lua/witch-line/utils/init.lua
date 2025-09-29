@@ -1,15 +1,17 @@
 local M = {}
-local vim = vim
-local uv = vim.uv or vim.loop
 
-
---- Debounces a function, ensuring it is only called after a specified delay
---- since the last invocation.
+--- Creates a debounced version of the given function.
+--- The debounced function will only execute after the specified delay has passed since the last invocation.
+--- If the debounced function is called again before the delay has passed, the timer resets.
+--- @usage
+--- @example
+--- local debounced_func = M.debounce(function() print("Hello, World!") end, 200)
+--- debounced_func() -- Will print "Hello, World!" after 200ms if not called again within that time.
 --- @param func function The function to debounce.
 --- @param delay number The delay in milliseconds.
---- @return function A debounced version of the input function.
+--- @return function debounced_func A debounced version of the input function.
 M.debounce = function(func, delay)
-	local timer, is_running = uv.new_timer(), false
+	local timer, is_running = (vim.uv or vim.loop).new_timer(), false
 	return function(...)
 		if is_running then
 			---@diagnostic disable-next-line: need-check-nil
@@ -30,13 +32,16 @@ M.debounce = function(func, delay)
 	end
 end
 
---- Calls a function or returns a value.
---- If the value is a function, it calls it with the provided arguments.
---- If the value is not a function, it simply returns the value.
---- @param value any The value to call or return.
+--- Evaluates a value that may be a function or a direct value.
+--- If it's a function, it calls it with the provided arguments; otherwise, it returns the value as is.
+--- @usage
+--- @example
+--- local result1 = M.eval(42) -- returns 42
+--- local result2 = M.eval(function(x) return x * 2 end, 21) -- returns 42
+--- @param value any The value to evaluate, which can be a function or any other type.
 --- @param ... any Additional arguments to pass to the function if `value` is a function.
---- @return any The result of calling the function or the value itself.
-M.call_or_get = function(value, ...)
+--- @return any result The evaluated result.
+M.eval = function(value, ...)
 	return type(value) == "function" and value(...) or value
 end
 

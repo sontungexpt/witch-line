@@ -1,6 +1,5 @@
 local ffi           = require("ffi")
 local bit           = bit or require("bit")
-
 local M             = {}
 
 local FNV_PRIME_32  = 0x01000193ULL
@@ -51,5 +50,6 @@ M.fnv1a32_fold = function(strs, i, j)
     end
     return tonumber(hash)
 end
+
 
 return M
