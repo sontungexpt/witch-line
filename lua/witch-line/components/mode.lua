@@ -5,7 +5,6 @@ local Id = require("witch-line.constant.id").Id
 return {
 	id = Id["mode"],
 	_plug_provided = true,
-
 	user_events = { "VeryLazy" },
 	events = { "VimResized", "ModeChanged" },
 	static = {

@@ -93,8 +93,9 @@ end
 --- Computes the FNV-1a 32-bit hash of a table.
 --- This function handles nested tables and ensures that the hash is consistent regardless of the order of keys.	
 --- @param tbl any The value to hash. If it's not a table, a constant hash is returned.
+--- @param hash_key string|nil A specific key in the table to use for hashing. If provided and the table contains this key, its value will be used as the hash representation of the table.
 --- @return number hash The computed FNV-1a 32-bit hash of the table.
-function M.fnv1a32_hash(tbl)
+function M.fnv1a32_hash(tbl, hash_key)
 	-- invalid type then return an 32 bit constant number
 	if type(tbl) ~= "table" or next(tbl) == nil then
 		return 0xFFFFFFFF
@@ -109,38 +110,43 @@ function M.fnv1a32_hash(tbl)
 	while stack_size > 0 do
 		current = stack[stack_size]
 		stack_size = stack_size - 1
-
-		-- asign the default values
-		keys, keys_size = {}, 0
-		for k in pairs(current) do
-			keys_size = keys_size + 1
-			local i = keys_size
-			while i > 1 and less(k, keys[i - 1]) do
-				keys[i] = keys[i - 1]
-				i = i - 1
-			end
-			keys[i] = k
-		end
-
-		for i = 1, keys_size do
-			local k = keys[i]
-			local v = current[k]
-
-			--- Add key
+		if hash_key and current[hash_key] then
+			-- use specific hash for table if available
 			str_buffer_size = str_buffer_size + 1
-			str_buffer[str_buffer_size] = simple_serialize(k)
-
-			-- Add value
-			str_buffer_size = str_buffer_size + 1
-			if type(v) == "table" then
-				if not seen[v] then
-					seen[v] = true
-					stack_size = stack_size + 1
-					stack[stack_size] = v
+			str_buffer[str_buffer_size] = simple_serialize(current[hash_key])
+		else
+			-- asign the default values
+			keys, keys_size = {}, 0
+			for k in pairs(current) do
+				keys_size = keys_size + 1
+				local i = keys_size
+				while i > 1 and less(k, keys[i - 1]) do
+					keys[i] = keys[i - 1]
+					i = i - 1
 				end
-				str_buffer[str_buffer_size] = "vtable"
-			else
-				str_buffer[str_buffer_size] = simple_serialize(v)
+				keys[i] = k
+			end
+
+			for i = 1, keys_size do
+				local k = keys[i]
+				local v = current[k]
+
+				--- Add key
+				str_buffer_size = str_buffer_size + 1
+				str_buffer[str_buffer_size] = simple_serialize(k)
+
+				-- Add value
+				str_buffer_size = str_buffer_size + 1
+				if type(v) == "table" then
+					if not seen[v] then
+						seen[v] = true
+						stack_size = stack_size + 1
+						stack[stack_size] = v
+					end
+					str_buffer[str_buffer_size] = "vtable"
+				else
+					str_buffer[str_buffer_size] = simple_serialize(v)
+				end
 			end
 		end
 	end
@@ -152,8 +158,9 @@ end
 --- blocking the main thread.
 --- @param tbl any The value to hash. If it's not a table, a constant hash is returned.
 --- @param bulk_size number|nil The number of key-value pairs to process in each iteration. Default is 10.
+--- @param hash_key any|nil A specific key in the table to use for hashing. If provided and the table contains this key, its value will be used as the hash representation of the table.
 --- @return fun(): (number|nil, number|nil) iterator An iterator function that returns the iteration count and the current hash value.
-function M.fnv1a32_hash_gradually(tbl, bulk_size)
+function M.fnv1a32_hash_gradually(tbl, bulk_size, hash_key)
 	local iteration = 0
 
 	-- invalid type then return an 32 bit constant number
@@ -191,7 +198,19 @@ function M.fnv1a32_hash_gradually(tbl, bulk_size)
 				-- then if we add new element we just asign new value for more performance
 				current = stack[stack_size]
 				stack_size = stack_size - 1
+				if hash_key and current[hash_key] ~= nil then
+					-- use specific hash for table if available
+					buf_size = buf_size + 1
+					buf[buf_size] = simple_serialize(current[hash_key])
+					current = nil
+					if buf_size >= bulk_size * 2 then
+						local hash = fvn1a32_fold(buf, 1, buf_size)
+						buf_size = 0
+						return iteration, hash
+					end
 
+					-- return iteration, fvn1a32_fold(buf, 1, buf_size)
+				end
 				-- asign the default values
 				keys, keys_size, key_idx = {}, 0, 1
 				for k in pairs(current) do

@@ -1,5 +1,5 @@
 local vim, concat = vim, table.concat
-local o = vim.o
+local o, bo = vim.o, vim.bo
 
 local M = {}
 local enabled = true
@@ -11,6 +11,7 @@ local ValuesSize = 0
 
 --- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit).
 local Frozens = {}
+
 
 --- Inspects the current statusline values.
 M.inspect = function()
@@ -77,6 +78,7 @@ end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
+---
 M.render = function()
 	if not enabled then
 		o.statusline = " "
@@ -135,15 +137,49 @@ M.get = function(idx)
 	return Values[idx]
 end
 
+--- Determines if a buffer is disabled based on its filetype and buftype.
+--- @param bufnr integer The buffer number to check.
+--- @param disabled BufDisabled|nil The disabled configuration to check against. If nil, the buffer is not disabled.
+--- @return boolean
+M.is_buf_disabled = function(bufnr, disabled)
+	if not vim.api.nvim_buf_is_valid(bufnr)
+		or type(disabled) ~= "table"
+	then
+		return false
+	end
 
-M.enable_hide_automatically = function()
+	local buf_o = bo[bufnr]
+	if type(disabled.filetypes) == "table" then
+		local filetype = buf_o.filetype
+		for _, ft in ipairs(disabled.filetypes) do
+			if filetype == ft then
+				return true
+			end
+		end
+	end
+
+	if type(disabled.buftypes) == "table" then
+		local buftype = buf_o.buftype
+		for _, bt in ipairs(disabled.buftypes) do
+			if buftype == bt then
+				return true
+			end
+		end
+	end
+
+
+	return false
+end
+
+--- Setup the necessary things for statusline rendering.
+--- @param disabled BufDisabled|nil The disabled configuration to apply.
+M.setup = function(disabled)
 	---@diagnostic disable-next-line: undefined-field
 	vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 		callback = function(e)
 			local buf = e.buf
 			vim.schedule(function()
-				local ConfMod = require("witch-line.config")
-				enabled = not ConfMod.is_buf_disabled(buf)
+				enabled = not M.is_buf_disabled(buf, disabled)
 				M.render()
 			end)
 		end,

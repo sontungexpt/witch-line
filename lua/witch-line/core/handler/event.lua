@@ -67,6 +67,8 @@ M.register_vim_resized = function(comp)
 end
 
 --- Initialize the autocmd for events and user events.
+--- @param work fun(session_id: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the session_id, component IDs, and event information as arguments.
+--- @param event_info_store_name DepGraphId The name of the store to save event information in the
 --- @return integer|nil group The ID of the autocmd group created.
 --- @return integer|nil events_id The ID of the autocmd for events.
 --- @return integer|nil user_events_id The ID of the autocmd for user events.
@@ -91,7 +93,7 @@ M.on_event             = function(work, event_info_store_name)
         id1 = api.nvim_create_autocmd(vim.tbl_keys(events), {
             group = group,
             callback = function(e)
-                for i, id in ipairs(events[e.event]) do
+                for _, id in ipairs(events[e.event]) do
                     id_map[id] = e
                 end
                 emit()

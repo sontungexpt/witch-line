@@ -15,7 +15,7 @@ local Copilot = {
 		},
 		fps = 3, -- should be 3 - 5
 	},
-	init = function(self)
+	init = function(self, static)
 		local nvim_exec_autocmds = vim.api.nvim_exec_autocmds
 		local get_option = vim.api.nvim_get_option_value
 		local timer = vim.uv.new_timer()

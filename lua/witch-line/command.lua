@@ -16,8 +16,11 @@ local commands = {
 		dep_store = function()
 			require("witch-line.core.CompManager").inspect("dep_store")
 		end,
-		highlight = function()
-			require("lua.witch-line.core.highlight").inspect()
+		rgb24bit = function()
+			require("witch-line.core.highlight").inspect("rgb24bit")
+		end,
+		styles = function()
+			require("witch-line.core.highlight").inspect("styles")
 		end,
 		statusline = function()
 			require("witch-line.core.statusline").inspect()

@@ -1,8 +1,9 @@
 local vim, type, ipairs, pairs, rawset, require = vim, type, ipairs, pairs, rawset, require
 
-local CacheMod = require("witch-line.cache")
 local Timer = require("witch-line.core.handler.timer")
 local Event = require("witch-line.core.handler.event")
+local Statusline = require("witch-line.core.statusline")
+local CompManager = require("witch-line.core.CompManager")
 
 local M = {}
 
@@ -14,21 +15,18 @@ local DepStoreKey = {
 	Timer = 4,
 }
 
-local statusline = require("witch-line.core.statusline")
-local CompManager = require("witch-line.core.CompManager")
-
 
 --- Clear the value of a component in the statusline.
 --- @param comp Component The component to clear.
 local hide_component = function(comp)
 	local indices = assert(comp._indices, "Component has no indices to clear")
 
-	statusline.bulk_set(indices, "")
+	Statusline.bulk_set(indices, "")
 	if type(comp.left) == "string" then
-		statusline.bulk_set_sep(indices, "", -1)
+		Statusline.bulk_set_sep(indices, "", -1)
 	end
 	if type(comp.right) == "string" then
-		statusline.bulk_set_sep(indices, "", 1)
+		Statusline.bulk_set_sep(indices, "", 1)
 	end
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
@@ -55,7 +53,6 @@ local function update_component(comp, session_id)
 	local hidden = type(min_screen_width) == "number" and vim.o.columns > min_screen_width
 		or CompManager.should_hidden(comp, session_id, ctx, static)
 
-
 	local value = ""
 
 	if hidden then
@@ -76,35 +73,27 @@ local function update_component(comp, session_id)
 	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
 	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
-	local need_style_update = Component.needs_style_update(comp, style, ref_comp)
-	if need_style_update then
-		Component.ensure_hl_name(comp, ref_comp)
-		Component.update_style(comp, style)
+	local style_updated = false
+	if style then
+		style_updated = Component.update_style(comp, style, ref_comp)
 	end
 
-	statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
+	Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
 
-	local left, right = Component.evaluate_left_right(comp, ctx, static)
+	local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
 	if left then
-		if need_style_update or Component.needs_side_style_update(comp, "left") then
-			Component.ensure_side_hl_name(comp, "left")
-			Component.update_side_style(comp, "left", style, session_id, ctx, static)
-		end
-		statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
+		Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+		Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
 	end
 
 	if right then
-		if need_style_update or Component.needs_side_style_update(comp, "right") then
-			Component.ensure_side_hl_name(comp, "right")
-			Component.update_side_style(comp, "right", style, session_id, ctx, static)
-		end
-		statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
+		Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+		Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
 	end
 	rawset(comp, "_hidden", false) -- Reset hidden state
 
 	::FINALIZE::
 	Component.emit_post_update(comp, session_id, ctx, static)
-
 	return value
 end
 M.update_comp = update_component
@@ -196,9 +185,6 @@ local function bind_dependencies(comp)
 		link_ref_field(comp, inherit, DepStoreKey.Display)
 	end
 end
-
-
-
 
 --- Register conditions for a component.
 --- @param comp Component The component to register conditions for.
@@ -312,10 +298,10 @@ local function register_component(comp)
 			end
 
 			if comp.left then
-				statusline.push("")
+				Statusline.push("")
 			end
 
-			local st_idx = type(update) == "string" and statusline.push(update) or statusline.push("")
+			local st_idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
 			local indices = comp._indices
 			if not indices then
 				rawset(comp, "_indices", { st_idx })
@@ -324,7 +310,7 @@ local function register_component(comp)
 			end
 
 			if comp.right then
-				statusline.push("")
+				Statusline.push("")
 			end
 		end
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
@@ -337,7 +323,7 @@ end
 --- @param comp LiteralComponent The string component to register.
 local function register_literal_comp(comp)
 	if comp ~= "" then
-		statusline.freeze(statusline.push(comp))
+		Statusline.freeze(Statusline.push(comp))
 	end
 	return comp
 end
@@ -370,63 +356,59 @@ function M.register_combined_component(comp, parent_id)
 
 	for i, child in ipairs(comp) do
 		M.register_combined_component(child, comp.id)
-		comp[i] = nil -- Remove child to avoid duplication
+		rawset(comp, i, nil) -- Remove child to avoid duplication
 	end
 	return comp
 end
 
 --- Setup the statusline with the given configurations.
---- @param configs Config|nil  The configurations for the statusline.
---- @param cached boolean|nil Whether the setup is from a cached state.
-M.setup = function(configs, cached)
+--- @param user_configs UserConfig  The configurations for the statusline.
+--- @param cached boolean Whether the setup is from a cached state.
+M.setup = function(user_configs, cached)
 	if not cached then
-		local abstract = configs.abstract
-		for i = 1, #abstract do
-			local c = abstract[i]
-			if type(c) == "string" then
-				---@diagnostic disable-next-line
-				c = require("witch-line.core.Component").require(c)
-			end
-			if type(c) == "table" and c.id then
-				M.register_abstract_component(c)
-			else
-				error("Abstract component must be a component with an 'id' field: " .. tostring(c))
+		local abstract = user_configs.abstract
+		if type(abstract) == "table" then
+			for i = 1, #abstract do
+				local c = abstract[i]
+				if type(c) == "string" then
+					---@diagnostic disable-next-line
+					c = require("witch-line.core.Component").require(c)
+				end
+				if type(c) == "table" and c.id then
+					M.register_abstract_component(c)
+				else
+					error("Abstract component must be a component with an 'id' field: " .. tostring(c))
+				end
 			end
 		end
 
-		local comps = configs.components
+		local comps = user_configs.components
 		for i = 1, #comps do
 			M.register_combined_component(comps[i])
 		end
 	end
 
-	for _, comp in CompManager.iter_pending_init_components() do
-		comp.init(comp)
-	end
-
-	local Session = require("witch-line.core.Session")
-	Session.run_once(function(session_id)
-		local Session = require("witch-line.core.Session")
-		Session.run_once(function(session_id)
-			M.update_comp_graph_by_ids(urgents, session_id, {
-				DepStoreKey.Event,
-				DepStoreKey.Timer,
-			}, {})
-		end)
-	end)
-
-
 	Event.on_event(function(session_id, ids)
 		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Event, {})
-		statusline.render()
+		Statusline.render()
 	end, DepStoreKey.EventInfo)
 
 	Timer.on_timer_trigger(function(session_id, ids)
 		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Timer, {})
-		statusline.render()
+		Statusline.render()
 	end)
 
-	statusline.render()
+	local Session = require("witch-line.core.Session")
+	Session.run_once(function(session_id)
+		for _, comp in CompManager.iter_pending_init_components() do
+			comp.init(comp, CompManager.get_static(comp))
+		end
+		M.update_comp_graph_by_ids(CompManager.get_emergency_ids(), session_id, {
+			DepStoreKey.Event,
+			DepStoreKey.Timer,
+		}, {})
+		Statusline.render()
+	end)
 end
 
 return M

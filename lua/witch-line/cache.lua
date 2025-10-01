@@ -31,18 +31,7 @@ end
 
 --- @alias DataKey string|number
 --- @type table<DataKey, any>
-local Data = {
-	-- HighlightCache = nil,
-	-- EventStore = nil,
-	-- TimerStore = nil,
-	-- DepStore = nil,
-	-- Comps = nil,
-	-- Statusline = nil,
-	-- StatuslineSize = nil,
-	-- G_REFS = nil,
-	-- Urgents = nil,
-	-- Disabled = nil
-}
+local Data = {}
 
 local load_data = function(data)
 	Data = data
@@ -62,7 +51,6 @@ M.DataAccessor = {
 		Data[key] = value
 	end
 }
-
 
 
 --- Inspect the Data table
@@ -143,7 +131,7 @@ end
 M.read = function(checksum)
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
 	if err and err == "ENOENT" then
-		return
+		return nil
 	end
 	local stat = assert(uv.fs_fstat(fd))
 	local content = assert(uv.fs_read(fd, stat.size, 0))
@@ -154,7 +142,7 @@ M.read = function(checksum)
 	local bytecode = validate_expiration(checksum, content)
 	if not bytecode then
 		M.clear()
-		return
+		return nil
 	end
 
 	local data = tbl_utils.deserialize_table_from_bytecode(bytecode)

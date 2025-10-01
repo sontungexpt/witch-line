@@ -104,7 +104,7 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ---
 
-## 🔖 Table of Default Components
+## 🔖 Default Components
 
 | Name                    | Module File       | Description                                |
 |-------------------------|-------------------|--------------------------------------------|
@@ -119,6 +119,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `encoding`              | `encoding.lua`    | Displays file encoding (e.g., utf-8)       |
 | `cursor.pos`            | `cursor.lua`      | Shows the current cursor line/column       |
 | `cursor.progress`       | `cursor.lua`      | Shows the cursor position as a % progress  |
+
 
 ---
 
@@ -142,7 +143,7 @@ Below is a table of all supported fields and their expected types:
 
 ---
 
-### 🛠 Example usage with `override_comp(path, override)`
+You can use the `override_comp` function to create a customized version of any default component by specifying overrides for these fields.
 
 ```lua
 local override_comp = require("your_module").override_comp
@@ -157,91 +158,125 @@ local my_component = override_comp("file.name", {
 })
 ```
 
-## 📂 Hierarchical Component Structure
+Or you can also use the [0] field to override the default component.
 
-Some components are grouped using a `.` dot notation.  
-This represents logical grouping in code and file/module layout.
+```lua
+local my_component = {
+  [0] = "file.name",  -- Inherit from the default file.name component
+  padding = { left = 2 },
+  min_screen_width = 60,
+  hide = function()
+    return vim.bo.buftype == "nofile"
+  end,
+  style = { fg = "#ffffff", bg = "#222222", bold = true },
+}
+```
 
- ## 🔧 Component Reference
-
-Each component in `witch-line` is a table with powerful customization capabilities. Here's a complete reference of available fields:
-
-| **Field**           | **Type**                                                                 | **Description**                                                                                         |
-|---------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `id`                | `string`, `number`                                                       | Unique identifier for the component.                                                                   |
-| `inherit`           | `string`, `number`, `nil`                                                | Inherit fields from another component by ID.                                                           |
-| `init`              | `fun(raw_self: Component)`                                               | Called once when the component is initialized.                                                         |
-| `pre_update`        | `fun(self, ctx, static)`                                                 | Called before the update method.                                                                       |
-| `update`            | `string`, `fun(self, ctx, static): string`, `nil`                        | Called to update the component. Should return the display string.                                      |
-| `post_update`       | `fun(self, ctx, static)`                                                 | Called after the update, used for cleanup or state updates.                                            |
-| `hide`              | `fun(self, ctx, static): boolean`                                        | Return `true` to hide the component dynamically.                                                       |
-| `left`              | `string`, `fun(self, ctx, static): string`, `nil`                        | Left content of the component (static or dynamic).                                                     |
-| `right`             | `string`, `fun(self, ctx, static): string`, `nil`                        | Right content of the component (static or dynamic).                                                    |
-| `left_style`        | `table`, `fun(self, ctx, static): table`, `nil`                          | Style for the left section (foreground, background, bold, etc.).                                       |
-| `right_style`       | `table`, `fun(self, ctx, static): table`, `nil`                          | Style for the right section.                                                                           |
-| `padding`           | `integer`, `{left, right}`, `fun(...)`                                   | Padding around the component. Supports static or dynamic values.                                       |
-| `style`             | `highlight`, `fun(self, ctx, static): highlight`                         | Main style applied to the whole component. Uses Neovim highlight options.                              |
-| `static`            | `any`                                                                    | A static table available during all lifecycle methods.                                                 |
-| `context`           | `fun(self, static): any`                                                 | Function to generate the `ctx` passed to `update` and lifecycle functions.                             |
-| `timing`            | `boolean`, `integer`                                                     | If `true` or a number, the component updates on a time interval.                                       |
-| `lazy`              | `boolean`                                                                | If `true`, component is lazily initialized.                                                            |
-| `min_screen_width`  | `number`, `fun(self, ctx, static): number`, `nil`                        | Minimum screen width required to render the component.                                                 |
-| `events`            | `string[]`                                                               | List of Neovim events that will trigger updates.                                                       |
-| `user_events`       | `string[]`                                                               | List of user-defined events to trigger updates.                                                        |
-| `ref`               | `Ref`                                                                    | A reference table for reusing logic and values across multiple components.                             |
 
 ---
 
+## 📂 Component Structure
+
+### 🔗 Type Aliases 
+| Alias           | Definition                                                                                                   |
+|-----------------|--------------------------------------------------------------------------------------------------------------|
+| `PaddingFunc`   | `(self, ctx, static, session_id) → number \| PaddingTable`                                                   |
+| `PaddingTable`  | `{ left: integer\|nil\|PaddingFunc, right: integer\|nil\|PaddingFunc }`                                      |
+| `UpdateFunc`    | `(self, ctx, static, session_id) → string \| nil`                                                            |
+| `StyleFunc`     | `(self, ctx, static, session_id) → vim.api.keyset.highlight`                                                 |
+| `SideStyleFunc` | `(self, ctx, static, session_id) → table \| SepStyle`                                                        |
+| `SepStyle`      | `{ fg: string\|nil, bg: string\|nil, bold: boolean\|nil, underline: boolean\|nil, italic: boolean\|nil }`     |
+| `CompId`        | `string \| integer`                                                                                          |
+| `SessionId`     |                                                                                                       |
+---
+
+
 ### 🔗 Ref Table Subfields
+Each component in `witch-line` is a table with powerful customization capabilities. Here's a complete reference of available fields:
 
 The `ref` field supports the following subfields for deferred configuration:
 
-- `events`
-- `user_events`
-- `timing`
-- `style`
-- `static`
-- `context`
-- `min_screen_width`
-- `hide`
 
-These allow reusing logic/configuration between components or lazily loading behavior.
-
----
-
-### 📚 Example
-
-```lua
-{
-  id = "mode",
-  events = { "ModeChanged" },
-  update = function()
-    return vim.fn.mode()
-  end,
-  style = { fg = "#ffffff", bg = "#005f87", bold = true },
-  padding = { left = 1, right = 1 },
-  hide = function()
-    return vim.bo.filetype == "NvimTree"
-  end,
-}.
+| Field             | Type                  | Description                                                                 |
+|-------------------|-----------------------|-----------------------------------------------------------------------------|
+| `events`          | `CompId \| CompId[]`  | References components that provide events.                                  |
+| `user_events`     | `CompId \| CompId[]`  | References components that provide user-defined events.                     |
+| `timing`          | `CompId \| CompId[]`  | References components that provide timing updates.                          |
+| `style`           | `CompId`              | Reference to a component whose style will be used.                          |
+| `static`          | `CompId`              | Reference to a component that provides static values.                       |
+| `context`         | `CompId`              | Reference to a component that provides context values.                      |
+| `hide`            | `CompId \| CompId[]`  | Reference to components that provide a hide function.                       |
+| `min_screen_width`| `CompId \| CompId[]`  | Reference to components that provide min screen width logic.                |
 
 ---
 
-### 📚 Example
+### 🔧 Component Fields
+
+| Field             | Type(s)                  | Description                                                                 |
+|-------------------|--------------------------|-----------------------------------------------------------------------------|
+| `id`              | `CompId`                 | Unique identifier for the component.                                         |
+| `version`         | `integer`, `string`, `nil` | Version of the component for cache management.                              |
+| `inherit`         | `CompId`, `nil`          | ID of another component to inherit properties from.                         |
+| `timing`         | `boolean`, `integer`, `nil` | Enables timing updates or sets a custom interval.                             |
+| `lazy`            | `boolean`, `nil`         | If true, the component is loaded only when needed.                                 |
+| `padding`         | `number`, `table`, `PaddingFunc`, `nil` | Padding around the component. Can be a number, table, or function. |
+| `static`          | `any`, `nil`             | | Static value or metadata for the component.                                  |
+| `context`         | `any`, `nil`             | | Context value for the component.                                            |
+| `pre_update`     | `function`, `nil`        | | Called before the component is updated, can be used to set up the context.  |
+| `post_update`    | `function`, `nil`        | | Called after the component is updated, can be used to clean up the context. |
+| `update`          | `UpdateFunc`, `nil`        | Function to generate the component's content.                                 |
+| `style`           | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil` | | Style override for the entire component output.                               |
+| `min_screen_width`| `number`, `nil`          | Hides the component if screen width is below this threshold.                 |   
+| `hide`            | `boolean`, `function`, `nil` | Hide condition. If true or a function returning true, hides the component.    |
+| `left_style`      | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil` | Style override for the left part of the component.                            |
+| `left`            | `string`, `function`, `nil` | Left content to be rendered. Can be a string or generator function.         |
+| `right_style`     | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil` | Style override for the right part of the component.                           |
+| `right`           | `string`, `function`, `nil` | Right content to be rendered. Can be a string or generator function.          |
+| `ref`             | `table`, `nil`           | References to other components for deferred configuration.                 |
+| `init`            | `function`, `nil`        | | Called when the component is initialized, can be used to set up the context. | 
+| `events`          | `CompId`, `CompId[]`, `nil` | References components that provide events.                                  |
+| `user_events`     | `CompId`, `CompId[]`, `nil` | References components that provide user-defined events.                     |
+| `style`           | `CompId`, `nil`          | Reference to a component whose style will be used.                          |
+
+
+### 📚 Example Component Structure
 
 ```lua
-{
-  id = "mode",
-  events = { "ModeChanged" },
-  update = function()
-    return vim.fn.mode()
+local component = {
+  id = "file.name",               -- Unique identifier
+  padding = { left = 1, right = 1 }, -- Padding around the component
+  static = { some_key = "some_value }, -- Static metadata
+  timing = false,                 -- No timing updates
+  style = { fg = "#ffffff", bg = "#000000", bold = true }, -- Style override
+  min_screen_width = 80,          -- Hide if screen width < 80
+  hide = function()               -- Hide condition
+    return vim.bo.buftype == "nofile"
   end,
-  style = { fg = "#ffffff", bg = "#005f87", bold = true },
-  padding = { left = 1, right = 1 },
-  hide = function()
-    return vim.bo.filetype == "NvimTree"
+  left_style = { fg = "#ff0000" }, -- Left style override
+  left = function(self, ctx, static, session_id) -- Left content generator
+    return "File: " .. vim.fn.expand("%:t")
+  end,
+  right_style = { fg = "#00ff00" }, -- Right style override
+  right = function(self, ctx, static, session_id) -- Right content generator
+    return " [" .. vim.fn.expand("%:p") .. "]"
+  end,
+  update = function(self, ctx, static, session_id) -- Main content generator
+    return vim.fn.expand("%:t")
+  end,
+  ref = {                       -- References to other components
+    events = { "file.events" },
+    style = "file.style",     
+    static = "file.static",
+    hide = { "file.hide" },
+  },
+  init = function(self, static)  -- Initialization function
+    -- Custom setup logic here
   end,
 }
+```
+
+
+
 
 ## 🙌 Community Help & Contributions Wanted
 

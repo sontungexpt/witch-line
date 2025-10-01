@@ -60,6 +60,7 @@ M.register_timer = function(comp)
 end
 
 --- Initialize the timer for components that have timers registered.
+--- @param work fun(session_id: SessionId, ids: CompId[], interval: uinteger) The function to execute when the timer triggers. It receives the session_id, component IDs, and interval as arguments.
 M.on_timer_trigger = function(work)
 	if not next(TimerStore) then
 		return
