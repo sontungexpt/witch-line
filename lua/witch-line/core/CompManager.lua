@@ -76,7 +76,7 @@ end
 
 
 --- The function to be called before Vim exits.
---- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.	
+--- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	local Component = require("witch-line.core.Component")
 	for _, comp in pairs(Comps) do
@@ -308,7 +308,7 @@ end
 --- @note
 --- The difference between this function and `lookup_inherited_value` is that this function
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
---- will only look for static values without calling functions or caching.	
+--- will only look for static values without calling functions or caching.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
 	local id, value = comp.id, comp[key]
 
@@ -317,7 +317,9 @@ local function lookup_ref_value(comp, key, session_id, seen, ...)
 		return store[id], comp
 	elseif value then
 		if type(value) == "function" then
-			value = value(comp, ..., session_id)
+      local args = {...}
+      table.insert(args, session_id)
+      value = value(comp, unpack(args))
 		end
 		store[id] = value
 		return value, comp
@@ -366,8 +368,8 @@ end
 --- @param ... any Additional arguments to pass to the style function.
 --- @return vim.api.keyset.highlight|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
-M.get_style = function(comp, session_id, ctx, static, ...)
-	return lookup_ref_value(comp, "style", session_id, {}, ctx, static, ...)
+M.get_style = function(comp, session_id, ctx, static)
+	return lookup_ref_value(comp, "style", session_id, {}, ctx, static)
 end
 
 --- Check if a component should be displayed.

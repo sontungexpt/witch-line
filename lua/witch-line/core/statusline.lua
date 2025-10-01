@@ -99,7 +99,7 @@ M.push = function(value)
 end
 
 --- Marks a component's value as frozen, preventing it from being cleared on Vim exit.
---- @param idx integer The index of the component to freeze.		
+--- @param idx integer The index of the component to freeze.
 M.freeze = function(idx)
 	Frozens[idx] = true
 end

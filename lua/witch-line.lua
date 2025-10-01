@@ -12,6 +12,7 @@ M.setup = function(user_configs)
 	local tbl_utils = require("witch-line.utils.tbl")
 	local checksum = tostring(tbl_utils.fnv1a32_hash(user_configs, "version"))
 
+
 	if type(user_configs) ~= "table" then
 		user_configs = {
 			components = require("witch-line.constant.default"),

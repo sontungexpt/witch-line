@@ -57,42 +57,39 @@ local function update_component(comp, session_id)
 
 	if hidden then
 		hide_component(comp)
-		goto FINALIZE
+  else
+    value = Component.evaluate(comp, session_id, ctx, static)
+    if value == "" then
+      hide_component(comp)
+    else
+      local indices = assert(comp._indices,
+        "Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
+
+      local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
+
+      local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+      local style_updated = false
+      if style then
+        style_updated = Component.update_style(comp, style, ref_comp)
+      end
+
+      Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
+
+      local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
+      if left then
+        Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+        Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
+      end
+
+      if right then
+        Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+        Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
+      end
+      rawset(comp, "_hidden", false) -- Reset hidden state
+    end
 	end
 
-	value = Component.evaluate(comp, ctx, static, session_id)
-	if value == "" then
-		hide_component(comp)
-		goto FINALIZE
-	end
 
-
-	local indices = assert(comp._indices,
-		"Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
-
-	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
-
-	local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
-	local style_updated = false
-	if style then
-		style_updated = Component.update_style(comp, style, ref_comp)
-	end
-
-	Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
-
-	local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
-	if left then
-		Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-		Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
-	end
-
-	if right then
-		Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-		Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
-	end
-	rawset(comp, "_hidden", false) -- Reset hidden state
-
-	::FINALIZE::
 	Component.emit_post_update(comp, session_id, ctx, static)
 	return value
 end
@@ -301,6 +298,7 @@ local function register_component(comp)
 				Statusline.push("")
 			end
 
+
 			local st_idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
 			local indices = comp._indices
 			if not indices then
@@ -336,10 +334,10 @@ function M.register_combined_component(comp, parent_id)
 	local kind = type(comp)
 	if kind == "string" then
 		local c = require("witch-line.core.Component").require(comp)
-		if c then
-			comp = register_component(c)
+		if not c then
+      return register_literal_comp(comp)
 		end
-		return register_literal_comp(comp)
+		comp = register_component(c)
 	elseif kind == "table" and next(comp) then
 		comp = register_component(comp)
 	else

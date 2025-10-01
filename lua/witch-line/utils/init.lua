@@ -41,7 +41,7 @@ end
 --- @param value any The value to evaluate, which can be a function or any other type.
 --- @param ... any Additional arguments to pass to the function if `value` is a function.
 --- @return any result The evaluated result.
-M.eval = function(value, ...)
+M.resolve = function(value, ...)
 	return type(value) == "function" and value(...) or value
 end
 

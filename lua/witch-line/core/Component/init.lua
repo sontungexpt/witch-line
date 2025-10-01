@@ -1,6 +1,6 @@
 local type, str_rep, rawset = type, string.rep, rawset
 local Highlight = require("witch-line.core.highlight")
-local eval = require("witch-line.utils").eval
+local resolve = require("witch-line.utils").resolve
 
 local COMP_MODULE_PATH = "witch-line.components."
 
@@ -116,7 +116,7 @@ local RIGHT_SUFFIX = "R"
 --- - If nil: No style will be applied.
 --- - If function: called and its return value is used as above.
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
---- - Example of style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`	
+--- - Example of style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field static any A static field that will be passed to the component's update function
 --- @field context nil|fun(self: ManagedComponent, static:any, session_id: SessionId): any
 --- A context field that will be passed to the component's update function
@@ -174,7 +174,7 @@ end
 --- @param comp Component the component to get the id from
 --- @return CompId id the id of the component
 M.valid_id = function(comp)
-	local id = comp.id and require("witch-line.constant.id").validate(comp.id)
+	local id = comp.id and not comp._plug_provided and require("witch-line.constant.id").validate(comp.id)
 		or (tostring(comp) .. tostring(math.random(1, 1000000)))
 	rawset(comp, "id", id) -- Ensure the component has an ID field
 	return id
@@ -305,11 +305,11 @@ end
 --- @param main_style vim.api.keyset.highlight|nil the main style of the component, used for inheriting styles
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
 --- @param session_id SessionId the session id to use for the component
---- @param ctx any The `context` field value to pass to the component's update function	
+--- @param ctx any The `context` field value to pass to the component's update function
 --- @param static any The `static` field value to pass to the component's update function
 --- @return boolean updated true if the style was updated, false otherwise
 M.update_side_style = function(comp, side, main_style, main_style_updated, session_id, ctx, static)
-	local side_style = eval(comp[side .. "_style"], comp, ctx, static, session_id)
+	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id)
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
@@ -359,26 +359,26 @@ end
 
 
 --- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
---- @param comp Component the component to evaluate
+--- @param comp Component the component to resolveuate
 --- @param ctx any The `context` field value to pass to the component's update function
 --- @param static any The `static` field value to pass to the component's update function
 --- @param session_id SessionId the session id to use for the component
 --- @return string value the new value of the component
 M.evaluate = function(comp, session_id, ctx, static)
-	local result = eval(comp.update, comp, ctx, static, session_id)
+	local result = resolve(comp.update, comp, ctx, static, session_id)
 
 	if type(result) ~= "string" then
 		result = ""
 	elseif result ~= "" then
-		local padding = eval(comp.padding or 1, comp, ctx, static, session_id)
+		local padding = resolve(comp.padding or 1, comp, ctx, static, session_id)
 		local p_type = type(padding)
 		if p_type == "number" and padding > 0 then
 			local pad = str_rep(" ", padding)
 			result = pad .. result .. pad
 		elseif p_type == "table" then
 			local left, right =
-				eval(padding.left, comp, ctx, static, session_id),
-				eval(padding.right, comp, ctx, static, session_id)
+				resolve(padding.left, comp, ctx, static, session_id),
+				resolve(padding.right, comp, ctx, static, session_id)
 
 			if type(left) == "number" and left > 0 then
 				result = str_rep(" ", left) .. result
@@ -393,11 +393,11 @@ M.evaluate = function(comp, session_id, ctx, static)
 end
 
 --- Evaluates the left and right parts of the component, returning their values.
---- If the component is hidden or uninitialized, it will evaluate both parts fully.
---- If the component is visible and initialized, it will only evaluate the parts that are functions.
---- 	-| If a part is a string, it will not be re-evaluated and will return nil to indicate no update is needed.
+--- If the component is hidden or uninitialized, it will resolveuate both parts fully.
+--- If the component is visible and initialized, it will only resolveuate the parts that are functions.
+--- 	-| If a part is a string, it will not be re-resolveuated and will return nil to indicate no update is needed.
 --- 	-| This optimization avoids unnecessary updates to the status line.
---- @param comp Component the component to evaluate
+--- @param comp Component the component to resolveuate
 --- @param session_id SessionId the session id to use for the component
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
@@ -410,13 +410,13 @@ M.evaluate_left_right = function(comp, session_id, ctx, static)
 	--- So need to compare the left and right accurate
 	if comp._hidden ~= false then
 		if left then
-			left = eval(left, comp, ctx, static, session_id)
+			left = resolve(left, comp, ctx, static, session_id)
 			if type(left) ~= "string" then
 				left = ""
 			end
 		end
 		if right then
-			right = eval(right, comp, ctx, static, session_id)
+			right = resolve(right, comp, ctx, static, session_id)
 			if type(right) ~= "string" then
 				right = ""
 			end
@@ -456,8 +456,7 @@ end
 --- @param path DefaultId|string the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 M.require = function(path)
-	local Id = require("witch-line.constant.id").Id
-	if not Id[path] then
+	if not require("witch-line.constant.id").existed(path) then
 		return nil
 	end
 
@@ -465,10 +464,7 @@ M.require = function(path)
 	local size = #paths
 	local module_path = COMP_MODULE_PATH .. paths[1]
 
-	local ok, component = require(module_path)
-	if not ok then
-		return nil
-	end
+	local component = require(module_path)
 
 	for j = 2, size do
 		component = component[paths[j]]
@@ -519,7 +515,7 @@ end
 --- @param static any the static values to pass to the component's update function
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
 M.min_screen_width = function(comp, ctx, static)
-	local min_screen_width = eval(comp.min_screen_width, comp, ctx, static)
+	local min_screen_width = resolve(comp.min_screen_width, comp, ctx, static)
 	return type(min_screen_width) == "number" and min_screen_width or nil
 end
 
