@@ -107,94 +107,91 @@ local Branch   = {
     return branch ~= "" and static.icon .. " " .. branch or ""
   end,
 }
-local Diff     = {}
+
+local Diff  = {}
 
 --- @type DefaultComponent
 Diff.Interface = {
-  id = Id["git.diff.interface"],
-  events = { "BufWritePost", "BufEnter" },
-  _plug_provided = true,
-  hide = function(self, ctx, static, session_id)
-    if #vim.fn.expand('%') == 0 then
-      return true
-    end
-  end,
-  init = function(self, ctx, static)
-  end,
-  update = function(self, ctx, static)
-    -- Don't show git diff when current buffer doesn't have a filename
-    local api, fn = vim.api, vim.fn
-    local active_buf = tostring(vim.api.nvim_get_current_buf())
-    local diff_output_cache = {}
-    local diff_cache = {}
-    local git_diff
+    id = Id["git.diff.interface"],
+    events = { "BufWritePost", "BufEnter" },
+    _plug_provided = true,
+    hide = function(self, ctx, static, session_id)
+        if #vim.fn.expand('%') == 0 then
+            return true
+        end
+    end,
+    context = {
+      diff_cache = {}, -- Stores last known value of diff of a buffer
+      diff_output_cache = {},
+      process_diff = function (data)
+        -- Adapted from https://github.com/wbthomason/nvim-vcs.lua
+        local added, removed, modified = 0, 0, 0
+        for _, line in ipairs(data) do
+          if string.find(line, [[^@@ ]]) then
+            local tokens = vim.fn.matchlist(line, [[^@@ -\v(\d+),?(\d*) \+(\d+),?(\d*)]])
+            local line_stats = {
+              mod_count = tokens[3] == nil and 0 or tokens[3] == '' and 1 or tonumber(tokens[3]),
+              new_count = tokens[5] == nil and 0 or tokens[5] == '' and 1 or tonumber(tokens[5]),
+            }
 
-    ---@param bufnr number|nil
-    function M.get_sign_count(bufnr)
-      if bufnr then
-        return diff_cache[bufnr]
-      end
-      if M.src then
-        git_diff = M.src()
-        diff_cache[vim.api.nvim_get_current_buf()] = git_diff
-      elseif vim.g.actual_curbuf ~= nil and active_bufnr ~= vim.g.actual_curbuf then
-        -- Workaround for https://github.com/nvim-lualine/lualine.nvim/issues/286
-        -- See upstream issue https://github.com/neovim/neovim/issues/15300
-        -- Diff is out of sync re sync it.
-        M.update_diff_args()
-      end
-      return git_diff
-    end
-
-    ---process diff data and update git_diff{ added, removed, modified }
-    ---@param data string output on stdout od git diff job
-    local function process_diff(data)
-      -- Adapted from https://github.com/wbthomason/nvim-vcs.lua
-      local added, removed, modified = 0, 0, 0
-      for _, line in ipairs(data) do
-        if string.find(line, [[^@@ ]]) then
-          local tokens = vim.fn.matchlist(line, [[^@@ -\v(\d+),?(\d*) \+(\d+),?(\d*)]])
-          local line_stats = {
-            mod_count = tokens[3] == nil and 0 or tokens[3] == '' and 1 or tonumber(tokens[3]),
-            new_count = tokens[5] == nil and 0 or tokens[5] == '' and 1 or tonumber(tokens[5]),
-          }
-
-          if line_stats.mod_count == 0 and line_stats.new_count > 0 then
-            added = added + line_stats.new_count
-          elseif line_stats.mod_count > 0 and line_stats.new_count == 0 then
-            removed = removed + line_stats.mod_count
-          else
-            local min = math.min(line_stats.mod_count, line_stats.new_count)
-            modified = modified + min
-            added = added + line_stats.new_count - min
-            removed = removed + line_stats.mod_count - min
+            if line_stats.mod_count == 0 and line_stats.new_count > 0 then
+              added = added + line_stats.new_count
+            elseif line_stats.mod_count > 0 and line_stats.new_count == 0 then
+              removed = removed + line_stats.mod_count
+            else
+              local min = math.min(line_stats.mod_count, line_stats.new_count)
+              modified = modified + min
+              added = added + line_stats.new_count - min
+              removed = removed + line_stats.mod_count - min
+            end
           end
         end
+        return { added = added, modified = modified, removed = removed }
       end
-      git_diff = { added = added, modified = modified, removed = removed }
-    end
-    vim.system({
-      "git", "-C", fn.expand('%:h'),
-      "--no-pager diff", "--no-color", "--no-ext-diff", "-U0",
-      "--", fn.expand('%:t')
-    }, { text = true }, function(out)
-      if out.code ~= 0 then
-        git_diff = nil
-        diff_output_cache = {}
-        return
-      end
+    },
+    update = function(self, ctx, static)
+        -- Don't show git diff when current buffer doesn't have a filename
+        local api, fn = vim.api, vim.fn
+        local active_buf = tostring(vim.api.nvim_get_current_buf())
+        local git_diff
 
-      if out.stdout and #out.stdout > 0 then
-        local lines = vim.split(out.stdout, "\n", { trimempty = true })
-        diff_output_cache = vim.list_extend(diff_output_cache, lines)
-        process_diff(diff_output_cache)
-      else
-        git_diff = { added = 0, modified = 0, removed = 0 }
-      end
+        ---@param bufnr number|nil
+        function M.get_sign_count(bufnr)
+          if bufnr then
+            return ctx.diff_cache[bufnr]
+          end
+          -- if vim.g.actual_curbuf ~= nil and active_bufnr ~= vim.g.actual_curbuf then
+          --   -- Workaround for https://github.com/nvim-lualine/lualine.nvim/issues/286
+          --   -- See upstream issue https://github.com/neovim/neovim/issues/15300
+          --   -- Diff is out of sync re sync it.
+          --   M.update_diff_args()
+          -- end
+          return git_diff
+        end
+        ---process diff data and update git_diff{ added, removed, modified }
+        ---@param data string output on stdout od git diff job
+        vim.system({
+          "git" , "-C", fn.expand('%:h'),
+          "--no-pager diff", "--no-color", "--no-ext-diff", "-U0",
+          "--", fn.expand('%:t')
+        }, { text  = true }, function (out)
+            if out.code ~= 0 then
+              git_diff = nil
+              ctx.diff_output_cache = {}
+              return
+            end
 
-      diff_cache[vim.api.nvim_get_current_buf()] = git_diff
-    end)
-  end,
+            if out.stdout and #out.stdout > 0 then
+              local lines = vim.split(out.stdout, "\n", { trimempty = true })
+              ctx.diff_output_cache = vim.list_extend(ctx.diff_output_cache, lines)
+              git_diff = ctx.process_diff(ctx.diff_utput_cache)
+            else
+              git_diff = { added = 0, modified = 0, removed = 0 }
+            end
+
+            ctx.diff_cache[vim.api.nvim_get_current_buf()] = git_diff
+        end)
+    end,
 
 }
 Diff.Added     = {
