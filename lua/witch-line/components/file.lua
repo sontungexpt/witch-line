@@ -22,9 +22,8 @@ local Name = {
 		events = Id["file.interface"],
 		user_events = Id["file.interface"],
 	},
-	-- id = require("witch-line.components.id.enum").FileName,
 	style = {
-		fg = colors.orange,
+		bg = colors.orange,
 	},
 	static = {
 		formatter = {
