@@ -8,7 +8,7 @@ local M = {}
 ---@field disabled BufDisabled|nil A table containing filetypes and buftypes where the statusline is disabled.
 
 --- Use default configs if missing
---- @param user_configs UserConfig|nil user_configs to check 
+--- @param user_configs UserConfig|nil user_configs to check
 --- @return UserConfig user_configs with defaults applied
 local use_default_config = function (user_configs)
 	if type(user_configs) ~= "table" then

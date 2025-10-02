@@ -15,9 +15,6 @@ local SepStyle = {
 }
 
 
-local LEFT_SUFFIX = "L"
-local RIGHT_SUFFIX = "R"
-
 --- @class CompId : Id
 
 --- @class Ref : table
@@ -281,7 +278,7 @@ end
 --- @param comp Component the component to checks
 --- @param side "left"|"right" the side to check, either "left" or "right"
 M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-	local side_hl_name = side .. "_hl_name"
+	local side_hl_name = "_".. side .. "_hl_name"
 	if not comp[side_hl_name] then
 		return true
 	elseif type(comp[side .. "_style"]) == "function" then
@@ -298,7 +295,7 @@ end
 --- @param comp Component
 --- @param side "left"|"right"
 M.ensure_side_hl_name = function(comp, side)
-	local field = side .. "_hl_name"
+	local field = "_" .. side .. "_hl_name"
 	if not comp[field] then
 		local hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id)
 		--- If the component already has a main highlight name, use it as the base
@@ -323,7 +320,7 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 
 	M.ensure_side_hl_name(comp, side)
 
-	local hl_name_field = side .. "_hl_name"
+	local hl_name_field = "_".. side .. "_hl_name"
 	local side_hl_name = comp[hl_name_field]
 
 	local type_side_style = type(side_style)
@@ -332,9 +329,10 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 		return true
 	elseif type_side_style == "nil" then
 		--- inherits from main style
-		rawset(comp, hl_name_field, comp._hl_name)
-		return true
-	elseif type_side_style == "number" and main_style then
+    side_style = SepStyle.SepBg
+  end
+
+	if type(side_style) == "number" and main_style then
 		if side_style == SepStyle.SepFg then
 			side_style = {
 				fg = main_style.fg,
@@ -356,7 +354,6 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 			--- invalid styles
 			return false
 		end
-
 		Highlight.highlight(side_hl_name, side_style)
 		return true
 	end
