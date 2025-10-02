@@ -36,10 +36,10 @@ end
 --- @param session_id SessionId The ID of the process to use for this update.
 --- @return string|nil updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
 local function update_component(comp, session_id)
-  -- It's just a abstract component then no need to really update
-  if not comp._loaded then
-    return nil
-  end
+	-- It's just a abstract component then no need to really update
+	if not comp._loaded then
+		return nil
+	end
 
 	local Component = require("witch-line.core.Component")
 
@@ -63,37 +63,37 @@ local function update_component(comp, session_id)
 
 	if hidden then
 		hide_component(comp)
-  else
-    value = Component.evaluate(comp, session_id, ctx, static)
-    if value == "" then
-      hide_component(comp)
-    else
-      local indices = assert(comp._indices,
-        "Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
+	else
+		value = Component.evaluate(comp, session_id, ctx, static)
+		if value == "" then
+			hide_component(comp)
+		else
+			local indices = assert(comp._indices,
+				"Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
 
 
-      local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
+			local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
-      local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
-      local style_updated = false
-      if style then
-        style_updated = Component.update_style(comp, style, ref_comp)
-      end
+			local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+			local style_updated = false
+			if style then
+				style_updated = Component.update_style(comp, style, ref_comp)
+			end
 
-      Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
+			Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
 
-      local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
-      if left then
-        Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-        Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
-      end
+			local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
+			if left then
+				Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+				Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
+			end
 
-      if right then
-        Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-        Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
-      end
-      rawset(comp, "_hidden", false) -- Reset hidden state
-    end
+			if right then
+				Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+				Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
+			end
+			rawset(comp, "_hidden", false) -- Reset hidden state
+		end
 	end
 
 
@@ -342,7 +342,7 @@ function M.register_combined_component(comp, parent_id)
 	if kind == "string" then
 		local c = require("witch-line.core.Component").require(comp)
 		if not c then
-      return register_literal_comp(comp)
+			return register_literal_comp(comp)
 		end
 		comp = register_component(c)
 	elseif kind == "table" and next(comp) then
@@ -406,7 +406,9 @@ M.setup = function(user_configs, DataAccessor)
 	local Session = require("witch-line.core.Session")
 	Session.run_once(function(session_id)
 		for _, comp in CompManager.iter_pending_init_components() do
-			comp.init(comp, CompManager.get_static(comp))
+			local static = CompManager.get_static(comp)
+			local context = CompManager.get_context(comp, session_id, static)
+			comp.init(comp, context, static)
 		end
 		M.update_comp_graph_by_ids(CompManager.get_emergency_ids(), session_id, {
 			DepStoreKey.Event,

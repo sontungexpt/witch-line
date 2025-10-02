@@ -106,7 +106,7 @@ local SepStyle = {
 ---	- If function: called and its return value is used as above.
 --- - Example of padding function: `function(self, ctx, static, session_id) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, ctx, static, session_id) return 2 end` (adds 2 spaces to both sides)
---- @field init nil|fun(raw_self: ManagedComponent, static: any) called when the component is initialized, can be used to set up the context
+--- @field init nil|fun(self: ManagedComponent, ctx: any, static: any) called when the component is initialized, can be used to set up the context
 --- @field style vim.api.keyset.highlight|nil|StyleFunc
 --- A table of styles that will be applied to the component
 --- - If table: used as is.

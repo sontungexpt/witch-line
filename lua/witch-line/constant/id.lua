@@ -18,10 +18,11 @@ local Id = {
 	["indent"] = "indent",
 
 	["git.branch"] = "git.branch",
-	["git.add"] = "git.add",
-	["git.change"] = "git.change",
-	["git.delete"] = "git.delete",
-	["git.modified"] = "git.modified",
+	["git.diff.interface"] = "git.diff.interface",
+	["git.diff.add"] = "git.diff.add",
+	["git.diff.change"] = "git.diff.change",
+	["git.diff.delete"] = "git.diff.delete",
+	["git.diff.modified"] = "git.diff.modified",
 
 	-- "git.branch",
 	-- "GitAdd",
