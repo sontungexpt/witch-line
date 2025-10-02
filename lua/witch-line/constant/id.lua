@@ -4,6 +4,7 @@ local Id = {
 	["file.interface"] = "file.interface",
 	["file.name"] = "file.name",
 	["file.icon"] = "file.icon",
+	["file.modifier"] = "file.modifier",
 	["copilot"] = "copilot",
 	["diagnostic.interface"] = "diagnostic.interface",
 	["diagnostic.error"] = "diagnostic.error",

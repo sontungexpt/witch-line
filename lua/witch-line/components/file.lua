@@ -129,8 +129,36 @@ local Icon = {
 	end,
 }
 
+--- @type DefaultComponent
+local Modifier = {
+	id = Id["file.modifier"],
+	_plug_provided = true,
+	ref = {
+		events = Id["file.interface"],
+		user_events = Id["file.interface"],
+	},
+	style = {
+		bg = colors.orange,
+		fg = colors.black,
+	},
+	update = function(self, ctx, static)
+		local api = vim.api
+		local buftype = api.nvim_get_option_value("buftype", { buf = 0 })
+		if buftype == "prompt" then
+			return ""
+		end
+		if not api.nvim_buf_get_option(0, "modifiable") or api.nvim_buf_get_option(0, "readonly") then
+			return ""
+		elseif api.nvim_buf_get_option(0, "modified") then
+			return ""
+		end
+		return ""
+	end,
+}
+
 return {
 	interface = Interface,
 	name = Name,
 	icon = Icon,
+	modifier = Modifier,
 }

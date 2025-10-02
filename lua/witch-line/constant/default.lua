@@ -15,44 +15,7 @@ return {
 	"encoding",
 	"cursor.pos",
 	"cursor.progress",
-	-- {
-	-- 	event = "BufEnter",
-	-- 		{
-	-- 			padding = { left = 1, right = 0 },
-	-- 			styles = function(configs, context, shared, self)
-	-- 				local icon, color_icon, filename = self.static.get(configs)
-	-- 				return { fg = color_icon }
-	-- 			end,
-	-- 			update = function(configs, context, shared, self)
-	-- 				local icon, color_icon, filename = self.static.get(configs)
-	-- 				return icon
-	-- 			end,
-	-- 		},
-	-- 		{
-	-- 			update = function(configs, context, shared, self)
-	-- 				local icon, color_icon, filename = self.static.get(configs)
-	-- 				return filename
-	-- 			end,
-	-- 		},
-	-- 		{
-	-- 			styles = function()
-	-- 				if not api.nvim_buf_get_option(0, "modifiable") or api.nvim_buf_get_option(0, "readonly") then
-	-- 					return { fg = colors.red }
-	-- 				elseif api.nvim_buf_get_option(0, "modified") then
-	-- 					return { fg = "Statusline" }
-	-- 				end
-	-- 			end,
-	-- 			padding = { left = 0, right = 1 },
-	-- 			update = function()
-	-- 				if not api.nvim_buf_get_option(0, "modifiable") or api.nvim_buf_get_option(0, "readonly") then
-	-- 					return ""
-	-- 				elseif api.nvim_buf_get_option(0, "modified") then
-	-- 					return ""
-	-- 				end
-	-- 				return ""
-	-- 			end,
-	-- 		},
-	-- 	},
+
 	-- 	{
 	-- 		name = "git-branch",
 	-- 		user_event = "GitSignsUpdate",
