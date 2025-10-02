@@ -5,7 +5,8 @@ local colors = require("witch-line.constant.color")
 local Branch = {
     id = Id["git.branch"],
     _plug_provided = true,
-    events = { "BufEnter", "WinEnter", "User GitSignsUpdate" },
+    events = { "BufEnter", "WinEnter",  },
+    user_events = {"GitSignsUpdate"},
     static = {
         icon = "",
     },
