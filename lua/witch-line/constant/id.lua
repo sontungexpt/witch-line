@@ -17,6 +17,12 @@ local Id = {
 	["lsp.clients"] = "lsp.clients",
 	["indent"] = "indent",
 
+	["git.branch"] = "git.branch",
+	["git.add"] = "git.add",
+	["git.change"] = "git.change",
+	["git.delete"] = "git.delete",
+	["git.modified"] = "git.modified",
+
 	-- "git.branch",
 	-- "GitAdd",
 	-- "GitChange",

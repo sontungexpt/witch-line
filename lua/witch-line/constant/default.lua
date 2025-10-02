@@ -5,16 +5,18 @@ return {
 	"file.icon",
 	"file.modifier",
 
+	"git.branch",
+
 	"%=",
 
 	"copilot",
 
-  "lsp.clients",
+	"lsp.clients",
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",
 
-  "indent",
+	"indent",
 	"encoding",
 	"cursor.pos",
 	"cursor.progress",
