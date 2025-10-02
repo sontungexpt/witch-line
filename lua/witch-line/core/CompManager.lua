@@ -1,4 +1,4 @@
-local type = type
+ type = type
 
 local M = {}
 
@@ -185,13 +185,13 @@ end
 --- Iterate over all components that depend on a given component ID in a specific dependency store.
 --- Must sure that all components are registered before call this function including dependencies components.
 --- @param dep_graph_id DepGraphId The ID of the dependency store to search in.
---- @param id CompId The ID of the component to find dependencies for.
+--- @param comp_id CompId The ID of the component to find dependencies for.
 --- @return fun()|fun(): CompId, Component An iterator function that returns the next dependent ID and its component.
 --- @return DepMap|nil The dependencies map for the given ID, or nil if none exist.
-M.iterate_dependencies = function(dep_graph_id, id)
-	assert(dep_graph_id and id, "Both dep_graph_id and ref_id must be provided")
+M.iterate_dependents = function(dep_graph_id, comp_id)
+	assert(dep_graph_id and comp_id, "Both dep_graph_id and ref_id must be provided")
 	local store = DepGraphMap[dep_graph_id]
-	local id_map = store and store[id]
+	local id_map = store and store[comp_id]
 	if not id_map then
 		return function() end, nil
 	end
@@ -231,7 +231,7 @@ end
 
 --- Add a dependency for a component.
 --- @param comp Component The component to add the dependency for.
---- @param ref CompId|CompId[] The ID or IDs that this component depends on.
+--- @param ref_id CompId|CompId[] The ID or IDs that this component depends on.
 --- @param store_id DepGraphId The ID of the dependency store to use.
 M.link_ref_field = function(comp, ref_id, store_id)
 	local store = get_dependency_graph(store_id)
