@@ -1,0 +1,239 @@
+---@type CombinedComponent
+return {
+	"mode",
+	"file.name",
+	"file.icon",
+
+	"%=",
+
+	"copilot",
+
+	"diagnostic.error",
+	"diagnostic.warn",
+	"diagnostic.info",
+
+	"encoding",
+	"cursor.pos",
+	"cursor.progress",
+	-- {
+	-- 	event = "BufEnter",
+	-- 		{
+	-- 			padding = { left = 1, right = 0 },
+	-- 			styles = function(configs, context, shared, self)
+	-- 				local icon, color_icon, filename = self.static.get(configs)
+	-- 				return { fg = color_icon }
+	-- 			end,
+	-- 			update = function(configs, context, shared, self)
+	-- 				local icon, color_icon, filename = self.static.get(configs)
+	-- 				return icon
+	-- 			end,
+	-- 		},
+	-- 		{
+	-- 			update = function(configs, context, shared, self)
+	-- 				local icon, color_icon, filename = self.static.get(configs)
+	-- 				return filename
+	-- 			end,
+	-- 		},
+	-- 		{
+	-- 			styles = function()
+	-- 				if not api.nvim_buf_get_option(0, "modifiable") or api.nvim_buf_get_option(0, "readonly") then
+	-- 					return { fg = colors.red }
+	-- 				elseif api.nvim_buf_get_option(0, "modified") then
+	-- 					return { fg = "Statusline" }
+	-- 				end
+	-- 			end,
+	-- 			padding = { left = 0, right = 1 },
+	-- 			update = function()
+	-- 				if not api.nvim_buf_get_option(0, "modifiable") or api.nvim_buf_get_option(0, "readonly") then
+	-- 					return ""
+	-- 				elseif api.nvim_buf_get_option(0, "modified") then
+	-- 					return ""
+	-- 				end
+	-- 				return ""
+	-- 			end,
+	-- 		},
+	-- 	},
+	-- 	{
+	-- 		name = "git-branch",
+	-- 		user_event = "GitSignsUpdate",
+	-- 		configs = {
+	-- 			icon = "",
+	-- 		},
+	-- 		styles = { fg = colors.pink },
+	-- 		update = function(configs, context)
+	-- 			local branch = ""
+	-- 			local git_dir = fn.finddir(".git", ".;")
+	-- 			if git_dir ~= "" then
+	-- 				local head_file = io.open(git_dir .. "/HEAD", "r")
+	-- 				if head_file then
+	-- 					local content = head_file:read("*all")
+	-- 					head_file:close()
+	-- 					-- branch name  or commit hash
+	-- 					branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
+	-- 				end
+	-- 			end
+	-- 			return branch ~= "" and configs.icon .. " " .. branch or ""
+	-- 		end,
+	-- 		condition = function()
+	-- 			return api.nvim_buf_get_option(0, "buflisted")
+	-- 		end,
+	-- 	},
+	-- 	{
+	-- 		name = "git-diff",
+	-- 		event = "BufWritePost",
+	-- 		user_event = "GitSignsUpdate",
+	-- 		configs = {
+	-- 			added = "",
+	-- 			changed = "",
+	-- 			removed = "",
+	-- 		},
+	-- 		{
+	-- 			styles = { fg = "DiffAdd" },
+	-- 			update = function(configs)
+	-- 				local git_status = vim.b.gitsigns_status_dict
+	-- 				return git_status.added and git_status.added > 0 and configs.added .. " " .. git_status.added
+	-- 					or ""
+	-- 			end,
+	-- 		},
+	-- 		{
+	-- 			styles = { fg = "DiffChange" },
+	-- 			update = function(configs)
+	-- 				local git_status = vim.b.gitsigns_status_dict
+	-- 				return git_status.changed
+	-- 						and git_status.changed > 0
+	-- 						and configs.changed .. " " .. git_status.changed
+	-- 					or ""
+	-- 			end,
+	-- 		},
+	-- 		{
+	-- 			styles = { fg = "DiffDelete" },
+	-- 			update = function(configs)
+	-- 				local git_status = vim.b.gitsigns_status_dict
+	-- 				return git_status.removed
+	-- 						and git_status.removed > 0
+	-- 						and configs.removed .. " " .. git_status.removed
+	-- 					or ""
+	-- 			end,
+	-- 		},
+	-- 		condition = function()
+	-- 			return vim.b.gitsigns_status_dict ~= nil and vim.o.columns > 70
+	-- 		end,
+	-- 	},
+	-- },
+
+	-- "%=",
+	-- {
+	-- 	styles = {
+	-- 		fg = "DiagnosticHint",
+	-- 	},
+	-- 	update = function(configs)
+	-- 		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.HINT })
+	-- 		return count > 0 and configs.HINT .. " " .. count or ""
+	-- 	end,
+	-- },
+
+	-- {
+	-- 	name = "lsps-formatters",
+	-- 	event = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
+	-- 	styles = { fg = colors.magenta },
+	-- 	update = function()
+	-- 		local buf_clients = vim.lsp.buf_get_clients()
+	-- 		local server_names = {}
+	-- 		local has_null_ls = false
+	-- 		local ignore_lsp_servers = {
+	-- 			["null-ls"] = true,
+	-- 			["copilot"] = true,
+	-- 		}
+
+	-- 		for _, client in pairs(buf_clients) do
+	-- 			local client_name = client.name
+	-- 			if not ignore_lsp_servers[client_name] then
+	-- 				server_names[#server_names + 1] = client_name
+	-- 			end
+	-- 		end
+
+	-- 		if package.loaded["null-ls"] then
+	-- 			local null_ls = nil
+	-- 			has_null_ls, null_ls = pcall(require, "null-ls")
+
+	-- 			if has_null_ls then
+	-- 				local buf_ft = api.nvim_buf_get_option(0, "filetype")
+	-- 				local null_ls_methods = {
+	-- 					null_ls.methods.DIAGNOSTICS,
+	-- 					null_ls.methods.DIAGNOSTICS_ON_OPEN,
+	-- 					null_ls.methods.DIAGNOSTICS_ON_SAVE,
+	-- 					null_ls.methods.FORMATTING,
+	-- 				}
+
+	-- 				local get_null_ls_sources = function(methods, name_only)
+	-- 					local sources = require("null-ls.sources")
+	-- 					local available_sources = sources.get_available(buf_ft)
+
+	-- 					methods = type(methods) == "table" and methods or { methods }
+
+	-- 					-- methods = nil or {}
+	-- 					if #methods == 0 then
+	-- 						if name_only then
+	-- 							return vim.tbl_map(function(source)
+	-- 								return source.name
+	-- 							end, available_sources)
+	-- 						end
+	-- 						return available_sources
+	-- 					end
+
+	-- 					local source_results = {}
+
+	-- 					for _, source in ipairs(available_sources) do
+	-- 						for _, method in ipairs(methods) do
+	-- 							if source.methods[method] then
+	-- 								if name_only then
+	-- 									source_results[#source_results + 1] = source.name
+	-- 								else
+	-- 									source_results[#source_results + 1] = source
+	-- 								end
+	-- 								break
+	-- 							end
+	-- 						end
+	-- 					end
+
+	-- 					return source_results
+	-- 				end
+
+	-- 				local null_ls_builtins = get_null_ls_sources(null_ls_methods, true)
+	-- 				vim.list_extend(server_names, null_ls_builtins)
+	-- 			end
+	-- 		end
+
+	-- 		if package.loaded["conform"] then
+	-- 			local has_conform, conform = pcall(require, "conform")
+	-- 			if has_conform then
+	-- 				vim.list_extend(
+	-- 					server_names,
+	-- 					vim.tbl_map(function(formatter)
+	-- 						return formatter.name
+	-- 					end, conform.list_formatters(0))
+	-- 				)
+	-- 				if has_null_ls then
+	-- 					server_names = fn.uniq(server_names)
+	-- 				end
+	-- 			end
+	-- 		end
+
+	-- 		return #server_names > 0 and table.concat(server_names, ", ") or "NO LSP, FORMATTER  "
+	-- 	end,
+
+	-- 	condition = function()
+	-- 		return vim.o.columns > 70
+	-- 	end,
+	-- },
+	-- {
+	-- 	event = { "BufEnter", "WinEnter" },
+	-- 	{
+	-- 		name = "indent",
+	-- 		styles = { fg = colors.cyan },
+	-- 		update = function()
+	-- 			return "Tab: " .. api.nvim_buf_get_option(0, "shiftwidth") .. ""
+	-- 		end,
+	-- 	},
+	-- },
+}
