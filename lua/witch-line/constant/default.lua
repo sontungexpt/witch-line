@@ -9,10 +9,12 @@ return {
 
 	"copilot",
 
+  "lsp.clients",
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",
 
+  "indent",
 	"encoding",
 	"cursor.pos",
 	"cursor.progress",
@@ -96,5 +98,5 @@ return {
 	-- 	end,
 	-- },
 
-	-- 
+	--
 }

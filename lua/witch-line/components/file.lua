@@ -23,7 +23,7 @@ local Name = {
 		user_events = Id["file.interface"],
 	},
 	style = {
-		bg = colors.orange,
+		fg = colors.orange,
 	},
 	static = {
 		formatter = {

@@ -56,7 +56,7 @@ local function update_component(comp, session_id)
 	Component.emit_pre_update(comp, session_id, ctx, static)
 
 	local min_screen_width = CompManager.get_min_screen_width(comp, session_id, ctx, static)
-	local hidden = type(min_screen_width) == "number" and vim.o.columns > min_screen_width
+	local hidden = type(min_screen_width) == "number" and vim.o.columns < min_screen_width
 		or CompManager.should_hidden(comp, session_id, ctx, static)
 
 	local value = ""

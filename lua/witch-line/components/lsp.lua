@@ -1,12 +1,12 @@
 local Id = require("witch-line.constant.id").Id
-local colors = require("witch-line.constant.colors")
+local colors = require("witch-line.constant.color")
 
 
 ---@type DefaultComponent
 local Clients = {
     id = Id["lsp.clients"],
     _plug_provided = true,
-    event = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
+    events = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
     style = { fg = colors.magenta },
     update = function()
         local api, fn = vim.api, vim.fn

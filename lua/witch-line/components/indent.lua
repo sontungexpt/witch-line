@@ -1,5 +1,6 @@
 local Id = require("witch-line.constant.id").Id
-local colors = require("witch-line.constant.colors")
+local colors = require("witch-line.constant.color")
+
 
 ---@type DefaultComponent
 return {
