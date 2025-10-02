@@ -7,19 +7,31 @@ local M = {}
 ---@field components CombinedComponent[] Components that are rendered in the statusline.
 ---@field disabled BufDisabled|nil A table containing filetypes and buftypes where the statusline is disabled.
 
---- @param user_configs UserConfig|nil user_configs
-M.setup = function(user_configs)
-	local tbl_utils = require("witch-line.utils.tbl")
-	local checksum = tostring(tbl_utils.fnv1a32_hash(user_configs, "version"))
-
-
+--- Use default configs if missing
+--- @param user_configs UserConfig the configs
+--- @return UserConfig user_configs configs to use
+local use_default_config = function (user_configs)
 	if type(user_configs) ~= "table" then
 		user_configs = {
+      disabled = {
+        buftypes = {
+          "terminal",
+        },
+      },
 			components = require("witch-line.constant.default"),
 		}
 	elseif type(user_configs.components) ~= "table" or not next(user_configs.components) then
 		user_configs.components = require("witch-line.constant.default")
 	end
+  return user_configs
+end
+
+--- @param user_configs UserConfig|nil user_configs
+M.setup = function(user_configs)
+	local tbl_utils = require("witch-line.utils.tbl")
+	local checksum = tostring(tbl_utils.fnv1a32_hash(user_configs, "version"))
+
+  user_configs = use_default_config(user_configs)
 
 
 	local Cache = require("witch-line.cache")

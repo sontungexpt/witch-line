@@ -205,36 +205,17 @@ M.iterate_dependencies = function(dep_graph_id, id)
 end
 
 --- Iterate over all dependency IDs that a given component ID depends on in a specific dependency store
---- @param dep_graph_id DepGraphId The ID of the dependency store to search in
---- @param id CompId The ID of the component to find dependencies for
---- @return fun()|fun(): CompId An iterator function that returns the next dependent ID
-M.iterate_dependency_ids = function(dep_graph_id, id)
-	assert(dep_graph_id and id, "Both dep_graph_id and ref_id must be provided")
-	local store = DepGraphMap[dep_graph_id]
-	local id_map = store and store[id]
-	if not id_map then
-		return function() end
-	end
-	local curr_id = nil
-	return function()
-		curr_id = next(id_map, curr_id)
-		return curr_id
-	end
-end
-
---- Iterate over all dependency IDs that a given component ID depends on in a specific dependency store
---- @param id CompId The ID of the component to find dependencies for
---- @return fun()|fun(): CompId An iterator function that returns the next dependent ID
-M.iterate_all_dependency_ids = function(id)
-	assert(id, "id must be provided")
+--- @param comp_id CompId The ID of the component to find dependencies for
+--- @return fun()|fun(): CompId|nil An iterator function that returns the next dependent ID
+M.iterate_all_dependency_ids = function(comp_id)
+	assert(comp_id, "comp id must be provided")
 
 	local deps = {}
 	for _, graph in pairs(DepGraphMap) do
-		local id_map = graph[id]
-		if id_map then
-			for dep_id, _ in pairs(id_map) do
-				deps[dep_id] = true
-			end
+    for dep_id, map in pairs(graph) do
+      if map[comp_id] then
+        deps[dep_id] = true
+      end
 		end
 	end
 

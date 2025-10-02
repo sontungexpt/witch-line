@@ -34,7 +34,17 @@ end
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
+--- @return string|nil
+--- - If string
+---   - If empty string then the component is hidden
+---   - If has value then component is updated successfully
+--- - If nil it's is an abstract component and no need to update but the dependents must be update
 local function update_component(comp, session_id)
+  -- It's just a abstract component then no need to really update
+  if not comp._loaded then
+    return nil
+  end
+
 	local Component = require("witch-line.core.Component")
 
 	if comp.inherit and not Component.has_parent(comp) then
@@ -64,6 +74,7 @@ local function update_component(comp, session_id)
     else
       local indices = assert(comp._indices,
         "Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
+
 
       local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
@@ -361,9 +372,9 @@ end
 
 --- Setup the statusline with the given configurations.
 --- @param user_configs UserConfig  The configurations for the statusline.
---- @param cached boolean Whether the setup is from a cached state.
-M.setup = function(user_configs, cached)
-	if not cached then
+--- @param DataAccessor Cache.DataAccessor|nil The accessor to cache data if had cache ortherwise nil
+M.setup = function(user_configs, DataAccessor)
+	if not DataAccessor then
 		local abstract = user_configs.abstract
 		if type(abstract) == "table" then
 			for i = 1, #abstract do
