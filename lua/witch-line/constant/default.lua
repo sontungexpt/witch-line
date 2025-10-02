@@ -3,6 +3,7 @@ return {
 	"mode",
 	"file.name",
 	"file.icon",
+	"file.modifier",
 
 	"%=",
 

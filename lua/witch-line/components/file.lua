@@ -133,13 +133,9 @@ local Icon = {
 local Modifier = {
 	id = Id["file.modifier"],
 	_plug_provided = true,
-	ref = {
-		events = Id["file.interface"],
-		user_events = Id["file.interface"],
-	},
+  events = {"TextChangedI", "TextChanged"},
 	style = {
-		bg = colors.orange,
-		fg = colors.black,
+		fg = colors.fg,
 	},
 	update = function(self, ctx, static)
 		local api = vim.api

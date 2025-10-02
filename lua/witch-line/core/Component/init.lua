@@ -38,7 +38,7 @@ local SepStyle = {
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
 --- @class Component : table
---- @field id CompId The unique identifier for the component, can be a string or a number
+--- @field id CompId|nil The unique identifier for the component, can be a string or a number
 --- @field version integer|string|nil
 --- The version of the component, can be used to force reload the component when it changes
 --- - If provided, the component will be reloaded on start if the version changes manually when update component configurations by user. It's help the cache system work faster if speed is more important because the user manage the version manually.
