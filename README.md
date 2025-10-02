@@ -111,6 +111,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `mode`                  | `mode.lua`        | Shows the current Neovim mode              |
 | `file.name`             | `file.lua`        | Displays the filename                      |
 | `file.icon`             | `file.lua`        | Displays an icon for the file              |
+| `file.modified`         | `file.lua`        | Indicates if the file has unsaved changes  |
 | `%=`                    | _(builtin)_       | Separator to align left/right components   |
 | `copilot`               | `copilot.lua`     | Shows Copilot status (if available)        |
 | `diagnostic.error`      | `diagnostic.lua`  | Shows number of errors in current buffer   |
@@ -119,7 +120,12 @@ Each component is referenced by name and can be composed to build a flexible and
 | `encoding`              | `encoding.lua`    | Displays file encoding (e.g., utf-8)       |
 | `cursor.pos`            | `cursor.lua`      | Shows the current cursor line/column       |
 | `cursor.progress`       | `cursor.lua`      | Shows the cursor position as a % progress  |
-
+| `lsp.clients`           | `lsp.lua`         | Lists active LSP clients                  |
+| `git.branch`            | `git.lua`         | Shows current Git branch                     |
+| `git.added`             | `git.lua`         | Number of added lines in Git diff          |
+| `git.removed`           | `git.lua`         | Number of removed lines in Git diff        |
+| `git.changed`           | `git.lua`       | Number of changed lines in Git diff        |
+| `git.status`            | `git.lua`         | Summary of Git changes (added/
 
 ---
 
