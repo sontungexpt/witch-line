@@ -7,7 +7,7 @@ local commands = {
 	end,
 
 	inspect = {
-		cache = function(...)
+		cache_data = function(...)
 			require("witch-line.cache").inspect()
 		end,
 		comps = function()
@@ -25,6 +25,9 @@ local commands = {
 		statusline = function()
 			require("witch-line.core.statusline").inspect()
 		end,
+    event_store = function()
+			require("witch-line.core.handler.event").inspect()
+    end
 	},
 }
 

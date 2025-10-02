@@ -33,21 +33,16 @@ M.setup = function(user_configs)
 	}
 
 	local DataAccessor = Cache.read(checksum)
+  local disabled = user_configs.disabled
+
 	if DataAccessor then
 		for i = 1, #CACHE_MODS do
 			require(CACHE_MODS[i]).load_cache(DataAccessor)
 		end
-		require("witch-line.core.handler").setup(user_configs, true)
-		local disabled = DataAccessor.get("Disabled")
-		require("witch-line.core.statusline").setup(disabled)
-		goto FINALIZE
 	end
 
-	require("witch-line.core.handler").setup(user_configs, false)
+	require("witch-line.core.handler").setup(user_configs, DataAccessor )
 	require("witch-line.core.statusline").setup(user_configs.disabled)
-
-	::FINALIZE::
-
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		callback = function()
@@ -55,10 +50,6 @@ M.setup = function(user_configs)
 				local DataAccessor = Cache.DataAccessor
 				for i = 1, #CACHE_MODS do
 					require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
-				end
-
-				if type(user_configs.disabled) == "table" then
-					DataAccessor.set("Disabled", user_configs.disabled)
 				end
 				Cache.save(checksum)
 			end

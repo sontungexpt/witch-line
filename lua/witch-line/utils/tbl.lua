@@ -91,7 +91,7 @@ local function less(a, b)
 end
 
 --- Computes the FNV-1a 32-bit hash of a table.
---- This function handles nested tables and ensures that the hash is consistent regardless of the order of keys.	
+--- This function handles nested tables and ensures that the hash is consistent regardless of the order of keys.
 --- @param tbl any The value to hash. If it's not a table, a constant hash is returned.
 --- @param hash_key string|nil A specific key in the table to use for hashing. If provided and the table contains this key, its value will be used as the hash representation of the table.
 --- @return number hash The computed FNV-1a 32-bit hash of the table.
@@ -435,39 +435,42 @@ function M.deserialize_function(value, seen)
 	return value
 end
 
--- serialize giá trị bất kỳ
-local function serialize_value(v)
-	local t = type(v)
-	if t == "number" or t == "boolean" then
-		return tostring(v)
-	elseif t == "string" then
-		return string.format("%q", v)
-	elseif t == "table" then
-		return serialize_table(v)
-	else
-		error("Unsupported type: " .. t)
-	end
-end
-
 --- Serialize a table to a string
 --- Functions in the table are encoded to strings using `M.serialize_function`
 --- @param tbl table The table to serialize
 --- @return string str The serialized table as a string
 M.serialize_table = function(tbl)
-	---@diagnostic disable-next-line
-	tbl = M.serialize_function(tbl) -- encode functions to string
-	local parts = { "{" }
-	for k, v in pairs(tbl) do
-		local key
-		if type(k) == "string" and k:match("^[_%a][_%w]*$") then
-			key = k .. "="
-		else
-			key = "[" .. serialize_value(k) .. "]="
-		end
-		parts[#parts + 1] = key .. serialize_value(v) .. ","
-	end
-	parts[#parts + 1] = "}"
-	return table.concat(parts)
+  assert(type(tbl) == "table")
+  local L = {}
+	-- serialize giá trị bất kỳ
+  function L.serialize_value(v)
+    local t = type(v)
+    if t == "number" or t == "boolean" then
+      return tostring(v)
+    elseif t == "string" then
+      return string.format("%q", v)
+    elseif t == "table" then
+      return L.serialize_table(v)
+    else
+      error("Unsupported type: " .. t)
+    end
+  end
+  function L.serialize_table(v)
+    ---@diagnostic disable-next-line
+    local parts = { "{" }
+    for k, v in pairs(tbl) do
+      local key
+      if type(k) == "string" and k:match("^[_%a][_%w]*$") then
+        key = k .. "="
+      else
+        key = "[" .. L.serialize_value(k) .. "]="
+      end
+      parts[#parts + 1] = key .. L.serialize_value(v) .. ","
+    end
+    parts[#parts + 1] = "}"
+    return table.concat(parts)
+  end
+  return L.serialize_table(M.serialize_function(tbl))
 end
 
 --- Deserialize a table from a strings

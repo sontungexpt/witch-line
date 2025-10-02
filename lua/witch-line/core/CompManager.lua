@@ -252,20 +252,20 @@ end
 --- @param comp Component The component to add the dependency for.
 --- @param ref CompId|CompId[] The ID or IDs that this component depends on.
 --- @param store_id DepGraphId The ID of the dependency store to use.
-M.link_ref_field = function(comp, ref, store_id)
+M.link_ref_field = function(comp, ref_id, store_id)
 	local store = get_dependency_graph(store_id)
 
-	if type(ref) ~= "table" then
-		ref = { ref }
+	if type(ref_id) ~= "table" then
+		ref_id = { ref_id }
 	end
 
 	local id = comp.id
-	for i = 1, #ref do
-		local ref_id = ref[i]
-		local deps = store[ref_id] or {}
+	for i = 1, #ref_id do
+		local ref_id_i = ref_id[i]
+		local deps = store[ref_id_i] or {}
 		---@diagnostic disable-next-line: need-check-nil
 		deps[id] = true
-		store[ref_id] = deps
+		store[ref_id_i] = deps
 	end
 end
 

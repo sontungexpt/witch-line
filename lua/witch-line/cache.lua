@@ -3,11 +3,11 @@ local fn, uv = vim.fn, vim.uv or vim.loop
 
 
 ---@class Cache
-local M = {
-}
+local M = {}
 
-local CACHED_DIR = fn.stdpath("cache") .. "/witch-line"
-local CACHED_FILE = CACHED_DIR .. "/cache.luac"
+local sep = uv.os_uname().sysname == "Windows_NT" and "\\" or "/"
+local CACHED_DIR = fn.stdpath("cache") .. sep ..  "witch-line"
+local CACHED_FILE = CACHED_DIR .. sep ..  "cache.luac"
 
 ---Urly name to reduce collision with t==able key
 local ENCODED_FUNC_KEYS = "V_REF@@__q@@$$whaw2EWdjDSldkvj23@@19"
@@ -90,8 +90,6 @@ M.save = function(checksum)
 		return
 	end
 	local tbl_utils = require("witch-line.utils.tbl")
-
-
 	local bytecode = tbl_utils.serialize_table_as_bytecode(Data)
 	if not bytecode then
 		M.clear()

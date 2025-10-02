@@ -18,6 +18,7 @@ local EventStore       = {
     -- },
 }
 
+
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
 M.on_vim_leave_pre     = function(CacheDataAccessor)
@@ -34,6 +35,10 @@ M.load_cache           = function(CacheDataAccessor)
     return function()
         EventStore = before_event_store
     end
+end
+
+M.inspect = function()
+  require("witch-line.utils.notifier").info(vim.inspect(EventStore))
 end
 
 --- Register events for components.

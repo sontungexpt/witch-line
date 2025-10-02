@@ -155,6 +155,7 @@ local RIGHT_SUFFIX = "R"
 
 ---@class DefaultComponent : Component The default components provided by witch-line
 ---@field id DefaultId the id of default component
+---@field _plug_provided true Mark as created by witch-line
 
 --- @class ManagedComponent : Component, DefaultComponent
 --- @field [integer] CompId -- Child components by their IDs
@@ -174,9 +175,15 @@ end
 --- @param comp Component the component to get the id from
 --- @return CompId id the id of the component
 M.valid_id = function(comp)
-	local id = comp.id and not comp._plug_provided and require("witch-line.constant.id").validate(comp.id)
-		or (tostring(comp) .. tostring(math.random(1, 1000000)))
-	rawset(comp, "id", id) -- Ensure the component has an ID field
+  local id = comp.id
+  if comp._plug_provided then
+    return id
+  elseif id then
+    id = require("witch-line.constant.id").validate(id)
+  else
+    id = tostring(comp) .. tostring(math.random(1, 1000000))
+    rawset(comp, "id", id) -- Ensure the component has an ID field
+  end
 	return id
 end
 
@@ -248,7 +255,7 @@ end
 M.needs_style_update = function(comp, style, ref_comp)
 	if type(style) ~= "table" then
 		return false
-	elseif not comp._hl_name == nil then
+	elseif not comp._hl_name then
 		return true
 	elseif type(ref_comp.style) == "function" then
 		return true
