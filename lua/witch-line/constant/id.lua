@@ -14,6 +14,8 @@ local Id = {
 	["cursor.pos"] = "cursor.pos",
 	["cursor.progress"] = "cursor.progress",
 	["encoding"] = "encoding",
+	["lsp.clients"] = "lsp.clients",
+	["indent"] = "indent",
 
 	-- "git.branch",
 	-- "GitAdd",
