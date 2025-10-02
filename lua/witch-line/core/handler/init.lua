@@ -19,7 +19,12 @@ local DepStoreKey = {
 --- Clear the value of a component in the statusline.
 --- @param comp Component The component to clear.
 local hide_component = function(comp)
-	local indices = assert(comp._indices, "Component has no indices to clear")
+	local indices = comp._indices
+
+  -- A abstract component may be not have _indices key
+  if not indices then
+    return
+  end
 
 	Statusline.bulk_set(indices, "")
 	if type(comp.left) == "string" then
@@ -37,10 +42,6 @@ end
 --- @return string|nil updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
 local function update_component(comp, session_id)
 	-- It's just a abstract component then no need to really update
-	if not comp._loaded then
-		return nil
-	end
-
 	local Component = require("witch-line.core.Component")
 
 	if comp.inherit and not Component.has_parent(comp) then
@@ -68,34 +69,33 @@ local function update_component(comp, session_id)
 		if value == "" then
 			hide_component(comp)
 		else
-			local indices = assert(comp._indices,
-				"Component " .. comp.id .. " has no indices set. Ensure it has been registered properly.")
+      local indices = comp._indices
+      -- A abstract component may be not have _indices key
+      if indices then
+        local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
+        local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+        local style_updated = false
+        if style then
+          style_updated = Component.update_style(comp, style, ref_comp)
+        end
 
-			local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
+        Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
 
-			local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
-			local style_updated = false
-			if style then
-				style_updated = Component.update_style(comp, style, ref_comp)
-			end
+        local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
+        if left then
+          Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+          Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
+        end
 
-			Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
-
-			local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
-			if left then
-				Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-				Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
-			end
-
-			if right then
-				Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-				Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
-			end
-			rawset(comp, "_hidden", false) -- Reset hidden state
+        if right then
+          Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+          Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
+        end
+        rawset(comp, "_hidden", false) -- Reset hidden state
+      end
 		end
 	end
-
 
 	Component.emit_post_update(comp, session_id, ctx, static)
 	return value

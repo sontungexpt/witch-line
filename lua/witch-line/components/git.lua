@@ -7,68 +7,61 @@ local Branch   = {
     _plug_provided = true,
     user_events = { "GitBranchChanged" },
     static = {
-        icon = "",
+      icon = "",
+      skip_check = {
+        filetypes = {
+          "NvimTree",
+          "TelescopePrompt"
+        }
+      }
     },
-    context = function()
-        local git_dir = vim.fn.finddir(".git", ".;")
+    context = {
+      get_head_file_path = function()
+        local fn = vim.fn
+        local git_dir = fn.finddir(".git", ".;")
         if git_dir ~= "" then
-            return {
-                head_file_path = git_dir .. "/HEAD",
-            }
+            return fn.fnamemodify(git_dir, ":p") .. "HEAD"
         end
         return nil
+      end,
+    },
+    init = function(self, ctx, static)
+        local uv = vim.uv or vim.loop
+        local api = vim.api
+
+        local is_win = uv.os_uname().sysname == "Windows_NT"
+        local file_changed = is_win and uv.new_fs_poll() or uv.new_fs_event()
+
+        local last_head_file_path = ""
+        api.nvim_create_autocmd("BufEnter", {
+          callback = function(e)
+            if vim.list_contains(static.skip_check.filetypes,vim.bo[e.buf].filetype) then
+                return
+            end
+
+            if last_head_file_path ~= head_file_path then
+              last_head_file_path = ctx.get_head_file_path()
+              vim.api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
+              file_changed:stop()
+
+              if head_file_path then
+                file_changed:start(head_file_path,
+                  is_win and 1000 or {},
+                  vim.schedule_wrap(function()
+                      vim.api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
+                  end)
+                )
+              end
+            end
+          end,
+        })
     end,
-
-    -- init = function(self, ctx, static)
-    --     local uv = vim.uv or vim.loop
-    --     local api = vim.api
-
-    --     --- @type table<string, table<integer,true>|{uv.fs_event_t|uv.fs_poll_t}>
-    --     local cache = {
-
-    --     }
-    --     if ctx and ctx.head_file_path then
-    --         local head_file_path = ctx.head_file_path
-    --         local cur_buf = api.nvim_get_current_buf()
-
-    --         api.nvim_create_autocmd({ "BufEnter", "BufLeave" }, {
-    --             callback = function(e)
-    --                 local buf = e.buf
-    --                 if e.event == "BufEnter" then
-    --                     if not cache[head_file_path] then
-    --                         cache[head_file_path] = {
-    --                             [buf] = true,
-    --                             file_changed = uv.os_uname().sysname == "Windows_NT" and uv.new_fs_event() or
-    --                                 uv.new_fs_poll()
-    --                         }
-    --                         cache[head_file_path].file_changed:start(head_file_path, 1000, vim.schedule_wrap(function()
-    --                             if api.nvim_get_current_buf() == cur_buf then
-    --                                 vim.api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
-    --                             end
-    --                         end))
-    --                     end
-    --                     cache[head_file_path][buf] = true
-    --                 else
-    --                     cache[head_file_path][buf] = nil
-    --                     local key = next(cache[head_file_path])
-    --                     if key == "file_changed" then
-    --                         key = next(cache[head_file_path], key)
-    --                     end
-    --                     if key == nil then
-    --                         file_changed:stop()
-    --                         file_changed:close()
-    --                         cache[head_file_path] = nil
-    --                     end
-    --                 end
-    --             end,
-    --         })
-    --     end
-    -- end,
     style = { fg = colors.green },
     update = function(self, ctx, static)
         local branch = ""
-        if ctx and ctx.head_file_path then
-            local head_file = io.open(ctx.head_file_path, "r")
+        local head_file_path = ctx.get_head_file_path()
+        if head_file_path then
+            local head_file = io.open(head_file_path, "r")
             local content = head_file:read("*all")
             head_file:close()
             -- branch name  or commit hash
@@ -77,7 +70,7 @@ local Branch   = {
         return branch ~= "" and static.icon .. " " .. branch or ""
     end,
 }
-local Diff     = {}
+local Diff  = {}
 
 --- @type DefaultComponent
 Diff.Interface = {
@@ -90,44 +83,79 @@ Diff.Interface = {
         end
     end,
     init = function(self, ctx, static)
+    end,
+    update = function(self, ctx, static)
         -- Don't show git diff when current buffer doesn't have a filename
         local api, fn = vim.api, vim.fn
         local active_buf = tostring(vim.api.nvim_get_current_buf())
         local diff_output_cache = {}
-        local diff_args = {
-            cmd = string.format(
-                [[git -C %s --no-pager diff --no-color --no-ext-diff -U0 -- %s]],
-                fn.expand('%:h'),
-                fn.expand('%:t')
-            ),
-            on_stdout = function(_, data)
-                if next(data) then
-                    diff_output_cache = vim.list_extend(diff_output_cache, data)
-                end
-            end,
-            on_stderr = function(_, data)
-                data = table.concat(data, '\n')
-                if #data > 0 then
-                    git_diff = nil
-                    diff_output_cache = {}
-                end
-            end,
-            on_exit = function()
-                if #diff_output_cache > 0 then
-                    process_diff(diff_output_cache)
-                else
-                    git_diff = { added = 0, modified = 0, removed = 0 }
-                end
-                diff_cache[vim.api.nvim_get_current_buf()] = git_diff
-            end,
-        }
-        M.update_git_diff()
-    end,
-    update = function(self, ctx, static)
-        if ctx then
-            return ""
+        local diff_cache = {}
+        local git_diff
+
+        ---@param bufnr number|nil
+        function M.get_sign_count(bufnr)
+          if bufnr then
+            return diff_cache[bufnr]
+          end
+          if M.src then
+            git_diff = M.src()
+            diff_cache[vim.api.nvim_get_current_buf()] = git_diff
+          elseif vim.g.actual_curbuf ~= nil and active_bufnr ~= vim.g.actual_curbuf then
+            -- Workaround for https://github.com/nvim-lualine/lualine.nvim/issues/286
+            -- See upstream issue https://github.com/neovim/neovim/issues/15300
+            -- Diff is out of sync re sync it.
+            M.update_diff_args()
+          end
+          return git_diff
         end
-        return nil
+        ---process diff data and update git_diff{ added, removed, modified }
+        ---@param data string output on stdout od git diff job
+        local function process_diff(data)
+          -- Adapted from https://github.com/wbthomason/nvim-vcs.lua
+          local added, removed, modified = 0, 0, 0
+          for _, line in ipairs(data) do
+            if string.find(line, [[^@@ ]]) then
+              local tokens = vim.fn.matchlist(line, [[^@@ -\v(\d+),?(\d*) \+(\d+),?(\d*)]])
+              local line_stats = {
+                mod_count = tokens[3] == nil and 0 or tokens[3] == '' and 1 or tonumber(tokens[3]),
+                new_count = tokens[5] == nil and 0 or tokens[5] == '' and 1 or tonumber(tokens[5]),
+              }
+
+              if line_stats.mod_count == 0 and line_stats.new_count > 0 then
+                added = added + line_stats.new_count
+              elseif line_stats.mod_count > 0 and line_stats.new_count == 0 then
+                removed = removed + line_stats.mod_count
+              else
+                local min = math.min(line_stats.mod_count, line_stats.new_count)
+                modified = modified + min
+                added = added + line_stats.new_count - min
+                removed = removed + line_stats.mod_count - min
+              end
+            end
+          end
+          git_diff = { added = added, modified = modified, removed = removed }
+        end
+        vim.system({
+          "git" , "-C", fn.expand('%:h'),
+          "--no-pager diff", "--no-color", "--no-ext-diff", "-U0",
+          "--", fn.expand('%:t')
+        }, { text  = true }, function (out)
+            if out.code ~= 0 then
+              git_diff = nil
+              diff_output_cache = {}
+              return
+            end
+
+            if out.stdout and #out.stdout > 0 then
+              local lines = vim.split(out.stdout, "\n", { trimempty = true })
+              diff_output_cache = vim.list_extend(diff_output_cache, lines)
+              process_diff(diff_output_cache)
+            else
+              git_diff = { added = 0, modified = 0, removed = 0 }
+            end
+
+            diff_cache[vim.api.nvim_get_current_buf()] = git_diff
+        end)
     end,
 
 }

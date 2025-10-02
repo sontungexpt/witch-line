@@ -2,7 +2,7 @@
 
 The best statusline plugin for neovim. It's very lightweight and super fast.
 
-This plugin lazy load as much as possible 
+This plugin lazy load as much as possible
 
 ## Table of Contents
 
@@ -76,7 +76,7 @@ This plugin is ideal for developers who want full control over the look and feel
 require("witch-line").setup({
   components = {
      "mode" ,
-     "file.name", 
+     "file.name",
      "file.icon",
   },
   disabled = {
@@ -99,7 +99,7 @@ vim.opt.laststatus = 3
 
 # ✨ Default Components Reference
 
-This section describes the built-in components available in the plugin, their structure, and how to use them.  
+This section describes the built-in components available in the plugin, their structure, and how to use them.
 Each component is referenced by name and can be composed to build a flexible and performant statusline.
 
 ---
@@ -125,7 +125,7 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ## ⚙️ Customizable Fields for Components
 
-Each component accepts a set of customization fields to control its behavior, style, visibility, and layout.  
+Each component accepts a set of customization fields to control its behavior, style, visibility, and layout.
 Below is a table of all supported fields and their expected types:
 
 | Field              | Type(s)                  | Description                                                                 |
@@ -177,7 +177,7 @@ local my_component = {
 
 ## 📂 Component Structure
 
-### 🔗 Type Aliases 
+### 🔗 Type Aliases
 | Alias           | Definition                                                                                                   |
 |-----------------|--------------------------------------------------------------------------------------------------------------|
 | `PaddingFunc`   | `(self, ctx, static, session_id) → number \| PaddingTable`                                                   |
@@ -226,14 +226,14 @@ The `ref` field supports the following subfields for deferred configuration:
 | `post_update`    | `function`, `nil`        | | Called after the component is updated, can be used to clean up the context. |
 | `update`          | `UpdateFunc`, `nil`        | Function to generate the component's content.                                 |
 | `style`           | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil` | | Style override for the entire component output.                               |
-| `min_screen_width`| `number`, `nil`          | Hides the component if screen width is below this threshold.                 |   
+| `min_screen_width`| `number`, `nil`          | Hides the component if screen width is below this threshold.                 |
 | `hide`            | `boolean`, `function`, `nil` | Hide condition. If true or a function returning true, hides the component.    |
 | `left_style`      | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil` | Style override for the left part of the component.                            |
 | `left`            | `string`, `function`, `nil` | Left content to be rendered. Can be a string or generator function.         |
 | `right_style`     | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil` | Style override for the right part of the component.                           |
 | `right`           | `string`, `function`, `nil` | Right content to be rendered. Can be a string or generator function.          |
 | `ref`             | `table`, `nil`           | References to other components for deferred configuration.                 |
-| `init`            | `function`, `nil`        | | Called when the component is initialized, can be used to set up the context. | 
+| `init`            | `function`, `nil`        | | Called when the component is initialized, can be used to set up the context. |
 | `events`          | `CompId`, `CompId[]`, `nil` | References components that provide events.                                  |
 | `user_events`     | `CompId`, `CompId[]`, `nil` | References components that provide user-defined events.                     |
 | `style`           | `CompId`, `nil`          | Reference to a component whose style will be used.                          |
@@ -265,7 +265,7 @@ local component = {
   end,
   ref = {                       -- References to other components
     events = { "file.events" },
-    style = "file.style",     
+    style = "file.style",
     static = "file.static",
     hide = { "file.hide" },
   },
@@ -284,23 +284,22 @@ local component = {
 
 Here are a few areas where your help would be especially appreciated:
 
-- 📘 **API Documentation**  
+- 📘 **API Documentation**
   Help rewrite and polish the API reference into clear and professional documentation. Better docs will make it easier for others to build powerful custom setups.
 
-- 🧬 **Serialization System**  
+- 🧬 **Serialization System**
   Design and implement a robust system to serialize and deserialize component configurations. This would help cache system worj better
 
-- 🧪 **Component Testing Framework**  
+- 🧪 **Component Testing Framework**
   Improve or design an ergonomic and declarative way to test components individually and ensure they behave consistently in different contexts.
 
-- 📦 **Plugin Ecosystem**  
+- 📦 **Plugin Ecosystem**
   You can create new plugin extensions built on top of `witch-line`—such as battery indicators, LSP diagnostics, Git integrations, and more.
 
-- 💡 **Ideas, Feedback, and Bug Reports**  
+- 💡 **Ideas, Feedback, and Bug Reports**
   Even if you’re not a coder, suggestions, feedback, and bug reports are very welcome.
 
 If you’re interested in helping, feel free to open an issue, start a discussion, or submit a PR. Let's build something awesome together. 🙏
- 
 
 ## License
 
