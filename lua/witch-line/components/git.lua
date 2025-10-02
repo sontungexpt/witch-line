@@ -11,8 +11,13 @@ local Branch   = {
       skip_check = {
         filetypes = {
           "NvimTree",
+          "neo-tree",
+          "alpha" ,
+          "dashboard" ,
           "TelescopePrompt"
-        }
+        },
+        buftypes = {
+        },
       }
     },
     context = {
@@ -32,26 +37,58 @@ local Branch   = {
         local is_win = uv.os_uname().sysname == "Windows_NT"
         local file_changed = is_win and uv.new_fs_poll() or uv.new_fs_event()
 
-        local last_head_file_path = ""
-        api.nvim_create_autocmd("BufEnter", {
-          callback = function(e)
-            if vim.list_contains(static.skip_check.filetypes,vim.bo[e.buf].filetype) then
-                return
-            end
+        local last_head_file_path = nil
+        -- helper: restart watcher + trigger event
+        local function update_repo(new_path)
+            file_changed:stop()
 
-            if last_head_file_path ~= head_file_path then
-              last_head_file_path = ctx.get_head_file_path()
-              vim.api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
-              file_changed:stop()
-
-              if head_file_path then
-                file_changed:start(head_file_path,
+            if new_path then
+                file_changed:start(new_path,
                   is_win and 1000 or {},
                   vim.schedule_wrap(function()
                       vim.api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
                   end)
                 )
-              end
+            end
+
+            -- Update state
+            last_head_file_path = new_path
+            -- Trigger immediately so the branch text updates
+            api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
+        end      --
+
+        api.nvim_create_autocmd("BufEnter", {
+          callback = function(e)
+            if vim.list_contains(static.skip_check.filetypes,vim.bo[e.buf].filetype)
+              or vim.list_contains(static.skip_check.buftypes, vim.bo[e.buf].buftype)
+              then
+                return
+            end
+            local head_file_path = ctx.get_head_file_path()
+
+            -- Case 1: Entering first buffer (Neovim just opened)
+            -- last_head_file_path = nil
+            -- If buffer belongs to a git repo -> update
+            if last_head_file_path == nil and head_file_path ~= nil then
+                update_repo(head_file_path)
+
+            -- Case 2: Entering another buffer in the same repository
+            -- Both HEAD paths are the same -> no update
+            elseif head_file_path == last_head_file_path then
+                return
+
+            -- Case 3: Entering a buffer from a different repository
+            -- HEAD path changed -> update
+            elseif head_file_path ~= nil and head_file_path ~= last_head_file_path then
+                update_repo(head_file_path)
+
+            -- Case 4: Entering a buffer outside of any git repository
+            -- head_file_path = nil
+            -- If we previously were in a git repo -> clear and update
+            elseif head_file_path == nil then
+                if last_head_file_path ~= nil then
+                    update_repo(nil)
+                end
             end
           end,
         })
