@@ -20,6 +20,7 @@ end
 
 
 --- Resets all values
+--- @param condition function|nil If provided, only clears values for which the condition function returns true when passed the index.
 M.empty_values = function(condition)
 	if type(condition) == "function" then
 		for i = 1, ValuesSize do

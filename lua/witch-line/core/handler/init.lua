@@ -34,11 +34,7 @@ end
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @return string|nil
---- - If string
----   - If empty string then the component is hidden
----   - If has value then component is updated successfully
---- - If nil it's is an abstract component and no need to update but the dependents must be update
+--- @return string|nil updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
 local function update_component(comp, session_id)
   -- It's just a abstract component then no need to really update
   if not comp._loaded then
@@ -121,7 +117,7 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 	local updated_value = update_component(comp, session_id)
 
 	if updated_value == "" then
-		for dep_id, dep_comp in CompManager.iterate_dependencies(DepStoreKey.Display, id) do
+		for dep_id, dep_comp in CompManager.iterate_dependents(DepStoreKey.Display, id) do
 			seen[dep_id] = true
 			hide_component(dep_comp)
 		end
@@ -132,7 +128,7 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 			dep_store_ids = { dep_store_ids }
 		end
 		for _, ds_id in ipairs(dep_store_ids) do
-			for dep_id, dep_comp in CompManager.iterate_dependencies(ds_id, id) do
+			for dep_id, dep_comp in CompManager.iterate_dependents(ds_id, id) do
 				if not seen[dep_id] then
 					M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
 				end
