@@ -25,7 +25,7 @@ M.setup = function(user_configs)
 	local Cache = require("witch-line.cache")
 
 	local CACHE_MODS = {
-		"witch-line.core.handler",
+		"witch-line.core.handler.event",
 		"witch-line.core.handler.timer",
 		"witch-line.core.statusline",
 		"witch-line.core.CompManager",
@@ -33,7 +33,6 @@ M.setup = function(user_configs)
 	}
 
 	local DataAccessor = Cache.read(checksum)
-  local disabled = user_configs.disabled
 
 	if DataAccessor then
 		for i = 1, #CACHE_MODS do
@@ -41,7 +40,7 @@ M.setup = function(user_configs)
 		end
 	end
 
-	require("witch-line.core.handler").setup(user_configs, DataAccessor )
+	require("witch-line.core.handler").setup(user_configs, DataAccessor)
 	require("witch-line.core.statusline").setup(user_configs.disabled)
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {

@@ -439,33 +439,74 @@ end
 --- Functions in the table are encoded to strings using `M.serialize_function`
 --- @param tbl table The table to serialize
 --- @return string str The serialized table as a string
-M.serialize_table = function(tbl)
+M.serialize_table = function(tbl, pretty)
   assert(type(tbl) == "table")
   local L = {}
-	-- serialize giá trị bất kỳ
-  function L.serialize_value(v)
+  -- function L.serialize_value(v)
+  --   local t = type(v)
+  --   if t == "number" or t == "boolean" then
+  --     return tostring(v)
+  --   elseif t == "string" then
+  --     return string.format("%q", v)
+  --   elseif t == "table" then
+  --     return L.serialize_table(v)
+  --   else
+  --     error("Unsupported type: " .. t)
+  --   end
+  -- end
+  -- function L.serialize_table(t)
+  --   ---@diagnostic disable-next-line
+  --   local parts = { "{" }
+  --   for k, v in pairs(t) do
+  --     local key
+  --     if type(k) == "string" and k:match("^[_%a][_%w]*$") then
+  --       key = k .. "="
+  --     else
+  --       key = "[" .. L.serialize_value(k) .. "]="
+  --     end
+  --     parts[#parts + 1] = key .. L.serialize_value(v) .. ","
+  --   end
+  --   parts[#parts + 1] = "}"
+  --   return table.concat(parts)
+  -- end
+  function L.serialize_value(v,indent)
     local t = type(v)
     if t == "number" or t == "boolean" then
       return tostring(v)
     elseif t == "string" then
       return string.format("%q", v)
     elseif t == "table" then
-      return L.serialize_table(v)
+      return L.serialize_table(v,indent)
     else
       error("Unsupported type: " .. t)
     end
   end
-  function L.serialize_table(v)
+  function L.serialize_table(t,indent)
     ---@diagnostic disable-next-line
+    indent = indent or 0
     local parts = { "{" }
-    for k, v in pairs(tbl) do
+    local first = true
+
+    for k, v in pairs(t) do
       local key
       if type(k) == "string" and k:match("^[_%a][_%w]*$") then
         key = k .. "="
       else
         key = "[" .. L.serialize_value(k) .. "]="
       end
-      parts[#parts + 1] = key .. L.serialize_value(v) .. ","
+      if pretty then
+        if first then
+          parts[#parts + 1] = "\n"
+          first = false
+        end
+        parts[#parts + 1] = string.rep(" ", indent + 2)
+        parts[#parts + 1] = key .. L.serialize_value(v, indent + 2) .. ",\n"
+      else
+        parts[#parts + 1] = key .. L.serialize_value(v, indent + 2) .. ","
+      end
+    end
+    if pretty and not first then
+      parts[#parts + 1] = string.rep(" ", indent)
     end
     parts[#parts + 1] = "}"
     return table.concat(parts)
@@ -495,7 +536,8 @@ end
 --- @param tbl table The table to serialize
 --- @return string bytecode The serialized table as Lua bytecode
 function M.serialize_table_as_bytecode(tbl)
-	local str = M.serialize_table(tbl)
+	local str = M.serialize_table(tbl,false)
+
 	local func, err = loadstring("return " .. str)
 	if not func then
 		error("Failed to load table from string: " .. err)

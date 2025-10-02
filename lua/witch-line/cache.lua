@@ -89,6 +89,7 @@ M.save = function(checksum)
 		error("Failed to create cache directory: " .. CACHED_DIR)
 		return
 	end
+
 	local tbl_utils = require("witch-line.utils.tbl")
 	local bytecode = tbl_utils.serialize_table_as_bytecode(Data)
 	if not bytecode then

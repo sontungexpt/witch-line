@@ -21,7 +21,7 @@ end
 
 --- Resets all values
 M.empty_values = function(condition)
-	if type(condition) ~= "function" then
+	if type(condition) == "function" then
 		for i = 1, ValuesSize do
 			if condition(i) then
 				Values[i] = ""
