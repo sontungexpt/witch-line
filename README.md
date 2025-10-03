@@ -106,6 +106,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Implement disable system
   - [x] Support disable for specific filetypes
   - [x] Support disable for specific buftypes
+  - [ ] Support for laststatus = 2
 
 - Commands
 
@@ -143,7 +144,21 @@ You can setup the plugin by calling the `setup` function and passing in a table 
 
 require("witch-line").setup({
   --- @type Component[]
-  abstract = {},
+  abstract = {
+    "file.name",
+    {
+      id = "file", -- Abstract component for file-related info
+      padding = { left = 1, right = 1 }, -- Padding around the component
+      static = { some_key = "some_value" }, -- Static metadata
+      timing = false,                 -- No timing updates
+      style = { fg = "#ffffff", bg = "#000000", bold = true }, -- Style override
+      min_screen_width = 80,          -- Hide if screen width < 80
+      hide = function()               -- Hide condition
+        return vim.bo.buftype == "nofile"
+      end,
+
+    },
+  },
   --- @type CombinedComponent
   components = {
     "mode",
@@ -372,30 +387,32 @@ Example:
 
 ### 🔧 Component Fields
 
-| Field              | Type(s)                                                           | Description                                                                 |
-| ------------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `id`               | `CompId`                                                          | Unique identifier for the component.                                        |
-| `version`          | `integer`, `string`, `nil`                                        | Version of the component for cache management.                              |
-| `inherit`          | `CompId`, `nil`                                                   | ID of another component to inherit properties from.                         |
-| `events`           | `string[]`, `nil`                                                 | References components that provide events.                                  |                                                                              |
-| `user_events`      | `string[]`, `nil`                                                 | References components that provide user-defined events.                     |                                                                              |
-| `timing`           | `boolean`, `integer`, `nil`                                       | Enables timing updates or sets a custom interval.                           |
-| `lazy`             | `boolean`, `nil`                                                  | If true, the component is loaded only when needed.                          |
-| `padding`          | `number`, `table`, `PaddingFunc`, `nil`                           | Padding around the component. Can be a number, table, or function.          |
-| `static`           | `any`, `nil`                                                      | Static value or metadata for the component.                                 |
-| `context`          | `any`, `nil`, `fun(self, static, session_id)`                     | Context value for the component.                                            |
-| `ref`              | `table`, `nil`                                                    | References to other components for deferred configuration.                  |
-| `init`             | `fun(self, ctx, static, session_id)`, `nil`                       |                                                                             | Called when the component is initialized, can be used to set up the context. |
-| `pre_update`       | `fun(self, ctx, static, session_id)`, `nil`                       | Called before the component is updated, can be used to set up the context.  |
-| `post_update`      | `fun(self, ctx, static, session_id)`, `nil`                       | Called after the component is updated, can be used to clean up the context. |
-| `update`           | `UpdateFunc`, `nil`                                               | Function to generate the component's content.                               |
-| `left_style`       | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil`       | Style override for the left part of the component.                          |
-| `left`             | `string`, `UpdateFunc`, `nil`                                     | Left content to be rendered. Can be a string or generator function.         |
-| `right_style`      | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil`       | Style override for the right part of the component.                         |
-| `right`            | `string`, `UpdateFunc`, `nil`                                     | Right content to be rendered. Can be a string or generator function.        |
-| `style`            | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil`           |                                                                             | Style override for the entire component output.                              |
-| `min_screen_width` | `number`, `nil`, `fun(self, ctx, static, session_id) -> number`   | Hides the component if screen width is below this threshold.                |
-| `hide`             | `boolean`, `fun(self, ctx, static, session_id) -> boolean`, `nil` | Hide condition. If true or a function returning true, hides the component.  |
+Each component in `witch-line` is a table with powerful customization capabilities. Here's a complete reference of available fields:
+
+| Field              | Type(s)                                                           | Description                                                                  |
+| ------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `id`               | `CompId`                                                          | Unique identifier for the component.                                         |
+| `version`          | `integer`, `string`, `nil`                                        | Version of the component for cache management.                               |
+| `inherit`          | `CompId`, `nil`                                                   | ID of another component to inherit properties from.                          |
+| `events`           | `string[]`, `nil`                                                 | References components that provide events.                                   |
+| `user_events`      | `string[]`, `nil`                                                 | References components that provide user-defined events.                      |
+| `timing`           | `boolean`, `integer`, `nil`                                       | Enables timing updates or sets a custom interval.                            |
+| `lazy`             | `boolean`, `nil`                                                  | If true, the component is loaded only when needed.                           |
+| `padding`          | `number`, `table`, `PaddingFunc`, `nil`                           | Padding around the component. Can be a number, table, or function.           |
+| `static`           | `any`, `nil`                                                      | Static value or metadata for the component.                                  |
+| `context`          | `any`, `nil`, `fun(self, static, session_id)`                     | Context value for the component.                                             |
+| `ref`              | `table`, `nil`                                                    | References to other components for deferred configuration.                   |
+| `init`             | `fun(self, ctx, static, session_id)`, `nil`                       | Called when the component is initialized, can be used to set up the context. |
+| `pre_update`       | `fun(self, ctx, static, session_id)`, `nil`                       | Called before the component is updated, can be used to set up the context.   |
+| `post_update`      | `fun(self, ctx, static, session_id)`, `nil`                       | Called after the component is updated, can be used to clean up the context.  |
+| `update`           | `UpdateFunc`, `nil`                                               | Function to generate the component's content.                                |
+| `left_style`       | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil`       | Style override for the left part of the component.                           |
+| `left`             | `string`, `UpdateFunc`, `nil`                                     | Left content to be rendered. Can be a string or generator function.          |
+| `right_style`      | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil`       | Style override for the right part of the component.                          |
+| `right`            | `string`, `UpdateFunc`, `nil`                                     | Right content to be rendered. Can be a string or generator function.         |
+| `style`            | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil`           | Style override for the entire component output.                              |
+| `min_screen_width` | `number`, `nil`, `fun(self, ctx, static, session_id) -> number`   | Hides the component if screen width is below this threshold.                 |
+| `hide`             | `boolean`, `fun(self, ctx, static, session_id) -> boolean`, `nil` | Hide condition. If true or a function returning true, hides the component.   |
 
 ### 📚 Example Component Structure
 
