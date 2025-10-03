@@ -283,26 +283,25 @@ Example:
 | `id`               | `CompId`                                                          | Unique identifier for the component.                                        |
 | `version`          | `integer`, `string`, `nil`                                        | Version of the component for cache management.                              |
 | `inherit`          | `CompId`, `nil`                                                   | ID of another component to inherit properties from.                         |
+| `events`           | `string[]`, `nil`                                       | References components that provide events.                                            |                                                                              |
+| `user_events`      | `string[]`, `nil`                                       | References components that provide user-defined events.                               |                                                                               |
 | `timing`           | `boolean`, `integer`, `nil`                                       | Enables timing updates or sets a custom interval.                           |
 | `lazy`             | `boolean`, `nil`                                                  | If true, the component is loaded only when needed.                          |
 | `padding`          | `number`, `table`, `PaddingFunc`, `nil`                           | Padding around the component. Can be a number, table, or function.          |
 | `static`           | `any`, `nil`                                                      | Static value or metadata for the component.                                 |
 | `context`          | `any`, `nil`, `fun(self, static, session_id)`                     | Context value for the component.                                            |
+| `ref`              | `table`, `nil`                                                    | References to other components for deferred configuration.                  |
+| `init`             | `fun(self, ctx, static, session_id)`, `nil`                       |                                                                             | Called when the component is initialized, can be used to set up the context. |
 | `pre_update`       | `fun(self, ctx, static, session_id)`, `nil`                       | Called before the component is updated, can be used to set up the context.  |
 | `post_update`      | `fun(self, ctx, static, session_id)`, `nil`                       | Called after the component is updated, can be used to clean up the context. |
 | `update`           | `UpdateFunc`, `nil`                                               | Function to generate the component's content.                               |
-| `style`            | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil`           |                                                                             | Style override for the entire component output.                              |
-| `min_screen_width` | `number`, `nil`, `fun(self, ctx, static, session_id) -> number`   | Hides the component if screen width is below this threshold.                |
-| `hide`             | `boolean`, `fun(self, ctx, static, session_id) -> boolean`, `nil` | Hide condition. If true or a function returning true, hides the component.  |
 | `left_style`       | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil`       | Style override for the left part of the component.                          |
 | `left`             | `string`, `UpdateFunc`, `nil`                                     | Left content to be rendered. Can be a string or generator function.         |
 | `right_style`      | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil`       | Style override for the right part of the component.                         |
 | `right`            | `string`, `UpdateFunc`, `nil`                                     | Right content to be rendered. Can be a string or generator function.        |
-| `ref`              | `table`, `nil`                                                    | References to other components for deferred configuration.                  |
-| `init`             | `fun(self, ctx, static, session_id)`, `nil`                       |                                                                             | Called when the component is initialized, can be used to set up the context. |
-| `events`           | `CompId`, `CompId[]`, `nil`                                       | References components that provide events.                                  |
-| `user_events`      | `CompId`, `CompId[]`, `nil`                                       | References components that provide user-defined events.                     |
-| `style`            | `CompId`, `nil`                                                   | Reference to a component whose style will be used.                          |
+| `style`            | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil`           |                                                                             | Style override for the entire component output.                              |
+| `min_screen_width` | `number`, `nil`, `fun(self, ctx, static, session_id) -> number`   | Hides the component if screen width is below this threshold.                |
+| `hide`             | `boolean`, `fun(self, ctx, static, session_id) -> boolean`, `nil` | Hide condition. If true or a function returning true, hides the component.  |
 
 ### 📚 Example Component Structure
 
