@@ -12,12 +12,14 @@ return {
 
 	"%=",
 
-	"copilot",
 
 	"lsp.clients",
+	"copilot",
+
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",
+
 
 	"indent",
 	"encoding",

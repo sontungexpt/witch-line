@@ -9,11 +9,6 @@ local sep = uv.os_uname().sysname == "Windows_NT" and "\\" or "/"
 local CACHED_DIR = fn.stdpath("cache") .. sep ..  "witch-line"
 local CACHED_FILE = CACHED_DIR .. sep ..  "cache.luac"
 
----Urly name to reduce collision with t==able key
-local ENCODED_FUNC_KEYS = "V_REF@@__q@@$$whaw2EWdjDSldkvj23@@19"
-local ENCODED_TBL_KEYS = "TBL_KEYS__dcjvlwkiwEEW3df2df ##S"
-
-
 local loaded = false
 
 --- Check if the cache has been read and load data to ram
@@ -105,8 +100,14 @@ end
 
 --- Clear the cache file and reset the Data table
 M.clear = function()
-	uv.fs_unlink(CACHED_FILE)
-	Data = {}
+	uv.fs_unlink(CACHED_FILE, function (err)
+    if err then
+      require("witch-line.utils.notifier").error("Error while deleting cache")
+    else
+      Data = {}
+      require("witch-line.utils.notifier").info("Cache deleted successfully")
+    end
+	end)
 end
 
 --- Validate the cache file content against the user configs
@@ -124,6 +125,7 @@ local validate_expiration = function(checksum, content)
 	end
 	return content:sub(len + 2)
 end
+
 --- Read the data from cache file
 --- @param checksum string The checksum to validate against
 --- @return Cache.DataAccessor|nil The DataAccessor if the cache file is readable and valid, nil otherwise
