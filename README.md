@@ -26,6 +26,7 @@ any idea to create a new component, please open an issue or pull request.
 
 ## Preview
 
+
 ## ✨ Features
 
 `witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
@@ -74,6 +75,7 @@ This plugin is ideal for developers who want full control over the look and feel
 ```lua
 
 require("witch-line").setup({
+
   components = {
      "mode" ,
      "file.name",
@@ -86,8 +88,7 @@ require("witch-line").setup({
 })
 
 ```
-
-## Usage
+##  Usage
 
 ### Laststatus
 
@@ -124,8 +125,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `git.branch`            | `git.lua`         | Shows current Git branch                     |
 | `git.added`             | `git.lua`         | Number of added lines in Git diff          |
 | `git.removed`           | `git.lua`         | Number of removed lines in Git diff        |
-| `git.changed`           | `git.lua`       | Number of changed lines in Git diff        |
-| `git.status`            | `git.lua`         | Summary of Git changes (added/
+| `git.modified`          | `git.lua`         | Number of changed lines in Git diff        |
 
 ---
 
@@ -134,8 +134,8 @@ Each component is referenced by name and can be composed to build a flexible and
 Each component accepts a set of customization fields to control its behavior, style, visibility, and layout.
 Below is a table of all supported fields and their expected types:
 
-| Field              | Type(s)                  | Description                                                                 |
-|-------------------|--------------------------|-----------------------------------------------------------------------------|
+| Field             | Type(s)                   | Description                                                                 |
+|-------------------|---------------------------|-----------------------------------------------------------------------------|
 | `padding`         | `number`, `table`         | Adds padding around the component. Can be a single number or `{ left, right }`. |
 | `static`          | `any`                     | Any static value or metadata the component wants to keep.                  |
 | `timing`          | `boolean`, `number`       | Enables timing or sets a custom update interval for the component.        |
@@ -149,12 +149,11 @@ Below is a table of all supported fields and their expected types:
 
 ---
 
-You can use the `override_comp` function to create a customized version of any default component by specifying overrides for these fields.
+You can use the `require("witch-line.builtin").comp` builtin function to create a customized version of any default component by specifying overrides for these fields.
 
 ```lua
-local override_comp = require("your_module").override_comp
 
-local my_component = override_comp("file.name", {
+local my_component = require("witch-line.builtin").comp("file.name", {
   padding = { left = 2 },
   min_screen_width = 60,
   hide = function()
@@ -218,28 +217,28 @@ The `ref` field supports the following subfields for deferred configuration:
 
 ### 🔧 Component Fields
 
-| Field             | Type(s)                  | Description                                                                 |
-|-------------------|--------------------------|-----------------------------------------------------------------------------|
-| `id`              | `CompId`                 | Unique identifier for the component.                                         |
-| `version`         | `integer`, `string`, `nil` | Version of the component for cache management.                              |
-| `inherit`         | `CompId`, `nil`          | ID of another component to inherit properties from.                         |
-| `timing`         | `boolean`, `integer`, `nil` | Enables timing updates or sets a custom interval.                             |
-| `lazy`            | `boolean`, `nil`         | If true, the component is loaded only when needed.                                 |
-| `padding`         | `number`, `table`, `PaddingFunc`, `nil` | Padding around the component. Can be a number, table, or function. |
-| `static`          | `any`, `nil`             | | Static value or metadata for the component.                                  |
-| `context`         | `any`, `nil`             | | Context value for the component.                                            |
-| `pre_update`     | `function`, `nil`        | | Called before the component is updated, can be used to set up the context.  |
-| `post_update`    | `function`, `nil`        | | Called after the component is updated, can be used to clean up the context. |
-| `update`          | `UpdateFunc`, `nil`        | Function to generate the component's content.                                 |
+| Field             | Type(s)                                        | Description                                                                 |
+|-------------------|------------------------------------------------|-----------------------------------------------------------------------------|
+| `id`              | `CompId`                                       | Unique identifier for the component.                                        |
+| `version`         | `integer`, `string`, `nil`                     | Version of the component for cache management.                              |
+| `inherit`         | `CompId`, `nil`                                | ID of another component to inherit properties from.                         |
+| `timing`          | `boolean`, `integer`, `nil`                    | Enables timing updates or sets a custom interval.                           |
+| `lazy`            | `boolean`, `nil`                               | If true, the component is loaded only when needed.                          |
+| `padding`         | `number`, `table`, `PaddingFunc`, `nil`        | Padding around the component. Can be a number, table, or function.          |
+| `static`          | `any`, `nil`                                   | Static value or metadata for the component.                                 |
+| `context`         | `any`, `nil`, `fun(self, static, session_id)`  | Context value for the component.                                            |
+| `pre_update`      | `fun(self, ctx, static, session_id)`, `nil`    | Called before the component is updated, can be used to set up the context.  |
+| `post_update`     | `fun(self, ctx, static, session_id)`, `nil`    | Called after the component is updated, can be used to clean up the context. |
+| `update`          | `UpdateFunc`, `nil`                            | Function to generate the component's content.                                 |
 | `style`           | `vim.api.keyset.highlight`, `table`, `StyleFunc`, `nil` | | Style override for the entire component output.                               |
-| `min_screen_width`| `number`, `nil`          | Hides the component if screen width is below this threshold.                 |
-| `hide`            | `boolean`, `function`, `nil` | Hide condition. If true or a function returning true, hides the component.    |
+| `min_screen_width`| `number`, `nil`, `fun(self, ctx, static, session_id) -> number`          | Hides the component if screen width is below this threshold.                 |
+| `hide`            | `boolean`, `fun(self, ctx, static, session_id) -> boolean`, `nil` | Hide condition. If true or a function returning true, hides the component.    |
 | `left_style`      | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil` | Style override for the left part of the component.                            |
-| `left`            | `string`, `function`, `nil` | Left content to be rendered. Can be a string or generator function.         |
+| `left`            | `string`, `UpdateFunc`, `nil` | Left content to be rendered. Can be a string or generator function.         |
 | `right_style`     | `vim.api.keyset.highlight`, `table`, `SideStyleFunc`, `nil` | Style override for the right part of the component.                           |
-| `right`           | `string`, `function`, `nil` | Right content to be rendered. Can be a string or generator function.          |
+| `right`           | `string`, `UpdateFunc`, `nil` | Right content to be rendered. Can be a string or generator function.          |
 | `ref`             | `table`, `nil`           | References to other components for deferred configuration.                 |
-| `init`            | `function`, `nil`        | | Called when the component is initialized, can be used to set up the context. |
+| `init`            | `fun(self, ctx, static, session_id)`, `nil`        | | Called when the component is initialized, can be used to set up the context. |
 | `events`          | `CompId`, `CompId[]`, `nil` | References components that provide events.                                  |
 | `user_events`     | `CompId`, `CompId[]`, `nil` | References components that provide user-defined events.                     |
 | `style`           | `CompId`, `nil`          | Reference to a component whose style will be used.                          |
@@ -280,8 +279,6 @@ local component = {
   end,
 }
 ```
-
-
 
 
 ## 🙌 Community Help & Contributions Wanted

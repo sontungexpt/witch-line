@@ -428,7 +428,7 @@ M.setup = function(user_configs, DataAccessor)
 		for _, comp in CompManager.iter_pending_init_components() do
 			local static = CompManager.get_static(comp)
 			local context = CompManager.get_context(comp, session_id, static)
-			comp.init(comp, context, static)
+			comp.init(comp, context, static, session_id)
 		end
 		M.update_comp_graph_by_ids(CompManager.get_emergency_ids(), session_id, {
 			DepStoreKey.Event,
