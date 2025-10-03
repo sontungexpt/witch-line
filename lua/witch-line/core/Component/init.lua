@@ -38,7 +38,7 @@ local SepStyle = {
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
 --- @class Component : table
---- @field id CompId The unique identifier for the component, can be a string or a number
+--- @field id CompId|nil The unique identifier for the component, can be a string or a number
 --- @field version integer|string|nil
 --- The version of the component, can be used to force reload the component when it changes
 --- - If provided, the component will be reloaded on start if the version changes manually when update component configurations by user. It's help the cache system work faster if speed is more important because the user manage the version manually.
@@ -106,7 +106,7 @@ local SepStyle = {
 ---	- If function: called and its return value is used as above.
 --- - Example of padding function: `function(self, ctx, static, session_id) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, ctx, static, session_id) return 2 end` (adds 2 spaces to both sides)
---- @field init nil|fun(raw_self: ManagedComponent, static: any) called when the component is initialized, can be used to set up the context
+--- @field init nil|fun(self: ManagedComponent, ctx: any, static: any) called when the component is initialized, can be used to set up the context
 --- @field style vim.api.keyset.highlight|nil|StyleFunc
 --- A table of styles that will be applied to the component
 --- - If table: used as is.
@@ -115,7 +115,7 @@ local SepStyle = {
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
 --- - Example of style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field static any A static field that will be passed to the component's update function
---- @field context nil|fun(self: ManagedComponent, static:any, session_id: SessionId): any
+--- @field context NotFunction|fun(self: ManagedComponent, static:any, session_id: SessionId): any
 --- A context field that will be passed to the component's update function
 --- - If nil: no context will be passed.
 --- - If function: called and its return value is used as above.

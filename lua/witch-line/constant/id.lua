@@ -4,6 +4,7 @@ local Id = {
 	["file.interface"] = "file.interface",
 	["file.name"] = "file.name",
 	["file.icon"] = "file.icon",
+	["file.modifier"] = "file.modifier",
 	["copilot"] = "copilot",
 	["diagnostic.interface"] = "diagnostic.interface",
 	["diagnostic.error"] = "diagnostic.error",
@@ -13,6 +14,14 @@ local Id = {
 	["cursor.pos"] = "cursor.pos",
 	["cursor.progress"] = "cursor.progress",
 	["encoding"] = "encoding",
+	["lsp.clients"] = "lsp.clients",
+	["indent"] = "indent",
+
+	["git.branch"] = "git.branch",
+	["git.diff.interface"] = "git.diff.interface",
+	["git.diff.added"] = "git.diff.added",
+	["git.diff.removed"] = "git.diff.removed",
+	["git.diff.modified"] = "git.diff.modified",
 
 	-- "git.branch",
 	-- "GitAdd",
