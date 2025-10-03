@@ -26,7 +26,10 @@ local Id = {
 
   ["battery"] = "battery",
   ["datetime"] = "datetime",
+  ["os_uname"] = "os_uname",
 
+
+  ["nvim_dap"] = "nvim_dap",
 
 
 }

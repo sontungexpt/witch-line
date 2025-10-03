@@ -35,6 +35,11 @@ return {
 				"󰁹",
 			},
 		},
+    colors = {
+      battery_high = colors.green,
+      battery_medium = colors.yellow,
+      battery_weak = colors.red,
+    },
 	},
 	style = {
 		fg = colors.green,
@@ -68,9 +73,10 @@ return {
 		local status = ctx.get_status()
 		local capacity = ctx.get_capacity()
 		local icon_index = math.floor(capacity / 10) + 1
-		local battery_color = icon_index > 8 and colors.green
-			or icon_index > 3 and colors.yellow
-			or colors.red
+
+		local battery_color = icon_index > 8 and static.colors.battery_high
+			or icon_index > 3 and static.colors.battery_medium
+			or static.colors.battery_weak
 
     local value = ""
 		if status == "Charging" then

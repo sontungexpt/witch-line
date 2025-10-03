@@ -1,4 +1,4 @@
-local Id       = require("witch-line.constant.id").Id
+local Id = require("witch-line.constant.id").Id
 
 ---@type DefaultComponent
 return {
