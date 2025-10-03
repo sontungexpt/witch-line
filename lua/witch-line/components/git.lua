@@ -110,6 +110,7 @@ local Branch   = {
   end,
 }
 
+
 local Diff  = {}
 
 --- @type DefaultComponent
