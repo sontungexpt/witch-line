@@ -175,14 +175,32 @@ end
 --- Setup the necessary things for statusline rendering.
 --- @param disabled BufDisabled|nil The disabled configuration to apply.
 M.setup = function(disabled)
-	---@diagnostic disable-next-line: undefined-field
-	vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+  local api = vim.api
+
+  local user_laststatus = vim.F.npcall(api.nvim_get_option_value,"laststatus", {}) or 3
+  local laststatus = user_laststatus
+
+	api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 		callback = function(e)
 			local buf = e.buf
-			vim.schedule(function()
-				enabled = not M.is_buf_disabled(buf, disabled)
-				M.render()
-			end)
+      vim.schedule(function ()
+        enabled = not M.is_buf_disabled(buf, disabled)
+        if enabled and laststatus == 0 then
+          api.nvim_set_option_value("laststatus", user_laststatus, {})
+          laststatus = user_laststatus
+          if api.nvim_get_mode().mode == "c" then
+            vim.cmd("redrawstatus")
+          end
+        elseif not enabled and laststatus ~= 0 then
+          api.nvim_set_option_value("laststatus", user_laststatus, {})
+          laststatus = 0
+          -- rerender statusline immediately
+          M.render()
+          if api.nvim_get_mode().mode == "c" then
+            vim.cmd("redrawstatus")
+          end
+        end
+      end)
 		end,
 	})
 end

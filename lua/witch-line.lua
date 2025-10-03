@@ -12,17 +12,19 @@ local M = {}
 --- @return UserConfig user_configs with defaults applied
 local use_default_config = function (user_configs)
 	if type(user_configs) ~= "table" then
-		user_configs = {
-      disabled = {
-        buftypes = {
-          "terminal",
-        },
-      },
-			components = require("witch-line.constant.default"),
-		}
-	elseif type(user_configs.components) ~= "table" or not next(user_configs.components) then
+    user_configs = {}
+  end
+
+	if type(user_configs.components) ~= "table" or not next(user_configs.components) then
 		user_configs.components = require("witch-line.constant.default")
 	end
+  if type(user_configs.disabled)~= "table" then
+    user_configs.disabled = {
+      buftypes = {
+        "terminal",
+      },
+    }
+  end
   return user_configs
 end
 
