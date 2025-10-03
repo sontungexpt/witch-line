@@ -185,22 +185,20 @@ Diff.Interface = {
         }, { text = true  }, function(out)
           if out.code ~= 0 then
             -- do nothing
-          elseif out.stdout and #out.stdout > 0 then
+          elseif  out.stdout and #out.stdout > 0 then
             local lines = vim.split(out.stdout, "\n", { trimempty = true })
             diff_cache[bufnr] = ctx.process_diff(lines)
-            vim.schedule(function ()
-              api.nvim_exec_autocmds("User", {pattern = "GitDiffUpdate"})
-            end)
           else
-            diff_cache[bufnr] = {
-              added = 0,
-              modified = 0,
-              removed = 0,
-            }
-            vim.schedule(function ()
-              api.nvim_exec_autocmds("User", {pattern = "GitDiffUpdate"})
-            end)
+            -- do nothing
+            -- diff_cache[bufnr] = {
+            --   added = 0,
+            --   modified = 0,
+            --   removed = 0,
+            -- }
           end
+          vim.schedule(function ()
+            api.nvim_exec_autocmds("User", {pattern = "GitDiffUpdate"})
+          end)
         end)
       end
     end
