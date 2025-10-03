@@ -78,14 +78,14 @@ local function update_component(comp, session_id)
 
 				local style_updated = false
 
-        if style_returned then
-          style_updated = Component.update_style(comp, style_returned, nil, true)
-        else
-          local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
-          if style then
-            style_updated = Component.update_style(comp, style, ref_comp)
-          end
-        end
+				if style_returned then
+					style_updated = Component.update_style(comp, style_returned, nil, true)
+				else
+					local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+					if style then
+						style_updated = Component.update_style(comp, style, ref_comp)
+					end
+				end
 
 				Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
 
@@ -153,8 +153,10 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 	end
 end
 
----
----
+--- Refresh a component and its dependencies in the next session.
+--- @param comp Component The component to refresh.
+--- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
+--- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
 M.refresh_component_graph = function(comp, dep_store_ids, seen)
 	require("witch-line.core.Session").run_once(function(session_id)
 		M.update_comp_graph(comp, session_id, dep_store_ids, seen)

@@ -125,11 +125,11 @@ local SepStyle = {
 --- - If nil: nothing is called.
 --- - If function: called before the component is updated
 --- @field update nil|string|UpdateFunc
---- The update function that will be called to get the component's value
 --- - If string: used as is.
 --- - If nil: the component will not be updated.
---- - If function: called and its return value is used as the component's value.
+--- - If function: called and its return value and style are used as the new value and style of the component
 --- - Example of update function: `function(self, ctx, static, session_id) return "Hello World" end`
+--- - Example of update function with style: `function(self, ctx, static, session_id) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field post_update nil|fun(self: ManagedComponent,ctx: any, static: any, session_id: SessionId)
 --- Called after the component is updated. (Call before the dependencies are updated)
 --- - If nil: nothing is called.
@@ -172,15 +172,15 @@ end
 --- @param comp Component the component to get the id from
 --- @return CompId id the id of the component
 M.valid_id = function(comp)
-  local id = comp.id
-  if comp._plug_provided then
-    return id
-  elseif id then
-    id = require("witch-line.constant.id").validate(id)
-  else
-    id = tostring(comp) .. tostring(math.random(1, 1000000))
-    rawset(comp, "id", id) -- Ensure the component has an ID field
-  end
+	local id = comp.id
+	if comp._plug_provided then
+		return id
+	elseif id then
+		id = require("witch-line.constant.id").validate(id)
+	else
+		id = tostring(comp) .. tostring(math.random(1, 1000000))
+		rawset(comp, "id", id) -- Ensure the component has an ID field
+	end
 	return id
 end
 
@@ -279,7 +279,7 @@ end
 --- @param comp Component the component to checks
 --- @param side "left"|"right" the side to check, either "left" or "right"
 M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-	local side_hl_name = "_".. side .. "_hl_name"
+	local side_hl_name = "_" .. side .. "_hl_name"
 	if not comp[side_hl_name] then
 		return true
 	elseif type(comp[side .. "_style"]) == "function" then
@@ -321,7 +321,7 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 
 	M.ensure_side_hl_name(comp, side)
 
-	local hl_name_field = "_".. side .. "_hl_name"
+	local hl_name_field = "_" .. side .. "_hl_name"
 	local side_hl_name = comp[hl_name_field]
 
 	local type_side_style = type(side_style)
@@ -330,8 +330,8 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 		return true
 	elseif type_side_style == "nil" then
 		--- inherits from main style
-    side_style = SepStyle.SepBg
-  end
+		side_style = SepStyle.SepBg
+	end
 
 	if type(side_style) == "number" and main_style then
 		if side_style == SepStyle.SepFg then
@@ -489,6 +489,18 @@ M.remove_state_before_cache = function(comp)
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
 
+
+--- Recursively overrides the values of a component with the values from another component.
+--- If the types of the values are different, the value from the original component is kept.
+--- If the values are not tables, the value from the new component is used.
+--- If both values are tables, the function is called recursively on the tables.
+--- If one of the tables is empty, the other table is used.
+--- If both tables are empty, the original table is kept.
+--- If both values are lists, the value from the new component is used.
+--- @param to any the original component value
+--- @param from any the new component value
+--- @param skip_type_check boolean|nil if true, skips the type check and always overrides
+--- @return any value the overridden component value
 local function overrides_component_value(to, from, skip_type_check)
 	if to == nil then
 		return from
@@ -502,18 +514,18 @@ local function overrides_component_value(to, from, skip_type_check)
 		return to
 	elseif from_type ~= "table" then
 		return from
-  -- both are table from here
+		-- both are table from here
 	elseif next(to) == nil then
 		return from
 	elseif vim.islist(to) and vim.islist(from) then
 		return from
-  elseif next(from) == nil then
-    return to
-  end
+	elseif next(from) == nil then
+		return to
+	end
 
-  for k, v in pairs(from) do
-    to[k] = overrides_component_value(to[k], v, skip_type_check)
-  end
+	for k, v in pairs(from) do
+		to[k] = overrides_component_value(to[k], v, skip_type_check)
+	end
 end
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
 --- @param comp Component the component to create the statistic for
