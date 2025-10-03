@@ -6,6 +6,9 @@ return {
 	"file.modifier",
 
 	"git.branch",
+	"git.diff.added",
+	"git.diff.removed",
+	"git.diff.modified",
 
 	"%=",
 

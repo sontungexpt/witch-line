@@ -5,7 +5,7 @@ local colors   = require("witch-line.constant.color")
 local Branch   = {
   id = Id["git.branch"],
   _plug_provided = true,
-  user_events = { "GitBranchChanged" },
+  -- user_events = { "GitBranchChanged" },
   static = {
     icon = "",
     skip_check = {
@@ -33,6 +33,8 @@ local Branch   = {
   init = function(self, ctx, static)
     local uv = vim.uv or vim.loop
     local api = vim.api
+    local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
+
 
     local is_win = uv.os_uname().sysname == "Windows_NT"
     local file_changed = is_win and uv.new_fs_poll() or uv.new_fs_event()
@@ -46,7 +48,7 @@ local Branch   = {
         file_changed:start(new_path,
           is_win and 1000 or {},
           vim.schedule_wrap(function()
-            vim.api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
+            refresh_component_graph(self)
           end)
         )
       end
@@ -54,7 +56,7 @@ local Branch   = {
       -- Update state
       last_head_file_path = new_path
       -- Trigger immediately so the branch text updates
-      api.nvim_exec_autocmds("User", { pattern = "GitBranchChanged" })
+      refresh_component_graph(self)
     end --
 
     api.nvim_create_autocmd("BufEnter", {
@@ -115,116 +117,190 @@ Diff.Interface = {
     id = Id["git.diff.interface"],
     events = { "BufWritePost", "BufEnter" },
     _plug_provided = true,
-    hide = function(self, ctx, static, session_id)
-        if #vim.fn.expand('%') == 0 then
-            return true
-        end
-    end,
     context = {
       diff_cache = {}, -- Stores last known value of diff of a buffer
-      diff_output_cache = {},
-      process_diff = function (data)
+      process_diff = function (lines)
         -- Adapted from https://github.com/wbthomason/nvim-vcs.lua
         local added, removed, modified = 0, 0, 0
-        for _, line in ipairs(data) do
-          if string.find(line, [[^@@ ]]) then
-            local tokens = vim.fn.matchlist(line, [[^@@ -\v(\d+),?(\d*) \+(\d+),?(\d*)]])
-            local line_stats = {
-              mod_count = tokens[3] == nil and 0 or tokens[3] == '' and 1 or tonumber(tokens[3]),
-              new_count = tokens[5] == nil and 0 or tokens[5] == '' and 1 or tonumber(tokens[5]),
-            }
+        for _, line in ipairs(lines) do
+          -- match hunk header like: @@ -12,3 +14,4 @@
+          -- captures: old_start, old_count, new_start, new_count
+          local old_start, old_count, new_start, new_count = line:match("^@@ %-([0-9]+),?([0-9]*) %+([0-9]+),?([0-9]*)")
 
-            if line_stats.mod_count == 0 and line_stats.new_count > 0 then
-              added = added + line_stats.new_count
-            elseif line_stats.mod_count > 0 and line_stats.new_count == 0 then
-              removed = removed + line_stats.mod_count
+          if old_start then
+            -- convert captures to numbers using same rules as original:
+            -- nil → 0, "" → 1, else → tonumber
+            local mod_count = (old_count == nil and 0)
+              or (old_count == "" and 1)
+              or tonumber(old_count) or 0
+
+             new_count = (new_count == nil and 0)
+              or (new_count == "" and 1)
+              or tonumber(new_count) or 0
+
+            if mod_count == 0 and new_count > 0 then
+              added = added + new_count
+            elseif mod_count > 0 and new_count == 0 then
+              removed = removed + mod_count
             else
-              local min = math.min(line_stats.mod_count, line_stats.new_count)
-              modified = modified + min
-              added = added + line_stats.new_count - min
-              removed = removed + line_stats.mod_count - min
+              local minv = math.min(mod_count, new_count)
+              modified = modified + minv
+              added = added + (new_count - minv)
+              removed = removed + (mod_count - minv)
             end
           end
         end
         return { added = added, modified = modified, removed = removed }
-      end
+      end,
     },
-    update = function(self, ctx, static)
-        -- Don't show git diff when current buffer doesn't have a filename
-        local api, fn = vim.api, vim.fn
-        local active_buf = tostring(vim.api.nvim_get_current_buf())
-        local git_diff
-
-        ---@param bufnr number|nil
-        function M.get_sign_count(bufnr)
-          if bufnr then
-            return ctx.diff_cache[bufnr]
-          end
-          -- if vim.g.actual_curbuf ~= nil and active_bufnr ~= vim.g.actual_curbuf then
-          --   -- Workaround for https://github.com/nvim-lualine/lualine.nvim/issues/286
-          --   -- See upstream issue https://github.com/neovim/neovim/issues/15300
-          --   -- Diff is out of sync re sync it.
-          --   M.update_diff_args()
-          -- end
-          return git_diff
+    init = function (self, ctx, static)
+      vim.api.nvim_create_autocmd("BufLeave",{
+        callback = function (e)
+          ctx.diff_cache[e.buf] = nil
         end
-        ---process diff data and update git_diff{ added, removed, modified }
-        ---@param data string output on stdout od git diff job
-        vim.system({
-          "git" , "-C", fn.expand('%:h'),
-          "--no-pager diff", "--no-color", "--no-ext-diff", "-U0",
-          "--", fn.expand('%:t')
-        }, { text  = true }, function (out)
-            if out.code ~= 0 then
-              git_diff = nil
-              ctx.diff_output_cache = {}
-              return
-            end
-
-            if out.stdout and #out.stdout > 0 then
-              local lines = vim.split(out.stdout, "\n", { trimempty = true })
-              ctx.diff_output_cache = vim.list_extend(ctx.diff_output_cache, lines)
-              git_diff = ctx.process_diff(ctx.diff_utput_cache)
-            else
-              git_diff = { added = 0, modified = 0, removed = 0 }
-            end
-
-            ctx.diff_cache[vim.api.nvim_get_current_buf()] = git_diff
-        end)
+      })
     end,
+    hide = function (self, ctx, static, session_id)
+      local filepath = vim.fn.expand('%:p')
+      if filepath == "" then
+        return true
+      end
+      local bufnr = vim.api.nvim_get_current_buf()
+      return ctx.diff_cache[bufnr] == nil
+    end,
+    pre_update = function (self, ctx, static)
+      local api,fn = vim.api, vim.fn
+      local bufnr = api.nvim_get_current_buf()
+      local diff_cache = ctx.diff_cache
+
+      if diff_cache[bufnr] then
+        vim.schedule(function ()
+          api.nvim_exec_autocmds("User", {pattern = "GitDiffUpdate"})
+        end)
+      else
+        vim.system({
+          "git", "-C", fn.expand('%:h'),
+          "--no-pager", "diff", "--no-color", "--no-ext-diff", "-U0",
+          "--", fn.expand('%:t')
+        }, { text = true  }, function(out)
+          if out.code ~= 0 then
+            -- do nothing
+          elseif out.stdout and #out.stdout > 0 then
+            local lines = vim.split(out.stdout, "\n", { trimempty = true })
+            diff_cache[bufnr] = ctx.process_diff(lines)
+            vim.schedule(function ()
+              api.nvim_exec_autocmds("User", {pattern = "GitDiffUpdate"})
+            end)
+          else
+            diff_cache[bufnr] = {
+              added = 0,
+              modified = 0,
+              removed = 0,
+            }
+            vim.schedule(function ()
+              api.nvim_exec_autocmds("User", {pattern = "GitDiffUpdate"})
+            end)
+          end
+        end)
+      end
+    end
 
 }
+
+--- @type DefaultComponent
 Diff.Added     = {
-  update = function(configs)
-    local git_status = vim.b.gitsigns_status_dict
-    return git_status.added and git_status.added > 0 and configs.added .. " " .. git_status.added
-        or ""
+  id = Id["git.diff.added"],
+  user_events = {"GitDiffUpdate"},
+  _plug_provided = true,
+  -- inherit = Id["git.diff.interface"],
+  static = {
+    icon = ""
+  },
+  style = {
+    fg = colors.green
+  },
+  ref = {
+    context = Id["git.diff.interface"],
+    hide = Id["git.diff.interface"]
+  },
+  update = function(self, ctx, static, session_id)
+    local bufnr = vim.api.nvim_get_current_buf()
+    local diff_cache = ctx.diff_cache[bufnr]
+    if diff_cache then
+      local added = diff_cache.added
+      if added then
+        return static.icon  .. " "..  added
+      end
+    end
+    return ""
   end,
 }
 
 
-Diff.Changed  = {
-  styles = { fg = "DiffChange" },
-  update = function(configs)
-    local git_status = vim.b.gitsigns_status_dict
-    return git_status.changed
-        and git_status.changed > 0
-        and configs.changed .. " " .. git_status.changed
-        or ""
+---@type DefaultComponent
+Diff.Modified  = {
+  id = Id["git.diff.modified"],
+  user_events = {"GitDiffUpdate"},
+  _plug_provided = true,
+  -- inherit = Id["git.diff.interface"],
+  static = {
+    icon = ""
+  },
+  style = {
+    fg = colors.cyan
+  },
+  ref = {
+    context = Id["git.diff.interface"],
+    hide = Id["git.diff.interface"]
+  },
+  update = function(self, ctx, static, session_id)
+    local bufnr = vim.api.nvim_get_current_buf()
+    local diff_cache = ctx.diff_cache[bufnr]
+    if diff_cache then
+      local modified = diff_cache.modified
+      if modified then
+        return static.icon  .. " "..  modified
+      end
+    end
+    return ""
   end,
 }
-local Deleted = {
-  styles = { fg = "DiffDelete" },
-  update = function(configs)
-    local git_status = vim.b.gitsigns_status_dict
-    return git_status.removed
-        and git_status.removed > 0
-        and configs.removed .. " " .. git_status.removed
-        or ""
+
+---@type DefaultComponent
+Diff.Removed = {
+  id = Id["git.diff.removed"],
+  user_events = {"GitDiffUpdate"},
+  _plug_provided = true,
+  -- inherit = Id["git.diff.interface"],
+  static = {
+    icon = "-"
+  },
+  style = {
+    fg = colors.red,
+  },
+  ref = {
+    context = Id["git.diff.interface"],
+    hide = Id["git.diff.interface"]
+  },
+  update = function(self, ctx, static, session_id)
+    local bufnr = vim.api.nvim_get_current_buf()
+    local diff_cache = ctx.diff_cache[bufnr]
+    if diff_cache then
+      local removed = diff_cache.removed
+      if removed then
+        return static.icon  .. " "..  removed
+      end
+    end
+    return ""
   end,
 }
 
 return {
   branch = Branch,
-  diff = Diff
+  diff = {
+    interface = Diff.Interface,
+    added = Diff.Added,
+    removed = Diff.Removed,
+    modified = Diff.Modified,
+  }
 }

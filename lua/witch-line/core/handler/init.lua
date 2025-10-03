@@ -11,9 +11,10 @@ local M = {}
 local DepStoreKey = {
 	Display = 1,
 	Event = 2,
-	EventInfo = 3,
 	Timer = 4,
 }
+
+M.DepStoreKey = DepStoreKey
 
 
 --- Clear the value of a component in the statusline.
@@ -70,6 +71,7 @@ local function update_component(comp, session_id)
 			hide_component(comp)
 		else
       local indices = comp._indices
+
       -- A abstract component may be not have _indices key
       if indices then
         local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
@@ -100,47 +102,65 @@ local function update_component(comp, session_id)
 	Component.emit_post_update(comp, session_id, ctx, static)
 	return value
 end
-M.update_comp = update_component
+M.update_component = update_component
 
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
+  dep_store_ids = dep_store_ids or {
+    DepStoreKey.Event,
+    DepStoreKey.Timer,
+  }
 	seen = seen or {}
+
 	local id = comp.id
 	if seen[id] then
 		return -- Avoid infinite recursion
 	end
+
+  -- Always non nil
+  ---@cast id CompId
 	seen[id] = true
+
 	local updated_value = update_component(comp, session_id)
 
-	if updated_value == "" then
+  --- Check if component is loaded and should be render and affect to dependents
+  --- If it's not load. It's just the abstract component and we don't care about updated value of it. The function update is just call for update something for abstract component
+	if comp._loaded and updated_value == "" then
 		for dep_id, dep_comp in CompManager.iterate_dependents(DepStoreKey.Display, id) do
 			seen[dep_id] = true
 			hide_component(dep_comp)
 		end
 	end
 
-	if dep_store_ids then
-		if type(dep_store_ids) ~= "table" then
-			dep_store_ids = { dep_store_ids }
-		end
-		for _, ds_id in ipairs(dep_store_ids) do
-			for dep_id, dep_comp in CompManager.iterate_dependents(ds_id, id) do
-				if not seen[dep_id] then
-					M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
-				end
-			end
-		end
+  if type(dep_store_ids) ~= "table" then
+    dep_store_ids = { dep_store_ids }
+  end
+  for _, ds_id in ipairs(dep_store_ids) do
+    for dep_id, dep_comp in CompManager.iterate_dependents(ds_id, id) do
+      if not seen[dep_id] then
+        M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
+      end
+    end
 	end
 end
+
+---
+---
+M.refresh_component_graph = function (comp, dep_store_ids, seen)
+  require("witch-line.core.Session").run_once(function (session_id)
+    M.update_comp_graph(comp, session_id, dep_store_ids, seen)
+  end)
+end
+
 
 --- Update multiple components by their IDs.
 --- @param ids CompId[] The IDs of the components to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to EventStore.refs.
+--- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 M.update_comp_graph_by_ids = function(ids, session_id, dep_store_ids, seen)
 	seen = seen or {}
@@ -396,7 +416,7 @@ M.setup = function(user_configs, DataAccessor)
 	Event.on_event(function(session_id, ids)
 		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Event, {})
 		Statusline.render()
-	end, DepStoreKey.EventInfo)
+	end)
 
 	Timer.on_timer_trigger(function(session_id, ids)
 		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Timer, {})

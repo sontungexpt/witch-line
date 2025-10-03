@@ -20,8 +20,7 @@ local Id = {
 	["git.branch"] = "git.branch",
 	["git.diff.interface"] = "git.diff.interface",
 	["git.diff.added"] = "git.diff.added",
-	["git.diff.changed"] = "git.diff.changed",
-	["git.diff.deleted"] = "git.diff.deleted",
+	["git.diff.removed"] = "git.diff.removed",
 	["git.diff.modified"] = "git.diff.modified",
 
 	-- "git.branch",
