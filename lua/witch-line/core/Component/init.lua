@@ -34,7 +34,7 @@ local SepStyle = {
 
 --- @alias PaddingFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
---- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil
+--- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
 --- @class Component : table
@@ -106,7 +106,7 @@ local SepStyle = {
 ---	- If function: called and its return value is used as above.
 --- - Example of padding function: `function(self, ctx, static, session_id) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, ctx, static, session_id) return 2 end` (adds 2 spaces to both sides)
---- @field init nil|fun(self: ManagedComponent, ctx: any, static: any) called when the component is initialized, can be used to set up the context
+--- @field init nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId) called when the component is initialized, can be used to set up the context
 --- @field style vim.api.keyset.highlight|nil|StyleFunc
 --- A table of styles that will be applied to the component
 --- - If table: used as is.
@@ -234,7 +234,7 @@ end
 M.ensure_hl_name = function(comp, ref_comp)
 	if comp._hl_name then
 		return
-	elseif comp ~= ref_comp then
+	elseif ref_comp and comp ~= ref_comp then
 		if not ref_comp._hl_name then
 			rawset(ref_comp, "_hl_name", Highlight.make_hl_name_from_id(ref_comp.id))
 		end
@@ -247,14 +247,14 @@ end
 --- Determines if the component's style should be updated.
 --- @param comp Component the component to checks
 --- @param style table|nil the current style of the component
---- @param ref_comp Component the reference component to compare against
+--- @param ref_comp Component|nil the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
 M.needs_style_update = function(comp, style, ref_comp)
 	if type(style) ~= "table" then
 		return false
 	elseif not comp._hl_name then
 		return true
-	elseif type(ref_comp.style) == "function" then
+	elseif ref_comp and type(ref_comp.style) == "function" then
 		return true
 	end
 	return false
@@ -264,9 +264,10 @@ end
 --- @param comp Component the component to update
 --- @param style vim.api.keyset.highlight the style to apply to the component
 --- @param ref_comp Component the reference component to inherit from if necessary
+--- @param force boolean|nil if true, forces the style to be updated even if it doesn't need to be
 --- @return boolean updated true if the style was updated, false otherwise
-M.update_style = function(comp, style, ref_comp)
-	if not M.needs_style_update(comp, style, ref_comp) then
+M.update_style = function(comp, style, ref_comp, force)
+	if not force and not M.needs_style_update(comp, style, ref_comp) then
 		return false
 	end
 	M.ensure_hl_name(comp, ref_comp)
@@ -368,8 +369,9 @@ end
 --- @param static any The `static` field value to pass to the component's update function
 --- @param session_id SessionId the session id to use for the component
 --- @return string value the new value of the component
+--- @return vim.api.keyset.highlight|nil style the new style of the component
 M.evaluate = function(comp, session_id, ctx, static)
-	local result = resolve(comp.update, comp, ctx, static, session_id)
+	local result, style = resolve(comp.update, comp, ctx, static, session_id)
 
 	if type(result) ~= "string" then
 		result = ""
@@ -393,7 +395,7 @@ M.evaluate = function(comp, session_id, ctx, static)
 		end
 	end
 
-	return result
+	return result, style
 end
 
 --- Evaluates the left and right parts of the component, returning their values.
@@ -487,6 +489,32 @@ M.remove_state_before_cache = function(comp)
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
 
+local function overrides_component_value(to, from, skip_type_check)
+	if to == nil then
+		return from
+	elseif from == nil then
+		return to
+	end
+
+	local to_type, from_type = type(to), type(from)
+
+	if not skip_type_check and to_type ~= from_type then
+		return to
+	elseif from_type ~= "table" then
+		return from
+  -- both are table from here
+	elseif next(to) == nil then
+		return from
+	elseif vim.islist(to) and vim.islist(from) then
+		return from
+  elseif next(from) == nil then
+    return to
+  end
+
+  for k, v in pairs(from) do
+    to[k] = overrides_component_value(to[k], v, skip_type_check)
+  end
+end
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
 --- @param comp Component the component to create the statistic for
 --- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
@@ -502,7 +530,8 @@ M.overrides = function(comp, override)
 			local type_v = type(v)
 			if vim.tbl_contains(accepted[k], type_v) then
 				if type_v == "table" then
-					rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
+					-- rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
+					rawset(comp, overrides_component_value(comp[k], v, true))
 				else
 					rawset(comp, k, v)
 				end

@@ -5,6 +5,7 @@ local Id = {
 	["file.name"] = "file.name",
 	["file.icon"] = "file.icon",
 	["file.modifier"] = "file.modifier",
+  ["file.size"] = "file.size",
 	["copilot"] = "copilot",
 	["diagnostic.interface"] = "diagnostic.interface",
 	["diagnostic.error"] = "diagnostic.error",
@@ -23,11 +24,14 @@ local Id = {
 	["git.diff.removed"] = "git.diff.removed",
 	["git.diff.modified"] = "git.diff.modified",
 
-	-- "git.branch",
-	-- "GitAdd",
-	-- "GitChange",
-	-- "GitDelete",
-	-- "GitModified",
+  ["battery"] = "battery",
+  ["datetime"] = "datetime",
+  ["os_uname"] = "os_uname",
+
+
+  ["nvim_dap"] = "nvim_dap",
+
+
 }
 
 return {

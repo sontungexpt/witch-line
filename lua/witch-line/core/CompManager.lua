@@ -364,8 +364,8 @@ end
 --- @return boolean displayed True if the component should be displayed, false otherwise.
 --- @return Component inherited The component that provides the `should_display` value, or nil if not found.
 M.should_hidden = function(comp, session_id, ctx, static)
-	local displayed, last_comp = lookup_ref_value(comp, "should_display", session_id, {}, ctx, static)
-	return displayed == true, last_comp
+	local hidden, last_comp = lookup_ref_value(comp, "hide", session_id, {}, ctx, static)
+	return hidden == true, last_comp
 end
 
 --- Check if a component should be displayed.
