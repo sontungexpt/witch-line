@@ -487,6 +487,32 @@ M.remove_state_before_cache = function(comp)
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
 
+local function overrides_component_value(to, from, skip_type_check)
+	if to == nil then
+		return from
+	elseif from == nil then
+		return to
+	end
+
+	local to_type, from_type = type(to), type(from)
+
+	if not skip_type_check and to_type ~= from_type then
+		return to
+	elseif from_type ~= "table" then
+		return from
+  -- both are table from here
+	elseif next(to) == nil then
+		return from
+	elseif vim.islist(to) and vim.islist(from) then
+		return from
+  elseif next(from) == nil then
+    return to
+  end
+
+  for k, v in pairs(from) do
+    to[k] = overrides_component_value(to[k], v, skip_type_check)
+  end
+end
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
 --- @param comp Component the component to create the statistic for
 --- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
@@ -502,7 +528,8 @@ M.overrides = function(comp, override)
 			local type_v = type(v)
 			if vim.tbl_contains(accepted[k], type_v) then
 				if type_v == "table" then
-					rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
+					-- rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
+					rawset(comp, overrides_component_value(comp[k], v, true))
 				else
 					rawset(comp, k, v)
 				end
