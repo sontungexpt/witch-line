@@ -52,6 +52,66 @@ any idea to create a new component, please open an issue or pull request.
 
 This plugin is ideal for developers who want full control over the look and feel of their statusline, without sacrificing performance or flexibility.
 
+### TODO
+
+- Cache
+
+  - [x] Implement caching mechanism (serialization + deserialization)
+  - [x] Cache all needed data
+  - [x] Use checksum to detect config changes with FNV-1a
+  - [ ] Support up-value for component function caching
+
+- Customization
+
+  - [x] Support user-defined component
+  - [x] Support override default component by user value
+
+- Component
+
+  - [x] Only update component when needed
+  - [x] Implement component system
+  - [x] Support abstract component
+  - [x] Support nested component
+  - [x] Support ref field to reference other component
+  - [x] Support inherit field to inherit from other component
+  - [x] Support static field to store static data
+  - [x] Support context field to store context data
+  - [x] Support events field to listen to other component events
+  - [x] Support user_events field to listen to user-defined events
+  - [x] Support timing field to update component periodically
+  - [x] Support lazy field to lazy load component
+  - [x] Support padding field to add padding around component
+  - [x] Support style field to override component style
+  - [x] Support left_style field to override left part style
+  - [x] Support right_style field to override right part style
+  - [x] Support left field to add left content
+  - [x] Support right field to add right content
+  - [x] Support min_screen_width field to hide component if screen width is less than this value
+  - [x] Support hide field to hide component based on condition
+  - [x] Support init function to initialize component
+  - [x] Support pre_update function to run before update function
+  - [x] Support post_update function to run after update function
+  - [x] Support update function to generate component content
+  - [x] Support ref field to reference other component fields (events, style, static, context, hide, min_screen_width)
+  - [x] Support version field to manage component cache manually
+  - [ ] Support coroutine for update function
+
+- Hide Automatically
+
+  - [x] Implement disable system
+  - [x] Support disable for specific filetypes
+  - [x] Support disable for specific buftypes
+
+- Commands
+
+  - [x] Implement `:Witchline clear_cache` command to clear cache
+  - [x] Implement `:Witchline inspect` command to inspect some information
+
+- Testing
+
+  - [ ] Write unit tests for core functionality
+  - [ ] Write performance benchmarks
+
 ## Installation
 
 ```lua
@@ -283,8 +343,8 @@ Example:
 | `id`               | `CompId`                                                          | Unique identifier for the component.                                        |
 | `version`          | `integer`, `string`, `nil`                                        | Version of the component for cache management.                              |
 | `inherit`          | `CompId`, `nil`                                                   | ID of another component to inherit properties from.                         |
-| `events`           | `string[]`, `nil`                                       | References components that provide events.                                            |                                                                              |
-| `user_events`      | `string[]`, `nil`                                       | References components that provide user-defined events.                               |                                                                               |
+| `events`           | `string[]`, `nil`                                                 | References components that provide events.                                  |                                                                              |
+| `user_events`      | `string[]`, `nil`                                                 | References components that provide user-defined events.                     |                                                                              |
 | `timing`           | `boolean`, `integer`, `nil`                                       | Enables timing updates or sets a custom interval.                           |
 | `lazy`             | `boolean`, `nil`                                                  | If true, the component is loaded only when needed.                          |
 | `padding`          | `number`, `table`, `PaddingFunc`, `nil`                           | Padding around the component. Can be a number, table, or function.          |
