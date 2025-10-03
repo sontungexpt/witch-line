@@ -201,25 +201,30 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ## 🔖 Default Components
 
-| Name               | Module File      | Description                               |
-| ------------------ | ---------------- | ----------------------------------------- |
-| `mode`             | `mode.lua`       | Shows the current Neovim mode             |
-| `file.name`        | `file.lua`       | Displays the filename                     |
-| `file.icon`        | `file.lua`       | Displays an icon for the file             |
-| `file.modified`    | `file.lua`       | Indicates if the file has unsaved changes |
-| `%=`               | _(builtin)_      | Separator to align left/right components  |
-| `copilot`          | `copilot.lua`    | Shows Copilot status (if available)       |
-| `diagnostic.error` | `diagnostic.lua` | Shows number of errors in current buffer  |
-| `diagnostic.warn`  | `diagnostic.lua` | Shows number of warnings                  |
-| `diagnostic.info`  | `diagnostic.lua` | Shows info-level diagnostics              |
-| `encoding`         | `encoding.lua`   | Displays file encoding (e.g., utf-8)      |
-| `cursor.pos`       | `cursor.lua`     | Shows the current cursor line/column      |
-| `cursor.progress`  | `cursor.lua`     | Shows the cursor position as a % progress |
-| `lsp.clients`      | `lsp.lua`        | Lists active LSP clients                  |
-| `git.branch`       | `git.lua`        | Shows current Git branch                  |
-| `git.added`        | `git.lua`        | Number of added lines in Git diff         |
-| `git.removed`      | `git.lua`        | Number of removed lines in Git diff       |
-| `git.modified`     | `git.lua`        | Number of changed lines in Git diff       |
+| Name               | Module File      | Description                                |
+| ------------------ | ---------------- | ------------------------------------------ |
+| `mode`             | `mode.lua`       | Shows the current Neovim mode              |
+| `file.name`        | `file.lua`       | Displays the filename                      |
+| `file.icon`        | `file.lua`       | Displays an icon for the file              |
+| `file.modified`    | `file.lua`       | Indicates if the file has unsaved changes  |
+| `file.size`        | `file.lua`       | Shows the file size                        |
+| `%=`               | _(builtin)_      | Separator to align left/right components   |
+| `copilot`          | `copilot.lua`    | Shows Copilot status (if available)        |
+| `diagnostic.error` | `diagnostic.lua` | Shows number of errors in current buffer   |
+| `diagnostic.warn`  | `diagnostic.lua` | Shows number of warnings                   |
+| `diagnostic.info`  | `diagnostic.lua` | Shows info-level diagnostics               |
+| `encoding`         | `encoding.lua`   | Displays file encoding (e.g., utf-8)       |
+| `cursor.pos`       | `cursor.lua`     | Shows the current cursor line/column       |
+| `cursor.progress`  | `cursor.lua`     | Shows the cursor position as a % progress  |
+| `lsp.clients`      | `lsp.lua`        | Lists active LSP clients                   |
+| `git.branch`       | `git.lua`        | Shows current Git branch                   |
+| `git.added`        | `git.lua`        | Number of added lines in Git diff          |
+| `git.removed`      | `git.lua`        | Number of removed lines in Git diff        |
+| `git.modified`     | `git.lua`        | Number of changed lines in Git diff        |
+| `datetime`         | `datetime.lua`   | Displays current date and time             |
+| `battery`          | `battery.lua`    | Shows linux battery status (if applicable) |
+| `os_uname`         | `os_uname.lua`   | Displays the operating system name         |
+| `nvim_dap`         | `nvim_dap.lua`   | Shows nvim-dap status (if available)       |
 
 ---
 
@@ -277,6 +282,30 @@ local my_component = {
 ## 📂 Component Structure
 
 Each component is represented as a Lua table with various fields that define its behavior, appearance, and interactions. Below is a detailed reference of the fields available for each component.
+
+### 🔍 Notes
+
+Important about function fields to make the cache work properly:
+
+- Function fields should be pure functions without side effects.
+- They should only depend on their input parameters and not have any up-values.
+- The up-values allowed are only global variables such as `vim`, `package`, `require`.
+
+Example of a pure function:
+
+```lua
+local api = vim.api -- Not allowed, as it's an up-value you need to move it inside the function like below
+
+
+local component = {
+  id = "identifier",
+  update = function(self, ctx, static, session_id)
+    local api = vim.api -- Allowed, as it's a global API call
+    return api.nvim_buf_get_name(0) -- Depends only on the current buffer
+  end,
+}
+
+```
 
 ### 🔗 Type Aliases
 
