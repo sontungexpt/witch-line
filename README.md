@@ -4,19 +4,24 @@ The best statusline plugin for neovim. It's very lightweight and super fast.
 
 This plugin lazy load as much as possible
 
-## Table of Contents
+## Navigation
 
-- ❓ [Features](#features)
-- 👀 [Installation](#installation)
-- 🤖 [Options](#options)
-- 🤔 [A few words to say](#a-few-words-to-say)
-- 🤩 [Preview](#preview)
-- 😆 [Usage](#usage)
-- ☀️ [Create new component](#create-new-component)
-- 💻 [Default Components](#components)
-- 📰 [Detail of each key](#detail-of-each-key)
-- 😁 [Contributing](#contributing)
-- ✌️ [License](#license)
+- [✨ Features](#-features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Options](#options)
+  - [Laststatus](#laststatus)
+- [✏️ Default Components Reference](#-default-components-reference)
+  - [🔖 Default Components](#-default-components)
+  - [⚙️ Customizable Fields for Components](#️-customizable-fields-for-components)
+  - [📂 Component Structure](#-component-structure)
+    - [🔍 Notes](#-notes)
+    - [🔗 Type Aliases](#-type-aliases)
+    - [🔗 Ref Table Subfields](#-ref-table-subfields)
+    - [🔧 Component Fields](#-component-fields)
+    - [📚 Example Component Structure](#-example-component-structure)
+- [🙌 Community Help & Contributions Wanted](#-community-help--contributions-wanted)
+- [📜 License](#-license)
 
 ## A few words to say
 
