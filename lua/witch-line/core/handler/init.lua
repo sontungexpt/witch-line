@@ -1,4 +1,4 @@
-local vim, type, ipairs, pairs, rawset, require = vim, type, ipairs, pairs, rawset, require
+local vim, type, ipairs,  rawset, require = vim, type, ipairs, rawset, require
 
 local Timer = require("witch-line.core.handler.timer")
 local Event = require("witch-line.core.handler.event")

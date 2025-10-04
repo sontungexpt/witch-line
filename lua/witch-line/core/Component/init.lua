@@ -1,4 +1,4 @@
-local type, str_rep, rawset = type, string.rep, rawset
+local require, type, str_rep, rawset = require, type, string.rep, rawset
 local Highlight = require("witch-line.core.highlight")
 local resolve = require("witch-line.utils").resolve
 
@@ -146,7 +146,6 @@ local SepStyle = {
 --- @field _hl_name string|nil The highlight group name for the component
 --- @field _left_hl_name string|nil The highlight group name for the left part of the component
 --- @field _right_hl_name string|nil The highlight group name for the right part of the component
---- @field _parent boolean|nil If true, the component has a parent and should inherit from it
 --- @field _hidden boolean|nil If true, the component is hidden and should not be displayed
 --- @field _abstract boolean|nil If true, the component is abstract and should not be displayed directly (all component are abstract)
 
@@ -169,11 +168,12 @@ M.is_default = function(comp)
 end
 
 --- Ensures that the component has a valid id, generating one if it does not.
---- @param comp Component the component to get the id from
+--- @param comp Component|DefaultComponent the component to get the id from
 --- @return CompId id the id of the component
 M.valid_id = function(comp)
 	local id = comp.id
 	if comp._plug_provided then
+    ---@cast id CompId
 		return id
 	elseif id then
 		id = require("witch-line.constant.id").validate(id)
@@ -181,6 +181,8 @@ M.valid_id = function(comp)
 		id = tostring(comp) .. tostring(math.random(1, 1000000))
 		rawset(comp, "id", id) -- Ensure the component has an ID field
 	end
+
+  ---@cast id CompId
 	return id
 end
 
@@ -201,7 +203,7 @@ end
 --- @param comp Component the component to check
 --- @return boolean has_parent true if the component has a parent, false otherwise
 M.has_parent = function(comp)
-	return comp._parent == true
+  return getmetatable(comp) ~= nil
 end
 
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
@@ -484,7 +486,6 @@ end
 --- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
 --- @param comp Component the component to remove the state from
 M.remove_state_before_cache = function(comp)
-	rawset(comp, "_parent", nil)
 	rawset(comp, "_hidden", nil)
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
