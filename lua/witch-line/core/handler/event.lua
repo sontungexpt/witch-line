@@ -4,7 +4,7 @@ local M = {}
 ---@alias es nil|table<string, Id[]>
 ---@alias EventStore {events: es, user_events: es}
 ---@type EventStore
-local EventStore       = {
+local EventStore = {
     -- Stores component dependencies for events
     -- Only init if needed
     -- events = {
@@ -37,15 +37,19 @@ M.load_cache           = function(CacheDataAccessor)
     end
 end
 
-M.inspect = function()
-  require("witch-line.utils.notifier").info(vim.inspect(EventStore))
+M.inspect              = function()
+    require("witch-line.utils.notifier").info(vim.inspect(EventStore))
 end
 
 --- Register events for components.
 ---@param comp Component
 ---@param etype "events" | "user_events"
 M.register_events      = function(comp, etype)
+    assert(etype == "events" or etype == "user_events", "Invalid event type: " .. tostring(etype))
     local es = comp[etype]
+    if type(es) == "string" then
+        es = { es }
+    end
     if type(es) == "table" then
         local es_size = #es
         if es_size > 0 then

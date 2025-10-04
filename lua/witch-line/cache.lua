@@ -1,11 +1,9 @@
-local type, pairs, loadstring, mpack, json = type, pairs, loadstring, vim.mpack, vim.json
 local fn, uv = vim.fn, vim.uv or vim.loop
-
 
 ---@class Cache
 local M = {}
 
-local sep = uv.os_uname().sysname == "Windows_NT" and "\\" or "/"
+local sep = package.config:sub(1,1)
 local CACHED_DIR = fn.stdpath("cache") .. sep ..  "witch-line"
 local CACHED_FILE = CACHED_DIR .. sep ..  "cache.luac"
 
@@ -50,30 +48,19 @@ M.DataAccessor = {
 
 --- Inspect the Data table
 M.inspect = function()
-	require("witch-line.utils.notifier").info("Witch Line Data\n" .. vim.inspect(Data))
-end
-
-local benchmark = function(cb, name)
-	local start = vim.loop.hrtime()
-	cb()
-	local elapsed = (vim.loop.hrtime() - start) / 1e6 -- Convert to milliseconds
-	local file = io.open("/home/stilux/Data/Workspace/neovim-plugins/witch-line/lua/benchmark", "a")
-	if file then
-		--- get ms from elapsed
-		file:write(string.format("%s took %.2f ms\n", name, elapsed))
-		file:close()
-	end
+	require("witch-line.utils.notifier").info("WitchLine Cache Data\n" .. vim.inspect(Data))
 end
 
 --- Set the checksum for the current user configs
---- @param user_configs Config|nil The user configs to generate the checksum from
+--- @param user_configs UserConfig|nil The user configs to generate the checksum from
 M.checksum = function(user_configs)
 	local tbl_utils = require("witch-line.utils.tbl")
-	local hashs = {}
-	for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
-		hashs[i] = tostring(hash)
-	end
-	return table.concat(hashs)
+  return tbl_utils.fnv1a32_hash(user_configs)
+	-- local hashs = {}
+	-- for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
+	-- 	hashs[i] = tostring(hash)
+	-- end
+	-- return table.concat(hashs)
 end
 
 --- Save the Data table to cache file

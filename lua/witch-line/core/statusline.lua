@@ -1,8 +1,7 @@
 local vim, concat, type = vim, table.concat, type
-local o, bo = vim.o, vim.bo
+local o, bo, api = vim.o, vim.bo, vim.api
 
 local M = {}
-local enabled = true
 
 --- @type string[] The list of render value of component .
 local Values = {}
@@ -15,7 +14,7 @@ local Frozens = {}
 
 --- Inspects the current statusline values.
 M.inspect = function()
-	vim.notify(vim.inspect(Values), vim.log.levels.INFO, { title = "Witchline Statusline Values" })
+	require("witch-line.utils.notifier").info(vim.inspect(Values))
 end
 
 
@@ -81,10 +80,6 @@ end
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 ---
 M.render = function()
-	if not enabled then
-		o.statusline = " "
-		return
-	end
 	local str = concat(Values)
 	o.statusline = str ~= "" and str or " "
 end
@@ -143,7 +138,7 @@ end
 --- @param disabled BufDisabled|nil The disabled configuration to check against. If nil, the buffer is not disabled.
 --- @return boolean
 M.is_buf_disabled = function(bufnr, disabled)
-	if not vim.api.nvim_buf_is_valid(bufnr)
+	if not api.nvim_buf_is_valid(bufnr)
 		or type(disabled) ~= "table"
 	then
 		return false
@@ -175,32 +170,37 @@ end
 --- Setup the necessary things for statusline rendering.
 --- @param disabled BufDisabled|nil The disabled configuration to apply.
 M.setup = function(disabled)
-  local api = vim.api
+	local user_laststatus = o.laststatus or 3
 
-  local user_laststatus = vim.F.npcall(api.nvim_get_option_value,"laststatus", {}) or 3
-  local laststatus = user_laststatus
+	api.nvim_create_autocmd("OptionSet", {
+		pattern = "laststatus",
+		callback = function()
+			local new_status = o.laststatus
+			if new_status ~= 0 then
+				user_laststatus = new_status
+			end
+		end,
+	})
 
 	api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 		callback = function(e)
 			local buf = e.buf
-      vim.schedule(function ()
-        enabled = not M.is_buf_disabled(buf, disabled)
-        if enabled and laststatus == 0 then
-          api.nvim_set_option_value("laststatus", user_laststatus, {})
-          laststatus = user_laststatus
-          if api.nvim_get_mode().mode == "c" then
-            vim.cmd("redrawstatus")
-          end
-        elseif not enabled and laststatus ~= 0 then
-          api.nvim_set_option_value("laststatus", user_laststatus, {})
-          laststatus = 0
-          -- rerender statusline immediately
-          M.render()
-          if api.nvim_get_mode().mode == "c" then
-            vim.cmd("redrawstatus")
-          end
-        end
-      end)
+			vim.schedule(function()
+				local disabled = M.is_buf_disabled(buf, disabled)
+
+				if not disabled and o.laststatus == 0 then
+					api.nvim_set_option_value("laststatus", user_laststatus, {})
+					M.render() -- rerender statusline immediately
+				elseif disabled and o.laststatus ~= 0 then
+					api.nvim_set_option_value("laststatus", 0, {})
+				else
+					return -- no change no need to redrawstatus
+				end
+
+				if api.nvim_get_mode().mode == "c" then
+					vim.cmd("redrawstatus")
+				end
+			end)
 		end,
 	})
 end

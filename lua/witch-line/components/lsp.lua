@@ -8,27 +8,27 @@ local Clients = {
     _plug_provided = true,
     events = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
     static = {
-      disabled = {
-        filetypes = {
-          "NvimTree",
+        disabled = {
+            filetypes = {
+                "NvimTree",
+            },
         },
-      },
     },
-    hide = function (self, ctx, static, session_id)
-      if type(static.disabled) ~= "table" then
+    hidden = function(self, ctx, static, session_id)
+        if type(static.disabled) ~= "table" then
+            return false
+        elseif type(static.disabled.filetypes) == "table"
+            and vim.list_contains(static.disabled.filetypes, vim.bo.filetype)
+        then
+            return true
+        end
         return false
-      elseif type(static.disabled.filetypes) == "table"
-        and vim.list_contains(static.disabled.filetypes, vim.bo.filetype)
-      then
-        return true
-      end
-      return false
     end,
     style = { fg = colors.magenta },
     update = function()
         local api = vim.api
         local bufnr = api.nvim_get_current_buf()
-        local buf_clients = vim.lsp.get_clients({ bufnr = bufnr})
+        local buf_clients = vim.lsp.get_clients({ bufnr = bufnr })
         local server_names = {}
 
         local has_null_ls = false
@@ -50,7 +50,7 @@ local Clients = {
             has_null_ls, null_ls = pcall(require, "null-ls")
 
             if has_null_ls then
-                local buf_ft = api.nvim_get_option_value("filetype", { buf = bufnr})
+                local buf_ft = api.nvim_get_option_value("filetype", { buf = bufnr })
                 local null_ls_methods = {
                     null_ls.methods.DIAGNOSTICS,
                     null_ls.methods.DIAGNOSTICS_ON_OPEN,
@@ -107,7 +107,7 @@ local Clients = {
                     end, conform.list_formatters(0))
                 )
                 if has_null_ls then
-                  server_names = require("witch-line.utils.tbl").unique_list(server_names)
+                    server_names = require("witch-line.utils.tbl").unique_list(server_names)
                 end
             end
         end

@@ -1,14 +1,11 @@
-local ffi           = require("ffi")
-local bit           = bit or require("bit")
-local M             = {}
+local ffi = require("ffi")
+local bit = bit or require("bit")
 
-local FNV_PRIME_32  = 0x01000193ULL
-local FNV_OFFSET_32 = 0x811C9DC5ULL
+local FNV_PRIME_32  = 0x01000193
+local FNV_OFFSET_32 = 0x811C9DC5
+local FNV_MASK_32   = 0xffffffff
 
-ffi.cdef [[
-typedef uint32_t fnv32_t;
-typedef unsigned char uint8_t;
-]]
+local M = {}
 
 --- Calculates the FNV-1a 32-bit hash of a string.
 --- Uses FFI uint32_t for automatic 32-bit overflow (no bit.band needed).
@@ -17,12 +14,12 @@ typedef unsigned char uint8_t;
 M.fnv1a32 = function(str)
     local len = #str
     local ptr = ffi.cast("const uint8_t*", str)
-    local hash = ffi.new("fnv32_t", FNV_OFFSET_32)
-    local bxor = bit.bxor
+    local hash = FNV_OFFSET_32
+    local bxor, band = bit.bxor, bit.band
     for i = 0, len - 1 do
-        hash = bxor(hash, ptr[i]) * FNV_PRIME_32
+      hash = band((bxor(hash, ptr[i]) * FNV_PRIME_32), FNV_MASK_32)
     end
-    return tonumber(hash)
+    return hash
 end
 
 --- Calculates the FNV-1a 32-bit hash of concatenated strings.
@@ -37,18 +34,17 @@ M.fnv1a32_fold = function(strs, i, j)
         return M.fnv1a32(table.concat(strs, "", i or 1, last))
     end
 
-
-    local hash = ffi.new("fnv32_t", FNV_OFFSET_32)
-    local bxor = bit.bxor
+    local hash = FNV_OFFSET_32
+    local bxor, band = bit.bxor, bit.band
     for l = i or 1, last do
         local str = strs[l]
         local len = #str
         local ptr = ffi.cast("const uint8_t*", str)
         for k = 0, len - 1 do
-            hash = bxor(hash, ptr[k]) * FNV_PRIME_32
+          hash = band((bxor(hash, ptr[k]) * FNV_PRIME_32), FNV_MASK_32)
         end
     end
-    return tonumber(hash)
+    return hash
 end
 
 

@@ -1,4 +1,4 @@
-local vim, type, ipairs, pairs, rawset, require = vim, type, ipairs, pairs, rawset, require
+local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 
 local Timer = require("witch-line.core.handler.timer")
 local Event = require("witch-line.core.handler.event")
@@ -161,6 +161,7 @@ end
 M.refresh_component_graph = function(comp, dep_store_ids, seen)
 	require("witch-line.core.Session").run_once(function(session_id)
 		M.update_comp_graph(comp, session_id, dep_store_ids, seen)
+		Statusline.render()
 	end)
 end
 
@@ -201,8 +202,8 @@ local function bind_dependencies(comp)
 			link_ref_field(comp, ref.timing, DepStoreKey.Timer)
 		end
 
-		if ref.hide then
-			link_ref_field(comp, ref.hide, DepStoreKey.Display)
+		if ref.hidden then
+			link_ref_field(comp, ref.hidden, DepStoreKey.Display)
 		end
 
 		if ref.min_screen_width then
