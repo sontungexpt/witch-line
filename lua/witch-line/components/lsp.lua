@@ -7,6 +7,7 @@ local Clients = {
     id = Id["lsp.clients"],
     _plug_provided = true,
     events = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
+    flexible = 100,
     static = {
         disabled = {
             filetypes = {
@@ -114,7 +115,7 @@ local Clients = {
 
         return #server_names > 0 and table.concat(server_names, ", ") or "NO LSP, FORMATTER  "
     end,
-    min_screen_width = 70,
+
 }
 
 

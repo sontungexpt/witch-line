@@ -36,6 +36,8 @@ local FlexiblePriorityQueue = {
 	-- { idx = 2, priority = 2 },
 }
 
+local TruncedLength = 0
+
 
 --- Marks a component's highlight group.
 --- @param idxs integer[] The index or indices of the component(s) to mark.
@@ -162,7 +164,7 @@ end
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param full_width number|nil The max width of the statusline. If true, uses the full width of the window.
-M.render = function(full_width)
+M.render = require("lua.witch-line.utils").debounce(function(full_width)
 	local removed_idx = #FlexiblePriorityQueue
 	if removed_idx == 0 then
 		local str = concat(merge_highlight_with_values(Values))
@@ -174,19 +176,19 @@ M.render = function(full_width)
 
 	full_width = (full_width and o.columns) or api.nvim_win_get_width(0)
 	local ValuesCopied = require("witch-line.utils.tbl").shallow_copy(Values)
-	local values_len = strdisplaywidth(concat(ValuesCopied))
-	while removed_idx > 0 and values_len > full_width do
+	TruncedLength = strdisplaywidth(concat(ValuesCopied))
+	while removed_idx > 0 and TruncedLength > full_width do
 		local value_idx = FlexiblePriorityQueue[removed_idx].idx
 		local removed_value = ValuesCopied[value_idx] or ""
 		if removed_value ~= "" then
 			ValuesCopied[value_idx] = ""
-			values_len = values_len - strdisplaywidth(removed_value)
+			TruncedLength = TruncedLength - strdisplaywidth(removed_value)
 		end
 		removed_idx = removed_idx - 1
 	end
 	local str = concat(merge_highlight_with_values(ValuesCopied))
 	o.statusline = str ~= "" and str or " "
-end
+end, 100)
 
 
 --- Appends a new value to the statusline values list.
@@ -278,7 +280,10 @@ M.setup = function(disabled)
 	if next(FlexiblePriorityQueue) then
 		api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
 			callback = function()
-				M.render() -- full width
+        local width = o.columns or api.nvim_win_get_width(0)
+        if TruncedLength <= width then
+          M.render(width)
+        end
 			end,
 		})
 	end
