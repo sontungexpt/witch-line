@@ -234,7 +234,7 @@ end
 M.ensure_hl_name = function(comp, ref_comp)
 	if comp._hl_name then
 		return
-	elseif ref_comp and comp ~= ref_comp then
+	elseif comp ~= ref_comp then
 		if not ref_comp._hl_name then
 			rawset(ref_comp, "_hl_name", Highlight.make_hl_name_from_id(ref_comp.id))
 		end
@@ -247,14 +247,14 @@ end
 --- Determines if the component's style should be updated.
 --- @param comp Component the component to checks
 --- @param style table|nil the current style of the component
---- @param ref_comp Component|nil the reference component to compare against
+--- @param ref_comp Component the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
 M.needs_style_update = function(comp, style, ref_comp)
 	if type(style) ~= "table" then
 		return false
 	elseif not comp._hl_name then
 		return true
-	elseif ref_comp and type(ref_comp.style) == "function" then
+	elseif type(ref_comp.style) == "function" then
 		return true
 	end
 	return false

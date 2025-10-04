@@ -61,12 +61,13 @@ local function update_component(comp, session_id)
 	local hidden = (type(min_screen_width) == "number" and vim.o.columns < min_screen_width)
 		or CompManager.should_hidden(comp, session_id, ctx, static)
 
-	local value, style_returned = "", nil
+	local value, style, ref_comp = "", nil, comp
 
 	if hidden then
 		hide_component(comp)
 	else
-		value, style_returned = Component.evaluate(comp, session_id, ctx, static)
+		value, style = Component.evaluate(comp, session_id, ctx, static)
+
 		if value == "" then
 			hide_component(comp)
 		else
@@ -78,10 +79,10 @@ local function update_component(comp, session_id)
 
 				local style_updated = false
 
-				if style_returned then
-					style_updated = Component.update_style(comp, style_returned, nil, true)
+				if style then
+					style_updated = Component.update_style(comp, style, ref_comp, true)
 				else
-					local style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+					style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
 					if style then
 						style_updated = Component.update_style(comp, style, ref_comp)
 					end
