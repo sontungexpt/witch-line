@@ -7,18 +7,38 @@ local Clients = {
     id = Id["lsp.clients"],
     _plug_provided = true,
     events = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
+    static = {
+      disaabled = {
+        filetypes = {
+          "NvimTree",
+        },
+      },
+    },
+    hide = function (self, ctx, static, session_id)
+      if type(static.disaabled) ~= "table" then
+        return false
+      elseif type(static.disaabled.filetypes) == "table"
+        and vim.list_contains(static.disaabled.filetypes, vim.bo.filetype)
+      then
+        return true
+      end
+      return false
+    end,
     style = { fg = colors.magenta },
     update = function()
-        local api, fn = vim.api, vim.fn
-        local buf_clients = vim.lsp.buf_get_clients()
+        local api = vim.api
+        local bufnr = api.nvim_get_current_buf()
+        local buf_clients = vim.lsp.get_clients({ bufnr = bufnr})
         local server_names = {}
+
         local has_null_ls = false
+
         local ignore_lsp_servers = {
             ["null-ls"] = true,
             ["copilot"] = true,
         }
 
-        for _, client in pairs(buf_clients) do
+        for _, client in ipairs(buf_clients) do
             local client_name = client.name
             if not ignore_lsp_servers[client_name] then
                 server_names[#server_names + 1] = client_name
@@ -30,7 +50,7 @@ local Clients = {
             has_null_ls, null_ls = pcall(require, "null-ls")
 
             if has_null_ls then
-                local buf_ft = api.nvim_buf_get_option(0, "filetype")
+                local buf_ft = api.nvim_get_option_value("filetype", { buf = bufnr})
                 local null_ls_methods = {
                     null_ls.methods.DIAGNOSTICS,
                     null_ls.methods.DIAGNOSTICS_ON_OPEN,
@@ -87,7 +107,7 @@ local Clients = {
                     end, conform.list_formatters(0))
                 )
                 if has_null_ls then
-                    server_names = fn.uniq(server_names)
+                  server_names = require("witch-line.utils.tbl").unique_list(server_names)
                 end
             end
         end

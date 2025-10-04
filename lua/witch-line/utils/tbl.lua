@@ -3,6 +3,18 @@ local M = {}
 
 local type, pairs, tostring, loadstring, load = type, pairs, tostring, loadstring, load
 
+--- Removes duplicate entries from a list
+--- @generic T
+--- @param list T[] The list to process.
+--- @return T[] unique A new list containing only unique elements from the input list.
+M.unique_list = function(list)
+  local set = {}
+  for _, v in ipairs(list) do
+    set[v] = true
+  end
+  return vim.tbl_keys(set)
+end
+
 --- Creates a shallow copy of a table.
 --- @generic T
 --- @param tbl T The table to copy.
