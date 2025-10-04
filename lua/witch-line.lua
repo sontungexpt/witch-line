@@ -1,11 +1,11 @@
 local require, vim = require, vim
 local M = {}
 
----@alias BufDisabled {filetypes: string[], buftypes: string[]}
+---@alias BufDisabledConfig {filetypes: string[], buftypes: string[]}
 ---@class UserConfig : table
 ---@field abstract CombinedComponent[]|nil Abstract components that are not rendered directly.
 ---@field components CombinedComponent[] Components that are rendered in the statusline.
----@field disabled BufDisabled|nil A table containing filetypes and buftypes where the statusline is disabled.
+---@field disabled BufDisabledConfig|nil A table containing filetypes and buftypes where the statusline is disabled.
 
 --- Use default configs if missing
 --- @param user_configs UserConfig|nil user_configs to check

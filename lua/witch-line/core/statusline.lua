@@ -3,6 +3,13 @@ local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywid
 local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 local M = {}
 
+--- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit). It's contains the idx of string component in Values list.
+local Frozens = {
+	-- [1] = true,
+	-- [2] = true,
+}
+
+
 --- @type string[] The list of render value of component .
 local Values = {
 	-- [1] = "#WitchLineComponent1",
@@ -11,15 +18,11 @@ local Values = {
 	-- [4] = "Component2",
 }
 
---- @type table<integer, string> The map of idx to value that should be hidden when the statusline is truncated.
-local ForcedHiddenValues = {
-	-- [1] = "WitchLineComponent",
-}
-
 ---@type integer The size of the Values list.
 local ValuesSize = 0
 
---- @type table<integer, string> A mapping from component indices to their highlight group name
+
+--- @type table<integer, string> The map of idx of value to highlight group name.
 local IdxHlMap = {
 	-- [1] = "WitchLineComponent1",
 	-- [2] = "WitchLineComponent2",
@@ -27,10 +30,9 @@ local IdxHlMap = {
 }
 
 
---- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit).
-local Frozens = {
-	-- [1] = true,
-	-- [2] = true,
+--- @type table<integer, string> The map of idx of value to forced hidden value when truncated.
+local FlexibleHiddenIdxValueMap = {
+	-- [1] = "WitchLineComponent",
 }
 
 
@@ -42,7 +44,7 @@ local FlexiblePrioritySorted = {
 }
 
 local TruncatedLength = 0
-local TruncatedIdxStopped = 0
+local FlexibleHiddenStopped = -1
 
 
 --- Marks a component's highlight group.
@@ -64,6 +66,58 @@ M.mark_sep_highlight = function(idxs, hl_name, adjust)
 	end
 end
 
+--- Restores all hidden flexible values to their original state.
+--- This function is used to reset the statusline to its full state, making all components visible
+local function restore_all_hidden_flexible_values()
+	for idx, value in pairs(FlexibleHiddenIdxValueMap) do
+		Values[idx] = value
+	end
+end
+
+--- Hides flexible values based on the available width.
+--- It iteratively hides the least important flexible components until the total length fits within the specified width.
+--- @param width integer The available width to fit the statusline within.
+local function hide_flexible_values(width)
+	while FlexibleHiddenStopped > 0 and TruncatedLength > width do
+		FlexibleHiddenStopped                = FlexibleHiddenStopped - 1
+		local value_idx                      = FlexiblePrioritySorted[FlexibleHiddenStopped].idx
+		local value                          = Values[value_idx]
+		FlexibleHiddenIdxValueMap[value_idx] = value
+		Values[value_idx]                    = ""
+		TruncatedLength                      = TruncatedLength - strdisplaywidth(value)
+	end
+end
+
+--- Restores previously hidden flexible values based on the available width.
+--- It iteratively restores the most recently hidden flexible components until the total length exceeds the specified width.
+--- @param width integer The available width to fit the statusline within.	
+local function restore_flexible_hidden_values(width)
+	local len = #FlexiblePrioritySorted
+	repeat
+		FlexibleHiddenStopped = FlexibleHiddenStopped + 1
+		local prev_value_idx  = FlexiblePrioritySorted[FlexibleHiddenStopped].idx
+		local value           = FlexibleHiddenIdxValueMap[prev_value_idx]
+		local new_length      = TruncatedLength + strdisplaywidth(value)
+
+		if new_length > width then
+			FlexibleHiddenStopped = FlexibleHiddenStopped - 1
+			break
+		end
+
+		-- Restore the value
+		Values[prev_value_idx]                    = value
+		FlexibleHiddenIdxValueMap[prev_value_idx] = nil
+		TruncatedLength                           = new_length
+	until FlexibleHiddenStopped == len
+end
+
+local function handle_flexible_values(width)
+	if TruncatedLength < width then
+		restore_flexible_hidden_values(width)
+	elseif TruncatedLength > width then
+		hide_flexible_values(width)
+	end
+end
 
 --- Tracks a component as flexible with a given priority.
 --- Components with lower priority values are considered more important and will be retained longer when space is limited.
@@ -72,16 +126,18 @@ end
 M.track_flexible = function(idx, priority)
 	local new_len = #FlexiblePrioritySorted + 1
 
+	-- Insert the component and sort in ascending order of priority at the same time using insertion sort
 	FlexiblePrioritySorted[new_len] = { idx = idx, priority = priority }
+	while new_len > 1 and FlexiblePrioritySorted[new_len].priority < FlexiblePrioritySorted[new_len - 1].priority do
+		FlexiblePrioritySorted[new_len], FlexiblePrioritySorted[new_len - 1] = FlexiblePrioritySorted[new_len - 1],
+			FlexiblePrioritySorted[new_len]
+		new_len = new_len - 1
+	end
 
-	-- sort by insertion sort algorithm
-	for i = new_len, 2, -1 do
-		if FlexiblePrioritySorted[i].priority < FlexiblePrioritySorted[i - 1].priority then
-			FlexiblePrioritySorted[i], FlexiblePrioritySorted[i - 1] = FlexiblePrioritySorted[i - 1],
-				FlexiblePrioritySorted[i]
-		else
-			break
-		end
+	if FlexibleHiddenStopped ~= -1 then
+		local width = o.columns or api.nvim_win_get_width(0)
+		restore_all_hidden_flexible_values()
+		handle_flexible_values(width)
 	end
 end
 
@@ -109,16 +165,20 @@ M.empty_values = function(condition)
 end
 
 --- Handles necessary operations before Vim exits.
----
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
 M.on_vim_leave_pre = function(CacheDataAccessor)
+	--- restore real values of components
+	for idx, value in pairs(FlexibleHiddenIdxValueMap) do
+		Values[idx] = value
+	end
+
 	-- Clear unfrozen values to reset statusline on next startup
 	M.empty_values(function(idx)
 		return not Frozens[idx]
 	end)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
-	CacheDataAccessor.set("FlexiblePriority", FlexiblePrioritySorted)
+	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
 end
 
 --- Loads the statusline cache.
@@ -127,16 +187,16 @@ end
 M.load_cache = function(CacheDataAccessor)
 	local before_values = Values
 	local before_values_size = ValuesSize
-	local before_flexible_queue = FlexiblePrioritySorted
+	local before_flexible_priority_sorted = FlexiblePrioritySorted
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
-	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePriority") or FlexiblePrioritySorted
+	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
 
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
-		FlexiblePrioritySorted = before_flexible_queue
+		FlexiblePrioritySorted = before_flexible_priority_sorted
 	end
 end
 
@@ -155,47 +215,42 @@ M.get_size = function()
 end
 
 
+
+
+
 --- Merges the highlight group names with the corresponding statusline values.
---- @param values string[] The list of statusline values to merge with highlight group names.
 --- @return string[] merged The merged list of statusline values with highlight group names applied.
-local function merge_highlight_with_values(values)
+local function assign_hlname_to_value()
 	local merged = {}
-	local len    = values == Values and ValuesSize or #values
-	for i = 1, len do
+	for i = 1, ValuesSize do
 		local hl_name = IdxHlMap[i]
-		merged[i] = hl_name and assign_highlight_name(values[i], hl_name) or values[i]
+		merged[i] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
 	end
 	return merged
 end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
---- @param full_width number|nil The max width of the statusline. If true, uses the full width of the window.
-M.render = function(full_width)
-	TruncatedIdxStopped = #FlexiblePrioritySorted
-	if TruncatedIdxStopped == 0 then
-		local str = concat(merge_highlight_with_values(Values))
-		o.statusline = str ~= "" and str or " "
-		return
-	end
-
-
-	full_width = (full_width and o.columns) or api.nvim_win_get_width(0)
-
-	local ValuesCopied = require("witch-line.utils.tbl").shallow_copy(Values)
-	TruncatedLength = strdisplaywidth(concat(ValuesCopied))
-
-	while removed_idx > 0 and TruncatedLength > full_width do
-		local value_idx = FlexiblePrioritySorted[removed_idx].idx
-		local removed_value = ValuesCopied[value_idx] or ""
-		if removed_value ~= "" then
-			ValuesCopied[value_idx] = ""
-			TruncatedLength = TruncatedLength - strdisplaywidth(removed_value)
-		end
-		removed_idx = removed_idx - 1
-	end
-	local str = concat(merge_highlight_with_values(ValuesCopied))
+M.render = function()
+	local str = concat(assign_hlname_to_value())
 	o.statusline = str ~= "" and str or " "
+
+
+	-- full_width = (full_width and o.columns) or api.nvim_win_get_width(0)
+	-- local ValuesCopied = require("witch-line.utils.tbl").shallow_copy(Values)
+	-- TruncatedLength = strdisplaywidth(concat(ValuesCopied))
+
+	-- while removed_idx > 0 and TruncatedLength > full_width do
+	-- 	local value_idx = FlexiblePrioritySorted[removed_idx].idx
+	-- 	local removed_value = ValuesCopied[value_idx] or ""
+	-- 	if removed_value ~= "" then
+	-- 		ValuesCopied[value_idx] = ""
+	-- 		TruncatedLength = TruncatedLength - strdisplaywidth(removed_value)
+	-- 	end
+	-- 	removed_idx = removed_idx - 1
+	-- end
+	-- local str = concat(assign_hlname_to_value(ValuesCopied))
+	-- o.statusline = str ~= "" and str or " "
 end
 
 
@@ -286,13 +341,14 @@ end
 M.setup = function(disabled_config)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
 	if next(FlexiblePrioritySorted) then
-		api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
-			callback = function()
-        local width = o.columns or api.nvim_win_get_width(0)
-        if TruncatedLength <= width then
-          M.render(width)
-        end
-			end,
+		local render_flexible_debounce = require("witch-line.utils").debounce(function()
+			local width = o.columns or api.nvim_win_get_width(0)
+			handle_flexible_values(width)
+			M.render()
+		end, 100)
+
+		api.nvim_create_autocmd({ "VimResized" }, {
+			callback = render_flexible_debounce,
 		})
 	end
 
