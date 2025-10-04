@@ -155,7 +155,7 @@ Diff.Interface = {
     end,
   },
   init = function(self, ctx, static)
-    vim.api.nvim_create_autocmd("BufLeave", {
+    vim.api.nvim_create_autocmd({"BufLeave", "BufWritePost"}, {
       callback = function(e)
         ctx.diff_cache[e.buf] = nil
       end
@@ -175,9 +175,7 @@ Diff.Interface = {
     local diff_cache = ctx.diff_cache
 
     if diff_cache[bufnr] then
-      vim.schedule(function()
-        api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
-      end)
+      api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
     else
       vim.system({
         "git", "-C", fn.expand('%:h'),
