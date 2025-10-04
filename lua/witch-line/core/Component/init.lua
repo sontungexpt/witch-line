@@ -24,7 +24,7 @@ local SepStyle = {
 --- @field style CompId|nil A id of a component that this component references for its style
 --- @field static CompId|nil A id of a component that this component references for its static values
 --- @field context CompId|nil A id of a component that this component references for its context
---- @field hide CompId|CompId[]|nil A table of ids of components that this component references for its hide function
+--- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
 --- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
 
 --- @class LiteralComponent : string
@@ -46,8 +46,8 @@ local SepStyle = {
 --- @field inherit CompId|nil The id of the component to inherit from, can be used to extend a component
 --- @field timing boolean|integer|nil If true the component will be updated on every tick, if a number it will be updated every n ticks
 --- @field lazy boolean|nil If true the component will be loaded only when it is needed, used for lazy loading components
---- @field events string[]|nil A table of events that the component will listen to
---- @field user_events string[]|nil A table of user events that the component will listen to
+--- @field events string|string[]|nil A table of events that the component will listen to
+--- @field user_events string|string[]|nil A table of user events that the component will listen to
 --- @field min_screen_width integer|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):number|nil
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
@@ -135,7 +135,7 @@ local SepStyle = {
 --- - If nil: nothing is called.
 --- - If function: called after the component is updated
 ---	- Example of post_update function: `function(self, ctx, static, session_id) print("Component updated") end`
---- @field hide nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId): boolean|nil
+--- @field hidden nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId): boolean|nil
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
@@ -173,7 +173,7 @@ end
 M.valid_id = function(comp)
 	local id = comp.id
 	if comp._plug_provided then
-    ---@cast id CompId
+		---@cast id CompId
 		return id
 	elseif id then
 		id = require("witch-line.constant.id").validate(id)
@@ -182,7 +182,7 @@ M.valid_id = function(comp)
 		rawset(comp, "id", id) -- Ensure the component has an ID field
 	end
 
-  ---@cast id CompId
+	---@cast id CompId
 	return id
 end
 
@@ -203,7 +203,7 @@ end
 --- @param comp Component the component to check
 --- @return boolean has_parent true if the component has a parent, false otherwise
 M.has_parent = function(comp)
-  return getmetatable(comp) ~= nil
+	return getmetatable(comp) ~= nil
 end
 
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.

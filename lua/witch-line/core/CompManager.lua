@@ -1,4 +1,4 @@
- type = type
+type = type
 
 local M = {}
 
@@ -212,10 +212,10 @@ M.iterate_all_dependency_ids = function(comp_id)
 
 	local deps = {}
 	for _, graph in pairs(DepGraphMap) do
-    for dep_id, map in pairs(graph) do
-      if map[comp_id] then
-        deps[dep_id] = true
-      end
+		for dep_id, map in pairs(graph) do
+			if map[comp_id] then
+				deps[dep_id] = true
+			end
 		end
 	end
 
@@ -298,9 +298,9 @@ local function lookup_ref_value(comp, key, session_id, seen, ...)
 		return store[id], comp
 	elseif value then
 		if type(value) == "function" then
-      local args = {...}
-      table.insert(args, session_id)
-      value = value(comp, unpack(args))
+			local args = { ... }
+			table.insert(args, session_id)
+			value = value(comp, unpack(args))
 		end
 		store[id] = value
 		return value, comp
@@ -364,7 +364,7 @@ end
 --- @return boolean displayed True if the component should be displayed, false otherwise.
 --- @return Component inherited The component that provides the `should_display` value, or nil if not found.
 M.should_hidden = function(comp, session_id, ctx, static)
-	local hidden, last_comp = lookup_ref_value(comp, "hide", session_id, {}, ctx, static)
+	local hidden, last_comp = lookup_ref_value(comp, "hidden", session_id, {}, ctx, static)
 	return hidden == true, last_comp
 end
 

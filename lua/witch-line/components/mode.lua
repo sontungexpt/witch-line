@@ -82,7 +82,7 @@ return {
 		local mode = static.modes[mode_code]
 		return mode and mode[1] or mode_code
 	end,
-	hide = function(self)
+	hidden = function(self)
 		if self.static.auto_hide_on_vim_resized then
 			vim.opt.showmode = not (vim.o.columns > 70)
 			return vim.opt.showmode

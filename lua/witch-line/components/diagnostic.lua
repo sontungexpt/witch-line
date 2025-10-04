@@ -12,7 +12,7 @@ local Interface = {
 		INFO = "",
 		HINT = "",
 	},
-	hide = function()
+	hidden = function()
 		local filetype = vim.api.nvim_get_option_value("filetype", { buf = 0 })
 		return filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 	end,
