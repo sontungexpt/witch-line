@@ -1,15 +1,80 @@
 local vim, concat, type = vim, table.concat, type
 local o, bo, api = vim.o, vim.bo, vim.api
-
+local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 local M = {}
 
 --- @type string[] The list of render value of component .
-local Values = {}
+local Values = {
+	-- [1] = "%#WitchLineComponent1#",
+	-- [2] = "Component1",
+	-- [3] = "%#WitchLineComponent2#",
+	-- [4] = "Component2",
+}
 ---@type integer The size of the Values list.
 local ValuesSize = 0
 
+--- @type table<integer, string> A mapping from component indices to their highlight group name
+local IdxHlMap = {
+	-- [1] = "WitchLineComponent1",
+	-- [2] = "WitchLineComponent2",
+
+	-- [5] = "WitchLineComponent3",
+}
+
+
 --- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit).
-local Frozens = {}
+local Frozens = {
+	-- [1] = true,
+	-- [2] = true,
+}
+
+
+--- @type table<integer, {idx: integer, priority: integer}> A priority queue of flexible components. It's always sorted by priority in ascending order.
+--- Components with lower priority values are considered more important and will be retained longer when space is limited
+local FlexiblePriorityQueue = {
+	-- { idx = 1, priority = 1 },
+	-- { idx = 2, priority = 2 },
+}
+
+
+--- Marks a component's highlight group.
+--- @param idxs integer[] The index or indices of the component(s) to mark.
+--- @param hl_name string The highlight group name to assign.
+M.mark_highlight = function(idxs, hl_name)
+	for i = 1, #idxs do
+		IdxHlMap[idxs[i]] = hl_name
+	end
+end
+
+--- Marks a component's separator highlight group.
+--- @param idxs integer[] The index or indices of the component(s) to mark.
+--- @param hl_name string The highlight group name to assign.
+--- @param adjust number If true, marks the separator to the left of the component; otherwise, marks it to the right.
+M.mark_sep_highlight = function(idxs, hl_name, adjust)
+	for i = 1, #idxs do
+		IdxHlMap[idxs[i] + adjust] = hl_name
+	end
+end
+
+
+--- Tracks a component as flexible with a given priority.
+--- Components with lower priority values are considered more important and will be retained longer when space is limited.
+--- @param idx integer The index of the component to track.
+--- @param priority integer The priority of the component; lower values indicate higher importance.
+M.track_flexible = function(idx, priority)
+	local new_len = #FlexiblePriorityQueue + 1
+	FlexiblePriorityQueue[new_len] = { idx = idx, priority = priority }
+
+	-- sort by insertion sort algorithm
+	for i = new_len, 2, -1 do
+		if FlexiblePriorityQueue[i].priority < FlexiblePriorityQueue[i - 1].priority then
+			FlexiblePriorityQueue[i], FlexiblePriorityQueue[i - 1] = FlexiblePriorityQueue[i - 1],
+				FlexiblePriorityQueue[i]
+		else
+			break
+		end
+	end
+end
 
 
 --- Inspects the current statusline values.
@@ -76,11 +141,45 @@ M.get_size = function()
 	return ValuesSize
 end
 
+
+--- Merges the highlight group names with the corresponding statusline values.
+--- @param values string[] The list of statusline values to merge with highlight group names.
+--- @return string[] merged The merged list of statusline values with highlight group names applied.
+local function merge_highlight_with_values(values)
+	local merged = {}
+	for i = 1, #values do
+		local hl_name = IdxHlMap[i]
+		merged[i] = hl_name and assign_highlight_name(values[i], hl_name) or values[i]
+	end
+	return merged
+end
+
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
----
-M.render = function()
-	local str = concat(Values)
+--- @param full_width number The max width of the statusline. If true, uses the full width of the window.
+M.render = function(full_width)
+	local removed_idx = #FlexiblePriorityQueue
+	if removed_idx == 0 then
+		local str = concat(merge_highlight_with_values(Values))
+		o.statusline = str ~= "" and str or " "
+		return
+	end
+
+	local strdisplaywidth = vim.fn.strdisplaywidth
+
+	full_width = (full_width and o.columns) or api.nvim_win_get_width(0)
+	local ValuesCopied = require("witch-line.utils.tbl").shallow_copy(Values)
+	local values_len = strdisplaywidth(concat(ValuesCopied))
+	while removed_idx > 0 and values_len > full_width do
+		local value_idx = FlexiblePriorityQueue[removed_idx].idx
+		local removed_value = ValuesCopied[value_idx] or ""
+		if removed_value ~= "" then
+			ValuesCopied[value_idx] = ""
+			values_len = values_len - strdisplaywidth(removed_value)
+		end
+		removed_idx = removed_idx - 1
+	end
+	local str = concat(merge_highlight_with_values(ValuesCopied))
 	o.statusline = str ~= "" and str or " "
 end
 

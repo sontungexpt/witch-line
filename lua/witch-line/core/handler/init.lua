@@ -88,17 +88,21 @@ local function update_component(comp, session_id)
 					end
 				end
 
-				Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
+				Statusline.bulk_set(indices, value)
+				Statusline.mark_highlight(indices, comp._hl_name)
+
 
 				local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
 				if left then
 					Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
+					Statusline.bulk_set_sep(indices, left, -1)
+					Statusline.mark_sep_highlight(indices, comp._left_hl_name, -1)
 				end
 
 				if right then
 					Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
+					Statusline.bulk_set_sep(indices, right, 1)
+					Statusline.mark_sep_highlight(indices, comp._right_hl_name, 1)
 				end
 				rawset(comp, "_hidden", false) -- Reset hidden state
 			end
@@ -354,7 +358,6 @@ local function register_component(comp)
 				Statusline.push("")
 			end
 
-
 			local st_idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
 			local indices = comp._indices
 			if not indices then
@@ -362,7 +365,9 @@ local function register_component(comp)
 			else
 				indices[#indices + 1] = st_idx
 			end
-
+			if comp.flexible then
+				Statusline.track_flexible(st_idx, comp.flexible)
+			end
 			if comp.right then
 				Statusline.push("")
 			end

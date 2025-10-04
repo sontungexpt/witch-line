@@ -46,6 +46,7 @@ local SepStyle = {
 --- @field inherit CompId|nil The id of the component to inherit from, can be used to extend a component
 --- @field timing boolean|integer|nil If true the component will be updated on every tick, if a number it will be updated every n ticks
 --- @field lazy boolean|nil If true the component will be loaded only when it is needed, used for lazy loading components
+--- @field flexible number|nil The priority of the component when the status line is too long, higher numbers are more likely to be truncated
 --- @field events string|string[]|nil A table of events that the component will listen to
 --- @field user_events string|string[]|nil A table of user events that the component will listen to
 --- @field min_screen_width integer|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):number|nil
