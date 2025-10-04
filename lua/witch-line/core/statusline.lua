@@ -109,6 +109,7 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 	end)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
+	CacheDataAccessor.set("FlexiblePriorityQueue", FlexiblePriorityQueue)
 end
 
 --- Loads the statusline cache.
@@ -117,13 +118,16 @@ end
 M.load_cache = function(CacheDataAccessor)
 	local before_values = Values
 	local before_values_size = ValuesSize
+	local before_flexible_queue = FlexiblePriorityQueue
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
+	FlexiblePriorityQueue = CacheDataAccessor.get("FlexiblePriorityQueue") or FlexiblePriorityQueue
 
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
+		FlexiblePriorityQueue = before_flexible_queue
 	end
 end
 
@@ -147,7 +151,8 @@ end
 --- @return string[] merged The merged list of statusline values with highlight group names applied.
 local function merge_highlight_with_values(values)
 	local merged = {}
-	for i = 1, #values do
+	local len    = values == Values and ValuesSize or #values
+	for i = 1, len do
 		local hl_name = IdxHlMap[i]
 		merged[i] = hl_name and assign_highlight_name(values[i], hl_name) or values[i]
 	end
@@ -156,7 +161,7 @@ end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
---- @param full_width number The max width of the statusline. If true, uses the full width of the window.
+--- @param full_width number|nil The max width of the statusline. If true, uses the full width of the window.
 M.render = function(full_width)
 	local removed_idx = #FlexiblePriorityQueue
 	if removed_idx == 0 then
@@ -269,6 +274,16 @@ end
 --- Setup the necessary things for statusline rendering.
 --- @param disabled BufDisabled|nil The disabled configuration to apply.
 M.setup = function(disabled)
+	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
+	if next(FlexiblePriorityQueue) then
+		api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
+			callback = function()
+				M.render() -- full width
+			end,
+		})
+	end
+
+	--- For automatically toggle `laststatus` based on buffer filetype and buftype.
 	local user_laststatus = o.laststatus or 3
 
 	api.nvim_create_autocmd("OptionSet", {
