@@ -8,17 +8,17 @@ local Clients = {
     _plug_provided = true,
     events = { "LspAttach", "LspDetach", "BufWritePost", "BufEnter" },
     static = {
-      disaabled = {
+      disabled = {
         filetypes = {
           "NvimTree",
         },
       },
     },
     hide = function (self, ctx, static, session_id)
-      if type(static.disaabled) ~= "table" then
+      if type(static.disabled) ~= "table" then
         return false
-      elseif type(static.disaabled.filetypes) == "table"
-        and vim.list_contains(static.disaabled.filetypes, vim.bo.filetype)
+      elseif type(static.disabled.filetypes) == "table"
+        and vim.list_contains(static.disabled.filetypes, vim.bo.filetype)
       then
         return true
       end
