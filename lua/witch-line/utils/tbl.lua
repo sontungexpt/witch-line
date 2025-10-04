@@ -1,7 +1,7 @@
 --- Utility functions for table manipulation and serialization
 local M = {}
 
-local type, pairs, tostring, loadstring = type, pairs, tostring, loadstring
+local type, pairs, tostring, loadstring, load = type, pairs, tostring, loadstring, load
 
 --- Creates a shallow copy of a table.
 --- @generic T
@@ -229,42 +229,6 @@ function M.fnv1a32_hash_gradually(tbl, bulk_size, hash_key)
 	end
 end
 
--- -- Hàm serialize một giá trị bất kỳ
--- local function serialize_value(v, indent)
--- 	indent = indent or ""
--- 	local t = type(v)
--- 	if t == "number" or t == "boolean" then
--- 		return tostring(v)
--- 	elseif t == "string" then
--- 		return string.format("%q", v) -- thêm dấu nháy + escape ký tự đặc biệt
--- 	elseif t == "table" then
--- 		return serialize_table(v, indent)
--- 	else
--- 		error("Unsupported type: " .. t)
--- 	end
--- end
-
--- -- Hàm serialize table
--- M.serialize_table = function(tbl, indent)
--- 	indent = indent or ""
--- 	local next_indent = indent .. "  "
--- 	local parts = { "{" }
-
--- 	for k, v in pairs(tbl) do
--- 		local key
--- 		if type(k) == "string" and k:match("^[_%a][_%w]*$") then
--- 			key = k .. " = "
--- 		else
--- 			key = "[" .. serialize_value(k, next_indent) .. "] = "
--- 		end
-
--- 		table.insert(parts, "\n" .. next_indent .. key .. serialize_value(v, next_indent) .. ",")
--- 	end
-
--- 	table.insert(parts, "\n" .. indent .. "}")
--- 	return table.concat(parts)
--- end
-
 ---Urly name to reduce collision with t==able key
 local META_FUNC = "V_REF@@__q@@$$whaw2EWdjDSldkvj23@@19"
 local META_TBL = "TBL_KEYS__dcjvlwkiwEEW3df2df ##S"
@@ -360,7 +324,8 @@ end
 function M.deserialize_function(value, seen)
 	local t = type(value)
 	if t == "string" then
-		local func = loadstring(value)
+		local func = load(value, nil, "b")
+		-- local func = loadstring(value)
 		--- @diagnostic disable-next-line
 		return func or value
 	elseif t ~= "table" then
@@ -389,8 +354,9 @@ function M.deserialize_function(value, seen)
 	if funs then
 		for i = 1, #funs do
 			local k = funs[i]
-			local func, err = loadstring(value[k])
-			if not func then
+			-- local func, err = loadstring(value[k], k)
+			local func, err = load(value[k], k, "b")
+			if err then
 				error("Failed to load function from string: " .. err)
 			else
 				value[k] = func
@@ -492,13 +458,10 @@ function M.deserialize_table(str)
 	if not func then
 		error("Failed to load table from string: " .. err)
 	end
-	local ok, result = pcall(func)
-	if not ok then
-		error("Error executing loaded string: " .. result)
-	end
-
-	result = M.deserialize_function(result)
-	--- @cast result table
+	local result = M.deserialize_function(func())
+  if type(result) ~= "table" then
+    error("Deserialized string did not return a table")
+  end
 	return result
 end
 
@@ -508,7 +471,7 @@ end
 function M.serialize_table_as_bytecode(tbl)
 	local str = M.serialize_table(tbl,false)
 
-	local func, err = loadstring("return " .. str)
+	local func, err = load("return " .. str)
 	if not func then
 		error("Failed to load table from string: " .. err)
 	end
@@ -519,28 +482,17 @@ end
 --- @param bytecode string The Lua bytecode serialized by `M.serialize_table_as_bytecode
 --- @return table tbl The deserialized table with functions decoded back to functions
 function M.deserialize_table_from_bytecode(bytecode)
-	local func, err = loadstring(bytecode)
+	-- local func, err = loadstring(bytecode)
+	local func, err = load(bytecode, nil, "b")
 	if not func then
 		error("Failed to load bytecode: " .. err)
 	end
-	local ok, result = pcall(func)
-	if not ok then
-		error("Error executing loaded bytecode: " .. result)
-	end
-	result = M.deserialize_function(result)
-	--- @cast result table
+
+	local result = M.deserialize_function(func())
+  if type(result) ~= "table" then
+    error("Deserialized bytecode did not return a table")
+  end
 	return result
 end
-
--- -- ví dụ
--- local t = {
--- 	name = "Carolina",
--- 	age = 29,
--- 	skills = { "Lua", "Python", "Astrology" },
--- 	info = { city = "Tien Giang", active = true }
--- }
-
--- print(serialize_table(t))
-
 
 return M
