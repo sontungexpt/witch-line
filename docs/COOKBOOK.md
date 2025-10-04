@@ -2,6 +2,14 @@
 
 The cookbook is a collection of recipes that demonstrate how to use various features of the software. Each recipe provides step-by-step instructions, code examples, and explanations to help you understand and implement specific functionalities.
 
+## Navigation
+
+- [📚 Component Fields](#-component-fields)
+  - [🔍 Notes](#-notes)
+  - [📚 Basic Fields](#basic-fields)
+  - [📚 Referencing Fields](#referencing-fields)
+  - [📚 Advanced Fields](#advanced-fields)
+
 ### Component Fields
 
 #### 🔍 Notes
@@ -571,7 +579,7 @@ local component = {
     }
 ```
 
-#### Referencing Other Components Fields
+#### Referencing Fields
 
 An component can reference other components for some of its fields. This allows for reusing common configurations and creating more complex components by combining simpler ones. The following fields can reference other components:
 

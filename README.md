@@ -6,20 +6,17 @@ This plugin lazy load as much as possible
 
 ## Navigation
 
+- [A few words to say](#a-few-words-to-say)
+- [Preview](#preview)
 - [✨ Features](#-features)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Options](#options)
   - [Laststatus](#laststatus)
+  - [Options](#options)
 - [✏️ Default Components Reference](#-default-components-reference)
   - [🔖 Default Components](#-default-components)
   - [⚙️ Customizable Fields for Components](#️-customizable-fields-for-components)
   - [📂 Component Structure](#-component-structure)
-    - [🔍 Notes](#-notes)
-    - [🔗 Type Aliases](#-type-aliases)
-    - [🔗 Ref Table Subfields](#-ref-table-subfields)
-    - [🔧 Component Fields](#-component-fields)
-    - [📚 Example Component Structure](#-example-component-structure)
 - [🙌 Community Help & Contributions Wanted](#-community-help--contributions-wanted)
 - [📜 License](#-license)
 
@@ -141,6 +138,14 @@ This plugin is ideal for developers who want full control over the look and feel
 
 ## Usage
 
+### Laststatus
+
+You should set `laststatus` by yourself. I recommend you set `laststatus` to `3` to be better.
+
+```lua
+vim.o.laststatus = 3
+```
+
 ### Options
 
 You can setup the plugin by calling the `setup` function and passing in a table of options.
@@ -191,14 +196,6 @@ require("witch-line").setup({
   },
 })
 
-```
-
-### Laststatus
-
-You should set `laststatus` by yourself. I recommend you set `laststatus` to `3` to be better.
-
-```lua
-vim.o.laststatus = 3
 ```
 
 # ✨ Default Components Reference
@@ -315,6 +312,6 @@ Here are a few areas where your help would be especially appreciated:
 
 If you’re interested in helping, feel free to open an issue, start a discussion, or submit a PR. Let's build something awesome together. 🙏
 
-## License
+## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
