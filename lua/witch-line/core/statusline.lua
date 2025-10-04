@@ -1,4 +1,4 @@
-local vim, concat = vim, table.concat
+local vim, concat, type = vim, table.concat, type
 local o, bo = vim.o, vim.bo
 
 local M = {}
