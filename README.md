@@ -127,10 +127,8 @@ This plugin is ideal for developers who want full control over the look and feel
         dependencies = {
             "nvim-tree/nvim-web-devicons",
         },
-        event = { "BufEnter" },
-        config = function(_, opts)
-            require("sttusline").setup()
-        end,
+        lazy = false, -- Almost component is lazy load by default. So you can set lazy to false
+        opts = {},
     },
 ```
 

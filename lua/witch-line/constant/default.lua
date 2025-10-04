@@ -1,4 +1,4 @@
----@type CombinedComponent | DefaultId
+---@type CombinedComponent
 return {
 	"mode",
 	"file.name",

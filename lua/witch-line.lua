@@ -1,4 +1,4 @@
-local require = require
+local require, vim = require, vim
 local M = {}
 
 ---@alias BufDisabled {filetypes: string[], buftypes: string[]}
@@ -18,7 +18,7 @@ local use_default_config = function (user_configs)
 	if type(user_configs.components) ~= "table" or not next(user_configs.components) then
 		user_configs.components = require("witch-line.constant.default")
 	end
-  if type(user_configs.disabled)~= "table" then
+  if type(user_configs.disabled) ~= "table" then
     user_configs.disabled = {
       buftypes = {
         "terminal",
@@ -58,9 +58,10 @@ M.setup = function(user_configs)
 	require("witch-line.core.statusline").setup(user_configs.disabled)
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {
+    once = true,
 		callback = function()
 			if not Cache.loaded() then
-				local DataAccessor = Cache.DataAccessor
+				DataAccessor = Cache.DataAccessor
 				for i = 1, #CACHE_MODS do
 					require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
 				end
