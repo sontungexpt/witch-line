@@ -1,15 +1,21 @@
 local vim, concat, type = vim, table.concat, type
-local o, bo, api = vim.o, vim.bo, vim.api
+local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywidth
 local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 local M = {}
 
 --- @type string[] The list of render value of component .
 local Values = {
-	-- [1] = "%#WitchLineComponent1#",
+	-- [1] = "#WitchLineComponent1",
 	-- [2] = "Component1",
-	-- [3] = "%#WitchLineComponent2#",
+	-- [3] = "WitchLineComponent2",
 	-- [4] = "Component2",
 }
+
+--- @type table<integer, string> The map of idx to value that should be hidden when the statusline is truncated.
+local ForcedHiddenValues = {
+	-- [1] = "WitchLineComponent",
+}
+
 ---@type integer The size of the Values list.
 local ValuesSize = 0
 
@@ -17,7 +23,6 @@ local ValuesSize = 0
 local IdxHlMap = {
 	-- [1] = "WitchLineComponent1",
 	-- [2] = "WitchLineComponent2",
-
 	-- [5] = "WitchLineComponent3",
 }
 
@@ -31,12 +36,13 @@ local Frozens = {
 
 --- @type table<integer, {idx: integer, priority: integer}> A priority queue of flexible components. It's always sorted by priority in ascending order.
 --- Components with lower priority values are considered more important and will be retained longer when space is limited
-local FlexiblePriorityQueue = {
+local FlexiblePrioritySorted = {
 	-- { idx = 1, priority = 1 },
 	-- { idx = 2, priority = 2 },
 }
 
-local TruncedLength = 0
+local TruncatedLength = 0
+local TruncatedIdxStopped = 0
 
 
 --- Marks a component's highlight group.
@@ -64,14 +70,15 @@ end
 --- @param idx integer The index of the component to track.
 --- @param priority integer The priority of the component; lower values indicate higher importance.
 M.track_flexible = function(idx, priority)
-	local new_len = #FlexiblePriorityQueue + 1
-	FlexiblePriorityQueue[new_len] = { idx = idx, priority = priority }
+	local new_len = #FlexiblePrioritySorted + 1
+
+	FlexiblePrioritySorted[new_len] = { idx = idx, priority = priority }
 
 	-- sort by insertion sort algorithm
 	for i = new_len, 2, -1 do
-		if FlexiblePriorityQueue[i].priority < FlexiblePriorityQueue[i - 1].priority then
-			FlexiblePriorityQueue[i], FlexiblePriorityQueue[i - 1] = FlexiblePriorityQueue[i - 1],
-				FlexiblePriorityQueue[i]
+		if FlexiblePrioritySorted[i].priority < FlexiblePrioritySorted[i - 1].priority then
+			FlexiblePrioritySorted[i], FlexiblePrioritySorted[i - 1] = FlexiblePrioritySorted[i - 1],
+				FlexiblePrioritySorted[i]
 		else
 			break
 		end
@@ -111,7 +118,7 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 	end)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
-	CacheDataAccessor.set("FlexiblePriorityQueue", FlexiblePriorityQueue)
+	CacheDataAccessor.set("FlexiblePriority", FlexiblePrioritySorted)
 end
 
 --- Loads the statusline cache.
@@ -120,16 +127,16 @@ end
 M.load_cache = function(CacheDataAccessor)
 	local before_values = Values
 	local before_values_size = ValuesSize
-	local before_flexible_queue = FlexiblePriorityQueue
+	local before_flexible_queue = FlexiblePrioritySorted
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
-	FlexiblePriorityQueue = CacheDataAccessor.get("FlexiblePriorityQueue") or FlexiblePriorityQueue
+	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePriority") or FlexiblePrioritySorted
 
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
-		FlexiblePriorityQueue = before_flexible_queue
+		FlexiblePrioritySorted = before_flexible_queue
 	end
 end
 
@@ -164,31 +171,32 @@ end
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param full_width number|nil The max width of the statusline. If true, uses the full width of the window.
-M.render = require("lua.witch-line.utils").debounce(function(full_width)
-	local removed_idx = #FlexiblePriorityQueue
-	if removed_idx == 0 then
+M.render = function(full_width)
+	TruncatedIdxStopped = #FlexiblePrioritySorted
+	if TruncatedIdxStopped == 0 then
 		local str = concat(merge_highlight_with_values(Values))
 		o.statusline = str ~= "" and str or " "
 		return
 	end
 
-	local strdisplaywidth = vim.fn.strdisplaywidth
 
 	full_width = (full_width and o.columns) or api.nvim_win_get_width(0)
+
 	local ValuesCopied = require("witch-line.utils.tbl").shallow_copy(Values)
-	TruncedLength = strdisplaywidth(concat(ValuesCopied))
-	while removed_idx > 0 and TruncedLength > full_width do
-		local value_idx = FlexiblePriorityQueue[removed_idx].idx
+	TruncatedLength = strdisplaywidth(concat(ValuesCopied))
+
+	while removed_idx > 0 and TruncatedLength > full_width do
+		local value_idx = FlexiblePrioritySorted[removed_idx].idx
 		local removed_value = ValuesCopied[value_idx] or ""
 		if removed_value ~= "" then
 			ValuesCopied[value_idx] = ""
-			TruncedLength = TruncedLength - strdisplaywidth(removed_value)
+			TruncatedLength = TruncatedLength - strdisplaywidth(removed_value)
 		end
 		removed_idx = removed_idx - 1
 	end
 	local str = concat(merge_highlight_with_values(ValuesCopied))
 	o.statusline = str ~= "" and str or " "
-end, 100)
+end
 
 
 --- Appends a new value to the statusline values list.
@@ -241,7 +249,7 @@ end
 
 --- Determines if a buffer is disabled based on its filetype and buftype.
 --- @param bufnr integer The buffer number to check.
---- @param disabled BufDisabled|nil The disabled configuration to check against. If nil, the buffer is not disabled.
+--- @param disabled BufDisabledConfig|nil The disabled configuration to check against. If nil, the buffer is not disabled.
 --- @return boolean
 M.is_buf_disabled = function(bufnr, disabled)
 	if not api.nvim_buf_is_valid(bufnr)
@@ -274,14 +282,14 @@ M.is_buf_disabled = function(bufnr, disabled)
 end
 
 --- Setup the necessary things for statusline rendering.
---- @param disabled BufDisabled|nil The disabled configuration to apply.
-M.setup = function(disabled)
+--- @param disabled_config BufDisabledConfig|nil The disabled configuration to apply.
+M.setup = function(disabled_config)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
-	if next(FlexiblePriorityQueue) then
+	if next(FlexiblePrioritySorted) then
 		api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
 			callback = function()
         local width = o.columns or api.nvim_win_get_width(0)
-        if TruncedLength <= width then
+        if TruncatedLength <= width then
           M.render(width)
         end
 			end,
@@ -305,7 +313,7 @@ M.setup = function(disabled)
 		callback = function(e)
 			local buf = e.buf
 			vim.schedule(function()
-				local disabled = M.is_buf_disabled(buf, disabled)
+				local disabled = M.is_buf_disabled(buf, disabled_config)
 
 				if not disabled and o.laststatus == 0 then
 					api.nvim_set_option_value("laststatus", user_laststatus, {})
