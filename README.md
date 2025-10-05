@@ -258,6 +258,7 @@ Below is a table of all supported fields and their expected types:
 | `left`             | `string`, `function`  | Left content to be rendered. Can be a string or a generator function.             |
 | `right_style`      | `function`, `table`   | Style override applied to the right part of the component.                        |
 | `right`            | `string`, `function`  | Right content to be rendered. Can be a string or a generator function.            |
+| `flexible`         | `number`              | Priority for hiding when space is limited. Lower numbers hide first.              |
 
 ---
 
