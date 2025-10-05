@@ -155,18 +155,24 @@ Diff.Interface = {
       end
       return { added = added, modified = modified, removed = removed }
     end,
+    is_skipped = function (static)
+      return vim.list_contains(static.skip_check.filetypes, vim.bo.filetype)
+    end
   },
   static = {
     skip_check = {
       filetypes = {
         "NvimTree",
+        "neo-tree",
+        "alpha",
+        "dashboard",
+        "TelescopePrompt"
       },
     }
   },
-  temp = {
-    process = nil,
-  },
+  temp = {}, -- temp storage
   init = function(self, ctx, static)
+    -- Initialize temp storage
     vim.api.nvim_create_autocmd({"BufLeave", "BufWritePost"}, {
       callback = function(e)
         ctx.diff_cache[e.buf] = nil
@@ -180,6 +186,8 @@ Diff.Interface = {
 
     if diff_cache[bufnr] then
       api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
+    elseif ctx.is_skipped(static) then
+      api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
     else
       self.temp.process = vim.system({
         "git", "-C", fn.expand('%:h'),
@@ -187,12 +195,12 @@ Diff.Interface = {
         "--", fn.expand('%:t')
       }, { text = true }, function(out)
         self.temp.process = nil
-        if out.code == 15 then
+        if out.code == 15 or out.code == 9 then
+          require("witch-line.utils.notifier").info("Killed git diff process")
           return -- killed
-          -- do nothing
         elseif out.stdout and #out.stdout > 0 then
           local lines = vim.split(out.stdout, "\n", { trimempty = true })
-          diff_cache[bufnr] = ctx.process_diff(lines)
+          diff_cache[bufnr] =  api.nvim_buf_is_valid(bufnr) and ctx.process_diff(lines) or nil
         else
           -- do nothing
           -- diff_cache[bufnr] = {
@@ -209,12 +217,16 @@ Diff.Interface = {
   end,
   hidden = function(self, ctx, static, session_id)
     local filepath = vim.fn.expand('%:p')
-    if filepath == "" or vim.list_contains(static.skip_check.filetypes, vim.bo.filetype) then
-      local temp = self.temp
-      if temp.process and not temp.process:is_closing() then
-        require("witch-line.utils.notifier").info("Killing git diff process")
-        temp.process:kill(15) --SIGTERM
-        temp.process = nil
+    if filepath == "" or  ctx.is_skipped(static) then
+      local process = self.temp.process
+      if process and not process:is_closing() then
+        process:kill(15) --SIGTERM
+        vim.defer_fn(function ()
+          if process and not process:is_closing() then
+            process:kill(9)
+          end
+        end, 2000)
+        self.temp.process = nil
       end
       return true
     end

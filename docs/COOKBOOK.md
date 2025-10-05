@@ -233,10 +233,14 @@ local component = {
 
   ```lua
   local component = {
+      -- Empty table to hold temporary datas. The datas inside this table will not be cached so you need to set them in any function like init or update.
       temp = {
-          current_state = "initial",
-          another_temp_value = 123
-      }
+      },
+      -- If a temp is not a table, the temp field will be removed when restarting neovim.
+      -- or temp = "",
+      init = function(self, ctx, static, session_id)
+        self.temp.current_state = "initial"
+      end,
   }
   ```
 

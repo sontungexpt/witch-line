@@ -492,7 +492,14 @@ end
 --- @param comp Component the component to remove the state from
 M.remove_state_before_cache = function(comp)
 	rawset(comp, "_hidden", nil)
-	rawset(comp, "temp", nil)
+  local temp = comp.temp
+  if type(temp) == "table" then
+    for key, _ in pairs(temp) do
+      rawset(temp, key, nil)
+    end
+  else
+    rawset(comp, "temp", nil)
+  end
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
 
