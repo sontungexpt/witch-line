@@ -1,20 +1,95 @@
 local vim, concat, type = vim, table.concat, type
-local o, bo, api = vim.o, vim.bo, vim.api
-
+local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywidth
+local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 local M = {}
 
+--- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit). It's contains the idx of string component in Values list.
+local Frozens = {
+	-- [1] = true,
+	-- [2] = true,
+}
+
+
 --- @type string[] The list of render value of component .
-local Values = {}
+local Values = {
+	-- [1] = "#WitchLineComponent1",
+	-- [2] = "Component1",
+	-- [3] = "WitchLineComponent2",
+	-- [4] = "Component2",
+}
+
 ---@type integer The size of the Values list.
 local ValuesSize = 0
 
---- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit).
-local Frozens = {}
+
+--- @type table<integer, string> The map of idx of value to highlight group name.
+local IdxHlMap = {
+	-- [1] = "WitchLineComponent1",
+	-- [2] = "WitchLineComponent2",
+	-- [5] = "WitchLineComponent3",
+}
+
+
+--- @type table<integer, {idxs: integer[], priority: integer}> A priority queue of flexible components. It's always sorted by priority in ascending order.
+--- Components with lower priority values are considered more important and will be retained longer when space is limited
+local FlexiblePrioritySorted = {
+	-- { idx = 1, priority = 1 },
+	-- { idx = 2, priority = 2 },
+}
+
+--- @type integer The length of FlexiblePrioritySorted
+local FlexiblePrioritySortedLen = 0
+
+
+
+--- Marks a component's highlight group.
+--- @param idxs integer[] The index or indices of the component(s) to mark.
+--- @param hl_name string The highlight group name to assign.
+M.mark_highlight = function(idxs, hl_name)
+	for i = 1, #idxs do
+		IdxHlMap[idxs[i]] = hl_name
+	end
+end
+
+--- Marks a component's separator highlight group.
+--- @param idxs integer[] The index or indices of the component(s) to mark.
+--- @param hl_name string The highlight group name to assign.
+--- @param adjust number If true, marks the separator to the left of the component; otherwise, marks it to the right.
+M.mark_sep_highlight = function(idxs, hl_name, adjust)
+	for i = 1, #idxs do
+		IdxHlMap[idxs[i] + adjust] = hl_name
+	end
+end
+
+--- Tracks a component as flexible with a given priority.
+--- Components with lower priority values are considered more important and will be retained longer when space is limited.
+--- @param idxs integer[] The group indexs of the component to track as flexible (including main part and its separators).
+--- @param priority integer The priority of the component; lower values indicate higher importance.
+M.track_flexible = function(idxs, priority)
+	FlexiblePrioritySortedLen = FlexiblePrioritySortedLen + 1
+
+	-- Insert the component and sort in ascending order of priority at the same time using insertion sort
+	local i = FlexiblePrioritySortedLen
+	while i > 1 and priority < FlexiblePrioritySorted[i].priority do
+		FlexiblePrioritySorted[i] = FlexiblePrioritySorted[i - 1]
+		i = i - 1
+	end
+	FlexiblePrioritySorted[i] = { idxs = idxs, priority = priority }
+end
 
 
 --- Inspects the current statusline values.
-M.inspect = function()
-	require("witch-line.utils.notifier").info(vim.inspect(Values))
+M.inspect = function(t)
+	local notifier = require("witch-line.utils.notifier")
+	if t == "flexible_priority_sorted" then
+		notifier.info(vim.inspect(FlexiblePrioritySorted))
+	elseif t == "frozens" then
+		notifier.info(vim.inspect(Frozens))
+	elseif t == "idx_hl_map" then
+		notifier.info(vim.inspect(IdxHlMap))
+	else
+		notifier.info(vim.inspect(Values))
+	end
 end
 
 
@@ -35,7 +110,6 @@ M.empty_values = function(condition)
 end
 
 --- Handles necessary operations before Vim exits.
----
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
@@ -44,6 +118,8 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 	end)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
+	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
+	CacheDataAccessor.set("FlexiblePrioritySortedLen", FlexiblePrioritySortedLen)
 end
 
 --- Loads the statusline cache.
@@ -52,13 +128,18 @@ end
 M.load_cache = function(CacheDataAccessor)
 	local before_values = Values
 	local before_values_size = ValuesSize
+	local before_flexible_priority_sorted = FlexiblePrioritySorted
+	local before_flexible_priority_sorted_len = FlexiblePrioritySortedLen
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
-
+	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
+	FlexiblePrioritySortedLen = CacheDataAccessor.get("FlexiblePrioritySortedLen") or FlexiblePrioritySortedLen
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
+		FlexiblePrioritySorted = before_flexible_priority_sorted
+		FlexiblePrioritySortedLen = before_flexible_priority_sorted_len
 	end
 end
 
@@ -76,11 +157,58 @@ M.get_size = function()
 	return ValuesSize
 end
 
+--- Merges the highlight group names with the corresponding statusline values.
+--- @param skip table<integer, true>| nil An optinal set of indices to skip during merging
+--- @return string[] merged The merged list of statusline values with highlight group names applied.
+local function build_highlighted_values(skip)
+	local merged = {}
+	if not skip or next(skip) == nil then
+		for i = 1, ValuesSize do
+			local hl_name = IdxHlMap[i]
+			merged[i] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+		end
+		return merged
+	else
+		for i = 1, ValuesSize do
+			if not skip[i] then
+				local hl_name = IdxHlMap[i]
+				merged[#merged + 1] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+			end
+		end
+		return merged
+	end
+end
+
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
----
-M.render = function()
-	local str = concat(Values)
+--- @param max_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
+M.render = function(max_width)
+	if FlexiblePrioritySortedLen == 0 then
+		local str = concat(build_highlighted_values())
+		o.statusline = str ~= "" and str or " "
+		return
+	end
+
+
+	--- @type table<integer, true>
+	local hidden_idxs = {}
+	local removed_idx = FlexiblePrioritySortedLen
+	local truncated_len = strdisplaywidth(concat(Values))
+
+	max_width = max_width or o.columns
+	while removed_idx > 0 and truncated_len > max_width do
+		local value_idxs = FlexiblePrioritySorted[removed_idx].idxs
+		for j = 1, #value_idxs do
+			local value_idx = value_idxs[j]
+			local value = Values[value_idx]
+			hidden_idxs[value_idx] = true
+			if value ~= "" then
+				truncated_len = truncated_len - strdisplaywidth(value)
+			end
+		end
+		removed_idx = removed_idx - 1
+	end
+	local str = concat(build_highlighted_values(hidden_idxs))
 	o.statusline = str ~= "" and str or " "
 end
 
@@ -135,7 +263,7 @@ end
 
 --- Determines if a buffer is disabled based on its filetype and buftype.
 --- @param bufnr integer The buffer number to check.
---- @param disabled BufDisabled|nil The disabled configuration to check against. If nil, the buffer is not disabled.
+--- @param disabled BufDisabledConfig|nil The disabled configuration to check against. If nil, the buffer is not disabled.
 --- @return boolean
 M.is_buf_disabled = function(bufnr, disabled)
 	if not api.nvim_buf_is_valid(bufnr)
@@ -168,8 +296,19 @@ M.is_buf_disabled = function(bufnr, disabled)
 end
 
 --- Setup the necessary things for statusline rendering.
---- @param disabled BufDisabled|nil The disabled configuration to apply.
-M.setup = function(disabled)
+--- @param disabled_config BufDisabledConfig|nil The disabled configuration to apply.
+M.setup = function(disabled_config)
+	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
+	if FlexiblePrioritySortedLen > 0 then
+		local render_debounce = require("witch-line.utils").debounce(M.render, 100)
+		api.nvim_create_autocmd({ "VimResized" }, {
+			callback = function()
+				render_debounce(o.columns)
+			end,
+		})
+	end
+
+	--- For automatically toggle `laststatus` based on buffer filetype and buftype.
 	local user_laststatus = o.laststatus or 3
 
 	api.nvim_create_autocmd("OptionSet", {
@@ -186,7 +325,7 @@ M.setup = function(disabled)
 		callback = function(e)
 			local buf = e.buf
 			vim.schedule(function()
-				local disabled = M.is_buf_disabled(buf, disabled)
+				local disabled = M.is_buf_disabled(buf, disabled_config)
 
 				if not disabled and o.laststatus == 0 then
 					api.nvim_set_option_value("laststatus", user_laststatus, {})

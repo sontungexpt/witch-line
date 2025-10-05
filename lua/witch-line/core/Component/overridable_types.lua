@@ -15,16 +15,22 @@ local ANY = {
     "thread",
     "userdata"
 }
+
+local Number = {
+  "number"
+}
+
 return {
     padding = { "number", "table" },
     static = ANY,
     timing = { "boolean", "number" },
     lazy = { "boolean" },
     style = FT,
-    min_screen_width = { "number" },
+    min_screen_width = Number,
     hide = { "function", "boolean" },
     left_style = FT,
     left = SF,
     right_style = FT,
     right = SF,
+    flexible = Number,
 }

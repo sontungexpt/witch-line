@@ -88,17 +88,21 @@ local function update_component(comp, session_id)
 					end
 				end
 
-				Statusline.bulk_set(indices, assign_highlight_name(value, comp._hl_name))
+				Statusline.bulk_set(indices, value)
+				Statusline.mark_highlight(indices, comp._hl_name)
+
 
 				local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
 				if left then
 					Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, assign_highlight_name(left, comp._left_hl_name), -1)
+					Statusline.bulk_set_sep(indices, left, -1)
+					Statusline.mark_sep_highlight(indices, comp._left_hl_name, -1)
 				end
 
 				if right then
 					Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, assign_highlight_name(right, comp._right_hl_name), 1)
+					Statusline.bulk_set_sep(indices, right, 1)
+					Statusline.mark_sep_highlight(indices, comp._right_hl_name, 1)
 				end
 				rawset(comp, "_hidden", false) -- Reset hidden state
 			end
@@ -291,12 +295,45 @@ function M.register_abstract_component(comp)
 	return comp.id
 end
 
+--- Build statusline indices for a component.
+--- @param comp Component The component to build indices for.
+local function build_indices(comp)
+	local update = comp.update
+	if not update then
+		return
+	end
+
+	-- Add to statusline if renderable
+	local flexible_idxs = {}
+	if comp.left then
+		flexible_idxs[#flexible_idxs + 1] = Statusline.push("")
+	end
+
+	local idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
+	flexible_idxs[#flexible_idxs + 1] = idx
+
+	local indices = comp._indices
+	if not indices then
+		rawset(comp, "_indices", { idx })
+	else
+		indices[#indices + 1] = idx
+	end
+
+	if comp.right then
+		flexible_idxs[#flexible_idxs + 1] = Statusline.push("")
+	end
+
+	if comp.flexible then
+		Statusline.track_flexible(flexible_idxs, comp.flexible)
+	end
+end
 --- Register a component node, which may include nested components.
 --- @param comp Component The component to register.
 --- @return Component The registered component. Nil if registration failed.
 local function register_component(comp)
 	-- Avoid recursion for already loaded components
 	if comp._loaded then
+		build_indices(comp)
 		return comp
 	end
 
@@ -343,30 +380,10 @@ local function register_component(comp)
 		-- Abstract registration
 		local id = M.register_abstract_component(comp)
 
-		-- Add to statusline if renderable
-		local update = comp.update
-		if update then
-			if comp.lazy == false then
-				CompManager.mark_emergency(id)
-			end
-
-			if comp.left then
-				Statusline.push("")
-			end
-
-
-			local st_idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
-			local indices = comp._indices
-			if not indices then
-				rawset(comp, "_indices", { st_idx })
-			else
-				indices[#indices + 1] = st_idx
-			end
-
-			if comp.right then
-				Statusline.push("")
-			end
+		if comp.update and comp.lazy == false then
+			CompManager.mark_emergency(id)
 		end
+		build_indices(comp)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
 
