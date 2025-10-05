@@ -166,11 +166,11 @@ local function build_highlighted_values(skip)
 			if not skip[i] then
 				local cached = CachedHighlightedValues[i]
 				if cached then
-					merged[i] = cached
+					merged[#merged + 1] = cached
 				else
 					local hl_name = IdxHlMap[i]
 					cached = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
-					merged[i], CachedHighlightedValues[i] = cached, cached
+					merged[#merged + 1], CachedHighlightedValues[i] = cached, cached
 				end
 			end
 		end
