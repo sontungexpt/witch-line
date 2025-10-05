@@ -79,6 +79,7 @@ end
 
 
 --- Inspects the current statusline values.
+--- @param t "flexible_priority_sorted"|"frozens"|"idx_hl_map"|nil If provided, inspects the specified internal table; otherwise, inspects the Values table.
 M.inspect = function(t)
 	local notifier = require("witch-line.utils.notifier")
 	if t == "flexible_priority_sorted" then

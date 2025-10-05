@@ -140,6 +140,7 @@ local SepStyle = {
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
+--- @field on_click nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId, button: string): boolean called when the component is clicked, can be used to handle click events
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded boolean|nil If true, the component is loaded

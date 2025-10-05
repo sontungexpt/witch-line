@@ -108,7 +108,9 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support post_update function to run after update function
   - [x] Support update function to generate component content
   - [x] Support ref field to reference other component fields (events, style, static, context, hide, min_screen_width)
-  - [x] Support version field to manage component cache manually
+  - [x] Support version field to manage component cache
+  - [x] Support flexible field to hide component based on priority when space is limited
+  - [ ] Support on_click function to handle click events
   - [ ] Support coroutine for update function
 
 - Hide Automatically
@@ -116,7 +118,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Implement disable system
   - [x] Support disable for specific filetypes
   - [x] Support disable for specific buftypes
-  - [ ] Support for laststatus = 2
+  - [ ] Support for laststatus = 1, 2
 
 - Commands
 
