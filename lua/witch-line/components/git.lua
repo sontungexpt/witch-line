@@ -1,6 +1,7 @@
 local Id     = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
+
 ---@type DefaultComponent
 local Branch = {
   id = Id["git.branch"],
@@ -173,7 +174,7 @@ Diff.Interface = {
   temp = {}, -- temp storage
   init = function(self, ctx, static)
     -- Initialize temp storage
-    vim.api.nvim_create_autocmd({"BufLeave", "BufWritePost"}, {
+    vim.api.nvim_create_autocmd({"BufDelete", "BufWritePost"}, {
       callback = function(e)
         ctx.diff_cache[e.buf] = nil
       end
@@ -183,10 +184,8 @@ Diff.Interface = {
     local api, fn = vim.api, vim.fn
     local bufnr = api.nvim_get_current_buf()
     local diff_cache = ctx.diff_cache
-
-    if diff_cache[bufnr] then
-      api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
-    elseif ctx.is_skipped(static) then
+    --- Skip check then hide components immediately
+    if ctx.is_skipped(static) or diff_cache[bufnr] then
       api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
     else
       self.temp.process = vim.system({
@@ -195,20 +194,23 @@ Diff.Interface = {
         "--", fn.expand('%:t')
       }, { text = true }, function(out)
         self.temp.process = nil
-        if out.code == 15 or out.code == 9 then
+        local code, stdout = out.code , out.stdout
+        if code == 15 or code == 9 then
           require("witch-line.utils.notifier").info("Killed git diff process")
           return -- killed
-        elseif out.stdout and #out.stdout > 0 then
-          local lines = vim.split(out.stdout, "\n", { trimempty = true })
-          diff_cache[bufnr] =  api.nvim_buf_is_valid(bufnr) and ctx.process_diff(lines) or nil
-        else
-          -- do nothing
-          -- diff_cache[bufnr] = {
-          --   added = 0,
-          --   modified = 0,
-          --   removed = 0,
-          -- }
+        elseif stdout and #stdout > 0 then
+          local lines = vim.split(stdout, "\n", { trimempty = true })
+          vim.schedule(function()
+            if api.nvim_buf_is_valid(bufnr) then
+              diff_cache[bufnr] = ctx.process_diff(lines)
+              api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
+            end
+          end)
+          return
         end
+        -- No output or error occurred
+        -- It means that there are no git in this forlder
+        -- So we need to hide the components
         vim.schedule(function()
           api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
         end)
@@ -225,7 +227,7 @@ Diff.Interface = {
           if process and not process:is_closing() then
             process:kill(9)
           end
-        end, 2000)
+        end,1500)
         self.temp.process = nil
       end
       return true
