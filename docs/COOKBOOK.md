@@ -56,7 +56,7 @@ local component = {
 
   **Type**: `boolean | nil`
 
-  **Description**: A flag that indicates whether the component should be loaded lazily. If set to `true`, the component will only be loaded when it is needed, which can help improve performance. If not provided, the component will be loaded eagerly.
+  **Description**: A flag that indicates whether the component should be loaded lazily. If set to `true`, the component will only be loaded when it is needed, which can help improve performance. If not provided, the component will be loaded lazily.
 
   **Example**:
 

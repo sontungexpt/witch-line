@@ -29,6 +29,13 @@ local IdxHlMap = {
 	-- [5] = "WitchLineComponent3",
 }
 
+--- @type table<integer, string> The cached highlighted values to avoid redundant concatenation operations.
+--- This is used to optimize performance by storing pre-merged highlight group names with their corresponding values
+local CachedHighlightedValues = {
+	-- [1] = "%#WitchLineComponent1#Component1",
+	-- [2] = "%#WitchLineComponent2#Component2",
+	-- [3] = "%#WitchLineComponent3#Component3",
+}
 
 --- @type table<integer, {idxs: integer[], priority: integer}> A priority queue of flexible components. It's always sorted by priority in ascending order.
 --- Components with lower priority values are considered more important and will be retained longer when space is limited
@@ -39,27 +46,6 @@ local FlexiblePrioritySorted = {
 
 --- @type integer The length of FlexiblePrioritySorted
 local FlexiblePrioritySortedLen = 0
-
-
-
---- Marks a component's highlight group.
---- @param idxs integer[] The index or indices of the component(s) to mark.
---- @param hl_name string The highlight group name to assign.
-M.mark_highlight = function(idxs, hl_name)
-	for i = 1, #idxs do
-		IdxHlMap[idxs[i]] = hl_name
-	end
-end
-
---- Marks a component's separator highlight group.
---- @param idxs integer[] The index or indices of the component(s) to mark.
---- @param hl_name string The highlight group name to assign.
---- @param adjust number If true, marks the separator to the left of the component; otherwise, marks it to the right.
-M.mark_sep_highlight = function(idxs, hl_name, adjust)
-	for i = 1, #idxs do
-		IdxHlMap[idxs[i] + adjust] = hl_name
-	end
-end
 
 --- Tracks a component as flexible with a given priority.
 --- Components with lower priority values are considered more important and will be retained longer when space is limited.
@@ -79,6 +65,7 @@ end
 
 
 --- Inspects the current statusline values.
+--- @param t "flexible_priority_sorted"|"frozens"|"idx_hl_map"|nil If provided, inspects the specified internal table; otherwise, inspects the Values table.
 M.inspect = function(t)
 	local notifier = require("witch-line.utils.notifier")
 	if t == "flexible_priority_sorted" then
@@ -164,15 +151,27 @@ local function build_highlighted_values(skip)
 	local merged = {}
 	if not skip or next(skip) == nil then
 		for i = 1, ValuesSize do
-			local hl_name = IdxHlMap[i]
-			merged[i] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+			local cached = CachedHighlightedValues[i]
+			if cached then
+				merged[i] = cached
+			else
+				local hl_name = IdxHlMap[i]
+				cached = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+				merged[i], CachedHighlightedValues[i] = cached, cached
+			end
 		end
 		return merged
 	else
 		for i = 1, ValuesSize do
 			if not skip[i] then
-				local hl_name = IdxHlMap[i]
-				merged[#merged + 1] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+				local cached = CachedHighlightedValues[i]
+				if cached then
+					merged[#merged + 1] = cached
+				else
+					local hl_name = IdxHlMap[i]
+					cached = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+					merged[#merged + 1], CachedHighlightedValues[i] = cached, cached
+				end
 			end
 		end
 		return merged
@@ -188,7 +187,6 @@ M.render = function(max_width)
 		o.statusline = str ~= "" and str or " "
 		return
 	end
-
 
 	--- @type table<integer, true>
 	local hidden_idxs = {}
@@ -231,34 +229,40 @@ end
 --- Sets the value for multiple components at once.
 --- @param indices integer[] The indices of the components to set the value for.
 --- @param value string The value to set for the specified components.
-M.bulk_set = function(indices, value)
+--- @param hl_name string|nil The highlight group name to assign to the specified components.
+M.bulk_set = function(indices, value, hl_name)
 	for i = 1, #indices do
-		Values[indices[i]] = value
+		local idx = indices[i]
+		Values[idx], IdxHlMap[idx], CachedHighlightedValues[idx] = value, hl_name, nil
 	end
 end
 
 --- Sets the separator for left or right side of the component.
 --- @param indices integer[]|string[] The indices of the components to set the separator for.
---- @param value string The separator value to set.
 --- @param adjust number If true, sets the separator to the left of the component; otherwise, sets it to the right.
-M.bulk_set_sep = function(indices, value, adjust)
+--- @param value string The separator value to set.
+--- @param hl_name string|nil The highlight group name to assign to the separator.
+M.bulk_set_sep = function(indices, adjust, value, hl_name)
 	for i = 1, #indices do
-		Values[indices[i] + adjust] = value
+		local idx = indices[i] + adjust
+		Values[idx], IdxHlMap[idx], CachedHighlightedValues[idx] = value, hl_name, nil
 	end
 end
 
 --- Sets the value for a specific component.
 --- @param idx integer The index of the component to set the value for.
 --- @param value string The value to set for the specified component.
-M.set = function(idx, value)
-	Values[idx] = value
+--- @param hl_name string|nil The highlight group name to assign to the specified component.
+M.set = function(idx, value, hl_name)
+	Values[idx], IdxHlMap[idx] = value, hl_name
 end
 
 --- Gets the value for a specific component.
 --- @param idx integer The index of the component to get the value for.
---- @return string|nil The value of the specified component, or nil if it does not
+--- @return string|nil value The value of the specified component, or nil if it does not
+--- @return string|nil hl_name The highlight group name of the specified component, or nil if it does not have one.
 M.get = function(idx)
-	return Values[idx]
+	return Values[idx], IdxHlMap[idx]
 end
 
 --- Determines if a buffer is disabled based on its filetype and buftype.

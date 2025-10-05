@@ -29,10 +29,10 @@ local hide_component = function(comp)
 
 	Statusline.bulk_set(indices, "")
 	if type(comp.left) == "string" then
-		Statusline.bulk_set_sep(indices, "", -1)
+		Statusline.bulk_set_sep(indices, -1, "")
 	end
 	if type(comp.right) == "string" then
-		Statusline.bulk_set_sep(indices, "", 1)
+		Statusline.bulk_set_sep(indices, 1, "")
 	end
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
@@ -88,21 +88,18 @@ local function update_component(comp, session_id)
 					end
 				end
 
-				Statusline.bulk_set(indices, value)
-				Statusline.mark_highlight(indices, comp._hl_name)
+				Statusline.bulk_set(indices, value, comp._hl_name)
 
 
 				local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
 				if left then
 					Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, left, -1)
-					Statusline.mark_sep_highlight(indices, comp._left_hl_name, -1)
+					Statusline.bulk_set_sep(indices, -1, left, comp._left_hl_name)
 				end
 
 				if right then
 					Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, right, 1)
-					Statusline.mark_sep_highlight(indices, comp._right_hl_name, 1)
+					Statusline.bulk_set_sep(indices, 1, right, comp._right_hl_name)
 				end
 				rawset(comp, "_hidden", false) -- Reset hidden state
 			end

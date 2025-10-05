@@ -108,7 +108,9 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support post_update function to run after update function
   - [x] Support update function to generate component content
   - [x] Support ref field to reference other component fields (events, style, static, context, hide, min_screen_width)
-  - [x] Support version field to manage component cache manually
+  - [x] Support version field to manage component cache
+  - [x] Support flexible field to hide component based on priority when space is limited
+  - [ ] Support on_click function to handle click events
   - [ ] Support coroutine for update function
 
 - Hide Automatically
@@ -116,7 +118,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Implement disable system
   - [x] Support disable for specific filetypes
   - [x] Support disable for specific buftypes
-  - [ ] Support for laststatus = 2
+  - [ ] Support for laststatus = 1, 2
 
 - Commands
 
@@ -258,6 +260,7 @@ Below is a table of all supported fields and their expected types:
 | `left`             | `string`, `function`  | Left content to be rendered. Can be a string or a generator function.             |
 | `right_style`      | `function`, `table`   | Style override applied to the right part of the component.                        |
 | `right`            | `string`, `function`  | Right content to be rendered. Can be a string or a generator function.            |
+| `flexible`         | `number`              | Priority for hiding when space is limited. Lower numbers hide first.              |
 
 ---
 
@@ -294,6 +297,10 @@ local my_component = {
 ## 📂 Component Structure
 
 Each component is represented as a Lua table with various fields that define its behavior, appearance, and interactions. You can read the [COOKBOOK](./docs/COOKBOOK.md) for more examples of component structure.
+
+## 📚 Public Apis
+
+The plugin exposes a set of public APIs for advanced usage and customization. You can find the API reference in the [API.md](./docs/API.md) file.
 
 ## 🙌 Community Help & Contributions Wanted
 
