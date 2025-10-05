@@ -295,12 +295,46 @@ function M.register_abstract_component(comp)
 	return comp.id
 end
 
+--- Build or rebuild `_indices` for a component.
+--- Handles left/right/flexible fields and update value.
+--- @param comp Component
+local function build_indices(comp)
+    local update = comp.update
+    if not update then
+      return
+    end
+
+		-- Add to statusline if renderable
+    local flexible_idxs = {}
+    if comp.left then
+      flexible_idxs[#flexible_idxs+1] = Statusline.push("")
+    end
+
+    local idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
+    flexible_idxs[#flexible_idxs + 1] = idx
+
+    local indices = comp._indices
+    if not indices then
+      rawset(comp, "_indices", { idx })
+    else
+      indices[#indices + 1] = idx
+    end
+
+    if comp.right then
+      flexible_idxs[#flexible_idxs+1] = Statusline.push("")
+    end
+
+    if comp.flexible then
+      Statusline.track_flexible(flexible_idxs, comp.flexible)
+    end
+end
 --- Register a component node, which may include nested components.
 --- @param comp Component The component to register.
 --- @return Component The registered component. Nil if registration failed.
 local function register_component(comp)
 	-- Avoid recursion for already loaded components
 	if comp._loaded then
+    build_indices(comp)
 		return comp
 	end
 
@@ -347,33 +381,10 @@ local function register_component(comp)
 		-- Abstract registration
 		local id = M.register_abstract_component(comp)
 
-		-- Add to statusline if renderable
-		local update = comp.update
-		if update then
-			if comp.lazy == false then
-				CompManager.mark_emergency(id)
-			end
-
-      local flexible_idxs = {}
-			if comp.left then
-				flexible_idxs[#flexible_idxs+1] = Statusline.push("")
-			end
-
-			local st_idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
-      flexible_idxs[#flexible_idxs + 1] = st_idx
-			local indices = comp._indices
-			if not indices then
-				rawset(comp, "_indices", { st_idx })
-			else
-				indices[#indices + 1] = st_idx
-			end
-			if comp.right then
-        flexible_idxs[#flexible_idxs+1] = Statusline.push("")
-			end
-			if comp.flexible then
-				Statusline.track_flexible(flexible_idxs, comp.flexible)
-			end
-		end
+    if comp.update and comp.lazy == false then
+      CompManager.mark_emergency(id)
+    end
+    build_indices(comp)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
 
