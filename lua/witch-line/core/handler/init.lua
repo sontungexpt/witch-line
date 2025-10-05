@@ -295,38 +295,37 @@ function M.register_abstract_component(comp)
 	return comp.id
 end
 
---- Build or rebuild `_indices` for a component.
---- Handles left/right/flexible fields and update value.
---- @param comp Component
+--- Build statusline indices for a component.
+--- @param comp Component The component to build indices for.
 local function build_indices(comp)
-    local update = comp.update
-    if not update then
-      return
-    end
+	local update = comp.update
+	if not update then
+		return
+	end
 
-		-- Add to statusline if renderable
-    local flexible_idxs = {}
-    if comp.left then
-      flexible_idxs[#flexible_idxs+1] = Statusline.push("")
-    end
+	-- Add to statusline if renderable
+	local flexible_idxs = {}
+	if comp.left then
+		flexible_idxs[#flexible_idxs + 1] = Statusline.push("")
+	end
 
-    local idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
-    flexible_idxs[#flexible_idxs + 1] = idx
+	local idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
+	flexible_idxs[#flexible_idxs + 1] = idx
 
-    local indices = comp._indices
-    if not indices then
-      rawset(comp, "_indices", { idx })
-    else
-      indices[#indices + 1] = idx
-    end
+	local indices = comp._indices
+	if not indices then
+		rawset(comp, "_indices", { idx })
+	else
+		indices[#indices + 1] = idx
+	end
 
-    if comp.right then
-      flexible_idxs[#flexible_idxs+1] = Statusline.push("")
-    end
+	if comp.right then
+		flexible_idxs[#flexible_idxs + 1] = Statusline.push("")
+	end
 
-    if comp.flexible then
-      Statusline.track_flexible(flexible_idxs, comp.flexible)
-    end
+	if comp.flexible then
+		Statusline.track_flexible(flexible_idxs, comp.flexible)
+	end
 end
 --- Register a component node, which may include nested components.
 --- @param comp Component The component to register.
@@ -334,7 +333,7 @@ end
 local function register_component(comp)
 	-- Avoid recursion for already loaded components
 	if comp._loaded then
-    build_indices(comp)
+		build_indices(comp)
 		return comp
 	end
 
@@ -381,10 +380,10 @@ local function register_component(comp)
 		-- Abstract registration
 		local id = M.register_abstract_component(comp)
 
-    if comp.update and comp.lazy == false then
-      CompManager.mark_emergency(id)
-    end
-    build_indices(comp)
+		if comp.update and comp.lazy == false then
+			CompManager.mark_emergency(id)
+		end
+		build_indices(comp)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
 

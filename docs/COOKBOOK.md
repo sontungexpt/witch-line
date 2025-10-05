@@ -217,6 +217,20 @@ local component = {
   }
   ```
 
+- **flexible**:
+
+  **Type**: `number | nil`
+
+  **Description**: A priority value that determines how the component behaves when there is limited space in the status line. If the total width of all components exceeds the available space, components with higher `flexible` values will be truncated or hidden first. If not provided, the component will not be flexible and will always be displayed in full.
+
+  **Example**:
+
+  ```lua
+  local component = {
+      flexible = 2 -- Higher priority for truncation or hiding
+  }
+  ```
+
 - **padding**:
 
   **Alias**: `PaddingFunc` : `fun(self, ctx, static, session_id): number | nil`

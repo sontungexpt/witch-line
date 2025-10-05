@@ -66,30 +66,30 @@ end
 --- @param idxs integer[] The group indexs of the component to track as flexible (including main part and its separators).
 --- @param priority integer The priority of the component; lower values indicate higher importance.
 M.track_flexible = function(idxs, priority)
-  FlexiblePrioritySortedLen = FlexiblePrioritySortedLen + 1
+	FlexiblePrioritySortedLen = FlexiblePrioritySortedLen + 1
 
 	-- Insert the component and sort in ascending order of priority at the same time using insertion sort
-  local i = FlexiblePrioritySortedLen
-  while i > 1 and priority < FlexiblePrioritySorted[i].priority do
-    FlexiblePrioritySorted[i] = FlexiblePrioritySorted[i - 1]
-    i = i - 1
-  end
-  FlexiblePrioritySorted[i] = { idxs = idxs, priority = priority }
+	local i = FlexiblePrioritySortedLen
+	while i > 1 and priority < FlexiblePrioritySorted[i].priority do
+		FlexiblePrioritySorted[i] = FlexiblePrioritySorted[i - 1]
+		i = i - 1
+	end
+	FlexiblePrioritySorted[i] = { idxs = idxs, priority = priority }
 end
 
 
 --- Inspects the current statusline values.
 M.inspect = function(t)
-  local notifier = require("witch-line.utils.notifier")
-  if t == "flexible_priority_sorted" then
-    notifier.info(vim.inspect(FlexiblePrioritySorted))
-  elseif t == "frozens" then
-    notifier.info(vim.inspect(Frozens))
-  elseif t == "idx_hl_map" then
-    notifier.info(vim.inspect(IdxHlMap))
-  else
-    notifier.info(vim.inspect(Values))
-  end
+	local notifier = require("witch-line.utils.notifier")
+	if t == "flexible_priority_sorted" then
+		notifier.info(vim.inspect(FlexiblePrioritySorted))
+	elseif t == "frozens" then
+		notifier.info(vim.inspect(Frozens))
+	elseif t == "idx_hl_map" then
+		notifier.info(vim.inspect(IdxHlMap))
+	else
+		notifier.info(vim.inspect(Values))
+	end
 end
 
 
@@ -119,6 +119,7 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
 	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
+	CacheDataAccessor.set("FlexiblePrioritySortedLen", FlexiblePrioritySortedLen)
 end
 
 --- Loads the statusline cache.
@@ -128,15 +129,17 @@ M.load_cache = function(CacheDataAccessor)
 	local before_values = Values
 	local before_values_size = ValuesSize
 	local before_flexible_priority_sorted = FlexiblePrioritySorted
+	local before_flexible_priority_sorted_len = FlexiblePrioritySortedLen
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
 	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
-
+	FlexiblePrioritySortedLen = CacheDataAccessor.get("FlexiblePrioritySortedLen") or FlexiblePrioritySortedLen
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
 		FlexiblePrioritySorted = before_flexible_priority_sorted
+		FlexiblePrioritySortedLen = before_flexible_priority_sorted_len
 	end
 end
 
@@ -158,51 +161,51 @@ end
 --- @param skip table<integer, true>| nil An optinal set of indices to skip during merging
 --- @return string[] merged The merged list of statusline values with highlight group names applied.
 local function build_highlighted_values(skip)
-  local merged = {}
-  if not skip or next(skip) == nil then
-    for i = 1, ValuesSize do
-      local hl_name = IdxHlMap[i]
-      merged[i] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
-    end
-    return merged
-  else
-    for i = 1, ValuesSize do
-      if not skip[i] then
-        local hl_name = IdxHlMap[i]
-        merged[#merged+1] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
-      end
-    end
-    return merged
-  end
+	local merged = {}
+	if not skip or next(skip) == nil then
+		for i = 1, ValuesSize do
+			local hl_name = IdxHlMap[i]
+			merged[i] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+		end
+		return merged
+	else
+		for i = 1, ValuesSize do
+			if not skip[i] then
+				local hl_name = IdxHlMap[i]
+				merged[#merged + 1] = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
+			end
+		end
+		return merged
+	end
 end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param max_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
 M.render = function(max_width)
-  if FlexiblePrioritySortedLen == 0 then
-    local str = concat(build_highlighted_values())
-    o.statusline = str ~= "" and str or " "
-    return
-  end
+	if FlexiblePrioritySortedLen == 0 then
+		local str = concat(build_highlighted_values())
+		o.statusline = str ~= "" and str or " "
+		return
+	end
 
 
-  --- @type table<integer, true>
-  local hidden_idxs = {}
-  local removed_idx = FlexiblePrioritySortedLen
+	--- @type table<integer, true>
+	local hidden_idxs = {}
+	local removed_idx = FlexiblePrioritySortedLen
 	local truncated_len = strdisplaywidth(concat(Values))
 
-  max_width = max_width or o.columns
+	max_width = max_width or o.columns
 	while removed_idx > 0 and truncated_len > max_width do
 		local value_idxs = FlexiblePrioritySorted[removed_idx].idxs
-    for j = 1, #value_idxs do
-      local value_idx = value_idxs[j]
-      local value = Values[value_idx]
-      hidden_idxs[value_idx] = true
-      if value ~= "" then
-        truncated_len = truncated_len - strdisplaywidth(value)
-      end
-    end
+		for j = 1, #value_idxs do
+			local value_idx = value_idxs[j]
+			local value = Values[value_idx]
+			hidden_idxs[value_idx] = true
+			if value ~= "" then
+				truncated_len = truncated_len - strdisplaywidth(value)
+			end
+		end
 		removed_idx = removed_idx - 1
 	end
 	local str = concat(build_highlighted_values(hidden_idxs))
@@ -299,8 +302,8 @@ M.setup = function(disabled_config)
 	if FlexiblePrioritySortedLen > 0 then
 		local render_debounce = require("witch-line.utils").debounce(M.render, 100)
 		api.nvim_create_autocmd({ "VimResized" }, {
-			callback = function ()
-        render_debounce(o.columns)
+			callback = function()
+				render_debounce(o.columns)
 			end,
 		})
 	end
