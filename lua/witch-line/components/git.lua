@@ -101,10 +101,12 @@ local Branch = {
     local head_file_path = ctx.get_head_file_path()
     if head_file_path then
       local head_file = io.open(head_file_path, "r")
-      local content = head_file:read("*all")
-      head_file:close()
-      -- branch name  or commit hash
-      branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
+      if head_file then
+        local content = head_file:read("*all")
+        head_file:close()
+        -- branch name or commit hash
+        branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
+      end
     end
     return branch ~= "" and static.icon .. " " .. branch or ""
   end,
@@ -154,20 +156,22 @@ Diff.Interface = {
       return { added = added, modified = modified, removed = removed }
     end,
   },
+  static = {
+    skip_check = {
+      filetypes = {
+        "NvimTree",
+      },
+    }
+  },
+  temp = {
+    process = nil,
+  },
   init = function(self, ctx, static)
     vim.api.nvim_create_autocmd({"BufLeave", "BufWritePost"}, {
       callback = function(e)
         ctx.diff_cache[e.buf] = nil
       end
     })
-  end,
-  hidden = function(self, ctx, static, session_id)
-    local filepath = vim.fn.expand('%:p')
-    if filepath == "" then
-      return true
-    end
-    local bufnr = vim.api.nvim_get_current_buf()
-    return ctx.diff_cache[bufnr] == nil
   end,
   pre_update = function(self, ctx, static)
     local api, fn = vim.api, vim.fn
@@ -177,12 +181,14 @@ Diff.Interface = {
     if diff_cache[bufnr] then
       api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
     else
-      vim.system({
+      self.temp.process = vim.system({
         "git", "-C", fn.expand('%:h'),
         "--no-pager", "diff", "--no-color", "--no-ext-diff", "-U0",
         "--", fn.expand('%:t')
       }, { text = true }, function(out)
-        if out.code ~= 0 then
+        self.temp.process = nil
+        if out.code == 15 then
+          return -- killed
           -- do nothing
         elseif out.stdout and #out.stdout > 0 then
           local lines = vim.split(out.stdout, "\n", { trimempty = true })
@@ -200,12 +206,24 @@ Diff.Interface = {
         end)
       end)
     end
-  end
-
+  end,
+  hidden = function(self, ctx, static, session_id)
+    local filepath = vim.fn.expand('%:p')
+    if filepath == "" or vim.list_contains(static.skip_check.filetypes, vim.bo.filetype) then
+      local temp = self.temp
+      if temp.process and not temp.process:is_closing() then
+        require("witch-line.utils.notifier").info("Killing git diff process")
+        temp.process:kill(15) --SIGTERM
+        temp.process = nil
+      end
+      return true
+    end
+    return false
+  end,
 }
 
 --- @type DefaultComponent
-Diff.Added     = {
+Diff.Added = {
   id = Id["git.diff.added"],
   user_events = { "GitDiffUpdate" },
   _plug_provided = true,
