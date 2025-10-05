@@ -298,6 +298,10 @@ local my_component = {
 
 Each component is represented as a Lua table with various fields that define its behavior, appearance, and interactions. You can read the [COOKBOOK](./docs/COOKBOOK.md) for more examples of component structure.
 
+## 📚 Public Apis
+
+The plugin exposes a set of public APIs for advanced usage and customization. You can find the API reference in the [API.md](./docs/API.md) file.
+
 ## 🙌 Community Help & Contributions Wanted
 
 `witch-line` is a flexible and powerful statusline plugin for Neovim, but there's still a lot of room to improve and grow. I'm actively seeking help and contributions from the community to make this project even better.
