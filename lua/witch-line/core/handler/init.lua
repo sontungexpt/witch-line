@@ -75,8 +75,6 @@ local function update_component(comp, session_id)
 
 			-- A abstract component may be not have _indices key
 			if indices then
-				local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
-
 				local style_updated = false
 
 				if style then
