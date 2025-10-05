@@ -354,22 +354,24 @@ local function register_component(comp)
 				CompManager.mark_emergency(id)
 			end
 
+      local flexible_idxs = {}
 			if comp.left then
-				Statusline.push("")
+				flexible_idxs[#flexible_idxs+1] = Statusline.push("")
 			end
 
 			local st_idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
+      flexible_idxs[#flexible_idxs + 1] = st_idx
 			local indices = comp._indices
 			if not indices then
 				rawset(comp, "_indices", { st_idx })
 			else
 				indices[#indices + 1] = st_idx
 			end
-			if comp.flexible then
-				Statusline.track_flexible(st_idx, comp.flexible)
-			end
 			if comp.right then
-				Statusline.push("")
+        flexible_idxs[#flexible_idxs+1] = Statusline.push("")
+			end
+			if comp.flexible then
+				Statusline.track_flexible(flexible_idxs, comp.flexible)
 			end
 		end
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
