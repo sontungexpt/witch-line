@@ -26,6 +26,12 @@ This plugin lazy load as much as possible
 create your own component. I'm very happy to see your component. So if you have
 any idea to create a new component, please open an issue or pull request.
 
+### Concept ideas
+
+- I like the reference concept in any database structure based on id. So I use the same concept in this plugin for component system. You can reference other component by id to share some field like events, style, static, context, hide, min_screen_width. This will help you to create a component based on other component without duplicate code.
+
+- This plugin also support inherit field from parent by recursively. So you can create a component based on other component and override some field like [heirline](https://github.com/rebelot/heirline.nvim). But I think the reference concept is better than inherit concept because you can share some field between components. And the statusline is a flat structure so you don't need to create a nested structure like heirline.
+
 ## Preview
 
 ## ✨ Features
