@@ -19,16 +19,22 @@ Important about function fields to make the cache work properly:
 - Function fields should be pure functions without side effects.
 - They should only depend on their input parameters and not have any up-values.
 - The up-values allowed are only global variables such as `vim`, `package`, `require`.
+- The tips to remove up-values:
+  - Move the up-value inside the function.
+  - If you are using a module, require it inside the function.
+  - If you are using a global variable, use `vim` or `package` directly inside the function.
 
 Example of a pure function:
 
 ```lua
 local api = vim.api -- Not allowed, as it's an up-value you need to move it inside the function like below
+local builtin = require("witch-line.builtin") -- Not allowed, as it's an up-value you need to move it inside the function like below
 
 
 local component = {
   id = "identifier",
   update = function(self, ctx, static, session_id)
+    local builtin = require("witch-line.builtin") -- Allowed, as it's inside the function
     local api = vim.api -- Allowed, as it's a global API call
     return api.nvim_buf_get_name(0) -- Depends only on the current buffer
   end,
