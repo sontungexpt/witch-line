@@ -346,42 +346,12 @@ end
 --- @param session_id SessionId The ID of the process to use for this retrieval.
 --- @param ctx any The `context` field value of the component from this component or its references.
 --- @param static any The `static` field value of the component from this component or its references.
---- @param ... any Additional arguments to pass to the style function.
 --- @return vim.api.keyset.highlight|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
 M.get_style = function(comp, session_id, ctx, static)
 	return lookup_ref_value(comp, "style", session_id, {}, ctx, static)
 end
 
---- Check if a component should be displayed.
---- This function checks the `should_display` field of the component, which can be a boolean or a function.
---- If it is a function, it will be called with the component and the provided context.
---- The result will be cached in the session store to avoid redundant computations.
---- @param comp Component The component to check.
---- @param session_id SessionId The ID of the process to use for this check.
---- @param ctx any The `context` field value of the component from this component or its references.
---- @param static any The `static` field value of the component from this component or its
---- @return boolean displayed True if the component should be displayed, false otherwise.
---- @return Component inherited The component that provides the `should_display` value, or nil if not found.
-M.should_hidden = function(comp, session_id, ctx, static)
-	local hidden, last_comp = lookup_ref_value(comp, "hidden", session_id, {}, ctx, static)
-	return hidden == true, last_comp
-end
-
---- Check if a component should be displayed.
---- This function checks the `should_display` field of the component, which can be a boolean or a function.
---- If it is a function, it will be called with the component and the provided context.
---- The result will be cached in the session store to avoid redundant computations.
---- @param comp Component The component to check.
---- @param session_id SessionId The ID of the process to use for this check.
---- @param ctx any The `context` field value of the component from this component or its references.
---- @param static any The `static` field value of the component from this component or its references.
---- @return boolean displayed True if the component should be displayed, false otherwise.
---- @return Component inherited The component that provides the should_display value, or nil if not found.
-M.get_min_screen_width = function(comp, session_id, ctx, static)
-	local min_width, last_comp = lookup_ref_value(comp, "min_screen_width", session_id, {}, ctx, static)
-	return min_width, last_comp
-end
 
 --- Recursively look up a static value in a component and its references.
 --- If the value is found, it is returned along with the component that provides it.

@@ -17,6 +17,7 @@ This plugin lazy load as much as possible
   - [🔖 Default Components](#-default-components)
   - [⚙️ Customizable Fields for Components](#️-customizable-fields-for-components)
   - [📂 Component Structure](#-component-structure)
+- [📚 Public Apis](#-public-apis)
 - [🙌 Community Help & Contributions Wanted](#-community-help--contributions-wanted)
 - [📜 License](#-license)
 

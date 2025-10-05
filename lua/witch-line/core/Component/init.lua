@@ -17,6 +17,8 @@ local SepStyle = {
 
 --- @class CompId : Id
 
+--- @generic Static any
+--- @generic Context any
 --- @class Ref : table
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field user_events CompId|CompId[]|nil A table of ids of components that this component references
@@ -115,6 +117,7 @@ local SepStyle = {
 --- - If function: called and its return value is used as above.
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
 --- - Example of style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- @field temp any A temporary field that can be used to store temporary values, will not be cached
 --- @field static any A static field that will be passed to the component's update function
 --- @field context NotFunction|fun(self: ManagedComponent, static:any, session_id: SessionId): any
 --- A context field that will be passed to the component's update function
@@ -489,6 +492,14 @@ end
 --- @param comp Component the component to remove the state from
 M.remove_state_before_cache = function(comp)
 	rawset(comp, "_hidden", nil)
+  local temp = comp.temp
+  if type(temp) == "table" then
+    for key, _ in pairs(temp) do
+      rawset(temp, key, nil)
+    end
+  else
+    rawset(comp, "temp", nil)
+  end
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
 
@@ -561,10 +572,22 @@ end
 --- @param comp Component the component to get the minimum screen width from
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
+--- @param session_id SessionId the session id to use for the component update
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
-M.min_screen_width = function(comp, ctx, static)
-	local min_screen_width = resolve(comp.min_screen_width, comp, ctx, static)
+M.min_screen_width = function(comp, ctx, static, session_id)
+	local min_screen_width = resolve(comp.min_screen_width, comp, ctx, static, session_id)
 	return type(min_screen_width) == "number" and min_screen_width or nil
+end
+
+--- Checks if the component is hidden based on its `hidden` field.
+--- @param comp Component the component to checks
+--- @param ctx any the context to pass to the component's update function
+--- @param static any the static values to pass to the component's update function
+--- @param session_id SessionId the session id to use for the component update
+--- @return boolean hidden whether the component is hidden
+M.hidden = function(comp, ctx, static, session_id)
+	local hidden = resolve(comp.hidden, comp, ctx, static, session_id)
+	return hidden == true
 end
 
 return M

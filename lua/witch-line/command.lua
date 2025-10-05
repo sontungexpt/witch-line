@@ -39,6 +39,9 @@ local commands = {
 			idx_hl_map = function()
 				require("witch-line.core.statusline").inspect("idx_hl_map")
 			end,
+			cache_highlighted_values = function()
+				require("witch-line.core.statusline").inspect("cache_highlighted_values")
+			end,
 		},
 		event_store = function()
 			require("witch-line.core.handler.event").inspect()

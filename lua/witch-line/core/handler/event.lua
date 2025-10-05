@@ -91,7 +91,7 @@ M.on_event             = function(work)
             work(session_id, vim.tbl_keys(id_event_info_map), id_event_info_map)
             id_event_info_map = {}
         end)
-    end, 100)
+    end, 120)
 
     local api = vim.api
     local group, id1, id2 = nil, nil, nil

@@ -1,6 +1,5 @@
 local vim, concat, type = vim, table.concat, type
 local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywidth
-local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 local M = {}
 
 --- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit). It's contains the idx of string component in Values list.
@@ -65,7 +64,7 @@ end
 
 
 --- Inspects the current statusline values.
---- @param t "flexible_priority_sorted"|"frozens"|"idx_hl_map"|nil If provided, inspects the specified internal table; otherwise, inspects the Values table.
+--- @param t "flexible_priority_sorted"|"frozens"|"idx_hl_map"|"cache_highlighted_values" |nil If provided, inspects the specified internal table; otherwise, inspects the Values table.
 M.inspect = function(t)
 	local notifier = require("witch-line.utils.notifier")
 	if t == "flexible_priority_sorted" then
@@ -74,6 +73,8 @@ M.inspect = function(t)
 		notifier.info(vim.inspect(Frozens))
 	elseif t == "idx_hl_map" then
 		notifier.info(vim.inspect(IdxHlMap))
+	elseif t == "cache_highlighted_values" then
+		notifier.info(vim.inspect(CachedHighlightedValues))
 	else
 		notifier.info(vim.inspect(Values))
 	end
@@ -148,6 +149,9 @@ end
 --- @param skip table<integer, true>| nil An optinal set of indices to skip during merging
 --- @return string[] merged The merged list of statusline values with highlight group names applied.
 local function build_highlighted_values(skip)
+	--- Lazy load
+	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
+
 	local merged = {}
 	if not skip or next(skip) == nil then
 		for i = 1, ValuesSize do

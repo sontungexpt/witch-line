@@ -19,16 +19,22 @@ Important about function fields to make the cache work properly:
 - Function fields should be pure functions without side effects.
 - They should only depend on their input parameters and not have any up-values.
 - The up-values allowed are only global variables such as `vim`, `package`, `require`.
+- The tips to remove up-values:
+  - Move the up-value inside the function.
+  - If you are using a module, require it inside the function.
+  - If you are using a global variable, use `vim` or `package` directly inside the function.
 
 Example of a pure function:
 
 ```lua
 local api = vim.api -- Not allowed, as it's an up-value you need to move it inside the function like below
+local builtin = require("witch-line.builtin") -- Not allowed, as it's an up-value you need to move it inside the function like below
 
 
 local component = {
   id = "identifier",
   update = function(self, ctx, static, session_id)
+    local builtin = require("witch-line.builtin") -- Allowed, as it's inside the function
     local api = vim.api -- Allowed, as it's a global API call
     return api.nvim_buf_get_name(0) -- Depends only on the current buffer
   end,
@@ -214,6 +220,27 @@ local component = {
               another_dynamic_value = os.date("%Y-%m-%d %H:%M:%S") -- Current date and time
           }
       end
+  }
+  ```
+
+- `**temp**`:
+
+  **Type**: `any`
+
+  **Description**: A table that holds temporary data for the component. This data is not reactive and will not trigger updates when changed. It can be used to store state or other information that is only relevant during the lifetime of the component. It is not passed to any internal functions and is only accessible within the component itself. It is not stored in the cache, so it will when neovim is restarted.
+
+  **Example**:
+
+  ```lua
+  local component = {
+      -- Empty table to hold temporary datas. The datas inside this table will not be cached so you need to set them in any function like init or update.
+      temp = {
+      },
+      -- If a temp is not a table, the temp field will be removed when restarting neovim.
+      -- or temp = "",
+      init = function(self, ctx, static, session_id)
+        self.temp.current_state = "initial"
+      end,
   }
   ```
 

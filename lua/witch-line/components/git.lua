@@ -1,6 +1,7 @@
 local Id     = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
+
 ---@type DefaultComponent
 local Branch = {
   id = Id["git.branch"],
@@ -101,10 +102,12 @@ local Branch = {
     local head_file_path = ctx.get_head_file_path()
     if head_file_path then
       local head_file = io.open(head_file_path, "r")
-      local content = head_file:read("*all")
-      head_file:close()
-      -- branch name  or commit hash
-      branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
+      if head_file then
+        local content = head_file:read("*all")
+        head_file:close()
+        -- branch name or commit hash
+        branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
+      end
     end
     return branch ~= "" and static.icon .. " " .. branch or ""
   end,
@@ -153,59 +156,88 @@ Diff.Interface = {
       end
       return { added = added, modified = modified, removed = removed }
     end,
+    is_skipped = function (static)
+      return vim.list_contains(static.skip_check.filetypes, vim.bo.filetype)
+    end
   },
+  static = {
+    skip_check = {
+      filetypes = {
+        "NvimTree",
+        "neo-tree",
+        "alpha",
+        "dashboard",
+        "TelescopePrompt"
+      },
+    }
+  },
+  temp = {}, -- temp storage
   init = function(self, ctx, static)
-    vim.api.nvim_create_autocmd({"BufLeave", "BufWritePost"}, {
+    -- Initialize temp storage
+    vim.api.nvim_create_autocmd({"BufDelete", "BufWritePost"}, {
       callback = function(e)
         ctx.diff_cache[e.buf] = nil
       end
     })
   end,
-  hidden = function(self, ctx, static, session_id)
-    local filepath = vim.fn.expand('%:p')
-    if filepath == "" then
-      return true
-    end
-    local bufnr = vim.api.nvim_get_current_buf()
-    return ctx.diff_cache[bufnr] == nil
-  end,
   pre_update = function(self, ctx, static)
     local api, fn = vim.api, vim.fn
     local bufnr = api.nvim_get_current_buf()
     local diff_cache = ctx.diff_cache
-
-    if diff_cache[bufnr] then
+    --- Skip check then hide components immediately
+    if ctx.is_skipped(static) or diff_cache[bufnr] then
       api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
     else
-      vim.system({
+      self.temp.process = vim.system({
         "git", "-C", fn.expand('%:h'),
         "--no-pager", "diff", "--no-color", "--no-ext-diff", "-U0",
         "--", fn.expand('%:t')
       }, { text = true }, function(out)
-        if out.code ~= 0 then
-          -- do nothing
-        elseif out.stdout and #out.stdout > 0 then
-          local lines = vim.split(out.stdout, "\n", { trimempty = true })
-          diff_cache[bufnr] = ctx.process_diff(lines)
-        else
-          -- do nothing
-          -- diff_cache[bufnr] = {
-          --   added = 0,
-          --   modified = 0,
-          --   removed = 0,
-          -- }
+        self.temp.process = nil
+        local code, stdout = out.code , out.stdout
+        if code == 15 or code == 9 then
+          require("witch-line.utils.notifier").info("Killed git diff process")
+          return -- killed
+        elseif stdout and #stdout > 0 then
+          local lines = vim.split(stdout, "\n", { trimempty = true })
+          vim.schedule(function()
+            if api.nvim_buf_is_valid(bufnr) then
+              diff_cache[bufnr] = ctx.process_diff(lines)
+              api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
+            end
+          end)
+          return
         end
+        -- No output or error occurred
+        -- It means that there are no git in this forlder
+        -- So we need to hide the components
         vim.schedule(function()
           api.nvim_exec_autocmds("User", { pattern = "GitDiffUpdate" })
         end)
       end)
     end
-  end
-
+  end,
+  hidden = function(self, ctx, static, session_id)
+    local filepath = vim.fn.expand('%:p')
+    if filepath == "" or  ctx.is_skipped(static) then
+      local process = self.temp.process
+      if process and not process:is_closing() then
+        process:kill(15) --SIGTERM
+        vim.defer_fn(function ()
+          if process and not process:is_closing() then
+            process:kill(9)
+          end
+        end,1500)
+        self.temp.process = nil
+      end
+      return true
+    end
+    return false
+  end,
 }
 
 --- @type DefaultComponent
-Diff.Added     = {
+Diff.Added = {
   id = Id["git.diff.added"],
   user_events = { "GitDiffUpdate" },
   _plug_provided = true,
