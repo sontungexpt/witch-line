@@ -223,6 +223,23 @@ local component = {
   }
   ```
 
+- `**temp**`:
+
+  **Type**: `any`
+
+  **Description**: A table that holds temporary data for the component. This data is not reactive and will not trigger updates when changed. It can be used to store state or other information that is only relevant during the lifetime of the component. It is not passed to any internal functions and is only accessible within the component itself. It is not stored in the cache, so it will when neovim is restarted.
+
+  **Example**:
+
+  ```lua
+  local component = {
+      temp = {
+          current_state = "initial",
+          another_temp_value = 123
+      }
+  }
+  ```
+
 - **flexible**:
 
   **Type**: `number | nil`
