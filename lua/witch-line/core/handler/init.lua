@@ -58,9 +58,9 @@ local function update_component(comp, session_id)
 	Component.emit_pre_update(comp, session_id, ctx, static)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
-	local min_screen_width = Component.min_screen_width(comp, ctx, static, session_id)
+	local min_screen_width = Component.min_screen_width(comp, session_id, ctx, static)
 	local hidden = min_screen_width and vim.o.columns < min_screen_width
-		or Component.hidden(comp, ctx, static, session_id)
+		or Component.hidden(comp, session_id, ctx, static)
 
 	local value, style, ref_comp = "", nil, comp
 

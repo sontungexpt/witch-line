@@ -492,14 +492,14 @@ end
 --- @param comp Component the component to remove the state from
 M.remove_state_before_cache = function(comp)
 	rawset(comp, "_hidden", nil)
-  local temp = comp.temp
-  if type(temp) == "table" then
-    for key, _ in pairs(temp) do
-      rawset(temp, key, nil)
-    end
-  else
-    rawset(comp, "temp", nil)
-  end
+	local temp = comp.temp
+	if type(temp) == "table" then
+		for key, _ in pairs(temp) do
+			rawset(temp, key, nil)
+		end
+	else
+		rawset(comp, "temp", nil)
+	end
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
 
@@ -570,22 +570,22 @@ end
 
 --- Gets the minimum screen width required to display the component.
 --- @param comp Component the component to get the minimum screen width from
+--- @param session_id SessionId the session id to use for the component update
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
---- @param session_id SessionId the session id to use for the component update
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
-M.min_screen_width = function(comp, ctx, static, session_id)
+M.min_screen_width = function(comp, session_id, ctx, static)
 	local min_screen_width = resolve(comp.min_screen_width, comp, ctx, static, session_id)
 	return type(min_screen_width) == "number" and min_screen_width or nil
 end
 
 --- Checks if the component is hidden based on its `hidden` field.
 --- @param comp Component the component to checks
+--- @param session_id SessionId the session id to use for the component update
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
---- @param session_id SessionId the session id to use for the component update
 --- @return boolean hidden whether the component is hidden
-M.hidden = function(comp, ctx, static, session_id)
+M.hidden = function(comp, session_id, ctx, static)
 	local hidden = resolve(comp.hidden, comp, ctx, static, session_id)
 	return hidden == true
 end

@@ -223,25 +223,32 @@ local component = {
   }
   ```
 
-- `**temp**`:
+- **temp**:
 
   **Type**: `any`
 
-  **Description**: A table that holds temporary data for the component. This data is not reactive and will not trigger updates when changed. It can be used to store state or other information that is only relevant during the lifetime of the component. It is not passed to any internal functions and is only accessible within the component itself. It is not stored in the cache, so it will when neovim is restarted.
+  **Description**: Any temporary data that you want to store in the component instance. The data inside this field will not be cached, so you need to set them in any function like `init`, `update`, etc. This is useful for storing state or other information that should not persist across Neovim restarts. If the value is not a table, the `temp` field will be removed when restarting Neovim. If is a `table`, then the table will be emptied when restarting Neovim.
 
   **Example**:
 
   ```lua
   local component = {
       -- Empty table to hold temporary datas. The datas inside this table will not be cached so you need to set them in any function like init or update.
-      temp = {
-      },
+      temp = {},
       -- If a temp is not a table, the temp field will be removed when restarting neovim.
       -- or temp = "",
       init = function(self, ctx, static, session_id)
+        -- If temp is a table, and you set temp as a component field then you can do something like this to initialize the temp.current_state values because the temp field is still be a empty table when restarting neovim.
         self.temp.current_state = "initial"
+
+        -- But if temp is not a table, then you need to set it like this.
+        -- The temp field will be removed when restarting neovim, so you need to set it in init or any function that is called when the component is created.
+        -- self.temp = "initial"
       end,
-  }
+      update = function(self, ctx, static, session_id)
+          -- You can use self.temp.current_state here
+          return "Current State: " .. (self.temp.current_state or "unknown")
+      end}
   ```
 
 - **flexible**:
