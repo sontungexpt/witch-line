@@ -32,12 +32,18 @@ local SepStyle = {
 --- @class CombinedComponent : Component, LiteralComponent
 --- @field [integer] CombinedComponent a table of childs, can be used to create a list of components
 
+--- @class Neighbor
+--- @field [1] CompId The id of the neighbor component if you want to use numbered fields
+--- @field id CompId The id of the neighbor component if you want to use named fields
+--- @field space integer The space between the component and its neighbor
+--- @field priority integer The priority of the neighbor component when the status line is too long, higher numbers are more likely to be truncated
+
 --- @alias PaddingFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
 --- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
---- @generic Static
+---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
 --- @field version integer|string|nil
@@ -57,6 +63,7 @@ local SepStyle = {
 --- - If function: called and its return value is used as above.
 --- - Example of min_screen_width function: `function(self, ctx, static, session_id) return 80 end`
 --- @field ref Ref|nil A table of references to other components that this component depends on
+--- @field neighbors Neighbor[]|nil A table of neighbor components that this component is related to ( Not implemented yet )
 --- @field left_style table|nil|SideStyleFunc
 --- A table of styles that will be applied to the left separator of the component
 --- - If table: used as is.
@@ -142,7 +149,7 @@ local SepStyle = {
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
---- @field on_click nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId, button: string): boolean called when the component is clicked, can be used to handle click events
+--- @field on_click nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId, button: string): boolean called when the component is clicked, can be used to handle click events. (Unsupported yet)
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded boolean|nil If true, the component is loaded

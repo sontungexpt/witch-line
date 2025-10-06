@@ -10,6 +10,7 @@ The cookbook is a collection of recipes that demonstrate how to use various feat
   - [📚 Referencing Fields](#referencing-fields)
   - [📚 Advanced Fields](#advanced-fields)
 
+
 ### Component Fields
 
 #### 🔍 Notes
@@ -805,3 +806,21 @@ An component can reference other components for some of its fields. This allows 
 
   }
   ```
+
+### Component Function Lifecycle
+
+- `init` : Called once when the component is created. After `WitchLine` manages the component. (Such as setting up autocmds, etc.)
+- `pre_update` : Called every time the component needs to be update, right before calling `min_screen_width` ->  `hidden` -> `update` functions.
+- `min_screen_width` : Called every time the component needs to be update, right after calling `pre_update` function, right before calling `hidden` function.
+- `hidden` : Called every time the component needs to be update, right after calling `min_screen_width` function, right before calling `update` function.
+- `update` : Called every time the component needs to be update, right after calling `hidden` function, right before calling `padding` -> `post_update` function.
+- `padding` : Called every time the component needs to be update, right after calling `update` function, to get the padding of the component.
+- `post_update` : Called every time the component needs to be update, right after calling `update` function.
+- `style` : Called every time the component updated successfully, after calling `update` function, to get the style of the component.
+- `left` : Called every time the component updated successfully, after calling `update` function, to get the left part of the component.
+- `right` : Called every time the component updated successfully, after calling `update` function, to get the right part of the component.
+- `left_style` : Called every time the component updated successfully, after calling `update` function, to get the style of the left part of the component.
+- `right_style` : Called every time the component updated successfully, after calling `update` function, to get the style of the right part of the component.
+
+
+
