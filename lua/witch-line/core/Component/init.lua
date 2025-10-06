@@ -17,8 +17,6 @@ local SepStyle = {
 
 --- @class CompId : Id
 
---- @generic Static any
---- @generic Context any
 --- @class Ref : table
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field user_events CompId|CompId[]|nil A table of ids of components that this component references
@@ -39,6 +37,7 @@ local SepStyle = {
 --- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
+--- @generic Static
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
 --- @field version integer|string|nil
@@ -154,9 +153,9 @@ local SepStyle = {
 --- @field _hidden boolean|nil If true, the component is hidden and should not be displayed
 --- @field _abstract boolean|nil If true, the component is abstract and should not be displayed directly (all component are abstract)
 
----@class DefaultComponent : Component The default components provided by witch-line
----@field id DefaultId the id of default component
----@field _plug_provided true Mark as created by witch-line
+--- @class DefaultComponent : Component The default components provided by witch-line
+--- @field id DefaultId the id of default component
+--- @field _plug_provided true Mark as created by witch-line
 
 --- @class ManagedComponent : Component, DefaultComponent
 --- @field [integer] CompId -- Child components by their IDs
@@ -554,7 +553,7 @@ M.overrides = function(comp, override)
 	for k, v in pairs(override) do
 		if accepted[k] then
 			local type_v = type(v)
-			if vim.tbl_contains(accepted[k], type_v) then
+			if vim.list_contains(accepted[k], type_v) then
 				if type_v == "table" then
 					-- rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
 					rawset(comp, overrides_component_value(comp[k], v, true))
