@@ -126,10 +126,11 @@ Diff.Interface = {
     process_diff = function(lines)
       -- Adapted from https://github.com/wbthomason/nvim-vcs.lua
       local added, removed, modified = 0, 0, 0
-      for _, line in ipairs(lines) do
+      for i = 1, #lines do
         -- match hunk header like: @@ -12,3 +14,4 @@
         -- captures: old_start, old_count, new_start, new_count
-        local old_start, old_count, new_start, new_count = line:match("^@@ %-([0-9]+),?([0-9]*) %+([0-9]+),?([0-9]*)")
+        local old_start, old_count, new_start, new_count = lines[i]:match(
+          "^@@ %-([0-9]+),?([0-9]*) %+([0-9]+),?([0-9]*)")
 
         if old_start then
           -- convert captures to numbers using same rules as original:
@@ -156,7 +157,7 @@ Diff.Interface = {
       end
       return { added = added, modified = modified, removed = removed }
     end,
-    is_skipped = function (static)
+    is_skipped = function(static)
       return vim.list_contains(static.skip_check.filetypes, vim.bo.filetype)
     end
   },
@@ -174,7 +175,7 @@ Diff.Interface = {
   temp = {}, -- temp storage
   init = function(self, ctx, static)
     -- Initialize temp storage
-    vim.api.nvim_create_autocmd({"BufDelete", "BufWritePost"}, {
+    vim.api.nvim_create_autocmd({ "BufDelete", "BufWritePost" }, {
       callback = function(e)
         ctx.diff_cache[e.buf] = nil
       end
@@ -194,7 +195,7 @@ Diff.Interface = {
         "--", fn.expand('%:t')
       }, { text = true }, function(out)
         self.temp.process = nil
-        local code, stdout = out.code , out.stdout
+        local code, stdout = out.code, out.stdout
         if code == 15 or code == 9 then
           require("witch-line.utils.notifier").info("Killed git diff process")
           return -- killed
@@ -219,15 +220,15 @@ Diff.Interface = {
   end,
   hidden = function(self, ctx, static, session_id)
     local filepath = vim.fn.expand('%:p')
-    if filepath == "" or  ctx.is_skipped(static) then
+    if filepath == "" or ctx.is_skipped(static) then
       local process = self.temp.process
       if process and not process:is_closing() then
         process:kill(15) --SIGTERM
-        vim.defer_fn(function ()
+        vim.defer_fn(function()
           if process and not process:is_closing() then
             process:kill(9)
           end
-        end,1500)
+        end, 1500)
         self.temp.process = nil
       end
       return true
@@ -237,7 +238,7 @@ Diff.Interface = {
 }
 
 --- @type DefaultComponent
-Diff.Added = {
+Diff.Added     = {
   id = Id["git.diff.added"],
   user_events = { "GitDiffUpdate" },
   _plug_provided = true,
