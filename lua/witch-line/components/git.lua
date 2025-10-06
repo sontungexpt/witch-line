@@ -6,7 +6,6 @@ local colors = require("witch-line.constant.color")
 local Branch = {
   id = Id["git.branch"],
   _plug_provided = true,
-  -- user_events = { "GitBranchChanged" },
   static = {
     icon = "",
     skip_check = {
@@ -17,19 +16,48 @@ local Branch = {
         "dashboard",
         "TelescopePrompt"
       },
-      buftypes = {
-      },
     }
   },
   context = {
-    get_head_file_path = function()
-      local fn = vim.fn
-      local git_dir = fn.finddir(".git", ".;")
-      if git_dir ~= "" then
-        return fn.fnamemodify(git_dir, ":p") .. "HEAD"
+    get_head_file_path = function(dir_path)
+      local uv = vim.uv or vim.loop
+      local prev = ''
+      local dir = dir_path or uv.cwd()
+
+      while dir ~= prev do
+        local git_path = dir .. '/.git'
+        local stat = uv.fs_stat(git_path)
+        if stat then
+          if stat.type == 'directory' then
+            return git_path .. '/HEAD'
+          elseif stat.type == 'file' then
+            local fd = io.open(git_path, 'r')
+            if fd then
+              local line = fd:read('*l')
+              fd:close()
+              if line and line:find('^gitdir: ') then
+                local gitdir = line:sub(9):match('^%s*(.-)%s*$')
+                return vim.fn.simplify(dir .. '/' .. gitdir .. '/HEAD')
+              end
+            end
+          end
+        end
+
+        prev = dir
+        dir = dir:match('^(.*)[/\\][^/\\]+$') or dir
       end
       return nil
-    end,
+    end
+
+    -- The slower but simpler version
+    -- get_head_file_path = function()
+    --   local fn = vim.fn
+    --   local git_dir = fn.finddir(".git", ".;")
+    --   if git_dir ~= "" then
+    --     return fn.fnamemodify(git_dir, ":p") .. "HEAD"
+    --   end
+    --   return nil
+    -- end,
   },
   init = function(self, ctx, static)
     local uv = vim.uv or vim.loop
@@ -56,18 +84,17 @@ local Branch = {
 
       -- Update state
       last_head_file_path = new_path
+      self.temp = new_path -- store current HEAD path to reuse in update()
       -- Trigger immediately so the branch text updates
       refresh_component_graph(self)
     end --
 
-    api.nvim_create_autocmd("BufEnter", {
+    api.nvim_create_autocmd({ "BufEnter"}, {
       callback = function(e)
-        if vim.list_contains(static.skip_check.filetypes, vim.bo[e.buf].filetype)
-            or vim.list_contains(static.skip_check.buftypes, vim.bo[e.buf].buftype)
-        then
+        if vim.list_contains(static.skip_check.filetypes, vim.bo[e.buf].filetype) then
           return
         end
-        local head_file_path = ctx.get_head_file_path()
+        local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
 
         -- Case 1: Entering first buffer (Neovim just opened)
         -- last_head_file_path = nil
@@ -99,7 +126,7 @@ local Branch = {
   style = { fg = colors.green },
   update = function(self, ctx, static)
     local branch = ""
-    local head_file_path = ctx.get_head_file_path()
+    local head_file_path = self.temp
     if head_file_path then
       local head_file = io.open(head_file_path, "r")
       if head_file then
@@ -119,7 +146,7 @@ local Diff     = {}
 --- @type DefaultComponent
 Diff.Interface = {
   id = Id["git.diff.interface"],
-  events = { "BufWritePost", "BufEnter" },
+  events = { "BufWritePost", "BufEnter", "FileChangedShellPost" },
   _plug_provided = true,
   context = {
     diff_cache = {}, -- Stores last known value of diff of a buffer
