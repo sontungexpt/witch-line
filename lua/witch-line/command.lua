@@ -7,7 +7,7 @@ local commands = {
 	end,
 
 	inspect = {
-		cache_data = function(...)
+		cache_data = function()
 			require("witch-line.cache").inspect()
 		end,
 		comp_manager = {

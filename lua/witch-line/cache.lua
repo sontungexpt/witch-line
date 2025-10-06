@@ -89,10 +89,10 @@ end
 M.clear = function()
 	uv.fs_unlink(CACHED_FILE, function (err)
     if err then
-      require("witch-line.utils.notifier").error("Error while deleting cache")
+      require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
     else
       Data = {}
-      require("witch-line.utils.notifier").info("Cache deleted successfully")
+      require("witch-line.utils.notifier").info("Cache deleted successfully. Please restart Neovim for changes to take effect.")
     end
 	end)
 end

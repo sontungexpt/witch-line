@@ -1,4 +1,4 @@
 ---@class Id : string, number
----@alias NotString table|number|boolean|function|nil|thread|userdata
----@alias NotNil string|table|number|boolean|function|thread|userdata
+---@alias NotString table|number|boolean|function|nil
+---@alias NotNil string|table|number|boolean|function
 ---@alias NotFunction string|table|number|boolean|nil
