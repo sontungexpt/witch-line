@@ -2,7 +2,7 @@ local vim, concat, type = vim, table.concat, type
 local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywidth
 local M = {}
 
---- @type table<integer, true> The set of indices of components that are frozen (not cleared on Vim exit). It's contains the idx of string component in Values list.
+--- @type integer[] The set of indices of components that are frozen (not cleared on Vim exit). It's contains the idx of string component in Values list.
 local Frozens = {
 	-- [1] = true,
 	-- [2] = true,
@@ -64,7 +64,7 @@ end
 
 
 --- Inspects the current statusline values.
---- @param t "flexible_priority_sorted"|"frozens"|"idx_hl_map"|"cache_highlighted_values" |nil If provided, inspects the specified internal table; otherwise, inspects the Values table.
+--- @param t "flexible_priority_sorted"|"frozens"|"idx_hl_map"|"cache_highlighted_values"|"values"|nil If provided, inspects the specified internal table; otherwise, inspects the Values table.
 M.inspect = function(t)
 	local notifier = require("witch-line.utils.notifier")
 	if t == "flexible_priority_sorted" then
@@ -75,7 +75,7 @@ M.inspect = function(t)
 		notifier.info(vim.inspect(IdxHlMap))
 	elseif t == "cache_highlighted_values" then
 		notifier.info(vim.inspect(CachedHighlightedValues))
-	else
+	elseif t == nil or t == "values" then
 		notifier.info(vim.inspect(Values))
 	end
 end
@@ -102,8 +102,10 @@ end
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
 	M.empty_values(function(idx)
-		return not Frozens[idx]
+		return not vim.list_contains(Frozens, idx)
 	end)
+
+  CacheDataAccessor.set("Frozens", Frozens)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
 	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
@@ -118,25 +120,23 @@ M.load_cache = function(CacheDataAccessor)
 	local before_values_size = ValuesSize
 	local before_flexible_priority_sorted = FlexiblePrioritySorted
 	local before_flexible_priority_sorted_len = FlexiblePrioritySortedLen
+  local before_frozens = Frozens
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
 	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
 	FlexiblePrioritySortedLen = CacheDataAccessor.get("FlexiblePrioritySortedLen") or FlexiblePrioritySortedLen
+  Frozens = CacheDataAccessor.get("Frozens") or Frozens
+
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
 		FlexiblePrioritySorted = before_flexible_priority_sorted
 		FlexiblePrioritySortedLen = before_flexible_priority_sorted_len
+    Frozens = before_frozens
 	end
 end
 
---- Clears all statusline values and resets the statusline to a single space.
-M.clear = function()
-	Values = {}
-	ValuesSize = 0
-	o.statusline = " "
-end
 
 
 --- Gets the current size of the statusline values.
@@ -227,7 +227,7 @@ end
 --- Marks a component's value as frozen, preventing it from being cleared on Vim exit.
 --- @param idx integer The index of the component to freeze.
 M.freeze = function(idx)
-	Frozens[idx] = true
+  Frozens[#Frozens + 1] = idx
 end
 
 --- Sets the value for multiple components at once.
@@ -342,7 +342,7 @@ M.setup = function(disabled_config)
 					api.nvim_set_option_value("laststatus", 0, {})
 				else
 					return -- no change no need to redrawstatus
-				end
+      end
 
 				if api.nvim_get_mode().mode == "c" then
 					vim.cmd("redrawstatus")

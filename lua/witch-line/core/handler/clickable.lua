@@ -1,6 +1,6 @@
 local M            = {}
 
-local Prefix       = "WLClickable"
+local PREFIX       = "WL_Clickable_"
 
 --- Assign a function name to a clickable component value.
 M.assign_func_name = function(value, fun_name)
@@ -23,17 +23,29 @@ end
 
 
 --- Register a function to be called when a clickable component is clicked.
---- @param comp DefaultComponent The component to register the click event for.
+--- @param comp Component The component to register the click event for.
+--- @return string The function name to be used in the component's value. If no valid function is found, returns an empty string.
 M.register_click_event = function(comp)
-  local func_name = Prefix .. comp.id
-  if not _G[func_name] then
-    _G[func_name] = function(...)
-      comp.on_click(comp, ...)
-    end
+  local on_click=  comp.on_click
+  local func_name =  PREFIX .. comp.id
+
+  if type(on_click) == "table" then
+    func_name = on_click.name or func_name
+    on_click = on_click.callback
   end
-  return "v:lua." .. func_name
+
+  local t = type(on_click)
+  if t == "string" then
+    return "v:lua." .. on_click
+  elseif t == "function"  and not _G[func_name] then
+    _G[func_name] = function(...)
+      on_click(comp, ...)
+    end
+    return "v:lua." .. func_name
+  end
+
+  require("witch-line.utils.notifier").error("on_click must be a function or a table with callback method")
+  return ""
 end
-
-
 
 return M

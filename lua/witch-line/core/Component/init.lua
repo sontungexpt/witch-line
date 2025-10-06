@@ -43,6 +43,7 @@ local SepStyle = {
 --- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
+--- @alias OnClickFunc fun(self: ManagedComponent, button: string, minwid: string, clicks: number, mouse_bufnr: number)
 ---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
@@ -149,7 +150,7 @@ local SepStyle = {
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
---- @field on_click nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId, button: string): boolean called when the component is clicked, can be used to handle click events. (Unsupported yet)
+--- @field on_click nil|OnClickFunc|string|{callback: OnClickFunc|string, name: string|nil} A function that will be called when the component is clicked
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded boolean|nil If true, the component is loaded
@@ -558,9 +559,12 @@ M.overrides = function(comp, override)
 
 	local accepted = require("witch-line.core.Component.overridable_types")
 	for k, v in pairs(override) do
-		if accepted[k] then
+    local types_accepted = accepted[k]
+		if types_accepted then
 			local type_v = type(v)
-			if vim.list_contains(accepted[k], type_v) then
+			if type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
+        or  types_accepted == type_v -- single type
+      then
 				if type_v == "table" then
 					-- rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
 					rawset(comp, overrides_component_value(comp[k], v, true))
