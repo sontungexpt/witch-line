@@ -237,7 +237,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `git.removed`      | `git.lua`        | Number of removed lines in Git diff        |
 | `git.modified`     | `git.lua`        | Number of changed lines in Git diff        |
 | `datetime`         | `datetime.lua`   | Displays current date and time             |
-| `battery`          | `battery.lua`    | Shows linux battery status (if applicable) |
+| `battery`          | `battery.lua`    | Shows battery status (if applicable) |
 | `os_uname`         | `os_uname.lua`   | Displays the operating system name         |
 | `nvim_dap`         | `nvim_dap.lua`   | Shows nvim-dap status (if available)       |
 
