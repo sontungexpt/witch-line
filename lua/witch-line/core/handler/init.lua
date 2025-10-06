@@ -325,8 +325,9 @@ local function build_indices(comp)
 end
 --- Register a component node, which may include nested components.
 --- @param comp Component The component to register.
+--- @param parent_id CompId|nil The ID of the parent component, if any.
 --- @return Component The registered component. Nil if registration failed.
-local function register_component(comp)
+local function register_component(comp, parent_id)
 	-- Avoid recursion for already loaded components
 	if comp._loaded then
 		build_indices(comp)
@@ -366,6 +367,11 @@ local function register_component(comp)
 	-- Example: { { child1, child2, ... } }
 	-- Example: { child1, child2, ... }
 	if not vim.islist(comp) then
+		-- Set parent inheritance if applicable
+		if parent_id and not comp.inherit then
+			rawset(comp, "inherit", parent_id)
+		end
+
 		-- Every component is treat as an abstract component
 		-- The difference is that abstract components are not rendered directly
 		-- but they can be dependencies of other components
@@ -406,21 +412,15 @@ function M.register_combined_component(comp, parent_id)
 		if not c then
 			return register_literal_comp(comp)
 		end
-		comp = register_component(c)
+		comp = register_component(c, parent_id)
 	elseif kind == "table" and next(comp) then
-		comp = register_component(comp)
+		comp = register_component(comp, parent_id)
 	else
 		-- Invalid component type
 		return nil
 	end
 
 	-- If the component is not a literal component then it will drop by here
-
-	-- Set parent inheritance if applicable
-	if parent_id and not comp.inherit then
-		rawset(comp, "inherit", parent_id)
-	end
-
 	for i, child in ipairs(comp) do
 		M.register_combined_component(child, comp.id)
 		rawset(comp, i, nil) -- Remove child to avoid duplication
