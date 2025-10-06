@@ -62,7 +62,7 @@ local Copilot = {
 						-- don't need to get status when in TelescopePrompt
 						if get_option("buftype", { buf = 0 }) == "prompt" then
 							return
-						end
+          end
 
 						status = string.lower(data.status or "")
 

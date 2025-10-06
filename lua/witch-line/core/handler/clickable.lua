@@ -1,10 +1,8 @@
 local M            = {}
 
 local Prefix       = "WLClickable"
-local FuncStore    = {
 
-}
-
+--- Assign a function name to a clickable component value.
 M.assign_func_name = function(value, fun_name)
     return value ~= "" and "%@" .. fun_name .. "@" .. value .. "%X" or ""
 end
@@ -25,17 +23,17 @@ end
 
 
 --- Register a function to be called when a clickable component is clicked.
---- @param id CompId string The unique identifier for the clickable component.
---- @param func function The function to be called when the component is clicked.
-M.register_on_click = function(id, func)
-    FuncStore[id] = func
+--- @param comp DefaultComponent The component to register the click event for.
+M.register_click_event = function(comp)
+  local func_name = Prefix .. comp.id
+  if not _G[func_name] then
+    _G[func_name] = function(...)
+      comp.on_click(comp, ...)
+    end
+  end
+  return "v:lua." .. func_name
 end
 
-M.init = function()
-    for id, func in pairs(FuncStore) do
-        _G[Prefix .. id] = func
-    end
-end
 
 
 return M
