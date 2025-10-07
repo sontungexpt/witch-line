@@ -87,14 +87,13 @@ local function update_component(comp, session_id)
 					end
 				end
 
-				Statusline.bulk_set(indices, value, comp._hl_name)
-
-
 				local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
 				if left then
 					Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
 					Statusline.bulk_set_sep(indices, -1, left, comp._left_hl_name)
 				end
+
+				Statusline.bulk_set(indices, value, comp._hl_name)
 
 				if right then
 					Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)

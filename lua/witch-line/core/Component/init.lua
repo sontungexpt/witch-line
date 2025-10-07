@@ -45,6 +45,11 @@ local SepStyle = {
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
 --- @alias OnClickFunc fun(self: ManagedComponent, button: string, minwid: string, clicks: number, mouse_bufnr: number)
 ---
+--- @class OnClickTable
+--- @field callback OnClickFunc|string The function to call when the component is clicked
+--- @field name string|nil The name of the function to register, if not provided a name will be generated
+--- @field minwid integer|nil|fun(self: ManagedComponent): integer|nil The minwid to pass to the function, if not provided no minwid will be passed
+---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
 --- @field version integer|string|nil
@@ -150,7 +155,7 @@ local SepStyle = {
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
---- @field on_click nil|OnClickFunc|string|{callback: OnClickFunc|string, name: string|nil} A function that will be called when the component is clicked
+--- @field on_click nil|string|OnClickFunc|OnClickTable A function that will be called when the component is clicked
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded boolean|nil If true, the component is loaded
@@ -169,8 +174,6 @@ local SepStyle = {
 --- @field [integer] CompId -- Child components by their IDs
 --- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
 --- @field _loaded true Always true, indicates that the component has been loaded
-
-
 
 --- Check if is default component
 --- @param comp Component the component to get the id from
@@ -444,8 +447,10 @@ M.evaluate_left_right = function(comp, session_id, ctx, static)
 	else
 		-- nil means no need to update
 		-- Why?
-		-- Because in case the left or right is string type
-		-- It never update so we don't need to set statusline again
+		-- Because in this case the component is visible and initialized already
+		-- So the left and right are already set in the statusline
+		-- And we ensure that if they are string they will never change
+		-- Unless they are function type which we need to call it again to get the new value
 		if type(left) == "function" then
 			left = left(comp, ctx, static, session_id)
 			if type(left) ~= "string" then
@@ -559,12 +564,12 @@ M.overrides = function(comp, override)
 
 	local accepted = require("witch-line.core.Component.overridable_types")
 	for k, v in pairs(override) do
-    local types_accepted = accepted[k]
+		local types_accepted = accepted[k]
 		if types_accepted then
 			local type_v = type(v)
 			if type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
-        or  types_accepted == type_v -- single type
-      then
+				or types_accepted == type_v -- single type
+			then
 				if type_v == "table" then
 					-- rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
 					rawset(comp, overrides_component_value(comp[k], v, true))

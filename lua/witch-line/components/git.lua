@@ -19,35 +19,73 @@ local Branch = {
     }
   },
   context = {
-    get_head_file_path = function(dir_path)
+    -- get_head_file_path = function(dir_path)
+    --   local uv = vim.uv or vim.loop
+    --   local prev = ''
+    --   local dir = dir_path or uv.cwd()
+
+    --   while dir ~= prev do
+    --     local git_path = dir .. '/.git'
+    --     local stat = uv.fs_stat(git_path)
+    --     if stat then
+    --       if stat.type == 'directory' then
+    --         return git_path .. '/HEAD'
+    --       elseif stat.type == 'file' then
+    --         local fd = io.open(git_path, 'r')
+    --         if fd then
+    --           local line = fd:read('*l')
+    --           fd:close()
+    --           local gitdir = line:match("^gitdir:%s*(.-)%s*$")
+    --           if gitdir then
+    --             -- Handle relative gitdir path
+    --             if not gitdir:match("^/") and not gitdir:match("^%a:[/\\]") then
+    --               gitdir = dir .. "/" .. gitdir
+    --             end
+    --             -- Normalize and verify
+    --             return uv.fs_realpath(gitdir .. '/HEAD')
+    --           end
+    --         end
+    --       end
+    --     end
+
+    --     prev = dir
+    --     dir = dir:match('^(.*)[/\\][^/\\]+$') or dir
+    --   end
+    --   return nil
+    -- end,
+    get_root_by_git = function(dir_path)
       local uv = vim.uv or vim.loop
       local prev = ''
       local dir = dir_path or uv.cwd()
-
       while dir ~= prev do
         local git_path = dir .. '/.git'
         local stat = uv.fs_stat(git_path)
         if stat then
           if stat.type == 'directory' then
-            return git_path .. '/HEAD'
+            return dir
           elseif stat.type == 'file' then
             local fd = io.open(git_path, 'r')
             if fd then
               local line = fd:read('*l')
               fd:close()
-              if line and line:find('^gitdir: ') then
-                local gitdir = line:sub(9):match('^%s*(.-)%s*$')
-                return vim.fn.simplify(dir .. '/' .. gitdir .. '/HEAD')
+              local gitdir = line:match("^gitdir:%s*(.-)%s*$")
+              if gitdir then
+                -- Handle relative gitdir path
+                if not gitdir:match("^/") and not gitdir:match("^%a:[/\\]") then
+                  gitdir = dir .. "/" .. gitdir
+                end
+                -- Normalize and verify
+                return uv.fs_realpath(gitdir)
               end
             end
           end
         end
 
         prev = dir
-        dir = dir:match('^(.*)[/\\][^/\\]+$') or dir
+        dir = dir:match('^(.*)[/\\][^/\\]+$') or dir -- fallback to prevent infinite loop when reaching root
       end
       return nil
-    end
+    end,
 
     -- The slower but simpler version
     -- get_head_file_path = function()
@@ -60,21 +98,21 @@ local Branch = {
     -- end,
   },
   init = function(self, ctx, static)
-    local uv = vim.uv or vim.loop
-    local api = vim.api
+    local uv, api = vim.uv or vim.loop, vim.api
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
-
 
     local is_win = uv.os_uname().sysname == "Windows_NT"
     local file_changed = is_win and uv.new_fs_poll() or uv.new_fs_event()
 
-    local last_head_file_path = nil
+    -- local last_head_file_path = nil
+    local last_root_dir = nil
+
     -- helper: restart watcher + trigger event
-    local function update_repo(new_path)
+    local function update_repo(new_dir_path)
       file_changed:stop()
 
-      if new_path then
-        file_changed:start(new_path,
+      if new_dir_path then
+        file_changed:start(new_dir_path,
           is_win and 1000 or {},
           vim.schedule_wrap(function()
             refresh_component_graph(self)
@@ -83,40 +121,52 @@ local Branch = {
       end
 
       -- Update state
-      last_head_file_path = new_path
-      self.temp = new_path -- store current HEAD path to reuse in update()
+      -- last_head_file_path = new_dir_path
+      last_root_dir = new_dir_path
+      self.temp = new_dir_path -- store current dir path that contains .git to use in update()
       -- Trigger immediately so the branch text updates
       refresh_component_graph(self)
-    end --
+    end
 
-    api.nvim_create_autocmd({ "BufEnter"}, {
+    api.nvim_create_autocmd({ "BufEnter" }, {
       callback = function(e)
         if vim.list_contains(static.skip_check.filetypes, vim.bo[e.buf].filetype) then
           return
         end
-        local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
+
+        local parent_dir = e.file:gsub("\\", "/"):match("^(.*)/[^/]*$")
+        if not parent_dir then
+          update_repo(nil)
+          return
+        elseif last_root_dir and parent_dir:sub(1, #last_root_dir) == last_root_dir then
+          return -- still in the same repo
+        end
+
+        local new_root_dir = ctx.get_root_by_git(parent_dir)
+
+        --local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
 
         -- Case 1: Entering first buffer (Neovim just opened)
-        -- last_head_file_path = nil
+        -- last_root_dir = nil
         -- If buffer belongs to a git repo -> update
-        if last_head_file_path == nil and head_file_path ~= nil then
-          update_repo(head_file_path)
+        if new_root_dir ~= nil and last_root_dir == nil then
+          update_repo(new_root_dir)
 
           -- Case 2: Entering another buffer in the same repository
           -- Both HEAD paths are the same -> no update
-        elseif head_file_path == last_head_file_path then
+        elseif new_root_dir == last_root_dir then
           return
 
           -- Case 3: Entering a buffer from a different repository
           -- HEAD path changed -> update
-        elseif head_file_path ~= nil and head_file_path ~= last_head_file_path then
-          update_repo(head_file_path)
+        elseif new_root_dir ~= nil and new_root_dir ~= last_root_dir then
+          update_repo(new_root_dir)
 
           -- Case 4: Entering a buffer outside of any git repository
-          -- head_file_path = nil
+          -- new_root_dir = nil
           -- If we previously were in a git repo -> clear and update
-        elseif head_file_path == nil then
-          if last_head_file_path ~= nil then
+        elseif new_root_dir == nil then
+          if last_root_dir ~= nil then
             update_repo(nil)
           end
         end
@@ -125,8 +175,12 @@ local Branch = {
   end,
   style = { fg = colors.green },
   update = function(self, ctx, static)
+    if not self.temp then
+      return ""
+    end
+
     local branch = ""
-    local head_file_path = self.temp
+    local head_file_path = self.temp .. "/.git/HEAD"
     if head_file_path then
       local head_file = io.open(head_file_path, "r")
       if head_file then
