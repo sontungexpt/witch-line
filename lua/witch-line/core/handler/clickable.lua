@@ -29,43 +29,26 @@ end
 --- Register a function to be called when a clickable component is clicked.
 --- @param comp Component The component to register the click event for.
 --- @return string fun_name The function name to be used in the component's value. If no valid function is found, returns an empty string.
---- @return integer|nil minwid The minwid to be used in the component's value. If no minwid is found, returns nil.
 M.register_click_event = function(comp)
   local on_click = comp.on_click
-  local func_name = PREFIX .. comp.id
-
-
-  --- @type  integer|nil|fun(self: ManagedComponent): integer|nil
-  local minwid = nil
-
-
+  -- rm dot in function name
+  local func_name = (PREFIX .. comp.id):gsub("%.", "_")
   if type(on_click) == "table" then
     func_name = on_click.name or func_name
     on_click = on_click.callback
-    minwid = on_click.minwid
-    if type(minwid) == "function" then
-      minwid = minwid(comp)
-    end
   end
 
   local t = type(on_click)
   if t == "string" and _G[on_click] then
-    return "v:lua." .. on_click, minwid
+    return "v:lua." .. on_click
   elseif t == "function" then
     if not _G[func_name] then
       _G[func_name] = function(...)
         on_click(comp, ...)
       end
     end
-    return "v:lua." .. func_name, minwid
+    return "v:lua." .. func_name
   end
-
-  require("witch-line.utils.notifier").error(
-    string.format(
-      "Invalid on_click handler for component id '%s'. Expected function or existed function name string, got %s.",
-      comp.id,
-      t)
-  )
   return ""
 end
 
