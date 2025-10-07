@@ -4,8 +4,7 @@ local M = {}
 
 --- @type integer[] The set of indices of components that are frozen (not cleared on Vim exit). It's contains the idx of string component in Values list.
 local Frozens = {
-	-- [1] = true,
-	-- [2] = true,
+	-- 1, 2, 3
 }
 
 
@@ -105,7 +104,7 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 		return not vim.list_contains(Frozens, idx)
 	end)
 
-  CacheDataAccessor.set("Frozens", Frozens)
+	CacheDataAccessor.set("Frozens", Frozens)
 	CacheDataAccessor.set("Statusline", Values)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
 	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
@@ -120,24 +119,22 @@ M.load_cache = function(CacheDataAccessor)
 	local before_values_size = ValuesSize
 	local before_flexible_priority_sorted = FlexiblePrioritySorted
 	local before_flexible_priority_sorted_len = FlexiblePrioritySortedLen
-  local before_frozens = Frozens
+	local before_frozens = Frozens
 
 	Values = CacheDataAccessor.get("Statusline") or Values
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
 	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
 	FlexiblePrioritySortedLen = CacheDataAccessor.get("FlexiblePrioritySortedLen") or FlexiblePrioritySortedLen
-  Frozens = CacheDataAccessor.get("Frozens") or Frozens
+	Frozens = CacheDataAccessor.get("Frozens") or Frozens
 
 	return function()
 		Values = before_values
 		ValuesSize = before_values_size
 		FlexiblePrioritySorted = before_flexible_priority_sorted
 		FlexiblePrioritySortedLen = before_flexible_priority_sorted_len
-    Frozens = before_frozens
+		Frozens = before_frozens
 	end
 end
-
-
 
 --- Gets the current size of the statusline values.
 --- @return integer size The current size of the statusline values.
@@ -153,33 +150,19 @@ local function build_highlighted_values(skip)
 	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
 	local merged = {}
-	if not skip or next(skip) == nil then
-		for i = 1, ValuesSize do
+	for i = 1, ValuesSize do
+		if not skip or not skip[i] then
 			local cached = CachedHighlightedValues[i]
 			if cached then
-				merged[i] = cached
+				merged[#merged + 1] = cached
 			else
 				local hl_name = IdxHlMap[i]
 				cached = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
-				merged[i], CachedHighlightedValues[i] = cached, cached
+				merged[#merged + 1], CachedHighlightedValues[i] = cached, cached
 			end
 		end
-		return merged
-	else
-		for i = 1, ValuesSize do
-			if not skip[i] then
-				local cached = CachedHighlightedValues[i]
-				if cached then
-					merged[#merged + 1] = cached
-				else
-					local hl_name = IdxHlMap[i]
-					cached = hl_name and assign_highlight_name(Values[i], hl_name) or Values[i]
-					merged[#merged + 1], CachedHighlightedValues[i] = cached, cached
-				end
-			end
-		end
-		return merged
 	end
+	return merged
 end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
@@ -227,7 +210,7 @@ end
 --- Marks a component's value as frozen, preventing it from being cleared on Vim exit.
 --- @param idx integer The index of the component to freeze.
 M.freeze = function(idx)
-  Frozens[#Frozens + 1] = idx
+	Frozens[#Frozens + 1] = idx
 end
 
 --- Sets the value for multiple components at once.
@@ -342,7 +325,7 @@ M.setup = function(disabled_config)
 					api.nvim_set_option_value("laststatus", 0, {})
 				else
 					return -- no change no need to redrawstatus
-      end
+				end
 
 				if api.nvim_get_mode().mode == "c" then
 					vim.cmd("redrawstatus")
