@@ -266,14 +266,10 @@ end
 
 --- Determines if the component's style should be updated.
 --- @param comp Component the component to checks
---- @param style table|nil the current style of the component
 --- @param ref_comp Component the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
-M.needs_style_update = function(comp, style, ref_comp)
-  local type_style = type(style)
-	if type_style ~= "table" and type_style ~= "string" then
-		return false
-	elseif not comp._hl_name then
+M.needs_style_update = function(comp, ref_comp)
+	if not comp._hl_name then
 		return true
 	elseif type(ref_comp.style) == "function" then
 		return true
@@ -288,12 +284,13 @@ end
 --- @param force boolean|nil if true, forces the style to be updated even if it doesn't need to be
 --- @return boolean updated true if the style was updated, false otherwise
 M.update_style = function(comp, style, ref_comp, force)
-	if not force and not M.needs_style_update(comp, style, ref_comp) then
+  if not style then
+    return false
+  elseif not force and not M.needs_style_update(comp,  ref_comp) then
 		return false
 	end
 	M.ensure_hl_name(comp, ref_comp)
-	Highlight.highlight(comp._hl_name, style)
-	return true
+	return Highlight.highlight(comp._hl_name, style)
 end
 
 --- Determines if the separator style needs to be updated.
@@ -335,7 +332,7 @@ end
 --- @param static any The `static` field value to pass to the component's update function
 --- @return boolean updated true if the style was updated, false otherwise
 M.update_side_style = function(comp, side, main_style, main_style_updated, session_id, ctx, static)
-	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id)
+	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id) or SepStyle.SepBg
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
@@ -343,16 +340,6 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 	M.ensure_side_hl_name(comp, side)
 
 	local hl_name_field = "_" .. side .. "_hl_name"
-	local side_hl_name = comp[hl_name_field]
-
-	local type_side_style = type(side_style)
-	if type_side_style == "table" or type_side_style == "string" then
-		Highlight.highlight(side_hl_name, side_style)
-		return true
-	elseif type_side_style == "nil" then
-		--- inherits from main style
-		side_style = SepStyle.SepBg
-	end
 
 	if type(side_style) == "number" and main_style then
 		if side_style == SepStyle.SepFg then
@@ -372,14 +359,13 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 			}
 		elseif side_style == SepStyle.Inherited then
 			rawset(comp, hl_name_field, comp._hl_name)
+      return true
 		else
 			--- invalid styles
 			return false
 		end
-		Highlight.highlight(side_hl_name, side_style)
-		return true
 	end
-	return false
+  return Highlight.highlight(comp[hl_name_field], side_style)
 end
 
 
