@@ -266,7 +266,7 @@ end
 
 --- Determines if the component's style should be updated.
 --- @param comp Component the component to checks
---- @param style table|nil the current style of the component
+--- @param style vim.api.keyset.highlight|string|nil the current style of the component
 --- @param ref_comp Component the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
 M.needs_style_update = function(comp, style, ref_comp)
@@ -335,7 +335,7 @@ end
 --- @param static any The `static` field value to pass to the component's update function
 --- @return boolean updated true if the style was updated, false otherwise
 M.update_side_style = function(comp, side, main_style, main_style_updated, session_id, ctx, static)
-	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id)
+	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id) or SepStyle.SepBg
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
@@ -349,9 +349,6 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 	if type_side_style == "table" or type_side_style == "string" then
 		Highlight.highlight(side_hl_name, side_style)
 		return true
-	elseif type_side_style == "nil" then
-		--- inherits from main style
-		side_style = SepStyle.SepBg
 	end
 
 	if type(side_style) == "number" and main_style then

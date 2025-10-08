@@ -1,5 +1,12 @@
-local vim, concat, type = vim, table.concat, type
-local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywidth
+local vim, concat, type, ipairs = vim, table.concat, type, ipairs
+local o, bo, api= vim.o, vim.bo, vim.api
+local ffi = require("ffi")
+
+ffi.cdef[[
+  size_t mb_string2cells_len(const char *str, size_t size)
+]]
+local mb_string2cells_len = ffi.C.mb_string2cells_len
+
 
 local M = {}
 
@@ -18,6 +25,9 @@ local M = {}
 --- @field _cached_highlighted_value? string|nil The cached merged value with highlight group name. ( Not be cached )
 --- @field _cached_left_highlighted_value? string|nil The cached merged left value with highlight group name. ( Not be cached )
 --- @field _cached_right_highlighted_value? string|nil The cached merged right value with highlight group name. ( Not be cached )
+---
+
+local Disabled = false
 
 --- @type Segment[] The list of statusline components.
 local Statusline = {
@@ -210,11 +220,11 @@ end
 --- @return integer width The total display width of the component including its left and right parts.
 local compute_segment_width = function (segment)
   local width = segment._cached_total_display_width
-  if width then
-    return width
-  end
-  -- Safely concatenate without repeated string allocations
-  width = strdisplaywidth((segment.left or "") .. segment.value .. (segment.right or ""))
+  if width then return width end
+
+  local left, value, right = segment.left, segment.value, segment.right
+  width = (left and mb_string2cells_len(left, #left) or 0)
+    + mb_string2cells_len(value, #value) + (right and mb_string2cells_len(right, #right) or 0)
   segment._cached_total_display_width = width
   return width
 end
@@ -236,7 +246,9 @@ M.compute_statusline_width = compute_statusline_width
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param max_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
 M.render = function(max_width)
-	if FlexiblePrioritySortedLen == 0 then
+  if Disabled then
+    return
+  elseif FlexiblePrioritySortedLen == 0 then
 		local str = concat(build_values())
 		o.statusline = str ~= "" and str or " "
 		return
@@ -267,16 +279,13 @@ end
 --- @return integer new_idx The index of the newly added value.
 M.push = function(value, left_value, right_value, frozen)
 	ValuesSize = ValuesSize + 1
-  local new_segment  = {
+  --- @type Segment
+  Statusline[ValuesSize] = {
     value = value,
     left = left_value,
     right = right_value,
     frozen = frozen,
   }
-  if frozen then
-    new_segment._total_display_width = compute_segment_width(new_segment)
-  end
-  Statusline[ValuesSize] = new_segment
 	return ValuesSize
 end
 
@@ -390,12 +399,12 @@ M.setup = function(disabled_config)
 		callback = function(e)
 			local buf = e.buf
 			vim.schedule(function()
-				local disabled = M.is_buf_disabled(buf, disabled_config)
+				Disabled = M.is_buf_disabled(buf, disabled_config)
 
-				if not disabled and o.laststatus == 0 then
+				if not Disabled and o.laststatus == 0 then
 					api.nvim_set_option_value("laststatus", user_laststatus, {})
 					M.render() -- rerender statusline immediately
-				elseif disabled and o.laststatus ~= 0 then
+				elseif Disabled and o.laststatus ~= 0 then
 					api.nvim_set_option_value("laststatus", 0, {})
 				else
 					return -- no change no need to redrawstatus

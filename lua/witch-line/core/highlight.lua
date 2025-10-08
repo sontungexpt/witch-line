@@ -107,13 +107,6 @@ M.assign_highlight_name = function(str, hl_name)
 	return hl_name and str ~= "" and "%#" .. hl_name .. "#" .. str .. "%*" or str
 end
 
-M.is_hl_name = function(hl_name)
-	return type(hl_name) == "string" and hl_name ~= ""
-end
-
-M.is_hl_styles = function(hl_styles)
-	return type(hl_styles) == "table" and next(hl_styles)
-end
 
 --- Retrieves the highlight information for a given highlight group name.
 --- @param hl_name string The highlight group name.
