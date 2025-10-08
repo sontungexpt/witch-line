@@ -10,7 +10,7 @@ local M = {}
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
 
----@type table<string, vim.api.keyset.get_hl_info>
+---@type table<string, vim.api.keyset.highlight>
 local Styles = {}
 
 --- Retrieves the style for a given component.
@@ -134,14 +134,23 @@ M.get_hlprop = get_hlprop
 
 --- Defines or updates a highlight group with the specified styles.
 ---@param group_name string The highlight group name.
----@param hl_style vim.api.keyset.highlight The highlight styles to apply.
+---@param hl_style string|vim.api.keyset.highlight The highlight styles to apply.
 M.highlight = function(group_name, hl_style)
-	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
+	if group_name == "" then
 		return
 	end
-	Styles[group_name] = hl_style
-	local style = shallow_copy(hl_style)
 
+  local hl_style_type = type(hl_style)
+  if hl_style_type == "string" and hl_style ~="" then
+    nvim_set_hl(0, group_name, { link = hl_style, default = true} )
+    return
+  elseif hl_style_type ~="table" or not next(hl_style) then
+    return
+  end
+
+	Styles[group_name] = hl_style
+
+	local style = shallow_copy(hl_style)
 	local fg = style.foreground or style.fg
 	local bg = style.background or style.bg
 

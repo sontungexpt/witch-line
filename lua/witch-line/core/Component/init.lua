@@ -40,9 +40,9 @@ local SepStyle = {
 
 --- @alias PaddingFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
---- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil
---- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
---- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
+--- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil|string
+--- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight|string
+--- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight|SepStyle|string
 --- @alias OnClickFunc fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 ---
 --- @class OnClickTable
@@ -69,9 +69,10 @@ local SepStyle = {
 --- - Example of min_screen_width function: `function(self, ctx, static, session_id) return 80 end`
 --- @field ref Ref|nil A table of references to other components that this component depends on
 --- @field neighbors Neighbor[]|nil A table of neighbor components that this component is related to ( Not implemented yet )
---- @field left_style table|nil|SideStyleFunc
+--- @field left_style string|vim.api.keyset.highlight|nil|SideStyleFunc|SepStyle
 --- A table of styles that will be applied to the left separator of the component
---- - If table: used as is.
+--- - If string: used as a highlight group name.
+--- - If table: used as highlight table properties.
 --- - If nil: inherits from `style` field..
 --- - If SepStyle enum value: special handling based on the enum value.
 --- 	-| SepFg: uses the foreground color of the main style for the separator.
@@ -86,9 +87,10 @@ local SepStyle = {
 --- - If nil: no left part.
 --- - If function: called and its return value is used as the left part.
 --- - Example of left function: `function(self, ctx, static, session_id) return "<" end`
---- @field right_style table|nil|SideStyleFunc
+--- @field right_style string|vim.api.keyset.highlight|nil|SideStyleFunc|SepStyle
 --- A table of styles that will be applied to the right part of the component
---- - If table: used as is.
+--- - If string: used as a highlight group name.
+--- - If table: used as highlight table properties.
 --- - If nil: inherits from `style` field..
 --- - If SepStyle enum value: special handling based on the enum value.
 --- 	-| SepFg: uses the foreground color of the main style for the separator.
@@ -121,8 +123,9 @@ local SepStyle = {
 --- - Example of padding function: `function(self, ctx, static, session_id) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, ctx, static, session_id) return 2 end` (adds 2 spaces to both sides)
 --- @field init nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId) called when the component is initialized, can be used to set up the context
---- @field style vim.api.keyset.highlight|nil|StyleFunc
+--- @field style string|vim.api.keyset.highlight|nil|StyleFunc
 --- A table of styles that will be applied to the component
+--- - If string: used as a highlight group name.
 --- - If table: used as is.
 --- - If nil: No style will be applied.
 --- - If function: called and its return value is used as above.
@@ -267,7 +270,8 @@ end
 --- @param ref_comp Component the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
 M.needs_style_update = function(comp, style, ref_comp)
-	if type(style) ~= "table" then
+  local type_style = type(style)
+	if type_style ~= "table" and type_style ~= "string" then
 		return false
 	elseif not comp._hl_name then
 		return true
@@ -342,7 +346,7 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 	local side_hl_name = comp[hl_name_field]
 
 	local type_side_style = type(side_style)
-	if type_side_style == "table" then
+	if type_side_style == "table" or type_side_style == "string" then
 		Highlight.highlight(side_hl_name, side_style)
 		return true
 	elseif type_side_style == "nil" then
