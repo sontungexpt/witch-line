@@ -111,7 +111,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support ref field to reference other component fields (events, style, static, context, hide, min_screen_width)
   - [x] Support version field to manage component cache
   - [x] Support flexible field to hide component based on priority when space is limited
-  - [ ] Support on_click function to handle click events
+  - [x] Support on_click function to handle click events
   - [ ] Support coroutine for update function
 
 - Hide Automatically
