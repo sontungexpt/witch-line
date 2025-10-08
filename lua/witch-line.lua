@@ -1,4 +1,5 @@
 local require, vim = require, vim
+
 local M = {}
 
 ---@alias BufDisabledConfig {filetypes: string[], buftypes: string[]}

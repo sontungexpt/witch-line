@@ -1,4 +1,4 @@
-type = type
+local type = type
 
 local M = {}
 
@@ -291,26 +291,29 @@ end
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
 --- will only look for static values without calling functions or caching.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
-	local id, value = comp.id, comp[key]
-
+	local id, value = comp.id, rawget(comp, key)
 	local store = require("witch-line.core.Session").get_store(session_id, key, {})
 	if store[id] then
 		return store[id], comp
 	elseif value then
 		if type(value) == "function" then
 			local args = { ... }
-			table.insert(args, session_id)
+      args[#args + 1] = session_id
 			value = value(comp, unpack(args))
 		end
 		store[id] = value
 		return value, comp
 	end
 	local ref = comp.ref
-	if type(ref) ~= "table" then
-		return nil, comp
-	end
-
-	local ref_id = ref[key]
+  --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
+  --- This enables function-based field inheritance without recalculating values.
+  --- Example:
+  --- ```lua
+  --- local Base = { id = "base", context = function() return { foo = "bar" } end }
+  --- local Child = { id = "child", inherit = "base", context = nil }
+  --- ```
+  --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
+  local ref_id = type(ref) == "table" and ref[key] or comp.inherit
 	if not ref_id or seen[ref_id] then
 		return nil, comp
 	end

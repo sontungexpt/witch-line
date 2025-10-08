@@ -1,4 +1,3 @@
--- local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
 --- @type DefaultComponent
@@ -12,10 +11,12 @@ local Interface = {
 		INFO = "",
 		HINT = "",
 	},
-	hidden = function()
-		local filetype = vim.api.nvim_get_option_value("filetype", { buf = 0 })
-		return filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
+  hidden = function (self, ctx, static, session_id)
+		return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 	end,
+  context = function (self, static, session_id)
+    return vim.diagnostic.count(0)
+  end
 }
 
 --- @type DefaultComponent
@@ -26,13 +27,8 @@ local Error = {
 		fg = "DiagnosticError",
 	},
 	inherit = Id["diagnostic.interface"],
-	-- ref = {
-	-- 	events = Id["diagnostic.interface"],
-	-- 	static = Id["diagnostic.interface"],
-	-- 	hide = Id["diagnostic.interface"],
-	-- },
 	update = function(self, ctx, static)
-		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.ERROR })
+    local count = ctx[vim.diagnostic.severity.ERROR] or 0
 		return count > 0 and static.ERROR .. " " .. count or ""
 	end,
 }
@@ -45,13 +41,8 @@ local Warn = {
 	style = {
 		fg = "DiagnosticWarn",
 	},
-	-- ref = {
-	-- 	events = Id["diagnostic.interface"],
-	-- 	static = Id["diagnostic.interface"],
-	-- 	hide = Id["diagnostic.interface"],
-	-- },
 	update = function(self, ctx, static)
-		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.WARN })
+    local count = ctx[vim.diagnostic.severity.WARN] or 0
 		return count > 0 and static.WARN .. " " .. count or ""
 	end,
 }
@@ -64,13 +55,8 @@ local Info = {
 	style = {
 		fg = "DiagnosticInfo",
 	},
-	-- ref = {
-	-- 	events = Id["diagnostic.interface"],
-	-- 	static = Id["diagnostic.interface"],
-	-- 	hide = Id["diagnostic.interface"],
-	-- },
 	update = function(self, ctx, static)
-		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.INFO })
+    local count = ctx[vim.diagnostic.severity.INFO] or 0
 		return count > 0 and static.INFO .. " " .. count or ""
 	end,
 }
@@ -83,13 +69,8 @@ local Hint = {
 	style = {
 		fg = "DiagnosticHint",
 	},
-	-- ref = {
-	-- 	events = Id["diagnostic.interface"],
-	-- 	static = Id["diagnostic.interface"],
-	-- 	hide = Id["diagnostic.interface"],
-	-- },
 	update = function(self, ctx, static)
-		local count = #vim.diagnostic.get(0, { severity = vim.diagnostic.severity.HINT })
+    local count = ctx[vim.diagnostic.severity.HINT] or 0
 		return count > 0 and static.HINT .. " " .. count or ""
 	end,
 }
