@@ -328,7 +328,7 @@ local component = {
 
 - **init**:
 
-  **Type**: `fun(self, ctx, static, session_id) -> Nil`
+  **Type**: `fun(self, ctx, static, session_id) -> nil`
 
   **Description**: A function that initializes the component. It is called once when the component is created right after the component is managed by WitchLine. This accepts the `context` field as the second argument, and `static` as the third argument, so you can use those values to initialize the component. This is useful for setting up any necessary state or configuration for the component before it is used.
 
@@ -403,7 +403,7 @@ local component = {
 
 - **pre_update**:
 
-  **Type**: `fun(self, ctx, static, session_id) -> Nil`
+  **Type**: `fun(self, ctx, static, session_id) -> nil`
 
   **Description**: A function that is called before the component is updated. It is called every time the component needs to be rerendered, right before the `update` function is called. This can be used to perform any necessary actions or calculations before the component is updated. It accepts the `context` field as the second argument, and `static` as the third argument, so you can use those values to perform any necessary actions before the update.
 
@@ -437,7 +437,7 @@ local component = {
 
 - **post_update**:
 
-  **Type**: `fun(self, ctx, static, session_id) -> Nil`
+  **Type**: `fun(self, ctx, static, session_id) -> nil`
 
   **Description**: A function that is called after the component is updated. It is called every time the component is rerendered, right after the `update` function is called. This can be used to perform any necessary actions or calculations after the component is updated. It accepts the `context` field as the second argument, and `static` as the third argument, so you can use those values to perform any necessary actions after the update.
 
@@ -679,6 +679,35 @@ local component = {
               end
           end
       }
+  ```
+
+- **on_click**:
+
+  **Alias**: `OnClickFunc` : `fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil`
+
+  **Type**: `nil|string|OnClickFunc|{name: string, callback: OnClickFunc}`
+
+  **Description**: A function name or a function that is called when the component is clicked. It can be a string representing the name of a global function, a function itself, or a table with `name` and `callback` fields. If it's a table, the `name` field is used to identify the click handler, and the `callback` field is the function that will be called when the component is clicked.
+
+  The function accepts the following parameters:
+
+  - `self`: The component instance.
+  - `minwid`: The minimum width of the component.
+  - `click_times`: The number of clicks (1 for single click, 2 for double click, etc.).
+  - `mouse button`: The mouse button that was clicked (`"l"` for left, `"r"` for right, `"m"` for middle).
+  - `modifier_pressed`: The modifier key that was pressed (`"s"` for Shift, `"c"` for Control, `"a"` for Alt, `"m"` for Meta).
+
+  This can be used to perform any necessary actions when the component is clicked.
+
+  **Example**:
+
+  ```lua
+  local component = {
+      on_click = function(self, ctx, static, session_id, button, clicks, mouse_pos)
+          -- Click handling code here
+          print("Component clicked with button: " .. button .. ", clicks: " .. clicks)
+      end
+  }
   ```
 
 #### Referencing Fields

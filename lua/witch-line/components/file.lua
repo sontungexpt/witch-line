@@ -8,8 +8,6 @@ local Interface = {
 	user_events = { "VeryLazy" },
 	events = {
 		"BufEnter",
-		"BufLeave",
-		"BufWinEnter",
 		"WinEnter",
 	},
 }
@@ -34,7 +32,6 @@ local Name = {
 				["lazy"] = "Lazy",
 				["checkhealth"] = "CheckHealth",
 			},
-
 			buftype = {
 				["terminal"] = "Terminal",
 			},
@@ -42,14 +39,15 @@ local Name = {
 	},
 	padding = { left = 1, right = 0 },
 	update = function(self, context, static)
-		local api = vim.api
+    local bo = vim.bo
 		local formatter = static.formatter
 
-		local filename = formatter.filetype[api.nvim_get_option_value("filetype", { buf = 0 })]
+		local filename = formatter.filetype[bo.filetype]
 		if filename then
 			return filename
 		end
-		filename = formatter.buftype[api.nvim_get_option_value("buftype", { buf = 0 })]
+
+		filename = formatter.buftype[bo.buftype]
 		if filename then
 			return filename
 		end
@@ -69,7 +67,6 @@ local Icon = {
 	},
 	static = {
 		extensions = {
-			-- filetypes = { icon, color, filename(optional) },
 			filetypes = {
 				["NvimTree"] = { "", colors.red },
 				["TelescopePrompt"] = { "", colors.red },
@@ -79,16 +76,14 @@ local Icon = {
 				["plantuml"] = { "", colors.green },
 				["dashboard"] = { "", colors.red },
 			},
-
 			buftypes = {
 				["terminal"] = { "", colors.red },
 			},
 		},
 	},
 	context = function(self, static)
-		local fn, api = vim.fn, vim.api
+		local fn = vim.fn
 		local filename = fn.expand("%:t")
-		-- local filename = vim.fs.basename(vim.api.nvim_buf_get_name(0))
 
 		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
 		local icon, color_icon = nil, nil
@@ -98,16 +93,12 @@ local Icon = {
 
 		if not icon then
 			local extensions = static.extensions
-			local buftype = api.nvim_get_option_value("buftype", {
-				buf = 0,
-			})
-
-			local extension = extensions.buftypes[buftype]
+			local extension = extensions.buftypes[vim.bo.buftype]
 			if extension then
 				icon, color_icon = extension[1], extension[2]
 			else
-				local filetype = api.nvim_get_option_value("filetype", { buf = 0 })
-				extension = extensions.filetypes[filetype]
+				local filetype = vim.bo.filetype
+        extension = extensions.filetypes[filetype]
 				if extension then
 					icon, color_icon = extension[1], extension[2]
 				end
@@ -138,14 +129,11 @@ local Modifier = {
 		fg = colors.fg,
 	},
 	update = function(self, ctx, static)
-		local api = vim.api
-		local buftype = api.nvim_get_option_value("buftype", { buf = 0 })
-		if buftype == "prompt" then
+		if vim.bo.buftype == "prompt" then
 			return ""
-		end
-		if not api.nvim_buf_get_option(0, "modifiable") or api.nvim_buf_get_option(0, "readonly") then
+    elseif not vim.bo.modifiable or vim.bo.readonly then
 			return ""
-		elseif api.nvim_buf_get_option(0, "modified") then
+		elseif vim.bo.modified then
 			return ""
 		end
 		return ""
@@ -166,10 +154,12 @@ local Size =  {
 	static = {
 		icon = "",
 	},
-  update =function (self, ctx, static, session_id)
+  update = function (self, ctx, static, session_id)
 		local current_file = vim.api.nvim_buf_get_name(0)
-		local file_size = vim.fn.getfsize(current_file)
-		if file_size <= 0 then return "" end
+    if current_file == "" then return "" end
+
+    local file_size = (vim.uv or vim.loop).fs_stat(current_file).size
+    if file_size == 0 then return "" end
 
 		local suffixes = { "B", "KB", "MB", "GB" }
 		local i = 1

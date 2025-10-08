@@ -62,7 +62,7 @@ local function update_component(comp, session_id)
 	local hidden = min_screen_width and vim.o.columns < min_screen_width
 		or Component.hidden(comp, session_id, ctx, static)
 
-	local value, style, ref_comp = "", nil, comp
+	local value, style = "", nil
 
 	if hidden then
 		hide_component(comp)
@@ -76,8 +76,7 @@ local function update_component(comp, session_id)
 
 			-- A abstract component may be not have _indices key
 			if indices then
-				local style_updated = false
-
+				local style_updated, ref_comp = false, comp
 				if style then
 					style_updated = Component.update_style(comp, style, ref_comp, true)
 				else
@@ -101,7 +100,7 @@ local function update_component(comp, session_id)
 				end
 
         if comp.on_click then
-          local click_handler = require("witch-line.core.handler.clickable").register_click_event(comp)
+          local click_handler = Component.register_click_handler(comp)
           if click_handler ~= "" then
             Statusline.bulk_set_click_handler(indices, click_handler)
           end

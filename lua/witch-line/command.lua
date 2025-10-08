@@ -10,6 +10,9 @@ local commands = {
 		cache_data = function()
 			require("witch-line.cache").inspect()
 		end,
+		event_store = function()
+			require("witch-line.core.handler.event").inspect()
+		end,
 		comp_manager = {
 			comps = function()
 				require("witch-line.core.CompManager").inspect("comps")
@@ -28,24 +31,12 @@ local commands = {
 		},
 		statusline = {
 			values = function()
-				require("witch-line.core.statusline").inspect()
-			end,
-			frozens = function()
-				require("witch-line.core.statusline").inspect("frozens")
+				require("witch-line.core.statusline").inspect("statusline")
 			end,
 			flexible_priority_sorted = function()
 				require("witch-line.core.statusline").inspect("flexible_priority_sorted")
 			end,
-			idx_hl_map = function()
-				require("witch-line.core.statusline").inspect("idx_hl_map")
-			end,
-			cache_highlighted_values = function()
-				require("witch-line.core.statusline").inspect("cache_highlighted_values")
-			end,
 		},
-		event_store = function()
-			require("witch-line.core.handler.event").inspect()
-		end
 	},
 }
 

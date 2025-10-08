@@ -43,12 +43,11 @@ local SepStyle = {
 --- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil
 --- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight
 --- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): table|SepStyle
---- @alias OnClickFunc fun(self: ManagedComponent, button: string, minwid: string, clicks: number, mouse_bufnr: number)
+--- @alias OnClickFunc fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 ---
 --- @class OnClickTable
 --- @field callback OnClickFunc|string The function to call when the component is clicked
 --- @field name string|nil The name of the function to register, if not provided a name will be generated
---- @field minwid integer|nil|fun(self: ManagedComponent): integer|nil The minwid to pass to the function, if not provided no minwid will be passed
 ---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
@@ -113,11 +112,11 @@ local SepStyle = {
 --- 	-| Example: `{left = 2, right = 1}` adds 2 spaces to the left and 1 space to the right.
 ---  	-| Example: `{left = 2}` adds 2 spaces to the left and 0 spaces to the right.
 --- 	-| Example: `{right = 3}` adds 0 spaces to the left and 3 spaces to the right.
----   	-| Example: `{}` adds 0 spaces to both sides.
+---  	-| Example: `{}` adds 0 spaces to both sides.
 --- 	-| If `left` or `right` is a function, it will be called to get the number of spaces for that side.
----   	-| Example: `{left = function() return 2 end, right = 1}` adds 2 spaces to the left and 1 space to the right.
+---  	-| Example: `{left = function() return 2 end, right = 1}` adds 2 spaces to the left and 1 space to the right.
 ---  	-| Example: `{left = 2, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
----    	-| Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
+---  	-| Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
 ---	- If function: called and its return value is used as above.
 --- - Example of padding function: `function(self, ctx, static, session_id) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, ctx, static, session_id) return 2 end` (adds 2 spaces to both sides)
@@ -155,7 +154,7 @@ local SepStyle = {
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
---- @field on_click nil|string|OnClickFunc|OnClickTable A function that will be called when the component is clicked
+--- @field on_click nil|string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded boolean|nil If true, the component is loaded
@@ -165,6 +164,7 @@ local SepStyle = {
 --- @field _right_hl_name string|nil The highlight group name for the right part of the component
 --- @field _hidden boolean|nil If true, the component is hidden and should not be displayed
 --- @field _abstract boolean|nil If true, the component is abstract and should not be displayed directly (all component are abstract)
+--- @field _click_handler string|nil The name of the click handler function for the component
 
 --- @class DefaultComponent : Component The default components provided by witch-line
 --- @field id DefaultId the id of default component
@@ -478,6 +478,7 @@ M.require_by_id = function(id)
 	return M.require(id)
 end
 
+--- Requires a default component by its path.
 --- @param path DefaultId|string the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 M.require = function(path)
@@ -502,7 +503,7 @@ end
 
 --- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
 --- @param comp Component the component to remove the state from
-M.remove_state_before_cache = function(comp)
+M.format_state_before_cache = function(comp)
 	rawset(comp, "_hidden", nil)
 	local temp = comp.temp
 	if type(temp) == "table" then
@@ -603,6 +604,43 @@ end
 M.hidden = function(comp, session_id, ctx, static)
 	local hidden = resolve(comp.hidden, comp, ctx, static, session_id)
 	return hidden == true
+end
+
+--- Register a function to be called when a clickable component is clicked.
+--- @param comp Component The component to register the click event for.
+--- @return string fun_name The function name to be used in the component's value. If no valid function is found, returns an empty string.
+M.register_click_handler = function(comp)
+  if comp._click_handler then
+    return comp._click_handler
+  end
+
+  local on_click = comp.on_click
+
+  -- Fastest possible func_name derivation
+  local func_name = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
+
+  local t = type(on_click)
+  if t == "table" then
+    func_name = on_click.name or func_name
+    on_click = on_click.callback
+    t = type(on_click)
+  end
+
+  if t == "string" and _G[on_click] then
+    func_name = "v:lua." .. on_click
+    comp._click_handler = func_name
+    return comp._click_handler
+  elseif t == "function" then
+    if not _G[func_name] then
+      _G[func_name] = function(...)
+        on_click(comp, ...)
+      end
+    end
+    func_name = "v:lua." .. func_name
+    comp._click_handler = func_name
+    return func_name
+  end
+  return ""
 end
 
 return M

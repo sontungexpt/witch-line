@@ -1,5 +1,6 @@
 local vim, concat, type = vim, table.concat, type
 local o, bo, api, strdisplaywidth = vim.o, vim.bo, vim.api, vim.fn.strdisplaywidth
+
 local M = {}
 
 --- @class Segment A statusline component segment.
@@ -11,7 +12,6 @@ local M = {}
 --- @field right_hl_name string|nil The highlight group name of the right part. ( Not be cached )
 --- @field frozen true|nil If true, the part is frozen and will not be cleared on Vim exit.
 --- @field click_handler string|nil The click handler for the component. ( Not be cached )
---- @field minwid integer|nil The minimum width for the component when a click handler is set. ( Not be cached )
 ---
 --- @private
 --- @field _total_display_width? integer|nil The cached total display width of the component including its left and right parts. ( Not be cached )
@@ -62,12 +62,12 @@ end
 
 
 --- Inspects the current statusline values.
---- @param t "values"|"flexible_priority_sorted"|"cache_highlighted_values"|nil The type of values to inspect. If nil or "values", inspects the statusline values.
+--- @param t "statusline"|"flexible_priority_sorted"|nil The type of values to inspect. If nil or "values", inspects the statusline values.
 M.inspect = function(t)
 	local notifier = require("witch-line.utils.notifier")
 	if t == "flexible_priority_sorted" then
 		notifier.info(vim.inspect(FlexiblePrioritySorted))
-	elseif t == nil or t == "values" then
+	elseif t == nil or t == "statusline" then
 		notifier.info(vim.inspect(Statusline))
 	end
 end
@@ -84,7 +84,7 @@ end
 
 --- Resets the value of a statusline component before caching.
 --- @param segment Segment The statusline component to reset.
-local reset_value_before_cache = function (segment)
+local format_state_before_cache = function (segment)
   if not segment.frozen then
     segment.value = ""
     segment._total_display_width = nil
@@ -93,10 +93,12 @@ local reset_value_before_cache = function (segment)
 
   segment.left = nil
   segment.left_hl_name = nil
+
   segment.right = nil
   segment.right_hl_name = nil
 
   segment.click_handler = nil
+
   segment._highlighted_value = nil
   segment._left_highlighted_value = nil
   segment._right_highlighted_value = nil
@@ -107,7 +109,7 @@ end
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
   M.iterate_values(function(idx, segment)
-      reset_value_before_cache(segment)
+      format_state_before_cache(segment)
   end)
 
 	CacheDataAccessor.set("Statusline", Statusline)
@@ -120,10 +122,11 @@ end
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
 --- @return function undo function to restore the previous state
 M.load_cache = function(CacheDataAccessor)
-	local before_values = Statusline
-	local before_values_size = ValuesSize
-	local before_flexible_priority_sorted = FlexiblePrioritySorted
-	local before_flexible_priority_sorted_len = FlexiblePrioritySortedLen
+	local before_values, before_values_size, before_flexible_priority_sorted, before_flexible_priority_sorted_len =
+    Statusline,
+    ValuesSize,
+    FlexiblePrioritySorted,
+    FlexiblePrioritySortedLen
 
 	Statusline = CacheDataAccessor.get("Statusline") or Statusline
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
@@ -152,11 +155,7 @@ local function build_values(skip)
       local click_handler = seg.click_handler
       if click_handler then
         n = n + 1
-        if seg.minwid then
-          values[n] = "%" .. seg.minwid .. "@" .. click_handler .. "@"
-        else
-          values[n] = "%@" .. click_handler .. "@"
-        end
+        values[n] = "%@" .. click_handler .. "@"
       end
 
       if seg._left_highlighted_value then
@@ -215,15 +214,10 @@ local compute_segment_width = function (segment)
     return width
   end
   -- Safely concatenate without repeated string allocations
-  local left  = segment.left  or ""
-  local mid   = segment.value or ""
-  local right = segment.right or ""
-
-  width = strdisplaywidth(left .. mid .. right)
+  width = strdisplaywidth((segment.left or "") .. segment.value .. (segment.right or ""))
   segment._total_display_width = width
   return width
 end
-
 M.compute_segment_width = compute_segment_width
 
 --- Computes the total display width of all statusline components.
