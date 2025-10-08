@@ -128,17 +128,17 @@ M.get_hlprop = get_hlprop
 --- Defines or updates a highlight group with the specified styles.
 ---@param group_name string The highlight group name.
 ---@param hl_style string|vim.api.keyset.highlight The highlight styles to apply.
+---@return boolean success True if the highlight was applied successfully, false otherwise.
 M.highlight = function(group_name, hl_style)
 	if group_name == "" then
-		return
+		return false
 	end
-
   local hl_style_type = type(hl_style)
   if hl_style_type == "string" and hl_style ~="" then
     nvim_set_hl(0, group_name, { link = hl_style, default = true} )
-    return
-  elseif hl_style_type ~="table" or not next(hl_style) then
-    return
+    return true
+  elseif hl_style_type ~= "table" or not next(hl_style) then
+    return false
   end
 
 	Styles[group_name] = hl_style
@@ -180,6 +180,7 @@ M.highlight = function(group_name, hl_style)
 	style.foreground, style.background = fg, bg
 	style.fg, style.bg = nil, nil
 	nvim_set_hl(0, group_name, style)
+  return true
 end
 
 return M
