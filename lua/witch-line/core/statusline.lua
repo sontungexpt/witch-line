@@ -13,11 +13,11 @@ local M = {}
 --- @field frozen true|nil If true, the part is frozen and will not be cleared on Vim exit.
 --- @field click_handler string|nil The click handler for the component. ( Not be cached )
 ---
---- @private
---- @field _total_display_width? integer|nil The cached total display width of the component including its left and right parts. ( Not be cached )
---- @field _highlighted_value? string|nil The cached merged value with highlight group name. ( Not be cached )
---- @field _left_highlighted_value? string|nil The cached merged left value with highlight group name. ( Not be cached )
---- @field _right_highlighted_value? string|nil The cached merged right value with highlight group name. ( Not be cached )
+--- @private cached fields:
+--- @field _cached_total_display_width? integer|nil The cached total display width of the component including its left and right parts. ( Not be cached )
+--- @field _cached_highlighted_value? string|nil The cached merged value with highlight group name. ( Not be cached )
+--- @field _cached_left_highlighted_value? string|nil The cached merged left value with highlight group name. ( Not be cached )
+--- @field _cached_right_highlighted_value? string|nil The cached merged right value with highlight group name. ( Not be cached )
 
 --- @type Segment[] The list of statusline components.
 local Statusline = {
@@ -87,7 +87,7 @@ end
 local format_state_before_cache = function (segment)
   if not segment.frozen then
     segment.value = ""
-    segment._total_display_width = nil
+    segment._cached_total_display_width = nil
   end
   segment.hl_name = nil
 
@@ -99,9 +99,9 @@ local format_state_before_cache = function (segment)
 
   segment.click_handler = nil
 
-  segment._highlighted_value = nil
-  segment._left_highlighted_value = nil
-  segment._right_highlighted_value = nil
+  segment._cached_highlighted_value = nil
+  segment._cached_left_highlighted_value = nil
+  segment._cached_right_highlighted_value = nil
 end
 
 --- Handles necessary operations before Vim exits.
@@ -158,39 +158,39 @@ local function build_values(skip)
         values[n] = "%@" .. click_handler .. "@"
       end
 
-      if seg._left_highlighted_value then
+      if seg._cached_left_highlighted_value then
         n = n + 1
-        values[n] = seg._left_highlighted_value
+        values[n] = seg._cached_left_highlighted_value
       elseif seg.left then
         local left, left_hl = seg.left, seg.left_hl_name
         if left ~= "" then
           n = n + 1
           values[n] = left_hl and assign_highlight_name(left, left_hl) or left
-          seg._left_highlighted_value = values[n]
+          seg._cached_left_highlighted_value = values[n]
         end
       end
 
-      if seg._highlighted_value then
+      if seg._cached_highlighted_value then
         n = n + 1
-        values[n] = seg._highlighted_value
+        values[n] = seg._cached_highlighted_value
       else
         local val, hl = seg.value, seg.hl_name
         if val ~= "" then
           n = n + 1
           values[n] = hl and assign_highlight_name(val, hl) or val
-          seg._highlighted_value = values[n]
+          seg._cached_highlighted_value = values[n]
         end
       end
 
-      if seg._right_highlighted_value then
+      if seg._cached_right_highlighted_value then
         n = n + 1
-        values[n] = seg._right_highlighted_value
+        values[n] = seg._cached_right_highlighted_value
       elseif seg.right then
         local right, right_hl = seg.right, seg.right_hl_name
         if right ~= "" then
           n = n + 1
           values[n] = right_hl and assign_highlight_name(right, right_hl) or right
-          seg._right_highlighted_value = values[n]
+          seg._cached_right_highlighted_value = values[n]
         end
       end
 
@@ -209,13 +209,13 @@ end
 --- @param segment Segment The statusline component to compute the width for.
 --- @return integer width The total display width of the component including its left and right parts.
 local compute_segment_width = function (segment)
-  local width = segment._total_display_width
+  local width = segment._cached_total_display_width
   if width then
     return width
   end
   -- Safely concatenate without repeated string allocations
   width = strdisplaywidth((segment.left or "") .. segment.value .. (segment.right or ""))
-  segment._total_display_width = width
+  segment._cached_total_display_width = width
   return width
 end
 M.compute_segment_width = compute_segment_width
@@ -287,7 +287,7 @@ end
 M.bulk_set = function(idxs, value, hl_name)
   for i = 1, #idxs do
     local segment = Statusline[idxs[i]]
-    segment.value, segment.hl_name, segment._highlighted_value = value, hl_name, nil
+    segment.value, segment.hl_name, segment._cached_highlighted_value, segment._cached_total_display_width = value, hl_name, nil, nil
   end
 end
 
@@ -301,12 +301,14 @@ M.bulk_set_side = function(idxs, side, value, hl_name)
     for i = 1, #idxs do
       local segment = Statusline[idxs[i]]
       if side == "left" then
-        segment.left, segment.left_hl_name, segment._left_highlighted_value = value, hl_name, nil
+        segment.left, segment.left_hl_name, segment._cached_left_highlighted_value = value, hl_name, nil
       elseif side == "right" then
-        segment.right, segment.right_hl_name, segment._right_highlighted_value = value, hl_name, nil
+        segment.right, segment.right_hl_name, segment._cached_right_highlighted_value = value, hl_name, nil
       else
         error("Invalid side: " .. tostring(side) .. ". Expected 'left' or 'right'.")
+        return
       end
+      segment._cached_total_display_width = nil
     end
     return
   end
