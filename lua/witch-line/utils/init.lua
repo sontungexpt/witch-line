@@ -42,7 +42,14 @@ end
 --- @param ... any Additional arguments to pass to the function if `value` is a function.
 --- @return any result The evaluated result.
 M.resolve = function(value, ...)
-	return type(value) == "function" and value(...) or value
+  --- Why don't use 3 opearator expression?
+  --- Because when a value is a function and returns more than one value,
+  --- the 3 operator expression will only return the first value.
+  --- So we have to use if statement here.
+  if type(value) == "function" then
+    return value(...)
+  end
+  return value
 end
 
 M.benchmark = function(cb, name, file_path)

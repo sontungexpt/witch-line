@@ -29,10 +29,10 @@ local hide_component = function(comp)
 
 	Statusline.bulk_set(indices, "")
 	if type(comp.left) == "string" then
-		Statusline.bulk_set_sep(indices, -1, "")
+		Statusline.bulk_set_side(indices,"left", "")
 	end
 	if type(comp.right) == "string" then
-		Statusline.bulk_set_sep(indices, 1, "")
+		Statusline.bulk_set_side(indices, "right", "")
 	end
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
@@ -62,7 +62,7 @@ local function update_component(comp, session_id)
 	local hidden = min_screen_width and vim.o.columns < min_screen_width
 		or Component.hidden(comp, session_id, ctx, static)
 
-	local value, style, ref_comp = "", nil, comp
+	local value, style = "", nil
 
 	if hidden then
 		hide_component(comp)
@@ -76,8 +76,7 @@ local function update_component(comp, session_id)
 
 			-- A abstract component may be not have _indices key
 			if indices then
-				local style_updated = false
-
+				local style_updated, ref_comp = false, comp
 				if style then
 					style_updated = Component.update_style(comp, style, ref_comp, true)
 				else
@@ -90,15 +89,23 @@ local function update_component(comp, session_id)
 				local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
 				if left then
 					Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, -1, left, comp._left_hl_name)
+					Statusline.bulk_set_side(indices, "left", left, comp._left_hl_name)
 				end
 
 				Statusline.bulk_set(indices, value, comp._hl_name)
 
 				if right then
 					Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_sep(indices, 1, right, comp._right_hl_name)
+					Statusline.bulk_set_side(indices, "right", right, comp._right_hl_name)
 				end
+
+        if comp.on_click then
+          local click_handler = Component.register_click_handler(comp)
+          if click_handler ~= "" then
+            Statusline.bulk_set_click_handler(indices, click_handler)
+          end
+        end
+
 				rawset(comp, "_hidden", false) -- Reset hidden state
 			end
 		end
@@ -293,19 +300,24 @@ end
 --- Build statusline indices for a component.
 --- @param comp Component The component to build indices for.
 local function build_indices(comp)
+  -- Why not support left and right indpendently?
+  -- Because the update id the main part   --
+  -- The left and right are just the decoration of the main part
+  -- So if the main part is not renderable then the left and right are not renderable too
+  --
+  -- If really need the left and right we just add them as a separate component
 	local update = comp.update
 	if not update then
 		return
 	end
 
-	-- Add to statusline if renderable
-	local flexible_idxs = {}
-	if comp.left then
-		flexible_idxs[#flexible_idxs + 1] = Statusline.push("")
-	end
+  local left, right = comp.left, comp.right
 
-	local idx = type(update) == "string" and Statusline.push(update) or Statusline.push("")
-	flexible_idxs[#flexible_idxs + 1] = idx
+  local idx = Statusline.push(
+    type(update) == "string" and update or "",
+    type(left) == "string" and left or nil,
+    type(right) == "string" and right or nil
+  )
 
 	local indices = comp._indices
 	if not indices then
@@ -314,12 +326,8 @@ local function build_indices(comp)
 		indices[#indices + 1] = idx
 	end
 
-	if comp.right then
-		flexible_idxs[#flexible_idxs + 1] = Statusline.push("")
-	end
-
 	if comp.flexible then
-		Statusline.track_flexible(flexible_idxs, comp.flexible)
+		Statusline.track_flexible(idx, comp.flexible)
 	end
 end
 --- Register a component node, which may include nested components.
@@ -381,9 +389,10 @@ local function register_component(comp, parent_id)
 		-- Abstract registration
 		local id = M.register_abstract_component(comp)
 
-		if comp.update and comp.lazy == false then
+		if comp.lazy == false then
 			CompManager.mark_emergency(id)
 		end
+
 		build_indices(comp)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
@@ -395,7 +404,7 @@ end
 --- @param comp LiteralComponent The string component to register.
 local function register_literal_comp(comp)
 	if comp ~= "" then
-		Statusline.freeze(Statusline.push(comp))
+		Statusline.push(comp, nil, nil, true)
 	end
 	return comp
 end

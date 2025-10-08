@@ -80,7 +80,7 @@ end
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	local Component = require("witch-line.core.Component")
 	for _, comp in pairs(Comps) do
-		Component.remove_state_before_cache(comp)
+		Component.format_state_before_cache(comp)
 	end
 	CacheDataAccessor.set("Comps", Comps)
 	CacheDataAccessor.set("DepGraph", DepGraphMap)

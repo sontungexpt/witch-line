@@ -132,8 +132,9 @@ end
 
 M.get_hlprop = get_hlprop
 
+--- Defines or updates a highlight group with the specified styles.
 ---@param group_name string The highlight group name.
----@param hl_style vim.api.keyset.highlight
+---@param hl_style vim.api.keyset.highlight The highlight styles to apply.
 M.highlight = function(group_name, hl_style)
 	if group_name == "" or type(hl_style) ~= "table" or not next(hl_style) then
 		return

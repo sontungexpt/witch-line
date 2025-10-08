@@ -5,10 +5,7 @@ local colors   = require("witch-line.constant.color")
 return {
 	id = Id["os_uname"],
   _plug_provided = true,
-	events = { "VimEnter" },
-	style = {
-		fg = colors.orange,
-	},
+	events = { "BufEnter" },
 	static = {
 		icon = {
 			mac = "",
@@ -25,19 +22,19 @@ return {
 	},
   update =function (self, ctx, static, session_id)
 		local os_uname = (vim.uv or vim.loop).os_uname()
+		local uname, static_icon, static_colors = os_uname.sysname, static.icon, static.colors
 
-		local uname = os_uname.sysname
 		if uname == "Darwin" then
-			return static.icon.mac, { fg = static.colors.mac }
+			return static_icon.mac, { fg = static_colors.mac }
 		elseif uname == "Linux" then
 			if os_uname.release:find("arch") then
-				return static.icon.arch, { fg = static.colors.arch}
+				return static_icon.arch, { fg = static_colors.arch}
 			end
-				return static.icon.linux, { fg = static.colors.linux }
+      return static_icon.linux, { fg = static_colors.linux }
 		elseif uname == "Windows_NT" then
-				return static.icon.windows, { fg = static.colors.windows }
-		else
-			return uname or "󱚟 Unknown OS", {fg = "#ffffff"}
-		end
+      return static_icon.windows, { fg = static_colors.windows }
+    end
+
+    return uname or "󱚟 Unknown OS", { fg = "#ffffff" }
 	end,
 }
