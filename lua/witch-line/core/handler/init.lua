@@ -4,6 +4,7 @@ local Timer = require("witch-line.core.handler.timer")
 local Event = require("witch-line.core.handler.event")
 local Statusline = require("witch-line.core.statusline")
 local CompManager = require("witch-line.core.CompManager")
+local Component = require("witch-line.core.Component")
 
 local M = {}
 
@@ -21,20 +22,51 @@ M.DepStoreKey = DepStoreKey
 --- @param comp Component The component to clear.
 local hide_component = function(comp)
 	local indices = comp._indices
-
 	-- A abstract component may be not have _indices key
 	if not indices then
 		return
 	end
 
-	Statusline.bulk_set(indices, "")
-	if type(comp.left) == "string" then
-		Statusline.bulk_set_side(indices,"left", "")
-	end
-	if type(comp.right) == "string" then
-		Statusline.bulk_set_side(indices, "right", "")
-	end
+	Statusline.hide_segment(indices)
 	rawset(comp, "_hidden", true) -- Mark as hidden
+end
+
+
+--- Update the style of a component if necessary.
+--- @param comp Component The component to update.
+--- @param style CompStyle|nil The new style to apply. If nil, the style will be fetched from the component's configuration.
+--- @param session_id SessionId The ID of the process to use for this update.
+--- @param ctx table The context for evaluating the component.
+--- @param static table The static data for evaluating the component.
+--- @return boolean style_updated True if the style was updated, false otherwise.
+local function update_component_style(comp, style, session_id, ctx, static)
+  --- Update style
+  local style_updated, ref_comp = false, comp
+  if style then
+    style_updated = Component.update_style(comp, style, ref_comp, true)
+  else
+    style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+    if style then
+      style_updated = Component.update_style(comp, style, ref_comp)
+    end
+  end
+  local indices = comp._indices
+  --- @cast indices number[]
+  if style_updated then
+    Statusline.set_value_highlight(indices, comp._hl_name)
+  end
+
+  if comp.left_style
+    and Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+  then
+    Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name)
+  end
+  if comp.right_style
+    and Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+  then
+    Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name)
+  end
+  return style_updated
 end
 
 --- Update a component and its value in the statusline.
@@ -43,8 +75,6 @@ end
 --- @return string|nil updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
 local function update_component(comp, session_id)
 	-- It's just a abstract component then no need to really update
-	local Component = require("witch-line.core.Component")
-
 	if comp.inherit and not Component.has_parent(comp) then
 		local parent = CompManager.get_comp(comp.inherit)
 		if parent then
@@ -68,7 +98,6 @@ local function update_component(comp, session_id)
 		hide_component(comp)
 	else
 		value, style = Component.evaluate(comp, session_id, ctx, static)
-
 		if value == "" then
 			hide_component(comp)
 		else
@@ -76,28 +105,24 @@ local function update_component(comp, session_id)
 
 			-- A abstract component may be not have _indices key
 			if indices then
-				local style_updated, ref_comp = false, comp
-				if style then
-					style_updated = Component.update_style(comp, style, ref_comp, true)
-				else
-					style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
-					if style then
-						style_updated = Component.update_style(comp, style, ref_comp)
-					end
-				end
+        update_component_style(comp, style, session_id, ctx, static)
 
-				local left, right = Component.evaluate_left_right(comp, session_id, ctx, static)
-				if left then
-					Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_side(indices, "left", left, comp._left_hl_name)
-				end
+        --- Update value
+				Statusline.set_value(indices, value)
 
-				Statusline.bulk_set(indices, value, comp._hl_name)
-
-				if right then
-					Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-					Statusline.bulk_set_side(indices, "right", right, comp._right_hl_name)
-				end
+        local left, right = comp.left, comp.right
+        if type(left) == "function" then
+          Statusline.set_side_value(
+            indices, "left",
+            Component.resolve_side_fn(comp, left, session_id, ctx, static)
+          )
+        end
+        if type(right) == "function" then
+          Statusline.set_side_value(
+            indices, "right",
+            Component.resolve_side_fn(comp, right, session_id, ctx, static)
+          )
+        end
 
         if comp.on_click then
           local click_handler = Component.register_click_handler(comp)
@@ -249,7 +274,6 @@ end
 --- @param comp Component The component to pull dependencies for.
 local function pull_missing_dependencies(comp)
 	-- Pull missing dependencies from the component's ref field
-	local Component = require("witch-line.core.Component")
 	for dep_id in CompManager.iterate_all_dependency_ids(comp.id) do
 		if not CompManager.is_existed(dep_id) then
 			local c = Component.require_by_id(dep_id)
@@ -304,20 +328,20 @@ local function build_indices(comp)
   -- Because the update id the main part   --
   -- The left and right are just the decoration of the main part
   -- So if the main part is not renderable then the left and right are not renderable too
-  --
   -- If really need the left and right we just add them as a separate component
 	local update = comp.update
 	if not update then
 		return
 	end
 
+  local idx = Statusline.push("")
   local left, right = comp.left, comp.right
-
-  local idx = Statusline.push(
-    type(update) == "string" and update or "",
-    type(left) == "string" and left or nil,
-    type(right) == "string" and right or nil
-  )
+  if type(left) == "string" then
+    Statusline.set_side_value(idx, "left", left)
+  end
+  if type(right) == "string" then
+    Statusline.set_side_value(idx, "right", right)
+  end
 
 	local indices = comp._indices
 	if not indices then
@@ -326,8 +350,9 @@ local function build_indices(comp)
 		indices[#indices + 1] = idx
 	end
 
-	if comp.flexible then
-		Statusline.track_flexible(idx, comp.flexible)
+  local flexible = comp.flexible
+	if flexible then
+		Statusline.track_flexible(idx, flexible)
 	end
 end
 --- Register a component node, which may include nested components.
@@ -389,10 +414,11 @@ local function register_component(comp, parent_id)
 		-- Abstract registration
 		local id = M.register_abstract_component(comp)
 
-		if comp.lazy == false then
+    -- When a update type is a string it means that the component is always renderable as lazy is false
+    -- So we need to mark it as emergency
+		if type(comp.update) == "string" or comp.lazy == false then
 			CompManager.mark_emergency(id)
 		end
-
 		build_indices(comp)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
@@ -404,7 +430,7 @@ end
 --- @param comp LiteralComponent The string component to register.
 local function register_literal_comp(comp)
 	if comp ~= "" then
-		Statusline.push(comp, nil, nil, true)
+		Statusline.push(comp)
 	end
 	return comp
 end
@@ -416,7 +442,7 @@ end
 function M.register_combined_component(comp, parent_id)
 	local kind = type(comp)
 	if kind == "string" then
-		local c = require("witch-line.core.Component").require(comp)
+		local c = Component.require(comp)
 		if not c then
 			return register_literal_comp(comp)
 		end
@@ -447,7 +473,7 @@ M.setup = function(user_configs, DataAccessor)
 				local c = abstract[i]
 				if type(c) == "string" then
 					---@diagnostic disable-next-line
-					c = require("witch-line.core.Component").require(c)
+					c = Component.require(c)
 				end
 				if type(c) == "table" and c.id then
 					M.register_abstract_component(c)

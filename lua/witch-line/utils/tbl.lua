@@ -389,34 +389,8 @@ end
 --- @return string str The serialized table as a string
 M.serialize_table = function(tbl, pretty)
   assert(type(tbl) == "table")
+  local ffi = require("ffi")
   local L = {}
-  -- function L.serialize_value(v)
-  --   local t = type(v)
-  --   if t == "number" or t == "boolean" then
-  --     return tostring(v)
-  --   elseif t == "string" then
-  --     return string.format("%q", v)
-  --   elseif t == "table" then
-  --     return L.serialize_table(v)
-  --   else
-  --     error("Unsupported type: " .. t)
-  --   end
-  -- end
-  -- function L.serialize_table(t)
-  --   ---@diagnostic disable-next-line
-  --   local parts = { "{" }
-  --   for k, v in pairs(t) do
-  --     local key
-  --     if type(k) == "string" and k:match("^[_%a][_%w]*$") then
-  --       key = k .. "="
-  --     else
-  --       key = "[" .. L.serialize_value(k) .. "]="
-  --     end
-  --     parts[#parts + 1] = key .. L.serialize_value(v) .. ","
-  --   end
-  --   parts[#parts + 1] = "}"
-  --   return table.concat(parts)
-  -- end
   function L.serialize_value(v,indent)
     local t = type(v)
     if t == "number" or t == "boolean" then
@@ -425,10 +399,27 @@ M.serialize_table = function(tbl, pretty)
       return string.format("%q", v)
     elseif t == "table" then
       return L.serialize_table(v,indent)
+      --- Support ffi style
+    elseif t == "cdata" then
+      -- Check if it's a string
+      if ffi.istype("const char*", v) or ffi.istype("char*", v) then
+        return string.format("%q", ffi.string(v))
+      elseif ffi.istype("int8_t", v) or ffi.istype("uint8_t", v) or
+             ffi.istype("int16_t", v) or ffi.istype("uint16_t", v) or
+             ffi.istype("int32_t", v) or ffi.istype("uint32_t", v) or
+             ffi.istype("int64_t", v) or ffi.istype("uint64_t", v) or
+             ffi.istype("float", v) or ffi.istype("double", v) then
+        return tostring(v)
+      elseif ffi.istype("bool", v) then
+        return tostring(v)
+      else
+        error("Unsupported cdata type: " .. tostring(ffi.typeof(v)))
+      end
     else
       error("Unsupported type: " .. t)
     end
   end
+
   function L.serialize_table(t,indent)
     ---@diagnostic disable-next-line
     indent = indent or 0

@@ -1,14 +1,13 @@
-local vim, concat, type, ipairs = vim, table.concat, type, ipairs
-local o, bo, api= vim.o, vim.bo, vim.api
 local ffi = require("ffi")
-
 ffi.cdef[[
   size_t mb_string2cells_len(const char *str, size_t size)
 ]]
-local mb_string2cells_len = ffi.C.mb_string2cells_len
+local vim, concat, type, ipairs = vim, table.concat, type, ipairs
+local o, bo, api, mb_string2cells_len = vim.o, vim.bo, vim.api, ffi.C.mb_string2cells_len
 
 
 local M = {}
+
 
 --- @class Segment A statusline component segment.
 --- @field value string The render value of the part. ( Empty when cached if not frozen )
@@ -97,18 +96,14 @@ end
 local format_state_before_cache = function (segment)
   if not segment.frozen then
     segment.value = ""
-    segment._cached_total_display_width = nil
   end
+
   segment.hl_name = nil
-
-  segment.left = nil
   segment.left_hl_name = nil
-
-  segment.right = nil
   segment.right_hl_name = nil
-
   segment.click_handler = nil
 
+  segment._cached_total_display_width = nil
   segment._cached_highlighted_value = nil
   segment._cached_left_highlighted_value = nil
   segment._cached_right_highlighted_value = nil
@@ -162,51 +157,54 @@ local function build_values(skip)
 	for i = 1, ValuesSize do
 		if not skip or not skip[i] then
       local seg = Statusline[i]
-      local click_handler = seg.click_handler
-      if click_handler then
-        n = n + 1
-        values[n] = "%@" .. click_handler .. "@"
-      end
 
-      if seg._cached_left_highlighted_value then
-        n = n + 1
-        values[n] = seg._cached_left_highlighted_value
-      elseif seg.left then
-        local left, left_hl = seg.left, seg.left_hl_name
-        if left ~= "" then
+      local val = seg.value
+      -- If no main value, skip the whole segment including its left and right parts
+      if val ~= "" then
+        local click_handler = seg.click_handler
+        if click_handler then
           n = n + 1
-          values[n] = left_hl and assign_highlight_name(left, left_hl) or left
-          seg._cached_left_highlighted_value = values[n]
+          values[n] = "%@" .. click_handler .. "@"
         end
-      end
 
-      if seg._cached_highlighted_value then
-        n = n + 1
-        values[n] = seg._cached_highlighted_value
-      else
-        local val, hl = seg.value, seg.hl_name
-        if val ~= "" then
+
+        local left, right = seg.left, seg.right
+        if left and left ~= "" then
           n = n + 1
+          if seg._cached_left_highlighted_value then
+            values[n] = seg._cached_left_highlighted_value
+          else
+            local left_hl = seg.left_hl_name
+            values[n] = left_hl and assign_highlight_name(left, left_hl) or left
+            seg._cached_left_highlighted_value = values[n]
+          end
+        end
+
+        -- Main part
+        n = n + 1
+        if seg._cached_highlighted_value then
+          values[n] = seg._cached_highlighted_value
+        else
+          local hl =  seg.hl_name
           values[n] = hl and assign_highlight_name(val, hl) or val
           seg._cached_highlighted_value = values[n]
         end
-      end
 
-      if seg._cached_right_highlighted_value then
-        n = n + 1
-        values[n] = seg._cached_right_highlighted_value
-      elseif seg.right then
-        local right, right_hl = seg.right, seg.right_hl_name
-        if right ~= "" then
+        if right and right ~= "" then
           n = n + 1
-          values[n] = right_hl and assign_highlight_name(right, right_hl) or right
-          seg._cached_right_highlighted_value = values[n]
+          if seg._cached_right_highlighted_value then
+            values[n] = seg._cached_right_highlighted_value
+          elseif seg.right then
+            local right_hl = seg.right_hl_name
+            values[n] = right_hl and assign_highlight_name(right, right_hl) or right
+            seg._cached_right_highlighted_value = values[n]
+          end
         end
-      end
 
-      if click_handler then
-        n = n + 1
-        values[n] = "%X"
+        if click_handler then
+          n = n + 1
+          values[n] = "%X"
+        end
       end
 		end
 	end
@@ -222,9 +220,17 @@ local compute_segment_width = function (segment)
   local width = segment._cached_total_display_width
   if width then return width end
 
-  local left, value, right = segment.left, segment.value, segment.right
-  width = (left and mb_string2cells_len(left, #left) or 0)
-    + mb_string2cells_len(value, #value) + (right and mb_string2cells_len(right, #right) or 0)
+  local value = segment.value
+  width = value ~= "" and mb_string2cells_len(value, #value) or 0
+  if width ~= 0 then
+    local left, right = segment.left, segment.right
+    if left then
+      width = width + mb_string2cells_len(left, #left)
+    end
+    if right then
+      width = width + mb_string2cells_len(right, #right)
+    end
+  end
   segment._cached_total_display_width = width
   return width
 end
@@ -241,6 +247,15 @@ local compute_statusline_width = function ()
   return total_width
 end
 M.compute_statusline_width = compute_statusline_width
+
+--- Hides a specific component by setting its value to an empty string.
+--- @param idxs integer[] The index of the component to hide.
+M.hide_segment = function(idxs)
+  for i = 1, #idxs do
+    local segment = Statusline[idxs[i]]
+    segment.value, segment._cached_total_display_width = "", 0
+  end
+end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
@@ -273,55 +288,99 @@ end
 
 --- Appends a new value to the statusline values list.
 --- @param value string The value to append.
---- @param left_value string|nil The left side value of the component.
---- @param right_value string|nil The right side value of the component.
 --- @param frozen boolean|nil If true, the value is marked as frozen and will not be cleared on Vim exit.
 --- @return integer new_idx The index of the newly added value.
-M.push = function(value, left_value, right_value, frozen)
+M.push = function(value, frozen)
 	ValuesSize = ValuesSize + 1
+
   --- @type Segment
   Statusline[ValuesSize] = {
     value = value,
-    left = left_value,
-    right = right_value,
     frozen = frozen,
   }
 	return ValuesSize
 end
 
+
 --- Sets the value for a specific component.
---- @param idxs integer[] The index of the component to set the value for.
---- @param value string The value to set for the specified component.
+--- @param idxs integer|integer[] The index of the component to set the value for.
 --- @param hl_name string|nil The highlight group name to assign to the specified component.
-M.bulk_set = function(idxs, value, hl_name)
-  for i = 1, #idxs do
-    local segment = Statusline[idxs[i]]
-    segment.value, segment.hl_name, segment._cached_highlighted_value, segment._cached_total_display_width = value, hl_name, nil, nil
+M.set_value_highlight = function(idxs, hl_name)
+  if type(idxs) == "number" then
+    local seg = Statusline[idxs]
+    seg.hl_name, seg._cached_highlighted_value = hl_name, nil
+  else
+    for i = 1, #idxs do
+      local seg = Statusline[idxs[i]]
+      seg.hl_name, seg._cached_highlighted_value = hl_name, nil
+    end
+  end
+end
+
+--- Updates the highlight group name for the left or right side of a specific component.
+--- @param idxs integer[] The index of the component to update the side highlight for.
+--- @param side "left"|"right" The side to update the highlight for.
+--- @param hl_name string|nil The highlight group name to set for the specified side.
+M.set_side_value_highlight = function(idxs, side, hl_name)
+  if side == "left"  then
+    if type(idxs) == "number" then
+      local seg = Statusline[idxs]
+      seg.left_hl_name, seg._cached_left_highlighted_value = hl_name, nil
+    else
+      for i = 1, #idxs do
+        local seg = Statusline[idxs[i]]
+        seg.left_hl_name, seg._cached_left_highlighted_value = hl_name, nil
+      end
+    end
+  elseif side == "right" then
+    if type(idxs) == "number" then
+      local seg = Statusline[idxs]
+      seg.right_hl_name, seg._cached_right_highlighted_value = hl_name, nil
+    else
+      for i = 1, #idxs do
+        local seg = Statusline[idxs[i]]
+        seg.right_hl_name, seg._cached_right_highlighted_value = hl_name, nil
+      end
+    end
+  else
+    error("Invalid side: " .. tostring(side) .. ". Expected 'left' or 'right'.")
+  end
+end
+--- Sets the value for a specific component.
+--- @param idxs integer|integer[] The index of the component to set the side value for.
+--- @param value string The value to set for the specified side.
+M.set_value = function(idxs, value)
+  if type(idxs) == "number" then
+    local seg = Statusline[idxs]
+    seg.value , seg._cached_total_display_width = value,nil
+  else
+    for i = 1, #idxs do
+      local seg = Statusline[idxs[i]]
+      seg.value , seg._cached_total_display_width = value,nil
+    end
   end
 end
 
 --- Sets the left or right side value for a specific component.
---- @param idxs integer[] The index of the component to set the side value for.
+--- @param idxs integer|integer[] The index of the component to set the side value for.
 --- @param side "left"|"right" The side to set the value for.
 --- @param value string The value to set for the specified side.
---- @param hl_name string|nil The highlight group name to assign to the specified side.
-M.bulk_set_side = function(idxs, side, value, hl_name)
-  if type(idxs) == "table" then
-    for i = 1, #idxs do
-      local segment = Statusline[idxs[i]]
-      if side == "left" then
-        segment.left, segment.left_hl_name, segment._cached_left_highlighted_value = value, hl_name, nil
-      elseif side == "right" then
-        segment.right, segment.right_hl_name, segment._cached_right_highlighted_value = value, hl_name, nil
-      else
-        error("Invalid side: " .. tostring(side) .. ". Expected 'left' or 'right'.")
-        return
+M.set_side_value = function(idxs, side, value)
+  if side == "left" or side == "right" then
+    if type(idxs) == "number" then
+      local seg = Statusline[idxs]
+      seg[side] , seg._cached_total_display_width = value, nil
+    else
+      for i = 1, #idxs do
+        local seg = Statusline[idxs[i]]
+        seg[side] , seg._cached_total_display_width = value, nil
       end
-      segment._cached_total_display_width = nil
     end
-    return
+  else
+    error("Invalid side: " .. tostring(side) .. ". Expected 'left' or 'right'.")
   end
 end
+
 
 
 --- Updates the click handler for a specific component.
