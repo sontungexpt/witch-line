@@ -38,7 +38,6 @@ end
 --- @param session_id SessionId The ID of the process to use for this update.
 --- @param ctx table The context for evaluating the component.
 --- @param static table The static data for evaluating the component.
---- @return boolean style_updated True if the style was updated, false otherwise.
 local function update_component_style(comp, style, session_id, ctx, static)
   --- Update style
   local style_updated, ref_comp = false, comp
@@ -52,21 +51,17 @@ local function update_component_style(comp, style, session_id, ctx, static)
   end
   local indices = comp._indices
   --- @cast indices number[]
-  if style_updated then
-    Statusline.set_value_highlight(indices, comp._hl_name)
-  end
+  Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
-  if comp.left_style
-    and Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
-  then
-    Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name)
-  end
-  if comp.right_style
-    and Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
-  then
-    Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name)
-  end
-  return style_updated
+  Statusline.set_side_value_highlight(
+    indices, -1, comp._left_hl_name,
+    Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+  )
+
+  Statusline.set_side_value_highlight(
+    indices, 1, comp._right_hl_name,
+    Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+  )
 end
 
 --- Update a component and its value in the statusline.
@@ -113,13 +108,13 @@ local function update_component(comp, session_id)
         local left, right = comp.left, comp.right
         if type(left) == "function" then
           Statusline.set_side_value(
-            indices, "left",
+            indices, -1,
             Component.resolve_side_fn(comp, left, session_id, ctx, static)
           )
         end
         if type(right) == "function" then
           Statusline.set_side_value(
-            indices, "right",
+            indices, 1,
             Component.resolve_side_fn(comp, right, session_id, ctx, static)
           )
         end
@@ -337,10 +332,10 @@ local function build_indices(comp)
   local idx = Statusline.push("")
   local left, right = comp.left, comp.right
   if type(left) == "string" then
-    Statusline.set_side_value(idx, "left", left)
+    Statusline.set_side_value(idx, -1, left)
   end
   if type(right) == "string" then
-    Statusline.set_side_value(idx, "right", right)
+    Statusline.set_side_value(idx, 1, right)
   end
 
 	local indices = comp._indices
@@ -430,7 +425,7 @@ end
 --- @param comp LiteralComponent The string component to register.
 local function register_literal_comp(comp)
 	if comp ~= "" then
-		Statusline.push(comp)
+		Statusline.push(comp,true)
 	end
 	return comp
 end

@@ -305,18 +305,36 @@ M.update_style = function(comp, style, ref_comp, force)
 	return Highlight.highlight(comp._hl_name, style)
 end
 
+local HL_NAME_FIELD = {
+  left = "_left_hl_name",
+  right = "_right_hl_name",
+}
+
+local SIDE_STYLE_FIELD = {
+  left = "left_style",
+  right = "right_style",
+}
+
 --- Determines if the separator style needs to be updated.
 --- @param comp Component the component to checks
 --- @param side "left"|"right" the side to check, either "left" or "right"
 M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-	local side_hl_name = "_" .. side .. "_hl_name"
+  if not comp[side] then
+    return false
+  end
+  local side_hl_name = HL_NAME_FIELD[side]
 	if not comp[side_hl_name] then
 		return true
-	elseif type(comp[side .. "_style"]) == "function" then
+	elseif type(comp[SIDE_STYLE_FIELD[side]]) == "function" then
 		return true
 	elseif main_style_updated then
-		return type(side_style) == "number" and (side_style == SepStyle.SepFg or side_style == SepStyle.SepBg or
-			side_style == SepStyle.Reverse)
+		return type(side_style) == "number" and
+      (
+        side_style == SepStyle.SepFg
+        or side_style == SepStyle.SepBg
+        or side_style == SepStyle.Reverse
+        or side_style == SepStyle.Inherited
+      )
 	end
 	return false
 end
@@ -326,7 +344,7 @@ end
 --- @param comp Component
 --- @param side "left"|"right"
 M.ensure_side_hl_name = function(comp, side)
-	local field = "_" .. side .. "_hl_name"
+  local field = HL_NAME_FIELD[side]
 	if not comp[field] then
 		local hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id)
 		--- If the component already has a main highlight name, use it as the base
