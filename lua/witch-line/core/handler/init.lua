@@ -64,12 +64,12 @@ local function update_component_style(comp, style, session_id, ctx, static)
   --- So the comp._left_hl_name may be missing if the update_side_style has not been called yet
   local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
   Statusline.set_side_value_highlight(
-    indices, -1, comp._left_hl_name, left_style_updated
+    indices, "left", comp._left_hl_name, left_style_updated
   )
 
   local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
   Statusline.set_side_value_highlight(
-    indices, 1, comp._right_hl_name, right_style_updated
+    indices, "right", comp._right_hl_name, right_style_updated
   )
 end
 
@@ -119,13 +119,13 @@ local function update_component(comp, session_id)
         local left, right = comp.left, comp.right
         if type(left) == "function" then
           Statusline.set_side_value(
-            indices, -1,
+            indices, "left",
             Component.resolve_side_fn(comp, left, session_id, ctx, static)
           )
         end
         if type(right) == "function" then
           Statusline.set_side_value(
-            indices, 1,
+            indices, "right",
             Component.resolve_side_fn(comp, right, session_id, ctx, static)
           )
         end
@@ -340,10 +340,10 @@ local function build_indices(comp)
   local idx = Statusline.push("")
   local left, right = comp.left, comp.right
   if type(left) == "string" then
-    Statusline.set_side_value({idx}, -1, left)
+    Statusline.set_side_value({idx}, "left", left)
   end
   if type(right) == "string" then
-    Statusline.set_side_value({idx}, 1, right)
+    Statusline.set_side_value({idx}, "right", right)
   end
 
 	local indices = comp._indices

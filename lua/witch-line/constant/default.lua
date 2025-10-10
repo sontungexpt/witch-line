@@ -1,6 +1,6 @@
 ---@type CombinedComponent
 return {
-	-- "mode",
+	"mode",
 	"file.name",
 	"file.icon",
 	"file.modifier",

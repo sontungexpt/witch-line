@@ -5,63 +5,30 @@ ffi.cdef[[
 local vim, concat, type, ipairs = vim, table.concat, type, ipairs
 local o, bo, api, mb_string2cells_len = vim.o, vim.bo, vim.api, ffi.C.mb_string2cells_len
 
-
 local M = {}
 
-
---- @alias IdxValue 1
-local IDX_VALUE = 1
---- @alias IdxValue.Left 0
-local IDX_VALUE_LEFT,
---- @alias IdxValue.Right 2
-      IDX_VALUE_RIGHT
-        = IDX_VALUE - 1,
-          IDX_VALUE + 1
-
---- @alias IdxHL 4
---- @alias IdxHL.Left 3
---- @alias IdxHL.Right 5
-local IDX_HL = IDX_VALUE + 3
-
---- @alias IdxMergedHLValue 7
---- @alias IdxMergedHLValue.Left 6
---- @alias IdxMergedHLValue.Right 8
-local IDX_MERGED_HL_VAL = IDX_HL + 3
-
-
 --- @class Segment A statusline component segment.
---- @field [IdxValue.Left] string|nil The left value of the component.
---- @field [IdxValue] string The main value of the component.
---- @field [IdxValue.Right] string|nil The right value of the component.
---- @field [IdxHL.Left] string|nil The highlight group name for the left value of the component.
---- @field [IdxHL] string|nil The highlight group name for the main value of the component.
---- @field [IdxHL.Right] string|nil The highlight group name for the right value of the component.
---- @field [IdxMergedHLValue.Left] string|nil The cached merged left value with highlight group name. ( Not be cached )
---- @field [IdxMergedHLValue] string|nil The cached merged main value with highlight group name. ( Not be cached )
---- @field [IdxMergedHLValue.Right] string|nil The cached merged right value with highlight group name. ( Not be cached )
+--- @field value string The main value of the component.
+--- @field hl string|nil The highlight group name for the main value of the component.
+--- @field left string|nil The left value of the component.
+--- @field left_hl string|nil The highlight group name for the left value of the component.
+--- @field right string|nil The right value of the component.
+--- @field right_hl string|nil The highlight group name for the main value of the component.
 --- @field frozen true|nil If true, the part is frozen and will not be cleared on Vim exit.
 --- @field click_handler_form string|nil The click handler for the component. ( Not be cached )
 ---
 --- @private cached fields:
 --- @field _total_display_width? integer|nil The cached total display width of the component including its left and right parts. ( Not be cached )
+--- @field _merged_hl_value string|nil The cached merged main value with highlight group name. ( Not be cached )
+--- @field _merged_hl_value_left string|nil The cached merged left value with highlight group name. ( Not be cached )
+--- @field _merged_hl_value_right string|nil The cached merged right value with highlight group name. ( Not be cached )
 
 local Disabled = false
 
 --- @type Segment[] The list of statusline components.
 local Statusline = {
-  -- { [VALUE_KEY] = "value", -- main value
-  --   [VALUE_KEY - 1] = "left", -- left valuel
-  --   [VALUE_KEY + 1] = "right", -- right value
-  --   [HL_NAME_KEY] = "HighlightGroup", -- main highlight group name
-  --   [HL_NAME_KEY - 1] = "LeftHighlightGroup", -- left highlight group name
-  --   [HL_NAME_KEY + 1] = "RightHighlightGroup", -- right highlight group name
-  --   frozen = true, -- if true, the value will not be cleared on Vim exit
-  --   click_handler = "ClickHandler", -- click handler
-  --   _cached_total_display_width = 10, -- cached total display width of the component including its left and right parts
-  --   [MERGED_HL_VALUE] = "%#HighlightGroup#value", -- cached merged main value with highlight group name
-  --   [MERGED_HL_VALUE - 1] = "%#LeftHighlightGroup#left", -- cached merged left value with highlight group name
-  --   [MERGED_HL_VALUE + 1] = "%#RightHighlightGroup#right", -- cached merged right value with highlight group name
-  --  }
+  -- { value = "", hl = nil, left = nil, left_hl = nil, right = nil, right_hl = nil, frozen = nil, click_handler_form = nil },
+  -- { value = "", hl = nil, left = nil, left_hl = nil, right = nil, right_hl = nil, frozen = nil, click_handler_form = nil },
 }
 
 ---@type integer The size of the Values list.
@@ -108,26 +75,6 @@ M.inspect = function(t)
 		notifier.info(vim.inspect(FlexiblePrioritySorted))
 	elseif t == nil or t == "statusline" then
 		notifier.info(vim.inspect(Statusline))
-  elseif t == "statusline_readable" then
-    local new = {}
-    for i = 1, ValuesSize do
-      local seg = Statusline[i]
-      new[i] = {
-        value = seg[IDX_VALUE],
-        left = seg[IDX_VALUE - 1],
-        right = seg[IDX_VALUE + 1],
-        hl = seg[IDX_HL],
-        hl_left = seg[IDX_HL - 1],
-        hl_right = seg[IDX_HL + 1],
-        merged_hl_value = seg[IDX_MERGED_HL_VAL],
-        merged_hl_value_left = seg[IDX_MERGED_HL_VAL - 1],
-        merged_hl_value_right = seg[IDX_MERGED_HL_VAL + 1],
-        frozen = seg.frozen,
-        click_handler = seg.click_handler_form,
-        _total_display_width = seg._total_display_width,
-      }
-    end
-    notifier.info(vim.inspect(new))
 	end
 end
 
@@ -146,10 +93,11 @@ end
 local format_state_before_cache = function (segment)
   for k, v in pairs(segment) do
     if k ~= "frozen"
-      and k ~= IDX_VALUE_LEFT
-      and k ~= IDX_VALUE_RIGHT
+      and k ~= "click_handler_form"
+      and k ~= "left"
+      and k ~= "right"
     then
-      if k == IDX_VALUE  then
+      if k == "value"  then
         if not segment.frozen then
           segment[k] = ""  -- Clear unfrozen main value
         end
@@ -209,7 +157,7 @@ local function build_values(skip)
 		if not skip or not skip[i] then
       local seg = Statusline[i]
 
-      local val = seg[IDX_VALUE]
+      local val = seg.value
       -- If no main value, skip the whole segment including its left and right parts
       if val ~= "" then
         local click_handler_form = seg.click_handler_form
@@ -219,43 +167,38 @@ local function build_values(skip)
         end
 
 
-        local hl_value, hl
-        local left, right = seg[IDX_VALUE - 1], seg[IDX_VALUE + 1]
+        local merged_hl_val
+        local left, right = seg.left, seg.right
         if left and left ~= "" then
-          hl_value = seg[IDX_MERGED_HL_VAL - 1]
-          if hl_value then
-            n = n + 1
-            values[n] = hl_value
+          n = n + 1
+          merged_hl_val = seg._merged_hl_value_left
+          if merged_hl_val then
+            values[n] = merged_hl_val
           else
-            hl = seg[IDX_HL - 1]
-            hl_value = hl and assign_highlight_name(left, hl) or left
-            n = n + 1
-            values[n], seg[IDX_MERGED_HL_VAL - 1] = hl_value, hl_value
+            merged_hl_val = assign_highlight_name(left, seg.left_hl)
+            values[n], seg._merged_hl_value_left = merged_hl_val, merged_hl_val
           end
         end
 
-        -- Main part
-        hl_value = seg[IDX_MERGED_HL_VAL]
-        if hl_value then
-          n = n + 1
-          values[n] = hl_value
+        --- Main part
+        n = n + 1
+        merged_hl_val = seg._merged_hl_value
+        if merged_hl_val then
+          values[n] = merged_hl_val
         else
-          hl = seg[IDX_HL]
-          hl_value = hl and assign_highlight_name(val, hl) or val
-          n = n + 1
-          values[n], seg[IDX_MERGED_HL_VAL] = hl_value, hl_value
+          merged_hl_val = assign_highlight_name(val, seg.hl)
+          values[n], seg._merged_hl_value = merged_hl_val, merged_hl_val
         end
 
+        --- Right part
         if right and right ~= "" then
-          hl_value = seg[IDX_MERGED_HL_VAL + 1]
-          if hl_value then
-            n = n + 1
-            values[n] = hl_value
+          n = n + 1
+          merged_hl_val = seg._merged_hl_value_right
+          if merged_hl_val then
+            values[n] = merged_hl_val
           else
-            hl = seg[IDX_HL + 1]
-            hl_value = hl and assign_highlight_name(right, hl) or right
-            n = n + 1
-            values[n], seg[IDX_MERGED_HL_VAL + 1] = hl_value, hl_value
+            merged_hl_val = assign_highlight_name(right, seg.right_hl)
+            values[n], seg._merged_hl_value_right = merged_hl_val, merged_hl_val
           end
         end
 
@@ -278,10 +221,10 @@ local compute_segment_width = function (segment)
   local width = segment._total_display_width
   if width then return width end
 
-  local value = segment[IDX_VALUE]
+  local value = segment.value
   width = value ~= "" and mb_string2cells_len(value, #value) or 0
   if width ~= 0 then
-    local left, right = segment[IDX_VALUE_LEFT], segment[IDX_VALUE_RIGHT]
+    local left, right = segment.left, segment.right
     if left then
       width = width + mb_string2cells_len(left, #left)
     end
@@ -310,8 +253,8 @@ M.compute_statusline_width = compute_statusline_width
 --- @param idxs integer[] The index of the component to hide.
 M.hide_segment = function(idxs)
   for i = 1, #idxs do
-    local segment = Statusline[idxs[i]]
-    segment[IDX_VALUE] ,segment._total_display_width = "", 0
+    local seg = Statusline[idxs[i]]
+    seg.value, seg._total_display_width, seg._merged_hl_value = "", nil, nil
   end
 end
 
@@ -353,7 +296,7 @@ M.push = function(value, frozen)
 
   --- @type Segment
   Statusline[ValuesSize] = {
-    [IDX_VALUE] = value ,
+    value = value,
     frozen = frozen,
   }
 	return ValuesSize
@@ -363,11 +306,13 @@ end
 --- Sets the value for a specific component.
 --- @param idxs integer[] The index of the component to set the value for.
 --- @param hl_name string|nil The highlight group name to assign to the specified component.
+--- @param force boolean|nil If true, forces the update even if a highlight group name already exists.
 M.set_value_highlight = function(idxs, hl_name, force)
   for i = 1, #idxs do
     local seg = Statusline[idxs[i]]
-    if force or not seg[IDX_HL] then
-      seg[IDX_HL], seg[IDX_MERGED_HL_VAL] = hl_name, nil
+    local hl = seg.hl
+    if force or not hl then
+      seg.hl, seg._merged_hl_value = hl_name, nil
     else
       return -- Do not overwrite existing highlight
     end
@@ -376,10 +321,19 @@ end
 
 --- Updates the highlight group name for the left or right side of a specific component.
 --- @param idxs integer[] The index of the component to update the side highlight for.
---- @param side Side The side to set the highlight for. Use 1 for right and -1 for left.
+--- @param side "left"|"right" The side to set the highlight for. Use "left" for left and "right" for right.
 --- @param hl_name string|nil The highlight group name to set for the specified side.
+--- @param force boolean|nil If true, forces the update even if a highlight group name already exists for the specified side.
 M.set_side_value_highlight = function(idxs, side, hl_name, force)
-  local hl_key, merged_hl_key  = IDX_HL + side, IDX_MERGED_HL_VAL + side
+  local hl_key, merged_hl_key
+  if side == "left" then
+    hl_key, merged_hl_key = "left_hl", "_merged_hl_value_left"
+  elseif side == "right" then
+    hl_key, merged_hl_key = "right_hl", "_merged_hl_value_right"
+  else
+    error("Invalid side: " .. tostring(side) .. ". Use 'left' or 'right'.")
+  end
+
   for i = 1, #idxs do
     local seg = Statusline[idxs[i]]
     if force or not seg[hl_key] then
@@ -395,21 +349,29 @@ end
 M.set_value = function(idxs, value)
   for i = 1, #idxs do
     local seg = Statusline[idxs[i]]
-    seg[IDX_VALUE] , seg[IDX_MERGED_HL_VAL], seg._total_display_width = value, nil, nil
+    seg.value, seg._merged_hl_value, seg._total_display_width = value, nil, nil
   end
 end
 
 --- Sets the left or right side value for a specific component.
 --- @param idxs integer|integer[] The index of the component to set the side value for.
---- @param side Side The side to set the value for. Use 1 for right and -1 for left.
+--- @param side "left"|"right" The side to set the value for. Use "left" for left and "right" for right.
 --- @param value string The value to set for the specified side.
 --- @param force boolean|nil If true, forces the update even if a value already exists for the specified side.
 M.set_side_value = function(idxs, side, value, force)
+  local key, merged_key
+  if side == "left" then
+    key, merged_key = "left", "_merged_hl_value_left"
+  elseif side == "right" then
+    key, merged_key = "right", "_merged_hl_value_right"
+  else
+    error("Invalid side: " .. tostring(side) .. ". Use 'left' or 'right'.")
+  end
+
   for i = 1, #idxs do
     local seg = Statusline[idxs[i]]
-    local val = seg[IDX_VALUE + side]
-    if force or not val then
-      seg[IDX_VALUE + side], seg[IDX_MERGED_HL_VAL + side], seg._total_display_width = value, nil, nil
+    if force or not seg[key] then
+      seg[key], seg[merged_key], seg._total_display_width = value, nil, nil
     else
       return -- Do not overwrite existing value
     end

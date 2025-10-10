@@ -102,7 +102,7 @@ end
 
 --- Adds a highlight name to a string.
 --- @param str string The string to which the highlight name will be added.
---- @param hl_name string The highlight name to add.
+--- @param hl_name string|nil The highlight name to add.
 M.assign_highlight_name = function(str, hl_name)
 	return hl_name and str ~= "" and "%#" .. hl_name .. "#" .. str .. "%*" or str
 end
