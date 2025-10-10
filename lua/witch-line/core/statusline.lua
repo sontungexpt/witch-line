@@ -142,10 +142,11 @@ M.load_cache = function(CacheDataAccessor)
 	FlexiblePrioritySortedLen = CacheDataAccessor.get("FlexiblePrioritySortedLen") or FlexiblePrioritySortedLen
 
 	return function()
-		Statusline = before_values
-		ValuesSize = before_values_size
-		FlexiblePrioritySorted = before_flexible_priority_sorted
-		FlexiblePrioritySortedLen = before_flexible_priority_sorted_len
+    Statusline, ValuesSize, FlexiblePrioritySorted, FlexiblePrioritySortedLen =
+      before_values,
+      before_values_size,
+      before_flexible_priority_sorted,
+      before_flexible_priority_sorted_len
 	end
 end
 
