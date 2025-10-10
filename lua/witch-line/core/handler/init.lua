@@ -54,7 +54,7 @@ local function update_component_style(comp, style, session_id, ctx, static)
   --- @cast indices number[]
   Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
-  --- NOTE: Can not do sorter like this
+  --- WARN: Can not do sorter like this
   --- ```lua
   --- Statusline.set_side_value_highlight(
   ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
@@ -417,9 +417,7 @@ local function register_component(comp, parent_id)
 		-- Abstract registration
 		local id = M.register_abstract_component(comp)
 
-    -- When a update type is a string it means that the component is always renderable as lazy is false
-    -- So we need to mark it as emergency
-		if type(comp.update) == "string" or comp.lazy == false then
+		if comp.lazy == false then
 			CompManager.mark_emergency(id)
 		end
 		build_indices(comp)

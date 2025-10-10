@@ -1,9 +1,13 @@
 local ffi = require("ffi")
+local bit = require("bit")
+
 ffi.cdef[[
   size_t mb_string2cells_len(const char *str, size_t size)
 ]]
-local vim, concat, type, ipairs = vim, table.concat, type, ipairs
-local o, bo, api, mb_string2cells_len = vim.o, vim.bo, vim.api, ffi.C.mb_string2cells_len
+
+local vim, concat, type, ipairs, mb_string2cells_len  = vim, table.concat, type, ipairs, ffi.C.mb_string2cells_len
+local o, bo, api = vim.o, vim.bo, vim.api
+local bor, band, lshift = bit.bor, bit.band, bit.lshift
 
 local M = {}
 
@@ -23,7 +27,7 @@ local M = {}
 --- @field _merged_hl_value_left string|nil The cached merged left value with highlight group name. ( Not be cached )
 --- @field _merged_hl_value_right string|nil The cached merged right value with highlight group name. ( Not be cached )
 
-local Disabled = false
+local Disabled = o.laststatus == 0
 
 --- @type Segment[] The list of statusline components.
 local Statusline = {
@@ -145,16 +149,34 @@ M.load_cache = function(CacheDataAccessor)
 	end
 end
 
+--- Marks specific indices to be skipped during the merging process.
+--- @param bitmasks integer The current bitmask representing indices to skip.
+--- @param idx integer The index to mark for skipping.
+--- @return integer new_mask The updated bitmask with the specified index marked for skipping.
+local skip = function (bitmasks, idx)
+  return bor(bitmasks, lshift(1, idx - 1))
+end
+
+--- Checks if a specific index is marked to be skipped in the bitmask.
+--- @param bitmasks integer The bitmask representing indices to skip.
+--- @param idx integer The index to check for skipping.
+--- @return boolean is_skipped True if the index is marked to be skipped, false otherwise.
+local is_skipped = function (bitmasks, idx)
+  return band(bitmasks, lshift(1, idx - 1)) ~= 0
+end
+
 --- Merges the highlight group names with the corresponding statusline values.
---- @param skip table<integer, true>| nil An optinal set of indices to skip during merging
+--- @param skip_bitmasks integer|nil A bitmask representing indices to skip during the merging process (1-based index). If nil, no indices are skipped.
 --- @return string[] merged The merged list of statusline values with highlight group names applied.
-local function build_values(skip)
+local function build_values(skip_bitmasks)
+  skip_bitmasks = skip_bitmasks or 0
+
 	--- Lazy load
 	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
   local values, n = {}, 0
 
 	for i = 1, ValuesSize do
-		if not skip or not skip[i] then
+		if not is_skipped(skip_bitmasks, i) then
       local seg = Statusline[i]
 
       local val = seg.value
@@ -258,6 +280,7 @@ M.hide_segment = function(idxs)
   end
 end
 
+
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param max_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
@@ -270,19 +293,18 @@ M.render = function(max_width)
 		return
 	end
 
-	--- @type table<integer, true>
-	local hidden_idxs = {}
+  local skip_mask = 0
 	local removed_idx = FlexiblePrioritySortedLen
 	local truncated_len = compute_statusline_width()
 
 	max_width = max_width or o.columns
 	while removed_idx > 0 and truncated_len > max_width do
 		local value_idx = FlexiblePrioritySorted[removed_idx].idx
-    hidden_idxs[value_idx] = true
+    skip_mask = skip(skip_mask, value_idx)
     truncated_len = truncated_len - compute_segment_width(Statusline[value_idx])
 		removed_idx = removed_idx - 1
 	end
-	local str = concat(build_values(hidden_idxs))
+	local str = concat(build_values(skip_mask))
 	o.statusline = str ~= "" and str or " "
 end
 
@@ -348,7 +370,7 @@ end
 --- @param value string The value to set for the specified side.
 M.set_value = function(idxs, value)
   for i = 1, #idxs do
-    local seg = Statusline[idxs[i]]
+   local seg = Statusline[idxs[i]]
     seg.value, seg._merged_hl_value, seg._total_display_width = value, nil, nil
   end
 end
@@ -399,9 +421,7 @@ end
 --- @param disabled BufDisabledConfig|nil The disabled configuration to check against. If nil, the buffer is not disabled.
 --- @return boolean
 M.is_buf_disabled = function(bufnr, disabled)
-	if not api.nvim_buf_is_valid(bufnr)
-		or type(disabled) ~= "table"
-	then
+	if type(disabled) ~= "table" then
 		return false
 	end
 
@@ -432,8 +452,8 @@ end
 --- @param disabled_config BufDisabledConfig|nil The disabled configuration to apply.
 M.setup = function(disabled_config)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
+  local render_debounce = require("witch-line.utils").debounce(M.render, 100)
 	if FlexiblePrioritySortedLen > 0 then
-		local render_debounce = require("witch-line.utils").debounce(M.render, 100)
 		api.nvim_create_autocmd({ "VimResized" }, {
 			callback = function()
 				render_debounce(o.columns)
@@ -456,13 +476,17 @@ M.setup = function(disabled_config)
 
 	api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 		callback = function(e)
-			local buf = e.buf
+			local bufnr = e.buf
 			vim.schedule(function()
-				Disabled = M.is_buf_disabled(buf, disabled_config)
+        if not api.nvim_buf_is_valid(bufnr) then
+          return
+        end
+
+				Disabled = M.is_buf_disabled(bufnr, disabled_config)
 
 				if not Disabled and o.laststatus == 0 then
 					api.nvim_set_option_value("laststatus", user_laststatus, {})
-					M.render() -- rerender statusline immediately
+          render_debounce(o.columns) -- rerender statusline after enabling
 				elseif Disabled and o.laststatus ~= 0 then
 					api.nvim_set_option_value("laststatus", 0, {})
 				else
