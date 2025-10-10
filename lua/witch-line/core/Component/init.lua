@@ -193,8 +193,7 @@ local SepStyle = {
 --- Check if is default component
 --- @param comp Component the component to get the id from
 M.is_default = function(comp)
-	local Id = require("witch-line.constant.id").Id
-	return Id[comp.id] ~= nil
+	return require("witch-line.constant.id").existed(comp.id)
 end
 
 --- Ensures that the component has a valid id, generating one if it does not.
@@ -305,27 +304,33 @@ M.update_style = function(comp, style, ref_comp, force)
 	return Highlight.highlight(comp._hl_name, style)
 end
 
-local HL_NAME_FIELD = {
-  left = "_left_hl_name",
-  right = "_right_hl_name",
-}
 
-local SIDE_STYLE_FIELD = {
-  left = "left_style",
-  right = "right_style",
-}
+--- Returns the field name for the highlight name of the specified side.
+--- @param side "left"|"right" the side to get the field name for, either "left" or "right"
+--- @return string field_name the field name for the highlight name of the specified side
+local function hl_name_field(side)
+  return side == "left" and "_left_hl_name" or "_right_hl_name"
+end
+
+--- Returns the field name for the style of the specified side.
+--- @param side "left"|"right" the side to get the field name for, either "left" or "right"
+--- @return string field_name the field name for the style of the specified side
+local function style_field(side)
+  return side == "left" and "left_style" or "right_style"
+end
 
 --- Determines if the separator style needs to be updated.
 --- @param comp Component the component to checks
 --- @param side "left"|"right" the side to check, either "left" or "right"
+--- @param side_style CompStyle|SepStyle the style of the side to check
+--- @param main_style_updated boolean true if the main style was updated, false otherwise
+--- @return boolean needs_update true if the style needs to be updated, false otherwise
 M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-  if not comp[side] then
+  if not comp[side] then -- no side, no need to update
     return false
-  end
-  local side_hl_name = HL_NAME_FIELD[side]
-	if not comp[side_hl_name] then
+  elseif not comp[hl_name_field(side)] then
 		return true
-	elseif type(comp[SIDE_STYLE_FIELD[side]]) == "function" then
+	elseif type(comp[style_field(side)]) == "function" then
 		return true
 	elseif main_style_updated then
 		return type(side_style) == "number" and
@@ -339,16 +344,16 @@ M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
 	return false
 end
 
+
 --- Ensures that a component has a highlight name for the specified side (left or right).
 --- If it doesn't, it will be generated based on the component's id.
---- @param comp Component
---- @param side "left"|"right"
+--- @param comp Component the component to ensure has a highlight name for the specified side
+--- @param side "left"|"right" the side to ensure has a highlight name, either "left" or "right"
 M.ensure_side_hl_name = function(comp, side)
-  local field = HL_NAME_FIELD[side]
+  local field = hl_name_field(side)
 	if not comp[field] then
-		local hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id)
 		--- If the component already has a main highlight name, use it as the base
-		rawset(comp, field, hl_name .. side)
+		rawset(comp, field, (comp._hl_name or Highlight.make_hl_name_from_id(comp.id)) .. side)
 	end
 end
 
@@ -362,14 +367,12 @@ end
 --- @param static any The `static` field value to pass to the component's update function
 --- @return boolean updated true if the style was updated, false otherwise
 M.update_side_style = function(comp, side, main_style, main_style_updated, session_id, ctx, static)
-	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id) or SepStyle.SepBg
+	local side_style = resolve(comp[style_field(side)] or SepStyle.SepBg, comp, ctx, static, session_id)
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
 
 	M.ensure_side_hl_name(comp, side)
-
-	local hl_name_field = "_" .. side .. "_hl_name"
 
 	if type(side_style) == "number" and main_style then
 		if side_style == SepStyle.SepFg then
@@ -388,14 +391,15 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 				bg = main_style.fg,
 			}
 		elseif side_style == SepStyle.Inherited then
-			rawset(comp, hl_name_field, comp._hl_name)
+			rawset(comp, hl_name_field(side), comp._hl_name)
       return true
 		else
 			--- invalid styles
 			return false
 		end
 	end
-  return Highlight.highlight(comp[hl_name_field], side_style)
+
+  return Highlight.highlight(comp[hl_name_field(side)], side_style)
 end
 
 
@@ -587,39 +591,56 @@ end
 
 --- Register a function to be called when a clickable component is clicked.
 --- @param comp Component The component to register the click event for.
---- @return string fun_name The function name to be used in the component's value. If no valid function is found, returns an empty string.
+--- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
+--- @throws if has an invalid field type
 M.register_click_handler = function(comp)
-  if comp._click_handler then
-    return comp._click_handler
+  local click_handler = comp._click_handler
+  if click_handler then
+    return click_handler
   end
 
   local on_click = comp.on_click
 
-  -- Fastest possible func_name derivation
-  local func_name = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
-
   local t = type(on_click)
   if t == "table" then
-    func_name = on_click.name or func_name
+    -- {
+    --    name = "MyClickHandler", -- optional
+    --    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
+    --    -- If callback is a string, don't care about the name field
+    --    -- or callback = "MyClickHandler" -- the name of a global function
+    -- }
+
+    local name = on_click.name
+    if name and type(name) ~= "string"  or name == "" then
+      require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
+      return ""
+    end
+    click_handler = type(name) == "string" and name or nil
     on_click = on_click.callback
     t = type(on_click)
   end
 
   if t == "string" and _G[on_click] then
-    func_name = "v:lua." .. on_click
-    comp._click_handler = func_name
-    return comp._click_handler
+    click_handler = "v:lua." .. on_click
+    comp._click_handler = click_handler
+    return click_handler
   elseif t == "function" then
-    if not _G[func_name] then
-      _G[func_name] = function(...)
+    -- Fastest possible func_name derivation
+    if not click_handler then
+      click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
+    end
+    if not _G[click_handler] then
+      _G[click_handler] = function(...)
         on_click(comp, ...)
       end
     end
-    func_name = "v:lua." .. func_name
-    comp._click_handler = func_name
-    return func_name
+    click_handler = "v:lua." .. click_handler
+    comp._click_handler = click_handler
+    return click_handler
+  else
+    require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
+    return ""
   end
-  return ""
 end
 
 return M

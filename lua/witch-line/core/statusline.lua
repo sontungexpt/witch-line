@@ -10,9 +10,13 @@ local M = {}
 
 
 --- @alias IdxValue 1
---- @alias IdxValue.Left 0
---- @alias IdxValue.Right 2
 local IDX_VALUE = 1
+--- @alias IdxValue.Left 0
+local IDX_VALUE_LEFT,
+--- @alias IdxValue.Right 2
+      IDX_VALUE_RIGHT
+        = IDX_VALUE - 1,
+          IDX_VALUE + 1
 
 --- @alias IdxHL 4
 --- @alias IdxHL.Left 3
@@ -24,9 +28,6 @@ local IDX_HL = IDX_VALUE + 3
 --- @alias IdxMergedHLValue.Right 8
 local IDX_MERGED_HL_VAL = IDX_HL + 3
 
---- @alias Segment.Side
---- | 1 # Right
---- | -1 # Left
 
 --- @class Segment A statusline component segment.
 --- @field [IdxValue.Left] string|nil The left value of the component.
@@ -39,7 +40,7 @@ local IDX_MERGED_HL_VAL = IDX_HL + 3
 --- @field [IdxMergedHLValue] string|nil The cached merged main value with highlight group name. ( Not be cached )
 --- @field [IdxMergedHLValue.Right] string|nil The cached merged right value with highlight group name. ( Not be cached )
 --- @field frozen true|nil If true, the part is frozen and will not be cleared on Vim exit.
---- @field click_handler string|nil The click handler for the component. ( Not be cached )
+--- @field click_handler_form string|nil The click handler for the component. ( Not be cached )
 ---
 --- @private cached fields:
 --- @field _total_display_width? integer|nil The cached total display width of the component including its left and right parts. ( Not be cached )
@@ -122,7 +123,7 @@ M.inspect = function(t)
         merged_hl_value_left = seg[IDX_MERGED_HL_VAL - 1],
         merged_hl_value_right = seg[IDX_MERGED_HL_VAL + 1],
         frozen = seg.frozen,
-        click_handler = seg.click_handler,
+        click_handler = seg.click_handler_form,
         _total_display_width = seg._total_display_width,
       }
     end
@@ -145,8 +146,8 @@ end
 local format_state_before_cache = function (segment)
   for k, v in pairs(segment) do
     if k ~= "frozen"
-      and k ~= IDX_VALUE + 1 -- keep right value
-      and k ~= IDX_VALUE - 1  -- keep left value
+      and k ~= IDX_VALUE_LEFT
+      and k ~= IDX_VALUE_RIGHT
     then
       if k == IDX_VALUE  then
         if not segment.frozen then
@@ -211,51 +212,54 @@ local function build_values(skip)
       local val = seg[IDX_VALUE]
       -- If no main value, skip the whole segment including its left and right parts
       if val ~= "" then
-        local click_handler = seg.click_handler
-        if click_handler then
+        local click_handler_form = seg.click_handler_form
+        if click_handler_form then
           n = n + 1
-          values[n] = "%@" .. click_handler .. "@"
+          values[n] = click_handler_form
         end
 
 
         local hl_value, hl
         local left, right = seg[IDX_VALUE - 1], seg[IDX_VALUE + 1]
         if left and left ~= "" then
-          n = n + 1
           hl_value = seg[IDX_MERGED_HL_VAL - 1]
           if hl_value then
+            n = n + 1
             values[n] = hl_value
           else
             hl = seg[IDX_HL - 1]
             hl_value = hl and assign_highlight_name(left, hl) or left
+            n = n + 1
             values[n], seg[IDX_MERGED_HL_VAL - 1] = hl_value, hl_value
           end
         end
 
         -- Main part
-        n = n + 1
         hl_value = seg[IDX_MERGED_HL_VAL]
         if hl_value then
+          n = n + 1
           values[n] = hl_value
         else
           hl = seg[IDX_HL]
           hl_value = hl and assign_highlight_name(val, hl) or val
+          n = n + 1
           values[n], seg[IDX_MERGED_HL_VAL] = hl_value, hl_value
         end
 
         if right and right ~= "" then
-          n = n + 1
           hl_value = seg[IDX_MERGED_HL_VAL + 1]
           if hl_value then
+            n = n + 1
             values[n] = hl_value
           else
             hl = seg[IDX_HL + 1]
             hl_value = hl and assign_highlight_name(right, hl) or right
+            n = n + 1
             values[n], seg[IDX_MERGED_HL_VAL + 1] = hl_value, hl_value
           end
         end
 
-        if click_handler then
+        if click_handler_form then
           n = n + 1
           values[n] = "%X"
         end
@@ -277,7 +281,7 @@ local compute_segment_width = function (segment)
   local value = segment[IDX_VALUE]
   width = value ~= "" and mb_string2cells_len(value, #value) or 0
   if width ~= 0 then
-    local left, right = segment[IDX_VALUE - 1], segment[IDX_VALUE + 1]
+    local left, right = segment[IDX_VALUE_LEFT], segment[IDX_VALUE_RIGHT]
     if left then
       width = width + mb_string2cells_len(left, #left)
     end
@@ -357,40 +361,31 @@ end
 
 
 --- Sets the value for a specific component.
---- @param idxs integer|integer[] The index of the component to set the value for.
+--- @param idxs integer[] The index of the component to set the value for.
 --- @param hl_name string|nil The highlight group name to assign to the specified component.
 M.set_value_highlight = function(idxs, hl_name, force)
-  if type(idxs) == "number" then
-    local seg = Statusline[idxs]
+  for i = 1, #idxs do
+    local seg = Statusline[idxs[i]]
     if force or not seg[IDX_HL] then
       seg[IDX_HL], seg[IDX_MERGED_HL_VAL] = hl_name, nil
-    end
-  else
-    for i = 1, #idxs do
-      local seg = Statusline[idxs[i]]
-      if force or not seg[IDX_HL] then
-        seg[IDX_HL], seg[IDX_MERGED_HL_VAL] = hl_name, nil
-      end
+    else
+      return -- Do not overwrite existing highlight
     end
   end
 end
 
 --- Updates the highlight group name for the left or right side of a specific component.
 --- @param idxs integer[] The index of the component to update the side highlight for.
---- @param side Segment.Side The side to set the highlight for. Use 1 for right and -1 for left.
+--- @param side Side The side to set the highlight for. Use 1 for right and -1 for left.
 --- @param hl_name string|nil The highlight group name to set for the specified side.
 M.set_side_value_highlight = function(idxs, side, hl_name, force)
-  if type(idxs) == "number" then
-    local seg = Statusline[idxs]
-    if force or not seg[IDX_HL + side] then
-      seg[IDX_HL + side], seg[IDX_MERGED_HL_VAL + side] = hl_name, nil
-    end
-  else
-    for i = 1, #idxs do
-      local seg = Statusline[idxs[i]]
-      if force or not seg[IDX_HL + side] then
-        seg[IDX_HL + side], seg[IDX_MERGED_HL_VAL + side] = hl_name, nil
-      end
+  local hl_key, merged_hl_key  = IDX_HL + side, IDX_MERGED_HL_VAL + side
+  for i = 1, #idxs do
+    local seg = Statusline[idxs[i]]
+    if force or not seg[hl_key] then
+      seg[hl_key], seg[merged_hl_key] = hl_name, nil
+    else
+      return -- Do not overwrite existing highlight
     end
   end
 end
@@ -398,40 +393,41 @@ end
 --- @param idxs integer|integer[] The index of the component to set the side value for.
 --- @param value string The value to set for the specified side.
 M.set_value = function(idxs, value)
-  if type(idxs) == "number" then
-    local seg = Statusline[idxs]
-    seg[IDX_VALUE] , seg._total_display_width = value, nil
-  else
-    for i = 1, #idxs do
-      local seg = Statusline[idxs[i]]
-      seg[IDX_VALUE] , seg._total_display_width = value, nil
-    end
+  for i = 1, #idxs do
+    local seg = Statusline[idxs[i]]
+    seg[IDX_VALUE] , seg[IDX_MERGED_HL_VAL], seg._total_display_width = value, nil, nil
   end
 end
 
 --- Sets the left or right side value for a specific component.
 --- @param idxs integer|integer[] The index of the component to set the side value for.
---- @param side Segment.Side The side to set the value for. Use 1 for right and -1 for left.
+--- @param side Side The side to set the value for. Use 1 for right and -1 for left.
 --- @param value string The value to set for the specified side.
-M.set_side_value = function(idxs, side, value)
-  if type(idxs) == "number" then
-    local seg = Statusline[idxs]
-    seg[IDX_VALUE + side] , seg._total_display_width = value, nil
-  else
-    for i = 1, #idxs do
-      local seg = Statusline[idxs[i]]
-      seg[IDX_VALUE + side] , seg._total_display_width = value, nil
+--- @param force boolean|nil If true, forces the update even if a value already exists for the specified side.
+M.set_side_value = function(idxs, side, value, force)
+  for i = 1, #idxs do
+    local seg = Statusline[idxs[i]]
+    local val = seg[IDX_VALUE + side]
+    if force or not val then
+      seg[IDX_VALUE + side], seg[IDX_MERGED_HL_VAL + side], seg._total_display_width = value, nil, nil
+    else
+      return -- Do not overwrite existing value
     end
   end
 end
 
 --- Updates the click handler for a specific component.
---- @param idxs integer[] The index of the component to update the click handler for.
+--- @param idxs integer[] The index in the statusline of the component to update the click handler for.
 --- @param click_handler string|nil The click handler to set for the specified component.
-M.bulk_set_click_handler = function(idxs, click_handler)
+--- @param force boolean|nil If true, forces the update even if a click handler already exists.
+M.set_click_handler = function(idxs, click_handler, force)
   for i = 1, #idxs do
-    local segment = Statusline[idxs[i]]
-    segment.click_handler = click_handler
+    local seg = Statusline[idxs[i]]
+    if force or not seg.click_handler_form then
+      seg.click_handler_form = "%@" .. click_handler .. "@"
+    else
+      return -- Do not overwrite existing click handler
+    end
   end
 end
 

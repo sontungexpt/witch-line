@@ -32,7 +32,7 @@ local hide_component = function(comp)
 end
 
 
---- Update the style of a component if necessary.
+--- Update the style of a component if necessary. (Called internally by `update_component`.)
 --- @param comp Component The component to update.
 --- @param style CompStyle|nil The new style to apply. If nil, the style will be fetched from the component's configuration.
 --- @param session_id SessionId The ID of the process to use for this update.
@@ -49,18 +49,27 @@ local function update_component_style(comp, style, session_id, ctx, static)
       style_updated = Component.update_style(comp, style, ref_comp)
     end
   end
+
   local indices = comp._indices
   --- @cast indices number[]
   Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
+  --- NOTE: Can not do sorter like this
+  --- ```lua
+  --- Statusline.set_side_value_highlight(
+  ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+  --- )
+  --- ```
+  --- Because lua evaluate the argument from left to right
+  --- So the comp._left_hl_name may be missing if the update_side_style has not been called yet
+  local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
   Statusline.set_side_value_highlight(
-    indices, -1, comp._left_hl_name,
-    Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+    indices, -1, comp._left_hl_name, left_style_updated
   )
 
+  local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
   Statusline.set_side_value_highlight(
-    indices, 1, comp._right_hl_name,
-    Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+    indices, 1, comp._right_hl_name, right_style_updated
   )
 end
 
@@ -84,7 +93,9 @@ local function update_component(comp, session_id)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
 	local min_screen_width = Component.min_screen_width(comp, session_id, ctx, static)
-	local hidden = min_screen_width and vim.o.columns < min_screen_width
+
+	local hidden = min_screen_width
+    and vim.o.columns < min_screen_width
 		or Component.hidden(comp, session_id, ctx, static)
 
 	local value, style = "", nil
@@ -120,10 +131,7 @@ local function update_component(comp, session_id)
         end
 
         if comp.on_click then
-          local click_handler = Component.register_click_handler(comp)
-          if click_handler ~= "" then
-            Statusline.bulk_set_click_handler(indices, click_handler)
-          end
+          Statusline.set_click_handler(indices, Component.register_click_handler(comp))
         end
 
 				rawset(comp, "_hidden", false) -- Reset hidden state
@@ -332,10 +340,10 @@ local function build_indices(comp)
   local idx = Statusline.push("")
   local left, right = comp.left, comp.right
   if type(left) == "string" then
-    Statusline.set_side_value(idx, -1, left)
+    Statusline.set_side_value({idx}, -1, left)
   end
   if type(right) == "string" then
-    Statusline.set_side_value(idx, 1, right)
+    Statusline.set_side_value({idx}, 1, right)
   end
 
 	local indices = comp._indices
