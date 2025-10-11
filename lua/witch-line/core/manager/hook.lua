@@ -46,9 +46,12 @@ Hook.use_style = function(comp, session_id)
   local Highlight = require("witch-line.core.highlight")
   return setmetatable({}, {
     __index = style,
-    __newindex = function(t, k, v)
+    __newindex = function(_, k, v)
         style[k] = v
-        Highlight.highlight(comp._hl_name, style)
+        local hl_name = comp._hl_name
+        if hl_name then
+          Highlight.highlight(hl_name, style)
+        end
     end,
   })
 end

@@ -2,21 +2,15 @@ local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 local o = vim.o
 
 local Statusline = require("witch-line.core.statusline")
-local Manager = require("witch-line.core.manager")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
 local Component = require("witch-line.core.Component")
+local Session = require("witch-line.core.Session")
+local Manager = require("witch-line.core.manager")
+local DepGraphKind = Manager.DepGraphKind
 
 local M = {}
 
----@enum DepStoreKey
-local DepStoreKey = {
-	Display = 1,
-	Event = 2,
-	Timer = 4,
-}
-
-M.DepStoreKey = DepStoreKey
 
 
 --- Clear the value of a component in the statusline.
@@ -41,6 +35,13 @@ local function update_component_style(comp, style, session_id)
   local style_updated, ref_comp = false, comp
   if style then
     style_updated = Component.update_style(comp, style, ref_comp, true)
+
+    --- Sync style to session store
+    --- This is make sure that the `use_style` hooks always get the latest style
+    local store = Session.get_store(session_id, "style")
+    if store then
+      store[comp.id] = style
+    end
   else
     style, ref_comp = Manager.lookup_ref_value(comp, "style", session_id, {})
     if style then
@@ -131,9 +132,9 @@ M.update_component = update_component
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
+function M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
 	seen = seen or {}
 
 	local id = comp.id
@@ -150,25 +151,25 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 	--- Check if component is loaded and should be render and affect to dependents
 	--- If it's not load. It's just the abstract component and we don't care about updated value of it. The function update is just call for update something for abstract component
 	if comp._loaded and updated_value == "" then
-		for dep_id, dep_comp in Manager.iterate_dependents(DepStoreKey.Display, id) do
+		for dep_id, dep_comp in Manager.iterate_dependents(DepGraphKind.Display, id) do
 			seen[dep_id] = true
 			hide_component(dep_comp)
 		end
 	end
 
-  if not dep_store_ids then
-    dep_store_ids = {
-      DepStoreKey.Event,
-      DepStoreKey.Timer,
+  if not dep_graph_kind then
+    dep_graph_kind = {
+      DepGraphKind.Event,
+      DepGraphKind.Timer,
     }
-  elseif type(dep_store_ids) ~= "table" then
-		dep_store_ids = { dep_store_ids }
+  elseif type(dep_graph_kind) ~= "table" then
+		dep_graph_kind = { dep_graph_kind }
 	end
 
-	for _, store_id in ipairs(dep_store_ids) do
+	for _, store_id in ipairs(dep_graph_kind) do
 		for dep_id, dep_comp in Manager.iterate_dependents(store_id, id) do
 			if not seen[dep_id] then
-				M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
+				M.update_comp_graph(dep_comp, session_id, dep_graph_kind, seen)
 			end
 		end
 	end
@@ -176,11 +177,11 @@ end
 
 --- Refresh a component and its dependencies in the next session.
 --- @param comp Component The component to refresh.
---- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
-M.refresh_component_graph = function(comp, dep_store_ids, seen)
+M.refresh_component_graph = function(comp, dep_graph_kind, seen)
 	require("witch-line.core.Session").run_once(function(session_id)
-		M.update_comp_graph(comp, session_id, dep_store_ids, seen)
+		M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
 		Statusline.render()
 	end)
 end
@@ -189,15 +190,15 @@ end
 --- Update multiple components by their IDs.
 --- @param ids CompId[] The IDs of the components to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_graph_by_ids = function(ids, session_id, dep_store_ids, seen)
+M.update_comp_graph_by_ids = function(ids, session_id, dep_graph_kind, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
 			local comp = Manager.get_comp(id)
 			if comp then
-				M.update_comp_graph(comp, session_id, dep_store_ids, seen)
+				M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
 			end
 		end
 	end
@@ -211,31 +212,31 @@ local function bind_dependencies(comp)
 
 	if type(ref) == "table" then
 		if ref.events then
-			link_ref_field(comp, ref.events, DepStoreKey.Event)
+			link_ref_field(comp, ref.events, DepGraphKind.Event)
 		end
 
 		if ref.user_events then
-			link_ref_field(comp, ref.user_events, DepStoreKey.Event)
+			link_ref_field(comp, ref.user_events, DepGraphKind.Event)
 		end
 
 		if ref.timing then
-			link_ref_field(comp, ref.timing, DepStoreKey.Timer)
+			link_ref_field(comp, ref.timing, DepGraphKind.Timer)
 		end
 
 		if ref.hidden then
-			link_ref_field(comp, ref.hidden, DepStoreKey.Display)
+			link_ref_field(comp, ref.hidden, DepGraphKind.Display)
 		end
 
 		if ref.min_screen_width then
-			link_ref_field(comp, ref.min_screen_width, DepStoreKey.Display)
+			link_ref_field(comp, ref.min_screen_width, DepGraphKind.Display)
 		end
 	end
 
 	local inherit = comp.inherit
 	if inherit then
-		link_ref_field(comp, inherit, DepStoreKey.Event)
-		link_ref_field(comp, inherit, DepStoreKey.Timer)
-		link_ref_field(comp, inherit, DepStoreKey.Display)
+		link_ref_field(comp, inherit, DepGraphKind.Event)
+		link_ref_field(comp, inherit, DepGraphKind.Timer)
+		link_ref_field(comp, inherit, DepGraphKind.Display)
 	end
 end
 
@@ -470,23 +471,22 @@ M.setup = function(user_configs, DataAccessor)
 	end
 
 	Event.on_event(function(session_id, ids)
-		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Event, {})
+		M.update_comp_graph_by_ids(ids, session_id, DepGraphKind.Event, {})
 		Statusline.render()
 	end)
 
 	Timer.on_timer_trigger(function(session_id, ids)
-		M.update_comp_graph_by_ids(ids, session_id, DepStoreKey.Timer, {})
+		M.update_comp_graph_by_ids(ids, session_id, DepGraphKind.Timer, {})
 		Statusline.render()
 	end)
 
-	local Session = require("witch-line.core.Session")
 	Session.run_once(function(session_id)
 		for _, comp in Manager.iter_pending_init_components() do
       Component.emit_init(comp, session_id)
 		end
 		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), session_id, {
-			DepStoreKey.Event,
-			DepStoreKey.Timer,
+			DepGraphKind.Event,
+			DepGraphKind.Timer,
 		}, {})
 		Statusline.render()
 	end)
