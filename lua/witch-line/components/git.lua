@@ -18,6 +18,7 @@ local Branch = {
     }
   },
   context = {
+    root_dir = nil, -- the root directory of the current git repository
     get_root_by_git = function(dir_path)
       local uv = vim.uv or vim.loop
       local prev = ''
@@ -65,7 +66,8 @@ local Branch = {
   init = function(self, session_id)
     local uv, api = vim.uv or vim.loop, vim.api
     local static = self.static
-    local ctx  = require("witch-line.core.manager.hook").use_context(self, session_id)
+    --- @cast static { disabled: { filetypes: string[] }, icon: string }
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 
     local file_changed, sec_arg = nil, nil
@@ -96,7 +98,7 @@ local Branch = {
       -- Update state
       -- last_head_file_path = new_dir_path
       last_root_dir = new_dir_path
-      self.temp = new_dir_path -- store current dir path that contains .git to use in update()
+      ctx.root_dir = new_dir_path
       -- Trigger immediately so the branch text updates
       refresh_component_graph(self)
     end
@@ -144,12 +146,13 @@ local Branch = {
   end,
   style = { fg = colors.green },
   update = function(self, session_id)
-    if not self.temp then
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+    if not ctx.root_dir then
       return ""
     end
 
     local branch = ""
-    local head_file_path = self.temp .. "/.git/HEAD"
+    local head_file_path = ctx.root_dir .. "/.git/HEAD"
     if head_file_path then
       local head_file = io.open(head_file_path, "r")
       if head_file then
@@ -166,7 +169,7 @@ local Branch = {
 }
 
 
-local Diff     = {}
+local Diff = {}
 
 --- @type DefaultComponent
 Diff.Interface = {
@@ -184,6 +187,7 @@ Diff.Interface = {
     }
   },
   context = {
+
     -- get_diff = function (bufnr)
     --   -- return self.temp.diff[bufnr]
     -- end,
@@ -192,14 +196,27 @@ Diff.Interface = {
     local vim = vim
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
     local api, bo, min, tonumber, list_contains = vim.api, vim.bo, math.min, tonumber, vim.list_contains
-    local processes, diff = {}, {}
+
+    --- @alias DiffResult { added: integer, modified: integer, removed: integer }
+
+    --- @type table<integer, vim.SystemObj>
+    local processes = {}
+
+    --- @type table<integer, DiffResult?>
+    local diff = {}
+
 
     local static = self.static
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+    --- @cast static { disabled: { filetypes: string[] } }
 
-    --- Redefine get_diff function to access the local diff table
+    local ctx = self.context
+    --- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
+
+    --- Export function to get the diff of a buffer
+    --- @param bufnr? integer Buffer number, defaults to current buffer
+    --- @return DiffResult
     ctx.get_diff = function(bufnr)
-      return diff[bufnr]
+      return diff[bufnr or api.nvim_get_current_buf()]
     end
 
     local process_diff = function(lines)
@@ -340,7 +357,7 @@ Diff.Added     = {
     --- @cast static { icon: string }
 
     local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
-    local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
+    local diff = ctx.get_diff()
     if diff then
       local added = diff.added
       if added then
@@ -370,7 +387,7 @@ Diff.Modified = {
     local static = self.static
     --- @cast static { icon: string }
     local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
-    local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
+    local diff = ctx.get_diff()
     if diff then
       local modified = diff.modified
       if modified then

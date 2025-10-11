@@ -114,9 +114,7 @@ local Icon = {
 	end,
 	style = function(self, session_id)
     local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		return {
-			fg = ctx.color,
-		}
+		return { fg = ctx.color }
 	end,
 	update = function(self, session_id)
     local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
@@ -133,11 +131,12 @@ local Modifier = {
 		fg = colors.fg,
 	},
 	update = function(self, session_id)
-		if vim.bo.buftype == "prompt" then
+    local bo = vim.bo
+		if bo.buftype == "prompt" then
 			return ""
-    elseif not vim.bo.modifiable or vim.bo.readonly then
+    elseif not bo.modifiable or bo.readonly then
 			return ""
-		elseif vim.bo.modified then
+		elseif bo.modified then
 			return ""
 		end
 		return ""

@@ -87,11 +87,8 @@ end
 --- @param color string The color name to convert.
 local function color_to_24bit(color)
 	local c = ColorRgb24Bit[color]
-	if c then
-		return c
-	end
+	if c then return c end
 	local num = nvim_get_color_by_name(color)
-
 	if num ~= -1 then
 		ColorRgb24Bit[color] = num
 	end
