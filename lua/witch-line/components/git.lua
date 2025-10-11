@@ -18,40 +18,6 @@ local Branch = {
     }
   },
   context = {
-    -- get_head_file_path = function(dir_path)
-    --   local uv = vim.uv or vim.loop
-    --   local prev = ''
-    --   local dir = dir_path or uv.cwd()
-
-    --   while dir ~= prev do
-    --     local git_path = dir .. '/.git'
-    --     local stat = uv.fs_stat(git_path)
-    --     if stat then
-    --       if stat.type == 'directory' then
-    --         return git_path .. '/HEAD'
-    --       elseif stat.type == 'file' then
-    --         local fd = io.open(git_path, 'r')
-    --         if fd then
-    --           local line = fd:read('*l')
-    --           fd:close()
-    --           local gitdir = line:match("^gitdir:%s*(.-)%s*$")
-    --           if gitdir then
-    --             -- Handle relative gitdir path
-    --             if not gitdir:match("^/") and not gitdir:match("^%a:[/\\]") then
-    --               gitdir = dir .. "/" .. gitdir
-    --             end
-    --             -- Normalize and verify
-    --             return uv.fs_realpath(gitdir .. '/HEAD')
-    --           end
-    --         end
-    --       end
-    --     end
-
-    --     prev = dir
-    --     dir = dir:match('^(.*)[/\\][^/\\]+$') or dir
-    --   end
-    --   return nil
-    -- end,
     get_root_by_git = function(dir_path)
       local uv = vim.uv or vim.loop
       local prev = ''
@@ -267,8 +233,9 @@ Diff.Interface = {
     api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
       callback = function(e)
         local event, bufnr = e.event, e.buf
+
         --- Clear the old diff when buffer is deleted or written
-        if event == "BufDelete" or event == "BufWritePost" then
+        if event ~= "BufEnter" then
           diff[bufnr] = nil
 
           --- Stop any running process
@@ -284,10 +251,7 @@ Diff.Interface = {
           end
         end
 
-        if event == "BufEnter"
-          or event == "FileChangedShellPost"
-          or event == "BufWritePost"
-        then
+        if event ~= "BufDelete" then
           --- If diff is caculated and filetype is not disabled, just refresh
           if diff[bufnr] or list_contains(static.disabled.filetypes, bo[bufnr].filetype) then
             refresh_component_graph(self) -- trigger update
