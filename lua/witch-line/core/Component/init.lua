@@ -284,6 +284,19 @@ M.emit_post_update = function(comp, session_id)
 	end
 end
 
+--- Emits the `init` event for the component, calling the init function if it exists.
+--- @param comp Component the component to emit the event for
+--- @param session_id SessionId the session id to use for the component, used for lazy loading components
+M.emit_init = function(comp, session_id)
+  local init = comp.init
+  local t = type(init)
+  if t == "function" then
+    init(comp, session_id)
+  elseif t == "string" then
+    require(init)(comp, session_id)
+  end
+end
+
 
 --- Ensures that a component has a highlight name.
 --- If it doesn't, it will be inherited from the reference component or generated.

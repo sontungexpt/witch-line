@@ -499,7 +499,7 @@ M.setup = function(user_configs, DataAccessor)
 	local Session = require("witch-line.core.Session")
 	Session.run_once(function(session_id)
 		for _, comp in Manager.iter_pending_init_components() do
-			comp.init(comp, session_id)
+      Component.emit_init(comp, session_id)
 		end
 		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), session_id, {
 			DepStoreKey.Event,
