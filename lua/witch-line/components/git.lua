@@ -209,7 +209,8 @@ Diff.Interface = {
     local static = self.static
     --- @cast static { disabled: { filetypes: string[] } }
 
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+    local ctx = self.context
+    --- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
 
     --- Export function to get the diff of a buffer
     --- @param bufnr? integer Buffer number, defaults to current buffer
