@@ -47,6 +47,7 @@ end
 --- If the key does not exist, it will create an empty table for that key.
 --- @param session_id SessionId id of the session
 --- @param store_id NotNil key to retrieve session data
+--- @return any|nil value associated with the key, or nil if the key does not exist
 Session.get_store = function(session_id, store_id)
 	local store = Store[session_id]
 	if not store then

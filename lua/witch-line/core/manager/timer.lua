@@ -2,15 +2,12 @@ local M = {}
 
 local TIMER_TICK = 1000 -- 1 second
 
----@alias TimerStore table<uinteger , Id[] >
----@type TimerStore
+--- @class TimerStore
+--- @field [integer] Id[] List of component IDs associated with the timer interval.
 local TimerStore = {
 	-- Stores component IDs for timers with a specific interval
-	-- [interval] = {
-	--   comp_id1,
-	--   comp_id2,
-	--   ...
-	-- }
+	-- [interval] = { comp_id1, comp_id2, ... }
+  -- [1000] = { "comp_id1", "comp_id2" }, -- Example: Components to update every second
 }
 
 --- @type table<uinteger, uv.uv_timer_t>
@@ -67,13 +64,14 @@ M.on_timer_trigger = function(work)
 	end
 
 	local uv = vim.uv or vim.loop
+  local Session = require("witch-line.core.Session")
+
 	for interval, ids in pairs(TimerStore) do
 		local timer = uv.new_timer()
 		timer:start(
 			0,
 			interval,
 			vim.schedule_wrap(function()
-				local Session = require("witch-line.core.Session")
 				Session.run_once(function(session_id)
 					work(session_id, ids, interval)
 				end)

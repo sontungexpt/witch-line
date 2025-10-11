@@ -2,6 +2,7 @@ local require, type = require, type
 local Manager = require("witch-line.core.manager")
 local lookup_ref_value, lookup_inherited_value = Manager.lookup_ref_value, Manager.lookup_inherited_value
 
+--- @class Hook
 local Hook = {}
 
 --- Hook to get a context for a component
@@ -25,6 +26,14 @@ Hook.use_static = function(comp)
     return require(static)
   end
   return static
+end
+
+--- Hook to get event info for a component
+--- @param comp Component The component to get the event info for
+--- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event info for the component. Nil if not updated by any event
+Hook.use_event_info = function(comp, session_id)
+  -- Not use frequently, so require here for lazy load
+  return require("lua.witch-line.core.manager.event").get_event_info(comp, session_id)
 end
 
 return Hook

@@ -230,7 +230,10 @@ end
 --- Ensures that the component has a valid id, generating one if it does not.
 --- @param comp Component|DefaultComponent the component to get the id from
 --- @return CompId id the id of the component
-M.valid_id = function(comp)
+--- @return Component|DefaultComponent|nil comp the component itself, or nil if it is a default component
+M.setup = function(comp)
+  require("witch-line.core.Component.initial_state").save_initial_context(comp)
+
 	local id = comp.id
 	if comp._plug_provided then
 		---@cast id CompId
@@ -243,7 +246,7 @@ M.valid_id = function(comp)
 	end
 
 	---@cast id CompId
-	return id
+	return id, comp
 end
 
 --- Inherits the parent component's fields and methods, allowing for component extension.
@@ -525,6 +528,7 @@ end
 --- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
 --- @param comp Component the component to remove the state from
 M.format_state_before_cache = function(comp)
+  require("witch-line.core.Component.initial_state").restore_initial_context(comp)
 	rawset(comp, "_hidden", nil)
 	local temp = comp.temp
 	if type(temp) == "table" then
