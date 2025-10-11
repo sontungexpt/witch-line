@@ -1,5 +1,6 @@
 local type, unpack, rawget = type, unpack, rawget
-local get_session_store = require("witch-line.core.Session").get_store
+local Session = require("witch-line.core.Session")
+local get_session_store, new_session_store = Session.get_store, Session.new_store
 
 local M = {}
 
@@ -270,15 +271,17 @@ end
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
 --- will only look for static values without calling functions or caching.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
-  local store = get_session_store(session_id, key, {})
+  local store = get_session_store(session_id, key)
   local id, cached, value, ref, ref_id
 
   -- Do as least one loop
   repeat
     id = comp.id
-    cached = store[id]
-    if cached ~= nil then
-      return cached, comp
+    if store then
+      cached = store[id]
+      if cached ~= nil then
+        return cached, comp
+      end
     end
 
     value = rawget(comp, key)
@@ -289,7 +292,11 @@ local function lookup_ref_value(comp, key, session_id, seen, ...)
         value = value(comp, unpack(args))
       end
       --- @cast id CompId
-      store[id] = value
+      if not store then
+        store = new_session_store(session_id, key, { [id] = value })
+      else
+        store[id] = value
+      end
       return value, comp
     end
 
