@@ -335,8 +335,6 @@ local component = {
 
   **Alias**: `PaddingFunc` : `fun(self, session_id): number | nil`
 
-  **Type**: `number | nil` | `PaddingFunc` | { left: number | PaddingFunc | nil, right: number | PaddingFunc | nil } | nil
-
   | **Type**                                                                      | **Description**                                                                            |
   | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
   | `number`                                                                      | The padding applied to both sides of the component                                         |
