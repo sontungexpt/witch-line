@@ -16,12 +16,12 @@ local Copilot = {
 		fps = 3, -- should be 3 - 5
 	},
   context = {},
-	init = function(self, ctx, static)
-		local get_option = vim.api.nvim_get_option_value
+	init = function(self, session_id)
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 		local timer = (vim.uv or vim.loop).new_timer()
 		local curr_inprogress_index = 0
-		local icon = static.icon
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		local icon = self.static.icon
 		local status = ""
 
 		local check_status = function()
@@ -60,9 +60,7 @@ local Copilot = {
 				if cp_api_ok then
 					cp_api.register_status_notification_handler(vim.schedule_wrap(function(data)
 						-- don't need to get status when in TelescopePrompt
-						if get_option("buftype", { buf = 0 }) == "prompt" then
-							return
-          end
+            if vim.bo.buftype == "prompt" then return end
 
 						status = string.lower(data.status or "")
 
@@ -72,20 +70,12 @@ local Copilot = {
 								math.floor(1000 / self.static.fps),
 								vim.schedule_wrap(function()
                   refresh_component_graph(self)
-									-- nvim_exec_autocmds("User", {
-									-- 	pattern = "WLCopilotLoad",
-									-- 	modeline = false,
-									-- })
 								end)
 							)
 							return
 						end
 						timer:stop()
             refresh_component_graph(self)
-						-- nvim_exec_autocmds("User", {
-						-- 	pattern = "WLCopilotLoad",
-						-- 	modeline = false,
-						-- })
 					end))
 
           check_status()
@@ -104,7 +94,8 @@ local Copilot = {
 
 	end,
 
-	update = function(self, ctx, static, session_id)
+	update = function(self,  session_id)
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		return ctx.get_icon()
 	end,
 }

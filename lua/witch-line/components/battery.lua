@@ -47,8 +47,9 @@ return {
 	context = {
 		current_charging_index = 0,
 	},
-	init = function(self, ctx, static, session_id)
+	init = function(self, session_id)
     local sysname = (vim.uv or vim.loop).os_uname().sysname
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
     if sysname == "Linux" then
       local bat_dir = vim.fn.glob("/sys/class/power_supply/BAT*", true, true)[1]
       if not bat_dir then
@@ -166,7 +167,9 @@ return {
 			end
     end
 	end,
-	update = function(self, ctx, static, session_id)
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
 		if not ctx.get_status or not ctx.get_capacity then
 			return ""
 		end

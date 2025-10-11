@@ -11,10 +11,10 @@ local Interface = {
 		INFO = "",
 		HINT = "",
 	},
-  hidden = function (self, ctx, static, session_id)
+  hidden = function (self, session_id)
 		return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 	end,
-  context = function (self, static, session_id)
+  context = function (self)
     return vim.diagnostic.count(0)
   end
 }
@@ -27,7 +27,9 @@ local Error = {
 		fg = "DiagnosticError",
 	},
 	inherit = Id["diagnostic.interface"],
-	update = function(self, ctx, static)
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
     local count = ctx[vim.diagnostic.severity.ERROR] or 0
 		return count > 0 and static.ERROR .. " " .. count or ""
 	end,
@@ -41,7 +43,9 @@ local Warn = {
 	style = {
 		fg = "DiagnosticWarn",
 	},
-	update = function(self, ctx, static)
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
     local count = ctx[vim.diagnostic.severity.WARN] or 0
 		return count > 0 and static.WARN .. " " .. count or ""
 	end,
@@ -55,7 +59,9 @@ local Info = {
 	style = {
 		fg = "DiagnosticInfo",
 	},
-	update = function(self, ctx, static)
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
     local count = ctx[vim.diagnostic.severity.INFO] or 0
 		return count > 0 and static.INFO .. " " .. count or ""
 	end,
@@ -69,7 +75,9 @@ local Hint = {
 	style = {
 		fg = "DiagnosticHint",
 	},
-	update = function(self, ctx, static)
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
     local count = ctx[vim.diagnostic.severity.HINT] or 0
 		return count > 0 and static.HINT .. " " .. count or ""
 	end,

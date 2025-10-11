@@ -7,7 +7,7 @@ local CursorPos = {
 	_plug_provided = true,
 	style = { fg = colors.fg },
 	events = { "CursorMoved", "CursorMovedI" },
-	update = function(self, ctx, static)
+	update = function(self)
 		local pos = vim.api.nvim_win_get_cursor(0)
 		return pos[1] .. ":" .. pos[2]
 	end,
@@ -25,8 +25,10 @@ local CursorProgress = {
 	},
 	padding = 0,
 	style = { fg = colors.orange },
-	update = function(self, ctx, static)
+	update = function(self)
 		local line = vim.fn.line
+    local static = self.static
+    ---@diagnostic disable-next-line: need-check-nil
 		return static.chars[math.ceil(line(".") / line("$") * #static.chars)] or ""
 	end,
 }

@@ -1,4 +1,4 @@
-local Id = require("witch-line.constant.id").IdPathMap
+local Id = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
 
@@ -15,7 +15,8 @@ local Clients = {
             },
         },
     },
-    hidden = function(self, ctx, static, session_id)
+    hidden = function(self, session_id)
+      local static = require("witch-line.core.manager.hook").use_static(self)
         if type(static.disabled) ~= "table" then
             return false
         elseif type(static.disabled.filetypes) == "table"
@@ -26,7 +27,7 @@ local Clients = {
         return false
     end,
     style = { fg = colors.magenta },
-    update = function()
+    update = function(self, session_id)
         local api = vim.api
         local bufnr = api.nvim_get_current_buf()
         local buf_clients = vim.lsp.get_clients({ bufnr = bufnr })
