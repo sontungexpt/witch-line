@@ -31,7 +31,7 @@ local builtin = require("witch-line.builtin") -- Not allowed, as it's an up-valu
 
 local component = {
   id = "identifier",
-  update = function(self, ctx, static, session_id)
+  update = function(self, session_id)
     local builtin = require("witch-line.builtin") -- Allowed, as it's inside the function
     local api = vim.api -- Allowed, as it's a global API call
     return api.nvim_buf_get_name(0) -- Depends only on the current buffer
@@ -388,11 +388,29 @@ local component = {
 
   **Example**:
 
+   - Type: `fun(self, session_id): nil`
+
   ```lua
   local component = {
       init = function(self, session_id)
           -- Initialization code here
       end
+  }
+  ```
+
+    - Type: `string`
+
+  ```lua
+  -- my/module/path.lua
+  local vim = vim
+  return function(self, session_id)
+    -- Initialization code here
+  end
+
+
+  -- In your component definition
+  local component = {
+    init = "my.module.path" -- The module should return a function
   }
   ```
 
