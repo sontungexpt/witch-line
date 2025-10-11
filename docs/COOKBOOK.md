@@ -98,6 +98,10 @@ local component = {
 
   When a component has a `context` field or reference `context` from another component, Then the user can access the context field by using the hook `require("witch-line.core.manager.hook").use_context(comp, session_id)`.
 
+  Tricks:
+
+  - If you ensure that the context is same for all sessions by self not referencing other components (usually when context is a static table or a string path), then you can use the `self.context` directly in any function of the component like `init`, `update`, etc for better performance.
+
   **Example**:
 
   - Type: `string`
@@ -125,6 +129,10 @@ local component = {
     update = function(self, session_id)
         local hook = require("witch-line.core.manager.hook") -- Use hook to access context
         local ctx = hook.use_context(self, session_id)
+
+        -- You can also use self.context directly if you ensure that context is same for all sessions
+        -- local ctx = self.context
+
         return "Dynamic Value: " .. ctx.dynamic_value
     end
   }

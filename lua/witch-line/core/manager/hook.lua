@@ -33,7 +33,7 @@ end
 --- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event info for the component. Nil if not updated by any event
 Hook.use_event_info = function(comp, session_id)
   -- Not use frequently, so require here for lazy load
-  return require("lua.witch-line.core.manager.event").get_event_info(comp, session_id)
+  return require("witch-line.core.manager.event").get_event_info(comp, session_id)
 end
 
 return Hook
