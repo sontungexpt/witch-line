@@ -18,7 +18,7 @@ local Encoding = {
 	update = function(self, ctx, static)
 		local enc = vim.bo.fenc ~= "" and vim.bo.fenc or vim.o.enc
     if enc then
-      return static[enc] or enc
+      return self.static[enc] or enc
     end
     return  enc
 	end,
