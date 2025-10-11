@@ -64,8 +64,8 @@ local Branch = {
   },
   init = function(self, session_id)
     local uv, api = vim.uv or vim.loop, vim.api
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    local ctx  = require("witch-line.core.manager.hook").use_context(self, session_id)
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 
     local file_changed, sec_arg = nil, nil
@@ -159,8 +159,8 @@ local Branch = {
         branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
       end
     end
-    local hook = require("witch-line.core.manager.hook")
-    local static = hook.use_static(self)
+    local static = self.static
+    --- @cast static { icon: string }
     return branch ~= "" and static.icon .. " " .. branch or ""
   end,
 }
@@ -189,13 +189,14 @@ Diff.Interface = {
     -- end,
   },
   init = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
     local vim = vim
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
     local api, bo, min, tonumber, list_contains = vim.api, vim.bo, math.min, tonumber, vim.list_contains
     local processes, diff = {}, {}
 
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+
     --- Redefine get_diff function to access the local diff table
     ctx.get_diff = function(bufnr)
       return diff[bufnr]
@@ -310,7 +311,8 @@ Diff.Interface = {
 
   end,
   hidden = function(self, session_id)
-    local static = require("witch-line.core.manager.hook").use_static(self)
+    local static = self.static
+    --- @cast static { disabled: { filetypes: string[] } }
     if vim.list_contains(static.disabled.filetypes, vim.bo.filetype) then
       return true
     end
@@ -334,8 +336,10 @@ Diff.Added     = {
     hidden = Id["git.diff.interface"]
   },
   update = function(self,  session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    --- @cast static { icon: string }
+
+    local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
     local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
     if diff then
       local added = diff.added
@@ -363,8 +367,9 @@ Diff.Modified = {
     events = Id["git.diff.interface"],
   },
   update = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    --- @cast static { icon: string }
+    local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
     local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
     if diff then
       local modified = diff.modified
@@ -392,8 +397,9 @@ Diff.Removed  = {
     hidden = Id["git.diff.interface"]
   },
   update = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    --- @cast static { icon: string }
+    local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
     local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
     if diff then
       local removed = diff.removed

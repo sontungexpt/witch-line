@@ -236,7 +236,7 @@ M.link_ref_field = function(comp, ref, store_id)
 	local id = comp.id
   --- @cast id CompId Id never nil
 
-	if type(ref) == "table" then
+	if type(ref) ~= "table" then
 		ref = { ref }
 	end
 	for i = 1, #ref do

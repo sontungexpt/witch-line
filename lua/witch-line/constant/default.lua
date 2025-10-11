@@ -4,14 +4,14 @@ return {
 	"file.name",
 	"file.icon",
 	"file.modifier",
-	--
+
 	"git.branch",
 	"git.diff.added",
 	"git.diff.removed",
 	"git.diff.modified",
-	--
+
 	"%=",
-	--
+
 	"lsp.clients",
 	"copilot",
 

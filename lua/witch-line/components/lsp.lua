@@ -16,15 +16,16 @@ local Clients = {
         },
     },
     hidden = function(self, session_id)
-      local static = require("witch-line.core.manager.hook").use_static(self)
-        if type(static.disabled) ~= "table" then
-            return false
-        elseif type(static.disabled.filetypes) == "table"
-            and vim.list_contains(static.disabled.filetypes, vim.bo.filetype)
-        then
-            return true
-        end
-        return false
+      local static = self.static
+      --- @cast static {disabled: {filetypes: string[]}}
+      if type(static.disabled) ~= "table" then
+          return false
+      elseif type(static.disabled.filetypes) == "table"
+          and vim.list_contains(static.disabled.filetypes, vim.bo.filetype)
+      then
+          return true
+      end
+      return false
     end,
     style = { fg = colors.magenta },
     update = function(self, session_id)

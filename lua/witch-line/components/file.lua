@@ -37,7 +37,8 @@ local Name = {
 	padding = { left = 1, right = 0 },
 	update = function(self, session_id)
     local bo = vim.bo
-    local static = require("witch-line.core.manager.hook").use_static(self)
+    local static = self.static
+    --- @cast static {formatter: {filetype: table<string, string>, buftype: table<string, string>}}
 
 		local formatter = static.formatter
 
@@ -91,7 +92,8 @@ local Icon = {
 		end
 
 		if not icon then
-      local static = require("witch-line.core.manager.hook").use_static(self)
+      local static = self.static
+      --- @cast static {extensions: {filetypes: table<string, {[1]:string, [2]:string}>, buftypes: table<string, {[1]:string, [2]:string}>}}
 			local extensions = static.extensions
 			local extension = extensions.buftypes[vim.bo.buftype]
 			if extension then
@@ -111,15 +113,13 @@ local Icon = {
 		}
 	end,
 	style = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx = hook.use_context(self, session_id)
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		return {
 			fg = ctx.color,
 		}
 	end,
 	update = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx = hook.use_context(self, session_id)
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		return ctx.icon
 	end,
 }
@@ -173,7 +173,8 @@ local Size =  {
 		end
 
 		local format = i == 1 and "%d%s" or "%.1f%s"
-    local static = require("witch-line.core.manager.hook").use_static(self)
+    local static = self.static
+    --- @cast static {icon: string}
 		return static.icon .. " " .. string.format(format, file_size, suffixes[i])
 	end,
 }

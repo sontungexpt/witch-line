@@ -73,17 +73,17 @@ return {
     }
 	end,
   style = function (self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    --- @cast static {mode_colors: table<string, {fg: string}>, modes: table<string, { [1]: string, [2]: string}>}
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		local mode_code = ctx.mode
-		---@diagnostic disable-next-line: need-check-nil
 		return static.mode_colors[static.modes[mode_code][2]] or {}
 	end,
 	update = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    local static = self.static
+    --- @cast static {modes: table<string, { [1]: string, [2]: string}>}
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		local mode_code = ctx.mode
-		---@diagnostic disable-next-line: need-check-nil
 		local mode = static.modes[mode_code]
 		return mode and mode[1] or mode_code
 	end,
