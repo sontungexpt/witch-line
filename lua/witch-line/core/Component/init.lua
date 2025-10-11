@@ -21,11 +21,11 @@ local SepStyle = {
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field user_events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field timing CompId|CompId[]|nil A table of ids of components that this component references
+--- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
+--- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
 --- @field style CompId|nil A id of a component that this component references for its style
 --- @field static CompId|nil A id of a component that this component references for its static values
 --- @field context CompId|nil A id of a component that this component references for its context
---- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
---- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
 
 --- @class LiteralComponent : string
 
@@ -40,9 +40,10 @@ local SepStyle = {
 
 --- @alias PaddingFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
---- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , vim.api.keyset.highlight|nil|string
---- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight|string
---- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): vim.api.keyset.highlight|SepStyle|string
+--- @alias UpdateFunc fun(self:ManagedComponent, ctx: any, static: any, session_id: SessionId): string|nil , CompStyle|nil|
+--- @alias CompStyle vim.api.keyset.highlight|string
+--- @alias StyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): CompStyle
+--- @alias SideStyleFunc fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId): CompStyle|SepStyle
 --- @alias OnClickFunc fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 ---
 --- @class OnClickTable
@@ -51,79 +52,95 @@ local SepStyle = {
 ---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
---- @field version integer|string|nil
+---
 --- The version of the component, can be used to force reload the component when it changes
 --- - If provided, the component will be reloaded on start if the version changes manually when update component configurations by user. It's help the cache system work faster if speed is more important because the user manage the version manually.
 --- - If nil, the component will automatically reload when the component changes by search for the changes by Cache system.
+--- @field version integer|string|nil
+---
 --- @field inherit CompId|nil The id of the component to inherit from, can be used to extend a component
+---
 --- @field timing boolean|integer|nil If true the component will be updated on every tick, if a number it will be updated every n ticks
+---
 --- @field lazy boolean|nil If true the component will be loaded only when it is needed, used for lazy loading components
+---
 --- @field flexible number|nil The priority of the component when the status line is too long, higher numbers are more likely to be truncated
+---
 --- @field events string|string[]|nil A table of events that the component will listen to
+---
 --- @field user_events string|string[]|nil A table of user events that the component will listen to
---- @field min_screen_width integer|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):number|nil
+---
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
 --- - If nil: always visible.
 --- - If function: called and its return value is used as above.
 --- - Example of min_screen_width function: `function(self, ctx, static, session_id) return 80 end`
+--- @field min_screen_width integer|nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId):number|nil
+---
 --- @field ref Ref|nil A table of references to other components that this component depends on
+---
 --- @field neighbors Neighbor[]|nil A table of neighbor components that this component is related to ( Not implemented yet )
---- @field left_style string|vim.api.keyset.highlight|nil|SideStyleFunc|SepStyle
+---
 --- A table of styles that will be applied to the left separator of the component
 --- - If string: used as a highlight group name.
 --- - If table: used as highlight table properties.
 --- - If nil: inherits from `style` field..
 --- - If SepStyle enum value: special handling based on the enum value.
---- 	-| SepFg: uses the foreground color of the main style for the separator.
---- 	-| SepBg: uses the background color of the main style for the separator.
---- 	-| Reverse: swaps the foreground and background colors of the main style for the separator.
---- 	-| Inherited: inherits the main style directly.
+--- 	- SepFg: uses the foreground color of the main style for the separator.
+--- 	- SepBg: uses the background color of the main style for the separator.
+--- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
+--- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
 --- - Example of left_style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field left string|nil|UpdateFunc
+--- @field left_style CompStyle|nil|SideStyleFunc|SepStyle
+---
 --- The left separator of the component
 --- - If string: used as is.
 --- - If nil: no left part.
 --- - If function: called and its return value is used as the left part.
 --- - Example of left function: `function(self, ctx, static, session_id) return "<" end`
---- @field right_style string|vim.api.keyset.highlight|nil|SideStyleFunc|SepStyle
+--- @field left string|nil|UpdateFunc
+---
 --- A table of styles that will be applied to the right part of the component
 --- - If string: used as a highlight group name.
 --- - If table: used as highlight table properties.
 --- - If nil: inherits from `style` field..
 --- - If SepStyle enum value: special handling based on the enum value.
---- 	-| SepFg: uses the foreground color of the main style for the separator.
---- 	-| SepBg: uses the background color of the main style for the separator.
---- 	-| Reverse: swaps the foreground and background colors of the main style for the separator.
---- 	-| Inherited: inherits the main style directly.
+--- 	- SepFg: uses the foreground color of the main style for the separator.
+--- 	- SepBg: uses the background color of the main style for the separator.
+--- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
+--- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
 --- - Example of right_style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field right string|nil|UpdateFunc
+--- @field right_style CompStyle|nil|SideStyleFunc|SepStyle
+---
 --- The right separator of the component
 --- - If string: used as is.
 --- - If nil: no right part.
 --- - If function: called and its return value is used as the right part.
 --- - Example of right function: `function(self, ctx, static, session_id) return ">" end`
---- @field padding integer|nil|PaddingTable|PaddingFunc
+--- @field right string|nil|UpdateFunc
+---
 --- The padding of the component
 --- - If integer: number of spaces to add to both sides of the component.
 --- - If nil: defaults to 1 space on both sides.
 --- - If table: a table with `left` and `right` fields specifying the number of spaces for each side.
---- 	-| If `left` or `right` is nil, it defaults to 0 for that side.
---- 	-| Example: `{left = 2, right = 1}` adds 2 spaces to the left and 1 space to the right.
----  	-| Example: `{left = 2}` adds 2 spaces to the left and 0 spaces to the right.
---- 	-| Example: `{right = 3}` adds 0 spaces to the left and 3 spaces to the right.
----  	-| Example: `{}` adds 0 spaces to both sides.
---- 	-| If `left` or `right` is a function, it will be called to get the number of spaces for that side.
----  	-| Example: `{left = function() return 2 end, right = 1}` adds 2 spaces to the left and 1 space to the right.
----  	-| Example: `{left = 2, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
----  	-| Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
+--- 	- If `left` or `right` is nil, it defaults to 0 for that side.
+--- 	- Example: `{left = 2, right = 1}` adds 2 spaces to the left and 1 space to the right.
+---  	- Example: `{left = 2}` adds 2 spaces to the left and 0 spaces to the right.
+--- 	- Example: `{right = 3}` adds 0 spaces to the left and 3 spaces to the right.
+---  	- Example: `{}` adds 0 spaces to both sides.
+--- 	- If `left` or `right` is a function, it will be called to get the number of spaces for that side.
+---  	- Example: `{left = function() return 2 end, right = 1}` adds 2 spaces to the left and 1 space to the right.
+---  	- Example: `{left = 2, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
+---  	- Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
 ---	- If function: called and its return value is used as above.
 --- - Example of padding function: `function(self, ctx, static, session_id) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, ctx, static, session_id) return 2 end` (adds 2 spaces to both sides)
+--- @field padding integer|nil|PaddingTable|PaddingFunc
+---
 --- @field init nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId) called when the component is initialized, can be used to set up the context
---- @field style string|vim.api.keyset.highlight|nil|StyleFunc
+---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
 --- - If table: used as is.
@@ -131,32 +148,27 @@ local SepStyle = {
 --- - If function: called and its return value is used as above.
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
 --- - Example of style function: `function(self, ctx, static, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- @field style CompStyle|nil|StyleFunc
 --- @field temp any A temporary field that can be used to store temporary values, will not be cached
 --- @field static any A static field that will be passed to the component's update function
---- @field context NotFunction|fun(self: ManagedComponent, static:any, session_id: SessionId): any
+---
 --- A context field that will be passed to the component's update function
 --- - If nil: no context will be passed.
 --- - If function: called and its return value is used as above.
 --- - Example of context function: `function(self, static, session_id) return {buffer = vim.api.nvim_get_current_buf()} end`
---- @field pre_update nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId)
---- Called before the component is updated
---- - If nil: nothing is called.
---- - If function: called before the component is updated
---- @field update nil|string|UpdateFunc
+--- @field context NotFunction|fun(self: ManagedComponent, static:any, session_id: SessionId): any
+--- @field pre_update nil|fun(self: ManagedComponent, ctx: any, static: any, session_id: SessionId) Called before the component is updated
 --- - If string: used as is.
 --- - If nil: the component will not be updated.
 --- - If function: called and its return value and style are used as the new value and style of the component
 --- - Example of update function: `function(self, ctx, static, session_id) return "Hello World" end`
 --- - Example of update function with style: `function(self, ctx, static, session_id) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field post_update nil|fun(self: ManagedComponent,ctx: any, static: any, session_id: SessionId)
---- Called after the component is updated. (Call before the dependencies are updated)
---- - If nil: nothing is called.
---- - If function: called after the component is updated
----	- Example of post_update function: `function(self, ctx, static, session_id) print("Component updated") end`
---- @field hidden nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId): boolean|nil
+--- @field update nil|string|UpdateFunc
+--- @field post_update nil|fun(self: ManagedComponent,ctx: any, static: any, session_id: SessionId) Called after the component is updated. (Call before the dependencies are updated)
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
+--- @field hidden nil|fun(self: ManagedComponent, ctx:any, static: any, session_id: SessionId): boolean|nil
 --- @field on_click nil|string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
@@ -181,8 +193,7 @@ local SepStyle = {
 --- Check if is default component
 --- @param comp Component the component to get the id from
 M.is_default = function(comp)
-	local Id = require("witch-line.constant.id").Id
-	return Id[comp.id] ~= nil
+	return require("witch-line.constant.id").existed(comp.id)
 end
 
 --- Ensures that the component has a valid id, generating one if it does not.
@@ -279,7 +290,7 @@ end
 
 --- Updates the style of the component.
 --- @param comp Component the component to update
---- @param style vim.api.keyset.highlight the style to apply to the component
+--- @param style CompStyle the style to apply to the component
 --- @param ref_comp Component the reference component to inherit from if necessary
 --- @param force boolean|nil if true, forces the style to be updated even if it doesn't need to be
 --- @return boolean updated true if the style was updated, false otherwise
@@ -293,53 +304,75 @@ M.update_style = function(comp, style, ref_comp, force)
 	return Highlight.highlight(comp._hl_name, style)
 end
 
+
+--- Returns the field name for the highlight name of the specified side.
+--- @param side "left"|"right" the side to get the field name for, either "left" or "right"
+--- @return string field_name the field name for the highlight name of the specified side
+local function hl_name_field(side)
+  return side == "left" and "_left_hl_name" or "_right_hl_name"
+end
+
+--- Returns the field name for the style of the specified side.
+--- @param side "left"|"right" the side to get the field name for, either "left" or "right"
+--- @return string field_name the field name for the style of the specified side
+local function style_field(side)
+  return side == "left" and "left_style" or "right_style"
+end
+
 --- Determines if the separator style needs to be updated.
 --- @param comp Component the component to checks
 --- @param side "left"|"right" the side to check, either "left" or "right"
+--- @param side_style CompStyle|SepStyle the style of the side to check
+--- @param main_style_updated boolean true if the main style was updated, false otherwise
+--- @return boolean needs_update true if the style needs to be updated, false otherwise
 M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-	local side_hl_name = "_" .. side .. "_hl_name"
-	if not comp[side_hl_name] then
+  if not comp[side] then -- no side, no need to update
+    return false
+  elseif not comp[hl_name_field(side)] then
 		return true
-	elseif type(comp[side .. "_style"]) == "function" then
+	elseif type(comp[style_field(side)]) == "function" then
 		return true
 	elseif main_style_updated then
-		return type(side_style) == "number" and (side_style == SepStyle.SepFg or side_style == SepStyle.SepBg or
-			side_style == SepStyle.Reverse)
+		return type(side_style) == "number" and
+      (
+        side_style == SepStyle.SepFg
+        or side_style == SepStyle.SepBg
+        or side_style == SepStyle.Reverse
+        or side_style == SepStyle.Inherited
+      )
 	end
 	return false
 end
 
+
 --- Ensures that a component has a highlight name for the specified side (left or right).
 --- If it doesn't, it will be generated based on the component's id.
---- @param comp Component
---- @param side "left"|"right"
+--- @param comp Component the component to ensure has a highlight name for the specified side
+--- @param side "left"|"right" the side to ensure has a highlight name, either "left" or "right"
 M.ensure_side_hl_name = function(comp, side)
-	local field = "_" .. side .. "_hl_name"
+  local field = hl_name_field(side)
 	if not comp[field] then
-		local hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id)
 		--- If the component already has a main highlight name, use it as the base
-		rawset(comp, field, hl_name .. side)
+		rawset(comp, field, (comp._hl_name or Highlight.make_hl_name_from_id(comp.id)) .. side)
 	end
 end
 
 --- Updates the style of a side (left or right) of the component.
 --- @param comp Component the component to update
 --- @param side "left"|"right" the side to update
---- @param main_style vim.api.keyset.highlight|nil the main style of the component, used for inheriting styles
+--- @param main_style CompStyle|nil the main style of the component, used for inheriting styles
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
 --- @param session_id SessionId the session id to use for the component
 --- @param ctx any The `context` field value to pass to the component's update function
 --- @param static any The `static` field value to pass to the component's update function
 --- @return boolean updated true if the style was updated, false otherwise
 M.update_side_style = function(comp, side, main_style, main_style_updated, session_id, ctx, static)
-	local side_style = resolve(comp[side .. "_style"], comp, ctx, static, session_id) or SepStyle.SepBg
+	local side_style = resolve(comp[style_field(side)] or SepStyle.SepBg, comp, ctx, static, session_id)
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
 
 	M.ensure_side_hl_name(comp, side)
-
-	local hl_name_field = "_" .. side .. "_hl_name"
 
 	if type(side_style) == "number" and main_style then
 		if side_style == SepStyle.SepFg then
@@ -358,14 +391,15 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sessi
 				bg = main_style.fg,
 			}
 		elseif side_style == SepStyle.Inherited then
-			rawset(comp, hl_name_field, comp._hl_name)
+			rawset(comp, hl_name_field(side), comp._hl_name)
       return true
 		else
 			--- invalid styles
 			return false
 		end
 	end
-  return Highlight.highlight(comp[hl_name_field], side_style)
+
+  return Highlight.highlight(comp[hl_name_field(side)], side_style)
 end
 
 
@@ -405,60 +439,19 @@ M.evaluate = function(comp, session_id, ctx, static)
 	return result, style
 end
 
---- Evaluates the left and right parts of the component, returning their values.
---- If the component is hidden or uninitialized, it will resolveuate both parts fully.
---- If the component is visible and initialized, it will only resolveuate the parts that are functions.
---- 	-| If a part is a string, it will not be re-resolveuated and will return nil to indicate no update is needed.
---- 	-| This optimization avoids unnecessary updates to the status line.
---- @param comp Component the component to resolveuate
+--- Evaluates a side style function, ensuring the result is a string.
+--- @param comp Component the component to evaluate
+--- @param side_fn SideStyleFunc the side style function to evaluate
 --- @param session_id SessionId the session id to use for the component
 --- @param ctx any the context to pass to the component's update function
 --- @param static any the static values to pass to the component's update function
---- @return string|nil left The left part of the component, if left is a string the left part will be updated with new value, if nil it means no need to update
---- @return string|nil right The right part of the component, if right is a string the right part will be updated with new value, if nil it means no need to update
-M.evaluate_left_right = function(comp, session_id, ctx, static)
-	local left, right = comp.left, comp.right
-
-	--- All are hided or uninitialized
-	--- So need to compare the left and right accurate
-	if comp._hidden ~= false then
-		if left then
-			left = resolve(left, comp, ctx, static, session_id)
-			if type(left) ~= "string" then
-				left = ""
-			end
-		end
-		if right then
-			right = resolve(right, comp, ctx, static, session_id)
-			if type(right) ~= "string" then
-				right = ""
-			end
-		end
-	else
-		-- nil means no need to update
-		-- Why?
-		-- Because in this case the component is visible and initialized already
-		-- So the left and right are already set in the statusline
-		-- And we ensure that if they are string they will never change
-		-- Unless they are function type which we need to call it again to get the new value
-		if type(left) == "function" then
-			left = left(comp, ctx, static, session_id)
-			if type(left) ~= "string" then
-				left = nil
-			end
-		else
-			left = nil
-		end
-		if type(right) == "function" then
-			right = right(comp, ctx, static, session_id)
-			if type(right) ~= "string" then
-				right = nil
-			end
-		else
-			right = nil
-		end
-	end
-	return left, right
+--- @return string result The evaluated side of the component, or an empty string if the result is not a string
+M.resolve_side_fn = function(comp, side_fn, session_id, ctx, static)
+  local result = side_fn(comp, ctx, static, session_id)
+  if type(result) ~= "string" then
+    result = ""
+  end
+  return result
 end
 
 --- Requires a default component by its id.
@@ -598,39 +591,56 @@ end
 
 --- Register a function to be called when a clickable component is clicked.
 --- @param comp Component The component to register the click event for.
---- @return string fun_name The function name to be used in the component's value. If no valid function is found, returns an empty string.
+--- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
+--- @throws if has an invalid field type
 M.register_click_handler = function(comp)
-  if comp._click_handler then
-    return comp._click_handler
+  local click_handler = comp._click_handler
+  if click_handler then
+    return click_handler
   end
 
   local on_click = comp.on_click
 
-  -- Fastest possible func_name derivation
-  local func_name = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
-
   local t = type(on_click)
   if t == "table" then
-    func_name = on_click.name or func_name
+    -- {
+    --    name = "MyClickHandler", -- optional
+    --    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
+    --    -- If callback is a string, don't care about the name field
+    --    -- or callback = "MyClickHandler" -- the name of a global function
+    -- }
+
+    local name = on_click.name
+    if name and type(name) ~= "string"  or name == "" then
+      require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
+      return ""
+    end
+    click_handler = type(name) == "string" and name or nil
     on_click = on_click.callback
     t = type(on_click)
   end
 
   if t == "string" and _G[on_click] then
-    func_name = "v:lua." .. on_click
-    comp._click_handler = func_name
-    return comp._click_handler
+    click_handler = "v:lua." .. on_click
+    comp._click_handler = click_handler
+    return click_handler
   elseif t == "function" then
-    if not _G[func_name] then
-      _G[func_name] = function(...)
+    -- Fastest possible func_name derivation
+    if not click_handler then
+      click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
+    end
+    if not _G[click_handler] then
+      _G[click_handler] = function(...)
         on_click(comp, ...)
       end
     end
-    func_name = "v:lua." .. func_name
-    comp._click_handler = func_name
-    return func_name
+    click_handler = "v:lua." .. click_handler
+    comp._click_handler = click_handler
+    return click_handler
+  else
+    require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
+    return ""
   end
-  return ""
 end
 
 return M

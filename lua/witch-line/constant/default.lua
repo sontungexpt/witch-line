@@ -5,7 +5,7 @@ return {
 	"file.icon",
 	"file.modifier",
 
-	 "git.branch",
+  "git.branch",
 	"git.diff.added",
 	"git.diff.removed",
 	"git.diff.modified",
