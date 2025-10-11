@@ -122,7 +122,7 @@ M.get_hlprop = get_hlprop
 
 --- Defines or updates a highlight group with the specified styles.
 ---@param group_name string The highlight group name.
----@param hl_style string|vim.api.keyset.highlight The highlight styles to apply.
+---@param hl_style CompStyle The highlight styles to apply.
 ---@return boolean success True if the highlight was applied successfully, false otherwise.
 M.highlight = function(group_name, hl_style)
 	if group_name == "" then

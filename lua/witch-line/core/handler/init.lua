@@ -1,4 +1,5 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
+local o = vim.o
 
 local Statusline = require("witch-line.core.statusline")
 local Manager = require("witch-line.core.manager")
@@ -31,7 +32,6 @@ local hide_component = function(comp)
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
-
 --- Update the style of a component if necessary. (Called internally by `update_component`.)
 --- @param comp Component The component to update.
 --- @param style CompStyle|nil The new style to apply. If nil, the style will be fetched from the component's configuration.
@@ -42,7 +42,7 @@ local function update_component_style(comp, style, session_id)
   if style then
     style_updated = Component.update_style(comp, style, ref_comp, true)
   else
-    style, ref_comp = Manager.get_style(comp, session_id)
+    style, ref_comp = Manager.lookup_ref_value(comp, "style", session_id, {})
     if style then
       style_updated = Component.update_style(comp, style, ref_comp)
     end
@@ -74,7 +74,7 @@ end
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @return string|nil updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
+--- @return string updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
 local function update_component(comp, session_id)
 	-- It's just a abstract component then no need to really update
 	if comp.inherit and not Component.has_parent(comp) then
@@ -90,9 +90,8 @@ local function update_component(comp, session_id)
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
 	local min_screen_width = Component.min_screen_width(comp, session_id)
 
-	local hidden = min_screen_width
-    and vim.o.columns < min_screen_width
-		or Component.hidden(comp, session_id)
+	local hidden = min_screen_width and o.columns < min_screen_width
+    or Component.hidden(comp, session_id)
 
 	local value, style = "", nil
 
@@ -111,20 +110,9 @@ local function update_component(comp, session_id)
 
         --- Update value
 				Statusline.set_value(indices, value)
+        Statusline.set_side_value(indices, "left", Component.evaluate_side(comp, "left", session_id))
+        Statusline.set_side_value(indices, "right", Component.evaluate_side(comp, "right", session_id))
 
-        local left, right = comp.left, comp.right
-        if type(left) == "function" then
-          Statusline.set_side_value(
-            indices, "left",
-            Component.resolve_side_fn(comp, left, session_id)
-          )
-        end
-        if type(right) == "function" then
-          Statusline.set_side_value(
-            indices, "right",
-            Component.resolve_side_fn(comp, right, session_id)
-          )
-        end
 
         if comp.on_click then
           Statusline.set_click_handler(indices, Component.register_click_handler(comp))
@@ -146,10 +134,6 @@ M.update_component = update_component
 --- @param dep_store_ids DepGraphId|DepGraphId[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
-	dep_store_ids = dep_store_ids or {
-		DepStoreKey.Event,
-		DepStoreKey.Timer,
-	}
 	seen = seen or {}
 
 	local id = comp.id
@@ -172,11 +156,17 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 		end
 	end
 
-	if type(dep_store_ids) ~= "table" then
+  if not dep_store_ids then
+    dep_store_ids = {
+      DepStoreKey.Event,
+      DepStoreKey.Timer,
+    }
+  elseif type(dep_store_ids) ~= "table" then
 		dep_store_ids = { dep_store_ids }
 	end
-	for _, ds_id in ipairs(dep_store_ids) do
-		for dep_id, dep_comp in Manager.iterate_dependents(ds_id, id) do
+
+	for _, store_id in ipairs(dep_store_ids) do
+		for dep_id, dep_comp in Manager.iterate_dependents(store_id, id) do
 			if not seen[dep_id] then
 				M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
 			end
@@ -283,7 +273,7 @@ local function pull_missing_dependencies(comp)
 	end
 	local ref = comp.ref
 	if type(ref) == "table" then
-		local dependency_ids                = {}
+		local dependency_ids = {}
 		dependency_ids[#dependency_ids + 1] = ref.context
 		dependency_ids[#dependency_ids + 1] = ref.static
 		dependency_ids[#dependency_ids + 1] = ref.style
@@ -334,13 +324,6 @@ local function build_indices(comp)
 	end
 
   local idx = Statusline.push("")
-  local left, right = comp.left, comp.right
-  if type(left) == "string" then
-    Statusline.set_side_value({idx}, "left", left)
-  end
-  if type(right) == "string" then
-    Statusline.set_side_value({idx}, "right", right)
-  end
 
 	local indices = comp._indices
 	if not indices then

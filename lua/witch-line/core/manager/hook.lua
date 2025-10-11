@@ -36,4 +36,21 @@ Hook.use_event_info = function(comp, session_id)
   return require("witch-line.core.manager.event").get_event_info(comp, session_id)
 end
 
+--- Hook to get style for a component
+--- When the style is updated, it will automatically update the highlight too.
+--- @param comp Component The component to get the style for
+--- @param session_id SessionId The session id to get the style for
+--- @return CompStyle style The style for the component
+Hook.use_style = function(comp, session_id)
+  local style = lookup_ref_value(comp, "style", session_id, {})
+  local Highlight = require("witch-line.core.highlight")
+  return setmetatable({}, {
+    __index = style,
+    __newindex = function(t, k, v)
+        style[k] = v
+        Highlight.highlight(comp._hl_name, style)
+    end,
+  })
+end
+
 return Hook

@@ -448,7 +448,7 @@ end
 --- @param comp Component the component to resolveuate
 --- @param session_id SessionId the session id to use for the component
 --- @return string value the new value of the component
---- @return vim.api.keyset.highlight|nil style the new style of the component
+--- @return CompStyle|nil style the new style of the component
 M.evaluate = function(comp, session_id)
 	local result, style = resolve(comp.update, comp, session_id)
 
@@ -479,15 +479,21 @@ end
 
 --- Evaluates a side style function, ensuring the result is a string.
 --- @param comp Component the component to evaluate
---- @param side_fn SideStyleFunc the side style function to evaluate
+--- @param side "left"|"right" the side to evaluate, either "left" or "right"
 --- @param session_id SessionId the session id to use for the component
 --- @return string result The evaluated side of the component, or an empty string if the result is not a string
-M.resolve_side_fn = function(comp, side_fn, session_id)
-  local result = side_fn(comp, session_id)
-  if type(result) ~= "string" then
-    result = ""
+--- @return boolean is_func true if the side was a function, false otherwise
+M.evaluate_side = function(comp, side, session_id)
+  local value = comp[side]
+  local is_func = type(value) == "function"
+  if is_func then
+    value = value(comp, session_id)
   end
-  return result
+
+  if type(value) ~= "string" then
+    value = ""
+  end
+  return value, is_func
 end
 
 --- Requires a default component by its id.

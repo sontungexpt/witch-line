@@ -270,7 +270,7 @@ end
 --- The difference between this function and `lookup_inherited_value` is that this function
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
 --- will only look for static values without calling functions or caching.
-local function lookup_ref_value(comp, key, session_id, seen, ...)
+M.lookup_ref_value = function(comp, key, session_id, seen, ...)
   local store = get_session_store(session_id, key)
   local id, cached, value, ref, ref_id
 
@@ -319,20 +319,6 @@ local function lookup_ref_value(comp, key, session_id, seen, ...)
   until not comp
 
   return nil, comp
-end
-M.lookup_ref_value = lookup_ref_value
-
---- Get the style for a component.
---- This function checks the `style` field of the component, which can be a static value
---- or a function. If it is a function, it will be called with the component and the provided context.
---- The result will be cached in the session store to avoid redundant computations.
---- If the style is not found in the component, it will look up the reference chain.
---- @param comp Component The component to get the style for.
---- @param session_id SessionId The ID of the process to use for this retrieval.
---- @return CompStyle|nil style The style of the component.
---- @return Component inherited The component that provides the style, or nil if not found.
-M.get_style = function(comp, session_id)
-	return lookup_ref_value(comp, "style", session_id, {})
 end
 
 
