@@ -33,7 +33,27 @@ end
 --- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event info for the component. Nil if not updated by any event
 Hook.use_event_info = function(comp, session_id)
   -- Not use frequently, so require here for lazy load
-  return require("lua.witch-line.core.manager.event").get_event_info(comp, session_id)
+  return require("witch-line.core.manager.event").get_event_info(comp, session_id)
+end
+
+--- Hook to get style for a component
+--- When the style is updated, it will automatically update the highlight too.
+--- @param comp Component The component to get the style for
+--- @param session_id SessionId The session id to get the style for
+--- @return CompStyle style The style for the component
+Hook.use_style = function(comp, session_id)
+  local style = lookup_ref_value(comp, "style", session_id, {})
+  local Highlight = require("witch-line.core.highlight")
+  return setmetatable({}, {
+    __index = style,
+    __newindex = function(_, k, v)
+        style[k] = v
+        local hl_name = comp._hl_name
+        if hl_name then
+          Highlight.highlight(hl_name, style)
+        end
+    end,
+  })
 end
 
 return Hook

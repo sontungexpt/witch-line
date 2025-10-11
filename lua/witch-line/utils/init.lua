@@ -32,15 +32,23 @@ M.debounce = function(func, delay)
 	end
 end
 
---- Evaluates a value that may be a function or a direct value.
---- If it's a function, it calls it with the provided arguments; otherwise, it returns the value as is.
---- @usage
+--- Resolves a value that may be a function or a direct value.
+--- If `value` is a function, it is called with the provided arguments and its return result(s) are returned.
+--- Otherwise, the `value` itself is returned as-is.
+---
+--- This helper is used to transparently handle fields or configs that may be static values
+--- or lazily evaluated functions.
+---
+--- @generic T
+--- @param value T | fun(...): T|any Function or direct value to resolve.
+--- @param ... any Arguments to pass if `value` is a function.
+--- @return T|any result The resolved result; if `value` is a function, returns its result; otherwise returns `value`.
 --- @example
---- local result1 = M.eval(42) -- returns 42
---- local result2 = M.eval(function(x) return x * 2 end, 21) -- returns 42
---- @param value any The value to evaluate, which can be a function or any other type.
---- @param ... any Additional arguments to pass to the function if `value` is a function.
---- @return any result The evaluated result.
+--- -- Returns 42
+--- local result1 = M.resolve(42)
+---
+--- -- Returns 42 (function result)
+--- local result2 = M.resolve(function(x) return x * 2 end, 21)
 M.resolve = function(value, ...)
   --- Why don't use 3 opearator expression?
   --- Because when a value is a function and returns more than one value,
