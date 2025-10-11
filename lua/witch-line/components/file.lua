@@ -18,15 +18,8 @@ local Name = {
 		events = Id["file.interface"],
 	},
 	style = {
-		bg = colors.orange,
+		fg = colors.orange,
 	},
-  left = function (self, session_id)
-    if vim.bo.filetype == "NvimTree" then
-      return ""
-    end
-    return ""
-  end,
-  right = "",
 	static = {
 		formatter = {
 			filetype = {

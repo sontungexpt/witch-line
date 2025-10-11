@@ -4,17 +4,22 @@ local get_session_store, new_session_store = Session.get_store, Session.new_stor
 
 local M = {}
 
----@alias DepGraphId Id
----@alias DepMap table<CompId, true>
----@alias DepGraph table<CompId, DepMap>
----@type table<DepGraphId, DepGraph>
-local DepGraphMap = {
-	-- [store_id] = {
-	--    [comp_id] = {
-	--      -- [comp_id] = true, -- this component depends on comp_id
+--- @enum DepGraphKind
+M.DepGraphKind = {
+	Display = 1,
+	Event = 2,
+	Timer = 3,
+}
+
+---@alias DepSet table<CompId, true>
+---@alias DepGraphMap table<CompId, DepSet>
+---@type table<DepGraphKind, DepGraphMap>
+local DepGraphRegistry = {
+  -- [GraphKind.Display] = {
+	--   [comp_id] = {
+	--     [dep_comp_id] = true, -- comp_id depends on dep_comp_id
 	--   }
 	-- }
-	--
 }
 
 ---@type table<CompId, ManagedComponent>
@@ -84,7 +89,7 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 		Component.format_state_before_cache(comp)
 	end
 	CacheDataAccessor.set("Comps", Comps)
-	CacheDataAccessor.set("DepGraph", DepGraphMap)
+	CacheDataAccessor.set("DepGraph", DepGraphRegistry)
 	CacheDataAccessor.set("Urgents", EmergencyIds)
 	CacheDataAccessor.set("PendingInit", InitializePendingIds)
 end
@@ -98,18 +103,18 @@ M.load_cache = function(CacheDataAccessor)
 	before_pending_inits,
 	before_urgents =
 		Comps,
-		DepGraphMap,
+		DepGraphRegistry,
 		InitializePendingIds,
 		EmergencyIds
 
 
 	Comps = CacheDataAccessor.get("Comps") or Comps
-	DepGraphMap = CacheDataAccessor.get("DepGraph") or DepGraphMap
+	DepGraphRegistry = CacheDataAccessor.get("DepGraph") or DepGraphRegistry
 	InitializePendingIds = CacheDataAccessor.get("PendingInit") or InitializePendingIds
 	EmergencyIds = CacheDataAccessor.get("Urgents") or EmergencyIds
 	return function()
 		Comps = before_comps
-		DepGraphMap = before_dep_store
+		DepGraphRegistry = before_dep_store
 		InitializePendingIds = before_pending_inits
 		EmergencyIds = before_urgents
 	end
@@ -147,51 +152,51 @@ M.is_existed = function(id)
 end
 
 --- Get the dependency store for a given ID, creating it if it does not exist.
---- @param id DepGraphId The ID to get the dependency store for.
+--- @param kind DepGraphKind The ID to get the dependency store for.
 --- @param raw boolean|nil If true, return the raw store without creating it if it doesn't exist.
---- @return DepGraph depstore The dependency store for the given ID.
-local get_dependency_graph = function(id, raw)
-	local id_type = type(id)
+--- @return DepGraphMap depstore The dependency store for the given ID.
+local get_dependency_graph = function(kind, raw)
+	local id_type = type(kind)
 	assert(id_type == "number" or id_type == "string", "id must be a number or string, got: " .. id_type)
 
-	local dep_store = DepGraphMap[id]
+	local dep_store = DepGraphRegistry[kind]
 	if raw then
 		return dep_store
 	end
 
 	if not dep_store then
 		dep_store = {}
-		DepGraphMap[id] = dep_store
+		DepGraphRegistry[kind] = dep_store
 	end
 	return dep_store
 end
 M.get_dependency_graph = get_dependency_graph
 
 --- A iterator to loop all key, value in the depstore has id
---- @param id DepGraphId The ID of the dependency store to iterate over.
---- @return fun()|fun(): CompId, DepMap An iterator function that returns the next ID and its dependencies.
---- @return DepGraph|nil The dependency store for the given ID, or nil if it doesn't exist.
+--- @param id DepGraphKind The ID of the dependency store to iterate over.
+--- @return fun()|fun(): CompId, DepSet An iterator function that returns the next ID and its dependencies.
+--- @return DepGraphMap|nil The dependency store for the given ID, or nil if it doesn't exist.
 M.iterate_dependency_map = function(id)
-	local store = DepGraphMap[id]
+	local store = DepGraphRegistry[id]
 	return store and pairs(store) or function() end, store
 end
 
 --- Iterate over all dependency stores.
---- @return fun()|fun(): DepGraphId, DepGraph iterator An iterator function that returns
---- @return table<DepGraphId, DepGraph> dep_graph_map The dependency graph map.
+--- @return fun()|fun(): DepGraphKind, DepGraphMap iterator An iterator function that returns
+--- @return table<DepGraphKind, DepGraphMap> dep_graph_map The dependency graph map.
 M.iterate_dependency_graph = function()
-	return pairs(DepGraphMap)
+	return pairs(DepGraphRegistry)
 end
 
 --- Iterate over all components that depend on a given component ID in a specific dependency store.
 --- Must sure that all components are registered before call this function including dependencies components.
---- @param dep_graph_id DepGraphId The ID of the dependency store to search in.
+--- @param dep_graph_kind DepGraphKind The ID of the dependency store to search in.
 --- @param comp_id CompId The ID of the component to find dependencies for.
 --- @return fun()|fun(): CompId, Component An iterator function that returns the next dependent ID and its component.
---- @return DepMap|nil The dependencies map for the given ID, or nil if none exist.
-M.iterate_dependents = function(dep_graph_id, comp_id)
-	assert(dep_graph_id and comp_id, "Both dep_graph_id and ref_id must be provided")
-	local store = DepGraphMap[dep_graph_id]
+--- @return DepSet|nil The dependencies map for the given ID, or nil if none exist.
+M.iterate_dependents = function(dep_graph_kind, comp_id)
+	assert(dep_graph_kind and comp_id, "Both dep_graph_id and ref_id must be provided")
+	local store = DepGraphRegistry[dep_graph_kind]
 	local id_map = store and store[comp_id]
 	if not id_map then
 		return function() end, nil
@@ -212,7 +217,7 @@ M.iterate_all_dependency_ids = function(comp_id)
 	assert(comp_id, "comp id must be provided")
 
 	local deps = {}
-	for _, graph in pairs(DepGraphMap) do
+	for _, graph in pairs(DepGraphRegistry) do
 		for dep_id, map in pairs(graph) do
 			if map[comp_id] then
 				deps[dep_id] = true
@@ -231,9 +236,9 @@ end
 --- Add a dependency for a component.
 --- @param comp Component The component to add the dependency for.
 --- @param ref CompId|CompId[] The ID or IDs that this component depends on.
---- @param store_id DepGraphId The ID of the dependency store to use.
-M.link_ref_field = function(comp, ref, store_id)
-	local store = get_dependency_graph(store_id)
+--- @param dep_graph_kind DepGraphKind The ID of the dependency store to use.
+M.link_ref_field = function(comp, ref, dep_graph_kind)
+	local store = get_dependency_graph(dep_graph_kind)
 	local id = comp.id
   --- @cast id CompId Id never nil
 
@@ -362,7 +367,7 @@ M.inspect = function(target)
 	local notifier = require("witch-line.utils.notifier")
 	if target == "dep_store" then
 		notifier.info(
-			"Inspecting DepGraph\n" .. vim.inspect(DepGraphMap or {})
+			"Inspecting DepGraph\n" .. vim.inspect(DepGraphRegistry or {})
 		)
 	elseif target == "comps" then
 		notifier.info(
@@ -371,7 +376,7 @@ M.inspect = function(target)
 	else
 		notifier.info(
 			"Inspecting dep_store and comps: \n" .. vim.inspect({
-				DepGraph = DepGraphMap or {},
+				DepGraph = DepGraphRegistry or {},
 				Comps = Comps or {},
 			})
 		)
