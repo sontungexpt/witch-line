@@ -1,4 +1,4 @@
-local Id     = require("witch-line.constant.id").Id
+local Id = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
 ---@type DefaultComponent
@@ -7,7 +7,7 @@ local Branch = {
   _plug_provided = true,
   static = {
     icon = "",
-    skip_check = {
+    disabled = {
       filetypes = {
         "NvimTree",
         "neo-tree",
@@ -18,40 +18,6 @@ local Branch = {
     }
   },
   context = {
-    -- get_head_file_path = function(dir_path)
-    --   local uv = vim.uv or vim.loop
-    --   local prev = ''
-    --   local dir = dir_path or uv.cwd()
-
-    --   while dir ~= prev do
-    --     local git_path = dir .. '/.git'
-    --     local stat = uv.fs_stat(git_path)
-    --     if stat then
-    --       if stat.type == 'directory' then
-    --         return git_path .. '/HEAD'
-    --       elseif stat.type == 'file' then
-    --         local fd = io.open(git_path, 'r')
-    --         if fd then
-    --           local line = fd:read('*l')
-    --           fd:close()
-    --           local gitdir = line:match("^gitdir:%s*(.-)%s*$")
-    --           if gitdir then
-    --             -- Handle relative gitdir path
-    --             if not gitdir:match("^/") and not gitdir:match("^%a:[/\\]") then
-    --               gitdir = dir .. "/" .. gitdir
-    --             end
-    --             -- Normalize and verify
-    --             return uv.fs_realpath(gitdir .. '/HEAD')
-    --           end
-    --         end
-    --       end
-    --     end
-
-    --     prev = dir
-    --     dir = dir:match('^(.*)[/\\][^/\\]+$') or dir
-    --   end
-    --   return nil
-    -- end,
     get_root_by_git = function(dir_path)
       local uv = vim.uv or vim.loop
       local prev = ''
@@ -96,8 +62,10 @@ local Branch = {
     --   return nil
     -- end,
   },
-  init = function(self, ctx, static)
+  init = function(self, session_id)
     local uv, api = vim.uv or vim.loop, vim.api
+    local static = self.static
+    local ctx  = require("witch-line.core.manager.hook").use_context(self, session_id)
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 
     local file_changed, sec_arg = nil, nil
@@ -135,7 +103,7 @@ local Branch = {
 
     api.nvim_create_autocmd({ "BufEnter" }, {
       callback = function(e)
-        if vim.list_contains(static.skip_check.filetypes, vim.bo[e.buf].filetype) then
+        if vim.list_contains(static.disabled.filetypes, vim.bo[e.buf].filetype) then
           return
         end
         local file = e.file:gsub("\\", "/")
@@ -175,7 +143,7 @@ local Branch = {
     })
   end,
   style = { fg = colors.green },
-  update = function(self, ctx, static)
+  update = function(self, session_id)
     if not self.temp then
       return ""
     end
@@ -191,6 +159,8 @@ local Branch = {
         branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
       end
     end
+    local static = self.static
+    --- @cast static { icon: string }
     return branch ~= "" and static.icon .. " " .. branch or ""
   end,
 }
@@ -218,11 +188,14 @@ Diff.Interface = {
     --   -- return self.temp.diff[bufnr]
     -- end,
   },
-  init = function(self, ctx, static)
+  init = function(self, session_id)
     local vim = vim
     local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
     local api, bo, min, tonumber, list_contains = vim.api, vim.bo, math.min, tonumber, vim.list_contains
     local processes, diff = {}, {}
+
+    local static = self.static
+    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 
     --- Redefine get_diff function to access the local diff table
     ctx.get_diff = function(bufnr)
@@ -267,8 +240,9 @@ Diff.Interface = {
     api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
       callback = function(e)
         local event, bufnr = e.event, e.buf
+
         --- Clear the old diff when buffer is deleted or written
-        if event == "BufDelete" or event == "BufWritePost" then
+        if event ~= "BufEnter" then
           diff[bufnr] = nil
 
           --- Stop any running process
@@ -284,10 +258,7 @@ Diff.Interface = {
           end
         end
 
-        if event == "BufEnter"
-          or event == "FileChangedShellPost"
-          or event == "BufWritePost"
-        then
+        if event ~= "BufDelete" then
           --- If diff is caculated and filetype is not disabled, just refresh
           if diff[bufnr] or list_contains(static.disabled.filetypes, bo[bufnr].filetype) then
             refresh_component_graph(self) -- trigger update
@@ -339,7 +310,9 @@ Diff.Interface = {
     })
 
   end,
-  hidden = function(self, ctx, static, session_id)
+  hidden = function(self, session_id)
+    local static = self.static
+    --- @cast static { disabled: { filetypes: string[] } }
     if vim.list_contains(static.disabled.filetypes, vim.bo.filetype) then
       return true
     end
@@ -362,7 +335,11 @@ Diff.Added     = {
     context = Id["git.diff.interface"],
     hidden = Id["git.diff.interface"]
   },
-  update = function(self, ctx, static, session_id)
+  update = function(self,  session_id)
+    local static = self.static
+    --- @cast static { icon: string }
+
+    local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
     local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
     if diff then
       local added = diff.added
@@ -389,7 +366,10 @@ Diff.Modified = {
     hidden = Id["git.diff.interface"],
     events = Id["git.diff.interface"],
   },
-  update = function(self, ctx, static, session_id)
+  update = function(self, session_id)
+    local static = self.static
+    --- @cast static { icon: string }
+    local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
     local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
     if diff then
       local modified = diff.modified
@@ -405,7 +385,6 @@ Diff.Modified = {
 Diff.Removed  = {
   id = Id["git.diff.removed"],
   _plug_provided = true,
-  -- inherit = Id["git.diff.interface"],
   static = {
     icon = "-"
   },
@@ -417,7 +396,10 @@ Diff.Removed  = {
     context = Id["git.diff.interface"],
     hidden = Id["git.diff.interface"]
   },
-  update = function(self, ctx, static, session_id)
+  update = function(self, session_id)
+    local static = self.static
+    --- @cast static { icon: string }
+    local ctx= require("witch-line.core.manager.hook").use_context(self, session_id)
     local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
     if diff then
       local removed = diff.removed

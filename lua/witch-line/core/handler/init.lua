@@ -1,9 +1,9 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 
-local Timer = require("witch-line.core.handler.timer")
-local Event = require("witch-line.core.handler.event")
 local Statusline = require("witch-line.core.statusline")
-local CompManager = require("witch-line.core.CompManager")
+local Manager = require("witch-line.core.manager")
+local Event = require("witch-line.core.manager.event")
+local Timer = require("witch-line.core.manager.timer")
 local Component = require("witch-line.core.Component")
 
 local M = {}
@@ -36,15 +36,13 @@ end
 --- @param comp Component The component to update.
 --- @param style CompStyle|nil The new style to apply. If nil, the style will be fetched from the component's configuration.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @param ctx table The context for evaluating the component.
---- @param static table The static data for evaluating the component.
-local function update_component_style(comp, style, session_id, ctx, static)
+local function update_component_style(comp, style, session_id)
   --- Update style
   local style_updated, ref_comp = false, comp
   if style then
     style_updated = Component.update_style(comp, style, ref_comp, true)
   else
-    style, ref_comp = CompManager.get_style(comp, session_id, ctx, static)
+    style, ref_comp = Manager.get_style(comp, session_id)
     if style then
       style_updated = Component.update_style(comp, style, ref_comp)
     end
@@ -57,17 +55,17 @@ local function update_component_style(comp, style, session_id, ctx, static)
   --- WARN: Can not do sorter like this
   --- ```lua
   --- Statusline.set_side_value_highlight(
-  ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+  ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, session_id)
   --- )
   --- ```
   --- Because lua evaluate the argument from left to right
   --- So the comp._left_hl_name may be missing if the update_side_style has not been called yet
-  local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, session_id, ctx, static)
+  local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, session_id)
   Statusline.set_side_value_highlight(
     indices, "left", comp._left_hl_name, left_style_updated
   )
 
-  local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, session_id, ctx, static)
+  local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, session_id)
   Statusline.set_side_value_highlight(
     indices, "right", comp._right_hl_name, right_style_updated
   )
@@ -80,30 +78,28 @@ end
 local function update_component(comp, session_id)
 	-- It's just a abstract component then no need to really update
 	if comp.inherit and not Component.has_parent(comp) then
-		local parent = CompManager.get_comp(comp.inherit)
+		local parent = Manager.get_comp(comp.inherit)
 		if parent then
 			Component.inherit_parent(comp, parent)
 		end
 	end
 
-	local static = CompManager.get_static(comp)
-	local ctx = CompManager.get_context(comp, session_id, static)
 
-	Component.emit_pre_update(comp, session_id, ctx, static)
+	Component.emit_pre_update(comp, session_id)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
-	local min_screen_width = Component.min_screen_width(comp, session_id, ctx, static)
+	local min_screen_width = Component.min_screen_width(comp, session_id)
 
 	local hidden = min_screen_width
     and vim.o.columns < min_screen_width
-		or Component.hidden(comp, session_id, ctx, static)
+		or Component.hidden(comp, session_id)
 
 	local value, style = "", nil
 
 	if hidden then
 		hide_component(comp)
 	else
-		value, style = Component.evaluate(comp, session_id, ctx, static)
+		value, style = Component.evaluate(comp, session_id)
 		if value == "" then
 			hide_component(comp)
 		else
@@ -111,7 +107,7 @@ local function update_component(comp, session_id)
 
 			-- A abstract component may be not have _indices key
 			if indices then
-        update_component_style(comp, style, session_id, ctx, static)
+        update_component_style(comp, style, session_id)
 
         --- Update value
 				Statusline.set_value(indices, value)
@@ -120,13 +116,13 @@ local function update_component(comp, session_id)
         if type(left) == "function" then
           Statusline.set_side_value(
             indices, "left",
-            Component.resolve_side_fn(comp, left, session_id, ctx, static)
+            Component.resolve_side_fn(comp, left, session_id)
           )
         end
         if type(right) == "function" then
           Statusline.set_side_value(
             indices, "right",
-            Component.resolve_side_fn(comp, right, session_id, ctx, static)
+            Component.resolve_side_fn(comp, right, session_id)
           )
         end
 
@@ -139,7 +135,7 @@ local function update_component(comp, session_id)
 		end
 	end
 
-	Component.emit_post_update(comp, session_id, ctx, static)
+	Component.emit_post_update(comp, session_id)
 	return value
 end
 M.update_component = update_component
@@ -170,7 +166,7 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 	--- Check if component is loaded and should be render and affect to dependents
 	--- If it's not load. It's just the abstract component and we don't care about updated value of it. The function update is just call for update something for abstract component
 	if comp._loaded and updated_value == "" then
-		for dep_id, dep_comp in CompManager.iterate_dependents(DepStoreKey.Display, id) do
+		for dep_id, dep_comp in Manager.iterate_dependents(DepStoreKey.Display, id) do
 			seen[dep_id] = true
 			hide_component(dep_comp)
 		end
@@ -180,7 +176,7 @@ function M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 		dep_store_ids = { dep_store_ids }
 	end
 	for _, ds_id in ipairs(dep_store_ids) do
-		for dep_id, dep_comp in CompManager.iterate_dependents(ds_id, id) do
+		for dep_id, dep_comp in Manager.iterate_dependents(ds_id, id) do
 			if not seen[dep_id] then
 				M.update_comp_graph(dep_comp, session_id, dep_store_ids, seen)
 			end
@@ -209,7 +205,7 @@ M.update_comp_graph_by_ids = function(ids, session_id, dep_store_ids, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
-			local comp = CompManager.get_comp(id)
+			local comp = Manager.get_comp(id)
 			if comp then
 				M.update_comp_graph(comp, session_id, dep_store_ids, seen)
 			end
@@ -220,7 +216,7 @@ end
 --- Link dependencies for a component based on its ref and inherit fields.
 --- @param comp Component The component to link dependencies for.
 local function bind_dependencies(comp)
-	local link_ref_field = CompManager.link_ref_field
+	local link_ref_field = Manager.link_ref_field
 	local ref = comp.ref
 
 	if type(ref) == "table" then
@@ -277,8 +273,8 @@ end
 --- @param comp Component The component to pull dependencies for.
 local function pull_missing_dependencies(comp)
 	-- Pull missing dependencies from the component's ref field
-	for dep_id in CompManager.iterate_all_dependency_ids(comp.id) do
-		if not CompManager.is_existed(dep_id) then
+	for dep_id in Manager.iterate_all_dependency_ids(comp.id) do
+		if not Manager.is_existed(dep_id) then
 			local c = Component.require_by_id(dep_id)
 			if c then
 				M.register_abstract_component(c)
@@ -292,7 +288,7 @@ local function pull_missing_dependencies(comp)
 		dependency_ids[#dependency_ids + 1] = ref.static
 		dependency_ids[#dependency_ids + 1] = ref.style
 		for _, dep_id in ipairs(dependency_ids) do
-			if not CompManager.is_existed(dep_id) then
+			if not Manager.is_existed(dep_id) then
 				local c = Component.require_by_id(dep_id)
 				if c then
 					M.register_abstract_component(c)
@@ -308,10 +304,10 @@ end
 --- @return CompId The ID of the registered component.
 function M.register_abstract_component(comp)
 	if not comp._abstract then
-		local id = CompManager.register(comp)
+		local id = Manager.register(comp)
 
 		if comp.init then
-			CompManager.queue_initialization(id)
+			Manager.queue_initialization(id)
 		end
 
 		bind_update_conditions(comp)
@@ -418,7 +414,7 @@ local function register_component(comp, parent_id)
 		local id = M.register_abstract_component(comp)
 
 		if comp.lazy == false then
-			CompManager.mark_emergency(id)
+			Manager.mark_emergency(id)
 		end
 		build_indices(comp)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
@@ -443,7 +439,7 @@ end
 function M.register_combined_component(comp, parent_id)
 	local kind = type(comp)
 	if kind == "string" then
-		local c = Component.require(comp)
+		local c = Component.require_by_id(comp)
 		if not c then
 			return register_literal_comp(comp)
 		end
@@ -474,7 +470,7 @@ M.setup = function(user_configs, DataAccessor)
 				local c = abstract[i]
 				if type(c) == "string" then
 					---@diagnostic disable-next-line
-					c = Component.require(c)
+					c = Component.require_by_id(c)
 				end
 				if type(c) == "table" and c.id then
 					M.register_abstract_component(c)
@@ -502,12 +498,10 @@ M.setup = function(user_configs, DataAccessor)
 
 	local Session = require("witch-line.core.Session")
 	Session.run_once(function(session_id)
-		for _, comp in CompManager.iter_pending_init_components() do
-			local static = CompManager.get_static(comp)
-			local context = CompManager.get_context(comp, session_id, static)
-			comp.init(comp, context, static, session_id)
+		for _, comp in Manager.iter_pending_init_components() do
+			comp.init(comp, session_id)
 		end
-		M.update_comp_graph_by_ids(CompManager.get_emergency_ids(), session_id, {
+		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), session_id, {
 			DepStoreKey.Event,
 			DepStoreKey.Timer,
 		}, {})

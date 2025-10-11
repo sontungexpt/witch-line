@@ -1,4 +1,5 @@
-local type = type
+local type, unpack, rawget = type, unpack, rawget
+local get_session_store = require("witch-line.core.Session").get_store
 
 local M = {}
 
@@ -14,7 +15,6 @@ local DepGraphMap = {
 	-- }
 	--
 }
-
 
 ---@type table<CompId, ManagedComponent>
 local Comps = {
@@ -227,47 +227,25 @@ M.iterate_all_dependency_ids = function(comp_id)
 end
 
 
-
-
 --- Add a dependency for a component.
 --- @param comp Component The component to add the dependency for.
---- @param ref_id CompId|CompId[] The ID or IDs that this component depends on.
+--- @param ref CompId|CompId[] The ID or IDs that this component depends on.
 --- @param store_id DepGraphId The ID of the dependency store to use.
-M.link_ref_field = function(comp, ref_id, store_id)
+M.link_ref_field = function(comp, ref, store_id)
 	local store = get_dependency_graph(store_id)
-
-	if type(ref_id) ~= "table" then
-		ref_id = { ref_id }
-	end
-
 	local id = comp.id
-	for i = 1, #ref_id do
-		local ref_id_i = ref_id[i]
-		local deps = store[ref_id_i] or {}
-		---@diagnostic disable-next-line: need-check-nil
-		deps[id] = true
-		store[ref_id_i] = deps
+  --- @cast id CompId Id never nil
+
+	if type(ref) ~= "table" then
+		ref = { ref }
+	end
+	for i = 1, #ref do
+		local r = ref[i]
+		local dependents = store[r] or {}
+		dependents[id] = true
+		store[r] = dependents
 	end
 end
-
---- Remove a dependency store by its ID.
---- @param id DepGraphId The ID of the dependency store to remove.
-M.remove_dep_store = function(id)
-	DepGraphMap[id] = nil
-end
-
---- Remove all dependency stores.
-M.remove_all_dep_store = function()
-	DepGraphMap = {}
-end
-
---- Clear all dependencies for a given ID in the dependency store.
---- @param id DepGraphId The ID of the dependency store to clear.
-M.clear_dep_store = function(id)
-	DepGraphMap[id] = {}
-end
-
-
 
 --- Get a component by its ID.
 --- @param id CompId The ID of the component to retrieve.
@@ -275,6 +253,7 @@ end
 M.get_comp = function(id)
 	return id and Comps[id]
 end
+
 
 --- Recursively look up a value in a component and its references.
 --- If the value is a function, it will be called with the component and any additional arguments.
@@ -291,54 +270,50 @@ end
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
 --- will only look for static values without calling functions or caching.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
-	local id, value = comp.id, rawget(comp, key)
-	local store = require("witch-line.core.Session").get_store(session_id, key, {})
-	if store[id] then
-		return store[id], comp
-	elseif value then
-		if type(value) == "function" then
-			local args = { ... }
-      args[#args + 1] = session_id
-			value = value(comp, unpack(args))
-		end
-		store[id] = value
-		return value, comp
-	end
-	local ref = comp.ref
-  --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
-  --- This enables function-based field inheritance without recalculating values.
-  --- Example:
-  --- ```lua
-  --- local Base = { id = "base", context = function() return { foo = "bar" } end }
-  --- local Child = { id = "child", inherit = "base", context = nil }
-  --- ```
-  --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
-  local ref_id = type(ref) == "table" and ref[key] or comp.inherit
-	if not ref_id or seen[ref_id] then
-		return nil, comp
-	end
-	local ref_comp = Comps[ref_id]
-	if ref_comp then
-		return lookup_ref_value(ref_comp, key, session_id, seen, ...)
-	end
-	return nil, comp
+  local store = get_session_store(session_id, key, {})
+  local id, cached, value, ref, ref_id
+
+  -- Do as least one loop
+  repeat
+    id = comp.id
+    cached = store[id]
+    if cached ~= nil then
+      return cached, comp
+    end
+
+    value = rawget(comp, key)
+    if value ~= nil then
+      if type(value) == "function" then
+        local args = { ... }
+        args[#args + 1] = session_id
+        value = value(comp, unpack(args))
+      end
+      --- @cast id CompId
+      store[id] = value
+      return value, comp
+    end
+
+    --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
+    --- This enables function-based field inheritance without recalculating values.
+    --- Example:
+    --- ```lua
+    --- local Base = { id = "base", context = function() return { foo = "bar" } end }
+    --- local Child = { id = "child", inherit = "base", context = nil }
+    --- ```
+    --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
+    ref = comp.ref
+    ref_id = (type(ref) == "table" and ref[key]) or comp.inherit
+    if not ref_id or seen[ref_id] then
+      return nil, comp
+    end
+
+    seen[ref_id] = true
+    comp = Comps[ref_id]
+  until not comp
+
+  return nil, comp
 end
 M.lookup_ref_value = lookup_ref_value
-
---- Get the context for a component.
---- This function checks the `context` field of the component, which can be a static value or a function.
---- If it is a function, it will be called with the component.
---- The result will be cached in the session store to avoid redundant computations.
---- If the context is not found in the component, it will look up the reference chain.
---- @param comp Component The component to get the context for.
---- @param session_id SessionId The ID of the process to use for this retrieval.
---- @param static any The `static` field value of the component from this component or its references.
---- @return any context The context of the component.
---- @return Component inherited The component that provides the context, or nil if not found.
-M.get_context = function(comp, session_id, static)
-	return lookup_ref_value(comp, "context", session_id, {}, static)
-end
-
 
 --- Get the style for a component.
 --- This function checks the `style` field of the component, which can be a static value
@@ -347,12 +322,10 @@ end
 --- If the style is not found in the component, it will look up the reference chain.
 --- @param comp Component The component to get the style for.
 --- @param session_id SessionId The ID of the process to use for this retrieval.
---- @param ctx any The `context` field value of the component from this component or its references.
---- @param static any The `static` field value of the component from this component or its references.
---- @return vim.api.keyset.highlight|nil style The style of the component.
+--- @return CompStyle|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
-M.get_style = function(comp, session_id, ctx, static)
-	return lookup_ref_value(comp, "style", session_id, {}, ctx, static)
+M.get_style = function(comp, session_id)
+	return lookup_ref_value(comp, "style", session_id, {})
 end
 
 
@@ -368,42 +341,27 @@ end
 --- The difference between this function and `lookup_ref_value` is that this function
 --- will only look for static values without calling functions or caching, while `lookup_ref_value`
 --- will call functions and cache the result in the session store.
-local function lookup_inherited_value(comp, key, seen)
-	local static = comp[key]
-	if static then
-		return static, comp
-	end
+M.lookup_inherited_value = function(comp, key, seen)
+  local static, ref, ref_id
+  repeat
+    static = comp[key]
+    if static ~= nil then
+      return static, comp
+    end
 
-	local ref = comp.ref
-	if type(ref) ~= "table" then
-		return nil, comp
-	end
+    ref = comp.ref
+    ref_id = type(ref) == "table" and ref[key] or nil
+    if not ref_id or seen[ref_id] then
+      return nil, comp
+    end
 
-	static = ref[key]
-	if not static then
-		return nil, comp
-	end
+    seen[ref_id] = true
+    comp = Comps[ref_id]
+  until not comp
 
-	local ref_comp = Comps[static]
-	if ref_comp and not seen[static] then
-		return lookup_inherited_value(ref_comp, key, seen)
-	end
-	return nil, comp
+  return nil, comp
 end
 
-M.lookup_inherited_value = lookup_inherited_value
-
---- Get the value of the static field for a component.
---- This function looks up the `static` field in the component and its references.
---- It does not call functions or cache results; it only looks for static values.
---- If the static value is not found in the component, it will look up the reference chain.
---- If the reference is not found, it will return nil.
---- @param comp Component The component to get the static value for.
---- @return any value The static value of the component.
---- @return Component|nil inherited The component that provides the static value.
-M.get_static = function(comp)
-	return lookup_inherited_value(comp, "static", {})
-end
 
 --- Inspect the current state of the component manager.
 --- @param target "dep_store"|"comps"|nil The key to inspect.

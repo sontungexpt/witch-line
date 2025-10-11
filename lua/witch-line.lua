@@ -40,10 +40,10 @@ M.setup = function(user_configs)
 	local Cache = require("witch-line.cache")
 
 	local CACHE_MODS = {
-		"witch-line.core.handler.event",
-		"witch-line.core.handler.timer",
+		"witch-line.core.manager.event",
+		"witch-line.core.manager.timer",
+		"witch-line.core.manager",
 		"witch-line.core.statusline",
-		"witch-line.core.CompManager",
 		"witch-line.core.highlight",
 	}
 

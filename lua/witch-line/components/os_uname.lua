@@ -1,5 +1,5 @@
-local Id       = require("witch-line.constant.id").Id
-local colors   = require("witch-line.constant.color")
+local Id = require("witch-line.constant.id").Id
+local colors = require("witch-line.constant.color")
 
 --- @type DefaultComponent
 return {
@@ -20,8 +20,10 @@ return {
 			windows = colors.blue,
     },
 	},
-  update =function (self, ctx, static, session_id)
+  update =function (self, session_id)
 		local os_uname = (vim.uv or vim.loop).os_uname()
+    local static = self.static
+    --- @cast static { icon: { mac: string, arch: string, linux: string, windows: string }, colors: { mac: string, arch: string, linux: string, windows: string } }
 		local uname, static_icon, static_colors = os_uname.sysname, static.icon, static.colors
 
 		if uname == "Darwin" then

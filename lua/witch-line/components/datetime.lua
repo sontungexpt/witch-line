@@ -8,8 +8,12 @@ return {
 	static = {
 		format = "default",
 	},
-  update = function (self, ctx, static, session_id)
+  update = function (self, session_id)
+    --- @type {format: string}
+    ---@diagnostic disable-next-line: assign-type-mismatch
+    local static = self.static
 		local fmt = static.format or "default"
+    --- @cast fmt string
 		if fmt == "default" then
 			fmt = "%A, %B %d | %H.%M"
 		elseif fmt == "us" then

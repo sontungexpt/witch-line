@@ -1,5 +1,6 @@
 local api = vim.api
 local M = {}
+local FALLBACK_KEY = "\0fallback\0"
 
 local commands = {
 	uncached = function()
@@ -11,14 +12,14 @@ local commands = {
 			require("witch-line.cache").inspect()
 		end,
 		event_store = function()
-			require("witch-line.core.handler.event").inspect()
+			require("witch-line.core.manager.event").inspect()
 		end,
 		comp_manager = {
 			comps = function()
-				require("witch-line.core.CompManager").inspect("comps")
+				require("witch-line.core.manager").inspect("comps")
 			end,
 			dep_store = function()
-				require("witch-line.core.CompManager").inspect("dep_store")
+				require("witch-line.core.manager").inspect("dep_store")
 			end,
 		},
 		highlight = {
@@ -30,12 +31,15 @@ local commands = {
 			end,
 		},
 		statusline = {
-			values = function()
-				require("witch-line.core.statusline").inspect("statusline")
-			end,
 			flexible_priority_sorted = function()
 				require("witch-line.core.statusline").inspect("flexible_priority_sorted")
 			end,
+      values = function()
+        require("witch-line.core.statusline").inspect("statusline")
+      end,
+      [FALLBACK_KEY] = function()
+        require("witch-line.core.statusline").inspect("statusline")
+      end,
 		},
 	},
 }
@@ -62,7 +66,7 @@ local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
 
 	local completions = {}
 	for key, _ in pairs(node) do
-		if key:find("^" .. vim.pesc(arg_lead)) then
+		if key ~= FALLBACK_KEY and key:find("^" .. vim.pesc(arg_lead)) then
 			completions[#completions + 1] = key
 		end
 	end
@@ -84,6 +88,13 @@ api.nvim_create_user_command("WitchLine", function(a)
 
 	if type(work) == "function" then
 		work(arg, a)
+  elseif type(work) == "table" then
+    local fallback = work[FALLBACK_KEY]
+    if type(fallback) == "function" then
+      fallback(arg, a)
+    else
+      api.nvim_err_writeln("WitchLine: Incomplete command. Subcommand required.")
+    end
 	end
 end, {
 	nargs = "*",
