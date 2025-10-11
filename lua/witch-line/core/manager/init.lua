@@ -133,7 +133,7 @@ end
 --- @param comp Component The component to register.
 --- @return CompId The ID of the registered component.
 M.register = function(comp)
-	local id = require("witch-line.core.Component").new(comp)
+	local id = require("witch-line.core.Component").setup(comp)
 	Comps[id] = comp
 	return id
 end
