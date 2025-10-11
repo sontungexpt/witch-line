@@ -6,7 +6,6 @@ local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
 local M = {}
 
-
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
 
@@ -15,7 +14,7 @@ local Styles = {}
 
 --- Retrieves the style for a given component.
 --- @param comp Component The component to retrieve the style for.
---- @return table|nil style The style of the component or nil if not found.
+--- @return CompStyle|nil style The style of the component or nil if not found.
 M.get_style = function(comp)
 	if comp._hl_name then
 		return Styles[comp._hl_name]
@@ -63,8 +62,7 @@ end
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the highlight cache.
 --- @return function undo function to restore the previous state
 M.load_cache = function(CacheDataAccessor)
-	local color_rgb_24bit_before = ColorRgb24Bit
-	local styles_before = Styles
+	local color_rgb_24bit_before, styles_before = ColorRgb24Bit, Styles
 
 	ColorRgb24Bit = CacheDataAccessor.get("ColorRgb24Bit") or {}
 	Styles = CacheDataAccessor.get("HighlightStyles")

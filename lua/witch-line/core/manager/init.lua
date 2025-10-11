@@ -229,22 +229,21 @@ end
 
 --- Add a dependency for a component.
 --- @param comp Component The component to add the dependency for.
---- @param ref_id CompId|CompId[] The ID or IDs that this component depends on.
+--- @param ref CompId|CompId[] The ID or IDs that this component depends on.
 --- @param store_id DepGraphId The ID of the dependency store to use.
-M.link_ref_field = function(comp, ref_id, store_id)
+M.link_ref_field = function(comp, ref, store_id)
 	local store = get_dependency_graph(store_id)
-
-	if type(ref_id) ~= "table" then
-		ref_id = { ref_id }
-	end
-
 	local id = comp.id
-	for i = 1, #ref_id do
-		local ref_id_i = ref_id[i]
-		local deps = store[ref_id_i] or {}
-		---@diagnostic disable-next-line: need-check-nil
-		deps[id] = true
-		store[ref_id_i] = deps
+  --- @cast id CompId Id never nil
+
+	if type(ref) == "table" then
+		ref = { ref }
+	end
+	for i = 1, #ref do
+		local r = ref[i]
+		local dependents = store[r] or {}
+		dependents[id] = true
+		store[r] = dependents
 	end
 end
 
@@ -323,7 +322,7 @@ M.lookup_ref_value = lookup_ref_value
 --- If the style is not found in the component, it will look up the reference chain.
 --- @param comp Component The component to get the style for.
 --- @param session_id SessionId The ID of the process to use for this retrieval.
---- @return vim.api.keyset.highlight|nil style The style of the component.
+--- @return CompStyle|nil style The style of the component.
 --- @return Component inherited The component that provides the style, or nil if not found.
 M.get_style = function(comp, session_id)
 	return lookup_ref_value(comp, "style", session_id, {})
