@@ -272,92 +272,47 @@ end
 --- will only look for static values without calling functions or caching.
 local function lookup_ref_value(comp, key, session_id, seen, ...)
   local store = get_session_store(session_id, key, {})
-  local id, cached, value, ref, ref_id, ref_comp
+  local id, cached, value, ref, ref_id
 
-  --- Goto version
-  ::lookup::
-  id = comp.id
-  cached = store[id]
-  if cached ~= nil then
-    return cached, comp
-  end
-  value = rawget(comp, key)
-  if value ~= nil then
-    if type(value) == "function" then
-      local args = { ... }
-      args[#args + 1] = session_id
-      value = value(comp, unpack(args))
+  -- Do as least one loop
+  repeat
+    id = comp.id
+    cached = store[id]
+    if cached ~= nil then
+      return cached, comp
     end
-    --- @cast id CompId
-    store[id] = value
-    return value, comp
-  end
 
-  --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
-  --- This enables function-based field inheritance without recalculating values.
-  --- Example:
-  --- ```lua
-  --- local Base = { id = "base", context = function() return { foo = "bar" } end }
-  --- local Child = { id = "child", inherit = "base", context = nil }
-  --- ```
-  --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
-  ref = comp.ref
-  ref_id = type(ref) == "table" and ref[key] or comp.inherit
-  if not ref_id or seen[ref_id] then
-    return nil, comp
-  end
+    value = rawget(comp, key)
+    if value ~= nil then
+      if type(value) == "function" then
+        local args = { ... }
+        args[#args + 1] = session_id
+        value = value(comp, unpack(args))
+      end
+      --- @cast id CompId
+      store[id] = value
+      return value, comp
+    end
 
-  ref_comp = Comps[ref_id]
-  -- Not found reference component then stop here
-  if ref_comp == nil then
-    return nil, comp
-  end
+    --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
+    --- This enables function-based field inheritance without recalculating values.
+    --- Example:
+    --- ```lua
+    --- local Base = { id = "base", context = function() return { foo = "bar" } end }
+    --- local Child = { id = "child", inherit = "base", context = nil }
+    --- ```
+    --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
+    ref = comp.ref
+    ref_id = (type(ref) == "table" and ref[key]) or comp.inherit
+    if not ref_id or seen[ref_id] then
+      return nil, comp
+    end
 
-  seen[ref_id] = true
-  comp = ref_comp
+    seen[ref_id] = true
+    comp = Comps[ref_id]
+  until not comp
 
----@diagnostic disable-next-line: missing-return
-  goto lookup
-
-  --- While loop version
-  -- iterative instead of recursive
-  -- while comp do
-  --   id = comp.id
-  --   cached = store[id]
-  --   if cached ~= nil then
-  --     return cached, comp
-  --   end
-  --
-  --   value = rawget(comp, key)
-  --   if value ~= nil then
-  --     if type(value) == "function" then
-  --       local args = { ... }
-  --       args[#args + 1] = session_id
-  --       value = value(comp, unpack(args))
-  --     end
-  --     --- @cast id CompId
-  --     store[id] = value
-  --     return value, comp
-  --   end
-  --
-  --   --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
-  --   --- This enables function-based field inheritance without recalculating values.
-  --   --- Example:
-  --   --- ```lua
-  --   --- local Base = { id = "base", context = function() return { foo = "bar" } end }
-  --   --- local Child = { id = "child", inherit = "base", context = nil }
-  --   --- ```
-  --   --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
-  --   ref = comp.ref
-  --   ref_id = (type(ref) == "table" and ref[key]) or comp.inherit
-  --   if not ref_id or seen[ref_id] then
-  --     break
-  --   end
-  --   seen[ref_id] = true
-  --   comp = Comps[ref_id]
-  -- end
-  --
-  -- return nil, comp
+  return nil, comp
 end
 M.lookup_ref_value = lookup_ref_value
 
@@ -388,34 +343,24 @@ end
 --- will only look for static values without calling functions or caching, while `lookup_ref_value`
 --- will call functions and cache the result in the session store.
 M.lookup_inherited_value = function(comp, key, seen)
-  -- goto for tail call optimization by luajit
-  -- It's faster than while true loop
+  local static, ref, ref_id
+  repeat
+    static = comp[key]
+    if static ~= nil then
+      return static, comp
+    end
 
-  -- Init all local variables here for luajit optimization
-  local static, ref, ref_id, ref_comp
+    ref = comp.ref
+    ref_id = type(ref) == "table" and ref[key] or nil
+    if not ref_id or seen[ref_id] then
+      return nil, comp
+    end
 
-  ::lookup::
-  static = comp[key]
-  if static ~= nil then
-    return static, comp
-  end
+    seen[ref_id] = true
+    comp = Comps[ref_id]
+  until not comp
 
-  ref = comp.ref
-  ref_id = type(ref) == "table" and ref[key] or nil
-  if not ref_id or seen[ref_id] then
-    return nil, comp
-  end
-
-  ref_comp = Comps[ref_id]
-  if ref_comp == nil then
-    return nil, comp
-  end
-
-  seen[ref_id] = true
-  comp = ref_comp
-
-  ---@diagnostic disable-next-line: missing-return
-  goto lookup
+  return nil, comp
 end
 
 
