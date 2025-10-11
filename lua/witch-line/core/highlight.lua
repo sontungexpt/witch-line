@@ -9,7 +9,7 @@ local M = {}
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
 
----@type table<string, vim.api.keyset.highlight>
+---@type table<string, CompStyle>
 local Styles = {}
 
 --- Retrieves the style for a given component.
