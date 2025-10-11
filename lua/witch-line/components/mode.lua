@@ -67,17 +67,22 @@ return {
 		},
 		auto_hide_on_vim_resized = true,
 	},
-	context = function(self, static)
-		return vim.api.nvim_get_mode().mode
+	context = function(self)
+		return {
+      mode = vim.api.nvim_get_mode().mode
+    }
 	end,
-	style = function(self, ctx, static)
-		local mode_code = ctx
+  style = function (self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+		local mode_code = ctx.mode
 		---@diagnostic disable-next-line: need-check-nil
 		return static.mode_colors[static.modes[mode_code][2]] or {}
 	end,
-	update = function(self, ctx, static)
-		local mode_code = ctx
-		local static = self.static
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+		local mode_code = ctx.mode
 		---@diagnostic disable-next-line: need-check-nil
 		local mode = static.modes[mode_code]
 		return mode and mode[1] or mode_code

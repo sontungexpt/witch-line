@@ -5,11 +5,8 @@ local Id = require("witch-line.constant.id").Id
 local Interface = {
 	id = Id["file.interface"],
 	_plug_provided = true,
-	user_events = { "VeryLazy" },
-	events = {
-		"BufEnter",
-		"WinEnter",
-	},
+  user_events = { "VeryLazy" },
+	events = { "BufEnter", "WinEnter" },
 }
 
 ---@type DefaultComponent
@@ -17,8 +14,8 @@ local Name = {
 	id = Id["file.name"],
 	_plug_provided = true,
 	ref = {
+    user_events = Id["file.interface"],
 		events = Id["file.interface"],
-		user_events = Id["file.interface"],
 	},
 	style = {
 		fg = colors.orange,
@@ -38,8 +35,10 @@ local Name = {
 		},
 	},
 	padding = { left = 1, right = 0 },
-	update = function(self, context, static)
+	update = function(self, session_id)
     local bo = vim.bo
+    local static = require("witch-line.core.manager.hook").use_static(self)
+
 		local formatter = static.formatter
 
 		local filename = formatter.filetype[bo.filetype]
@@ -81,7 +80,7 @@ local Icon = {
 			},
 		},
 	},
-	context = function(self, static)
+	context = function(self)
 		local fn = vim.fn
 		local filename = fn.expand("%:t")
 
@@ -92,6 +91,7 @@ local Icon = {
 		end
 
 		if not icon then
+      local static = require("witch-line.core.manager.hook").use_static(self)
 			local extensions = static.extensions
 			local extension = extensions.buftypes[vim.bo.buftype]
 			if extension then
@@ -110,12 +110,16 @@ local Icon = {
 			color = color_icon or "#ffffff",
 		}
 	end,
-	style = function(self, ctx, static)
+	style = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx = hook.use_context(self, session_id)
 		return {
 			fg = ctx.color,
 		}
 	end,
-	update = function(self, ctx, static)
+	update = function(self, session_id)
+    local hook = require("witch-line.core.manager.hook")
+    local ctx = hook.use_context(self, session_id)
 		return ctx.icon
 	end,
 }
@@ -128,7 +132,7 @@ local Modifier = {
 	style = {
 		fg = colors.fg,
 	},
-	update = function(self, ctx, static)
+	update = function(self, session_id)
 		if vim.bo.buftype == "prompt" then
 			return ""
     elseif not vim.bo.modifiable or vim.bo.readonly then
@@ -154,7 +158,7 @@ local Size =  {
 	static = {
 		icon = "",
 	},
-  update = function (self, ctx, static, session_id)
+  update = function (self, session_id)
 		local current_file = vim.api.nvim_buf_get_name(0)
     if current_file == "" then return "" end
 
@@ -169,6 +173,7 @@ local Size =  {
 		end
 
 		local format = i == 1 and "%d%s" or "%.1f%s"
+    local static = require("witch-line.core.manager.hook").use_static(self)
 		return static.icon .. " " .. string.format(format, file_size, suffixes[i])
 	end,
 }

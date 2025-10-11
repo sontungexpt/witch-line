@@ -1,4 +1,4 @@
-local Id = require("witch-line.constant.id").Id
+local Id = require("witch-line.constant.id").IdPathMap
 local colors = require("witch-line.constant.color")
 
 

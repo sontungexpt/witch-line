@@ -11,14 +11,14 @@ local commands = {
 			require("witch-line.cache").inspect()
 		end,
 		event_store = function()
-			require("witch-line.core.handler.event").inspect()
+			require("witch-line.core.manager.event").inspect()
 		end,
 		comp_manager = {
 			comps = function()
-				require("witch-line.core.CompManager").inspect("comps")
+				require("witch-line.core.manager").inspect("comps")
 			end,
 			dep_store = function()
-				require("witch-line.core.CompManager").inspect("dep_store")
+				require("witch-line.core.manager").inspect("dep_store")
 			end,
 		},
 		highlight = {
