@@ -40,6 +40,14 @@ local component = {
 
 ```
 
+### Hooks
+
+WitchLine provides some hooks to access data in module `witch-line.core.manager.hook`.
+
+- `use_static(comp)`: Access the static field of the component or from referenced component.
+- `use_context(comp, session_id)`: Access the context field of the component or from referenced component for the given session.
+- `use_event_info(comp, session_id)`: Access the data event that triggered the update for the component in the given session. The result is the argument passed to the event callback in vim.api.nvim_create_autocmd.
+
 ### Global Accessable Fields
 
 - **static**:

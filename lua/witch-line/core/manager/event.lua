@@ -1,9 +1,12 @@
+local Session = require("witch-line.core.Session")
+
 local M = {}
 
+local EventInfoStoreId = "EventInfo"
 
----@alias es nil|table<string, Id[]>
----@alias EventStore {events: es, user_events: es}
----@type EventStore
+---@class EventStore
+---@field events nil|table<string, CompId[]> Stores component dependencies for nvim events
+---@field user_events nil|table<string, CompId[]> Stores component dependencies for user-defined events
 local EventStore = {
     -- Stores component dependencies for events
     -- Only init if needed
@@ -21,13 +24,14 @@ local EventStore = {
 
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
-M.on_vim_leave_pre     = function(CacheDataAccessor)
+M.on_vim_leave_pre = function(CacheDataAccessor)
     CacheDataAccessor.set("EventStore", EventStore)
 end
+
 --- Load the event and timer stores from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 --- @return function undo function to restore the previous state of the stores
-M.load_cache           = function(CacheDataAccessor)
+M.load_cache = function(CacheDataAccessor)
     local before_event_store = EventStore
 
     EventStore = CacheDataAccessor.get("EventStore") or EventStore
@@ -37,14 +41,14 @@ M.load_cache           = function(CacheDataAccessor)
     end
 end
 
-M.inspect              = function()
+M.inspect = function()
     require("witch-line.utils.notifier").info(vim.inspect(EventStore))
 end
 
 --- Register events for components.
 ---@param comp Component
 ---@param etype "events" | "user_events"
-M.register_events      = function(comp, etype)
+M.register_events = function(comp, etype)
     assert(etype == "events" or etype == "user_events", "Invalid event type: " .. tostring(etype))
     local es = comp[etype]
     if type(es) == "string" then
@@ -75,30 +79,36 @@ M.register_vim_resized = function(comp)
     store["VimResized"] = es
 end
 
+--- Get the event information for a component in a session.
+--- @param comp Component The component to get the event information for.
+--- @param session_id SessionId The session id to get the event information for.
+--- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event information for the component, or nil if not found.
+--- @see Hook.use_event_info
+M.get_event_info = function(comp, session_id)
+  local store = Session.get_store(session_id, EventInfoStoreId)
+  return store and store[comp.id] or nil
+end
+
 --- Initialize the autocmd for events and user events.
 --- @param work fun(session_id: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the session_id, component IDs, and event information as arguments.
---- @return integer|nil group The ID of the autocmd group created.
---- @return integer|nil events_id The ID of the autocmd for events.
---- @return integer|nil user_events_id The ID of the autocmd for user events.
-M.on_event             = function(work)
+M.on_event = function(work)
     local events, user_events = EventStore.events, EventStore.user_events
+
+    --- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
     local id_event_info_map = {}
 
     local emit = require("witch-line.utils").debounce(function()
-        local Session = require("witch-line.core.Session")
         Session.run_once(function(session_id)
-            Session.new_store(session_id, "EventInfo", id_event_info_map)
+            Session.new_store(session_id, EventInfoStoreId, id_event_info_map)
             work(session_id, vim.tbl_keys(id_event_info_map), id_event_info_map)
             id_event_info_map = {}
         end)
     end, 120)
 
     local api = vim.api
-    local group, id1, id2 = nil, nil, nil
-
+    local group = api.nvim_create_augroup("WitchLineEvents", { clear = true })
     if events and next(events) then
-        group = group or api.nvim_create_augroup("WitchLineEvents", { clear = true })
-        id1 = api.nvim_create_autocmd(vim.tbl_keys(events), {
+        api.nvim_create_autocmd(vim.tbl_keys(events), {
             group = group,
             callback = function(e)
                 for _, id in ipairs(events[e.event]) do
@@ -110,8 +120,7 @@ M.on_event             = function(work)
     end
 
     if user_events and next(user_events) then
-        group = group or api.nvim_create_augroup("WitchLineEvents", { clear = true })
-        id2 = api.nvim_create_autocmd("User", {
+        api.nvim_create_autocmd("User", {
             pattern = vim.tbl_keys(user_events),
             group = group,
             callback = function(e)
@@ -122,7 +131,5 @@ M.on_event             = function(work)
             end,
         })
     end
-
-    return group, id1, id2
 end
 return M
