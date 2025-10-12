@@ -11,8 +11,6 @@ local DepGraphKind = Manager.DepGraphKind
 
 local M = {}
 
-
-
 --- Clear the value of a component in the statusline.
 --- @param comp Component The component to clear.
 local hide_component = function(comp)
@@ -75,7 +73,7 @@ end
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param session_id SessionId The ID of the process to use for this update.
---- @return string updated_value  If string and non-empty then the component is visible and updated, if empty string then the component is hidden, if nil then the component is abstract and not rendered directly.
+--- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, session_id)
 	-- It's just a abstract component then no need to really update
 	if comp.inherit and not Component.has_parent(comp) then
@@ -94,38 +92,36 @@ local function update_component(comp, session_id)
 	local hidden = min_screen_width and o.columns < min_screen_width
     or Component.hidden(comp, session_id)
 
-	local value, style = "", nil
-
 	if hidden then
 		hide_component(comp)
-	else
-		value, style = Component.evaluate(comp, session_id)
-		if value == "" then
-			hide_component(comp)
-		else
-			local indices = comp._indices
+  else
+    local value, style = Component.evaluate(comp, session_id)
+    local indices = comp._indices
 
-			-- A abstract component may be not have _indices key
-			if indices then
+    -- A abstract component will not have indices
+    -- It's just call the update function for other purpose and we not affect to the statusline
+    -- So we just ignore it even the value is empty string
+    if indices then
+      if value == "" then
+        hide_component(comp)
+        hidden = true
+      else
         update_component_style(comp, style, session_id)
 
-        --- Update value
-				Statusline.set_value(indices, value)
+        --- Update statusline value
+        Statusline.set_value(indices, value)
         Statusline.set_side_value(indices, "left", Component.evaluate_side(comp, "left", session_id))
-        Statusline.set_side_value(indices, "right", Component.evaluate_side(comp, "right", session_id))
-
-
         if comp.on_click then
           Statusline.set_click_handler(indices, Component.register_click_handler(comp))
         end
 
-				rawset(comp, "_hidden", false) -- Reset hidden state
-			end
-		end
-	end
+        rawset(comp, "_hidden", false) -- Reset hidden state
+      end
+    end
+  end
 
 	Component.emit_post_update(comp, session_id)
-	return value
+	return hidden
 end
 M.update_component = update_component
 
@@ -146,23 +142,18 @@ function M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
 	---@cast id CompId
 	seen[id] = true
 
-	local updated_value = update_component(comp, session_id)
+	local hidden = update_component(comp, session_id)
 
 	--- Check if component is loaded and should be render and affect to dependents
 	--- If it's not load. It's just the abstract component and we don't care about updated value of it. The function update is just call for update something for abstract component
-	if comp._loaded and updated_value == "" then
-		for dep_id, dep_comp in Manager.iterate_dependents(DepGraphKind.Display, id) do
+	if hidden then
+		for dep_id, dep_comp in Manager.iterate_dependents(DepGraphKind.Visible, id) do
 			seen[dep_id] = true
 			hide_component(dep_comp)
 		end
 	end
 
-  if not dep_graph_kind then
-    dep_graph_kind = {
-      DepGraphKind.Event,
-      DepGraphKind.Timer,
-    }
-  elseif type(dep_graph_kind) ~= "table" then
+ if type(dep_graph_kind) ~= "table" then
 		dep_graph_kind = { dep_graph_kind }
 	end
 
@@ -181,7 +172,10 @@ end
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
 M.refresh_component_graph = function(comp, dep_graph_kind, seen)
 	require("witch-line.core.Session").run_once(function(session_id)
-		M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
+		M.update_comp_graph(comp, session_id, dep_graph_kind or {
+      DepGraphKind.Event,
+      DepGraphKind.Timer,
+    }, seen)
 		Statusline.render()
 	end)
 end
@@ -224,11 +218,11 @@ local function bind_dependencies(comp)
 		end
 
 		if ref.hidden then
-			link_ref_field(comp, ref.hidden, DepGraphKind.Display)
+			link_ref_field(comp, ref.hidden, DepGraphKind.Visible)
 		end
 
 		if ref.min_screen_width then
-			link_ref_field(comp, ref.min_screen_width, DepGraphKind.Display)
+			link_ref_field(comp, ref.min_screen_width, DepGraphKind.Visible)
 		end
 	end
 
@@ -236,7 +230,7 @@ local function bind_dependencies(comp)
 	if inherit then
 		link_ref_field(comp, inherit, DepGraphKind.Event)
 		link_ref_field(comp, inherit, DepGraphKind.Timer)
-		link_ref_field(comp, inherit, DepGraphKind.Display)
+		link_ref_field(comp, inherit, DepGraphKind.Visible)
 	end
 end
 

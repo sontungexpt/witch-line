@@ -6,7 +6,7 @@ local M = {}
 
 --- @enum DepGraphKind
 M.DepGraphKind = {
-	Display = 1,
+	Visible = 1,
 	Event = 2,
 	Timer = 3,
 }
@@ -277,11 +277,12 @@ end
 --- will only look for static values without calling functions or caching.
 M.lookup_ref_value = function(comp, key, session_id, seen, ...)
   local store = get_session_store(session_id, key)
-  local id, cached, value, ref, ref_id
+  local id = comp.id
+  ---@cast id CompId
+  local cached, value, ref, ref_comp
 
   -- Do as least one loop
   repeat
-    id = comp.id
     if store then
       cached = store[id]
       if cached ~= nil then
@@ -304,6 +305,7 @@ M.lookup_ref_value = function(comp, key, session_id, seen, ...)
       end
       return value, comp
     end
+    seen[id] = true
 
     --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
     --- This enables function-based field inheritance without recalculating values.
@@ -314,18 +316,20 @@ M.lookup_ref_value = function(comp, key, session_id, seen, ...)
     --- ```
     --- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
     ref = comp.ref
-    ref_id = (type(ref) == "table" and ref[key]) or comp.inherit
-    if not ref_id or seen[ref_id] then
+    id = (type(ref) == "table" and ref[key]) or comp.inherit
+    if not id or seen[id] then
       return nil, comp
     end
 
-    seen[ref_id] = true
-    comp = Comps[ref_id]
+    ref_comp = Comps[id]
+    if not ref_comp then
+      return nil, comp
+    end
+    comp = ref_comp
   until not comp
 
   return nil, comp
 end
-
 
 --- Recursively look up a static value in a component and its references.
 --- If the value is found, it is returned along with the component that provides it.
@@ -340,21 +344,26 @@ end
 --- will only look for static values without calling functions or caching, while `lookup_ref_value`
 --- will call functions and cache the result in the session store.
 M.lookup_inherited_value = function(comp, key, seen)
-  local static, ref, ref_id
+  local id = comp.id
+  ---@cast id CompId
+  local val, ref, ref_comp
   repeat
-    static = comp[key]
-    if static ~= nil then
-      return static, comp
+    val = comp[key]
+    if val ~= nil then
+      return val, comp
     end
+    seen[id] = true
 
     ref = comp.ref
-    ref_id = type(ref) == "table" and ref[key] or nil
-    if not ref_id or seen[ref_id] then
+    id = type(ref) == "table" and ref[key] or nil
+    if not id or seen[id] then
       return nil, comp
     end
-
-    seen[ref_id] = true
-    comp = Comps[ref_id]
+    ref_comp = Comps[id]
+    if not ref_comp then
+      return nil, comp
+    end
+    comp = ref_comp
   until not comp
 
   return nil, comp
