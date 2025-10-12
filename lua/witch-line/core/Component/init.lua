@@ -1,6 +1,6 @@
 local require, type, str_rep, rawset = require, type, string.rep, rawset
-local Highlight = require("witch-line.core.highlight")
 local resolve = require("witch-line.utils").resolve
+local Highlight = require("witch-line.core.highlight")
 
 local COMP_MODULE_PATH = "witch-line.components."
 
@@ -40,16 +40,15 @@ local SepStyle = {
 
 --- @alias PaddingFunc fun(self: ManagedComponent, session_id: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
+---
 --- @alias UpdateFunc fun(self:ManagedComponent,  session_id: SessionId): string|nil , CompStyle|nil|
+---
 --- @alias CompStyle vim.api.keyset.highlight|string
 --- @alias StyleFunc fun(self: ManagedComponent, session_id: SessionId): CompStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, session_id: SessionId): CompStyle|SepStyle
+---
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
----
---- @class OnClickTable
---- @field callback OnClickFunc|string The function to call when the component is clicked
---- @field name string|nil The name of the function to register, if not provided a name will be generated
----
+--- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 ---
 --- @alias Component.Static table|string
 --- @alias Component.Context table|string
@@ -62,17 +61,26 @@ local SepStyle = {
 --- - If nil, the component will automatically reload when the component changes by search for the changes by Cache system.
 --- @field version integer|string|nil
 ---
---- @field inherit CompId|nil The id of the component to inherit from, can be used to extend a component
+--- The id of the component to inherit from, can be used to extend a component
+--- @field inherit CompId|nil
 ---
---- @field timing boolean|integer|nil If true the component will be updated on every tick, if a number it will be updated every n ticks
+--- A timing configuration that determines how often the component is updated.
+--- - If true, the component will be updated on every 1 second.
+--- - If a number, the component will be updated every n ticks.
+--- @field timing boolean|integer|nil
 ---
---- @field lazy boolean|nil If true the component will be loaded only when it is needed, used for lazy loading components
 ---
---- @field flexible number|nil The priority of the component when the status line is too long, higher numbers are more likely to be truncated
+--- A fllag indicating whether the component should be lazy loaded or not.
+--- @field lazy boolean|nil
 ---
---- @field events string|string[]|nil A table of events that the component will listen to
+--- The priority of the component when the status line is too long, higher numbers are more likely to be truncated
+--- @field flexible number|nil
 ---
---- @field user_events string|string[]|nil A table of user events that the component will listen to
+--- A table of events that the component will listen to
+--- @field events string|string[]|nil
+---
+--- A table of user events that the component will listen to
+--- @field user_events string|string[]|nil
 ---
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
@@ -143,7 +151,11 @@ local SepStyle = {
 --- - Example of padding function: `function(self, session_id) return 2 end` (adds 2 spaces to both sides)
 --- @field padding integer|nil|PaddingTable|PaddingFunc
 ---
---- @field init nil|fun(self: ManagedComponent, session_id: SessionId) called when the component is initialized, can be used to set up the context
+--- An initialization function that will be called when the component is first loaded
+--- - If nil: no initialization function will be called.
+--- - If string: required the string as a module and called it with the component and session_id as arguments.
+--- - If function: called with the component and session_id as arguments.
+--- @field init nil|string|fun(self: ManagedComponent, session_id: SessionId)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
@@ -153,6 +165,7 @@ local SepStyle = {
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
 --- - Example of style function: `function(self, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field style CompStyle|nil|StyleFunc
+---
 --- @field temp any A temporary field that can be used to store temporary values, will not be cached
 ---
 --- A static field that can be accessed by the`use_static` hook
@@ -168,7 +181,8 @@ local SepStyle = {
 --- - Example of context function: `function(self, session_id) return {buffer = vim.api.nvim_get_current_buf()} end`
 --- @field context nil|Component.Context|fun(self: ManagedComponent): Component.Context
 ---
---- @field pre_update nil|fun(self: ManagedComponent, session_id: SessionId) Called before the component is updated
+--- A function that will be called before the component is updated
+--- @field pre_update nil|fun(self: ManagedComponent, session_id: SessionId)
 ---
 --- The update function that will be called to get the value of the component
 --- - If string: used as is.
@@ -177,7 +191,10 @@ local SepStyle = {
 --- - Example of update function: `function(self, session_id) return "Hello World" end`
 --- - Example of update function with style: `function(self, session_id) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field update nil|string|UpdateFunc
---- @field post_update nil|fun(self: ManagedComponent, session_id: SessionId) Called after the component is updated. (Call before the dependencies are updated)
+---
+--- A function that will be called after the component is updated
+--- @field post_update nil|fun(self: ManagedComponent, session_id: SessionId)
+---
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
@@ -273,8 +290,9 @@ end
 --- @param comp Component the component to emit the event for
 --- @param session_id SessionId the session id to use for the component, used for lazy loading components
 M.emit_pre_update = function(comp, session_id)
-	if type(comp.pre_update) == "function" then
-		comp.pre_update(comp, session_id)
+  local pre_update = comp.pre_update
+	if type(pre_update) == "function" then
+		pre_update(comp, session_id)
 	end
 end
 
@@ -282,8 +300,9 @@ end
 --- @param comp Component the component to emit the event for
 --- @param session_id SessionId the session id to use for the component, used for lazy
 M.emit_post_update = function(comp, session_id)
-	if type(comp.post_update) == "function" then
-		comp.post_update(comp, session_id)
+  local post_update = comp.post_update
+	if type(post_update) == "function" then
+		post_update(comp, session_id)
 	end
 end
 
