@@ -6,7 +6,7 @@ local M = {}
 
 --- @enum DepGraphKind
 M.DepGraphKind = {
-	Visible = 1,
+	Display = 1,
 	Event = 2,
 	Timer = 3,
 }
@@ -326,10 +326,11 @@ M.lookup_ref_value = function(comp, key, session_id, seen, ...)
       return nil, comp
     end
     comp = ref_comp
-  until not comp
+  until false -- until not comp -- never happens because of the return above
 
   return nil, comp
 end
+
 
 --- Recursively look up a static value in a component and its references.
 --- If the value is found, it is returned along with the component that provides it.
@@ -364,7 +365,7 @@ M.lookup_inherited_value = function(comp, key, seen)
       return nil, comp
     end
     comp = ref_comp
-  until not comp
+  until false -- until not comp -- never happens because of the return above
 
   return nil, comp
 end

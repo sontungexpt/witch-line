@@ -1,10 +1,10 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 local o = vim.o
 
+local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
-local Component = require("witch-line.core.Component")
 local Session = require("witch-line.core.Session")
 local Manager = require("witch-line.core.manager")
 local DepGraphKind = Manager.DepGraphKind

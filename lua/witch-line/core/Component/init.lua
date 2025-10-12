@@ -1,5 +1,6 @@
 local require, type, str_rep, rawset = require, type, string.rep, rawset
 local resolve = require("witch-line.utils").resolve
+
 local Highlight = require("witch-line.core.highlight")
 
 local COMP_MODULE_PATH = "witch-line.components."

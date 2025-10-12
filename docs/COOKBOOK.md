@@ -2,15 +2,18 @@ The cookbook is a collection of recipes that demonstrate how to use various feat
 
 ## Navigation
 
-- [📚 Component Fields](#-component-fields)
-  - [🔍 Notes](#-notes)
-  - [📚 Basic Fields](#basic-fields)
-  - [📚 Referencing Fields](#referencing-fields)
-  - [📚 Advanced Fields](#advanced-fields)
+- ⚙️ [Component Fields](#-component-fields)
+  - 🗒️ [Notes](#-notes)
+  - 🎣 [Hooks to Access Component Data](#-hooks-to-access-component-data)
+  - 🔡 [Global Accessible Fields](#-global-accessible-fields)
+  - 🧰 [Basic Fields](#-basic-fields)
+  - 🧩 [Referencing Fields](#-referencing-fields)
+  - 🚀 [Advanced Fields](#-advanced-fields)
+  - 🧪 [Component Function Lifecycle](#-component-function-lifecycle)
 
-## Component Fields
+## ⚙️ Component Fields
 
-### 🔍 Notes
+### ⚠️ Important Notes (Read Before Creating Components)
 
 Important about function fields to make the cache work properly:
 
@@ -40,7 +43,7 @@ local component = {
 
 ```
 
-### Hooks
+### 🎣 Hooks to Access Component Data
 
 WitchLine provides some hooks to access data in module `witch-line.core.manager.hook`.
 
@@ -49,7 +52,7 @@ WitchLine provides some hooks to access data in module `witch-line.core.manager.
 - `use_event_info(comp, session_id)`: Access the data event that triggered the update for the component in the given session. The result is the argument passed to the event callback in vim.api.nvim_create_autocmd.
 - `use_style(comp, session_id)`: Access the style of the component after resolving all the references and function calls for the given session. When the returned style is updated, the highlight will be updated automatically.
 
-### Global Accessable Fields
+### 🔡 Global Accessible Fields
 
 - **static**:
 
@@ -157,7 +160,7 @@ local component = {
   }
   ```
 
-### Basic Fields
+### 🧰 Basic Fields
 
 - **id**: (Very Important)
 
@@ -855,7 +858,7 @@ local component = {
   }
   ```
 
-#### Referencing Fields
+### 🔗 Referencing Fields
 
 An component can reference other components for some of its fields. This allows for reusing common configurations and creating more complex components by combining simpler ones. The following fields can reference other components:
 
@@ -942,7 +945,7 @@ An component can reference other components for some of its fields. This allows 
   }
   ```
 
-#### Advanced Fields
+### 🚀 Advanced Fields
 
 - **{...}**:
 
@@ -981,7 +984,7 @@ An component can reference other components for some of its fields. This allows 
   }
   ```
 
-### Component Function Lifecycle
+### 🧪 Component Function Lifecycle
 
 - `init` : Called once when the component is created. After `WitchLine` manages the component. (Such as setting up autocmds, etc.)
 - `pre_update` : Called every time the component needs to be update, right before calling `min_screen_width` -> `hidden` -> `update` functions.
