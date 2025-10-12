@@ -156,9 +156,8 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
  if type(dep_graph_kind) ~= "table" then
 		dep_graph_kind = { dep_graph_kind }
 	end
-
-	for _, store_id in ipairs(dep_graph_kind) do
-		for dep_id, dep_comp in Manager.iterate_dependents(store_id, id) do
+	for _, kind in ipairs(dep_graph_kind) do
+		for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
 			if not seen[dep_id] then
 				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
 			end
