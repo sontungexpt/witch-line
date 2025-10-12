@@ -27,8 +27,8 @@ end
 --- Update the style of a component if necessary. (Called internally by `update_component`.)
 --- @param comp Component The component to update.
 --- @param style CompStyle|nil The new style to apply. If nil, the style will be fetched from the component's configuration.
---- @param session_id SessionId The ID of the process to use for this update.
-local function update_component_style(comp, style, session_id)
+--- @param sid SessionId The ID of the process to use for this update.
+local function update_component_style(comp, style, sid)
   --- Update style
   local style_updated, ref_comp = false, comp
   if style then
@@ -36,12 +36,12 @@ local function update_component_style(comp, style, session_id)
 
     --- Sync style to session store
     --- This is make sure that the `use_style` hooks always get the latest style
-    local store = Session.get_store(session_id, "style")
+    local store = Session.get_store(sid, "style")
     if store then
       store[comp.id] = style
     end
   else
-    style, ref_comp = Manager.lookup_ref_value(comp, "style", session_id, {})
+    style, ref_comp = Manager.lookup_ref_value(comp, "style", sid, {})
     if style then
       style_updated = Component.update_style(comp, style, ref_comp)
     end
@@ -54,17 +54,17 @@ local function update_component_style(comp, style, session_id)
   --- WARN: Can not do sorter like this
   --- ```lua
   --- Statusline.set_side_value_highlight(
-  ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, session_id)
+  ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, sid)
   --- )
   --- ```
   --- Because lua evaluate the argument from left to right
   --- So the comp._left_hl_name may be missing if the update_side_style has not been called yet
-  local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, session_id)
+  local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
   Statusline.set_side_value_highlight(
     indices, "left", comp._left_hl_name, left_style_updated
   )
 
-  local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, session_id)
+  local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
   Statusline.set_side_value_highlight(
     indices, "right", comp._right_hl_name, right_style_updated
   )
@@ -72,9 +72,9 @@ end
 
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
---- @param session_id SessionId The ID of the process to use for this update.
+--- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
-local function update_component(comp, session_id)
+local function update_component(comp, sid)
 	-- It's just a abstract component then no need to really update
 	if comp.inherit and not Component.has_parent(comp) then
 		local parent = Manager.get_comp(comp.inherit)
@@ -84,18 +84,18 @@ local function update_component(comp, session_id)
 	end
 
 
-	Component.emit_pre_update(comp, session_id)
+	Component.emit_pre_update(comp, sid)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
-	local min_screen_width = Component.min_screen_width(comp, session_id)
+	local min_screen_width = Component.min_screen_width(comp, sid)
 
 	local hidden = min_screen_width and o.columns < min_screen_width
-    or Component.hidden(comp, session_id)
+    or Component.hidden(comp, sid)
 
 	if hidden then
 		hide_component(comp)
   else
-    local value, style = Component.evaluate(comp, session_id)
+    local value, style = Component.evaluate(comp, sid)
     local indices = comp._indices
 
     -- A abstract component will not have indices
@@ -106,11 +106,11 @@ local function update_component(comp, session_id)
         hide_component(comp)
         hidden = true
       else
-        update_component_style(comp, style, session_id)
+        update_component_style(comp, style, sid)
 
         --- Update statusline value
         Statusline.set_value(indices, value)
-        Statusline.set_side_value(indices, "left", Component.evaluate_side(comp, "left", session_id))
+        Statusline.set_side_value(indices, "left", Component.evaluate_side(comp, "left", sid))
         if comp.on_click then
           Statusline.set_click_handler(indices, Component.register_click_handler(comp))
         end
@@ -120,17 +120,17 @@ local function update_component(comp, session_id)
     end
   end
 
-	Component.emit_post_update(comp, session_id)
+	Component.emit_post_update(comp, sid)
 	return hidden
 end
 M.update_component = update_component
 
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
---- @param session_id SessionId The ID of the process to use for this update.
+--- @param sid SessionId The ID of the process to use for this update.
 --- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-function M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
+function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 	seen = seen or {}
 
 	local id = comp.id
@@ -142,7 +142,7 @@ function M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
 	---@cast id CompId
 	seen[id] = true
 
-	local hidden = update_component(comp, session_id)
+	local hidden = update_component(comp, sid)
 
 	--- Check if component is loaded and should be render and affect to dependents
 	--- If it's not load. It's just the abstract component and we don't care about updated value of it. The function update is just call for update something for abstract component
@@ -160,7 +160,7 @@ function M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
 	for _, store_id in ipairs(dep_graph_kind) do
 		for dep_id, dep_comp in Manager.iterate_dependents(store_id, id) do
 			if not seen[dep_id] then
-				M.update_comp_graph(dep_comp, session_id, dep_graph_kind, seen)
+				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
 			end
 		end
 	end
@@ -183,16 +183,16 @@ end
 
 --- Update multiple components by their IDs.
 --- @param ids CompId[] The IDs of the components to update.
---- @param session_id SessionId The ID of the process to use for this update.
+--- @param sid SessionId The ID of the process to use for this update.
 --- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
-M.update_comp_graph_by_ids = function(ids, session_id, dep_graph_kind, seen)
+M.update_comp_graph_by_ids = function(ids, sid, dep_graph_kind, seen)
 	seen = seen or {}
 	for _, id in ipairs(ids) do
 		if not seen[id] then
 			local comp = Manager.get_comp(id)
 			if comp then
-				M.update_comp_graph(comp, session_id, dep_graph_kind, seen)
+				M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 			end
 		end
 	end
@@ -464,13 +464,13 @@ M.setup = function(user_configs, DataAccessor)
 		end
 	end
 
-	Event.on_event(function(session_id, ids)
-		M.update_comp_graph_by_ids(ids, session_id, DepGraphKind.Event, {})
+	Event.on_event(function(sid, ids)
+		M.update_comp_graph_by_ids(ids, sid, DepGraphKind.Event, {})
 		Statusline.render()
 	end)
 
-	Timer.on_timer_trigger(function(session_id, ids)
-		M.update_comp_graph_by_ids(ids, session_id, DepGraphKind.Timer, {})
+	Timer.on_timer_trigger(function(sid, ids)
+		M.update_comp_graph_by_ids(ids, sid, DepGraphKind.Timer, {})
 		Statusline.render()
 	end)
 
