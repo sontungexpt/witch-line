@@ -1,10 +1,10 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 local o = vim.o
 
+local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
-local Component = require("witch-line.core.Component")
 local Session = require("witch-line.core.Session")
 local Manager = require("witch-line.core.manager")
 local DepGraphKind = Manager.DepGraphKind
@@ -156,9 +156,8 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
  if type(dep_graph_kind) ~= "table" then
 		dep_graph_kind = { dep_graph_kind }
 	end
-
-	for _, store_id in ipairs(dep_graph_kind) do
-		for dep_id, dep_comp in Manager.iterate_dependents(store_id, id) do
+	for _, kind in ipairs(dep_graph_kind) do
+		for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
 			if not seen[dep_id] then
 				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
 			end

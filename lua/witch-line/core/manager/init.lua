@@ -266,7 +266,7 @@ end
 --- The result will be cached in the session store to avoid redundant computations.
 --- @param comp Component The component to start the lookup from.
 --- @param key string The key to look for in the component.
---- @param session_id SessionId The ID of the process to use for this retrieval.
+--- @param sid SessionId The ID of the process to use for this retrieval.
 --- @param seen table<Id, boolean> A table to keep track of already seen values to avoid infinite recursion.
 --- @param ... any Additional arguments to pass to the value function.
 --- @return any value The value of the component for the given key, or nil if not found.
@@ -275,8 +275,8 @@ end
 --- The difference between this function and `lookup_inherited_value` is that this function
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
 --- will only look for static values without calling functions or caching.
-M.lookup_ref_value = function(comp, key, session_id, seen, ...)
-  local store = get_session_store(session_id, key)
+M.lookup_ref_value = function(comp, key, sid, seen, ...)
+  local store = get_session_store(sid, key)
   local id = comp.id
   ---@cast id CompId
   local cached, value, ref, ref_comp
@@ -293,13 +293,11 @@ M.lookup_ref_value = function(comp, key, session_id, seen, ...)
     value = rawget(comp, key)
     if value ~= nil then
       if type(value) == "function" then
-        local args = { ... }
-        args[#args + 1] = session_id
-        value = value(comp, unpack(args))
+        value = value(comp, sid, ...)
       end
       --- @cast id CompId
       if not store then
-        store = new_session_store(session_id, key, { [id] = value })
+        store = new_session_store(sid, key, { [id] = value })
       else
         store[id] = value
       end
@@ -326,10 +324,11 @@ M.lookup_ref_value = function(comp, key, session_id, seen, ...)
       return nil, comp
     end
     comp = ref_comp
-  until not comp
+  until false -- until not comp -- never happens because of the return above
 
   return nil, comp
 end
+
 
 --- Recursively look up a static value in a component and its references.
 --- If the value is found, it is returned along with the component that provides it.
@@ -364,7 +363,7 @@ M.lookup_inherited_value = function(comp, key, seen)
       return nil, comp
     end
     comp = ref_comp
-  until not comp
+  until false -- until not comp -- never happens because of the return above
 
   return nil, comp
 end
