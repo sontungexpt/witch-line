@@ -171,8 +171,8 @@ end
 --- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
 M.refresh_component_graph = function(comp, dep_graph_kind, seen)
-	require("witch-line.core.Session").run_once(function(session_id)
-		M.update_comp_graph(comp, session_id, dep_graph_kind or {
+	require("witch-line.core.Session").with_session(function(sid)
+		M.update_comp_graph(comp, sid, dep_graph_kind or {
       DepGraphKind.Event,
       DepGraphKind.Timer,
     }, seen)
@@ -474,11 +474,11 @@ M.setup = function(user_configs, DataAccessor)
 		Statusline.render()
 	end)
 
-	Session.run_once(function(session_id)
+	Session.with_session(function(sid)
 		for _, comp in Manager.iter_pending_init_components() do
-      Component.emit_init(comp, session_id)
+      Component.emit_init(comp, sid)
 		end
-		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), session_id, {
+		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), sid, {
 			DepGraphKind.Event,
 			DepGraphKind.Timer,
 		}, {})

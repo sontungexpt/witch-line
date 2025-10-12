@@ -38,14 +38,14 @@ local SepStyle = {
 --- @field space integer The space between the component and its neighbor
 --- @field priority integer The priority of the neighbor component when the status line is too long, higher numbers are more likely to be truncated
 
---- @alias PaddingFunc fun(self: ManagedComponent, session_id: SessionId): number|PaddingTable
+--- @alias PaddingFunc fun(self: ManagedComponent, sid: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
 ---
---- @alias UpdateFunc fun(self:ManagedComponent,  session_id: SessionId): string|nil , CompStyle|nil|
+--- @alias UpdateFunc fun(self:ManagedComponent,  sid: SessionId): string|nil , CompStyle|nil|
 ---
 --- @alias CompStyle vim.api.keyset.highlight|string
---- @alias StyleFunc fun(self: ManagedComponent, session_id: SessionId): CompStyle
---- @alias SideStyleFunc fun(self: ManagedComponent, session_id: SessionId): CompStyle|SepStyle
+--- @alias StyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle
+--- @alias SideStyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle|SepStyle
 ---
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
@@ -86,8 +86,8 @@ local SepStyle = {
 --- - If integer: component is hidden when screen width is smaller.
 --- - If nil: always visible.
 --- - If function: called and its return value is used as above.
---- - Example of min_screen_width function: `function(self: ManagedComponent, session_id: SessionId) return 80 end`
---- @field min_screen_width integer|nil|fun(self: ManagedComponent, session_id: SessionId):number|nil
+--- - Example of min_screen_width function: `function(self: ManagedComponent, sid: SessionId) return 80 end`
+--- @field min_screen_width integer|nil|fun(self: ManagedComponent, sid: SessionId):number|nil
 ---
 --- @field ref Ref|nil A table of references to other components that this component depends on
 ---
@@ -103,14 +103,14 @@ local SepStyle = {
 --- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
 --- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
---- - Example of left_style function: `function(self, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of left_style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field left_style CompStyle|nil|SideStyleFunc|SepStyle
 ---
 --- The left separator of the component
 --- - If string: used as is.
 --- - If nil: no left part.
 --- - If function: called and its return value is used as the left part.
---- - Example of left function: `function(self, session_id) return "<" end`
+--- - Example of left function: `function(self, sid) return "<" end`
 --- @field left string|nil|UpdateFunc
 ---
 --- A table of styles that will be applied to the right part of the component
@@ -123,14 +123,14 @@ local SepStyle = {
 --- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
 --- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
---- - Example of right_style function: `function(self, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of right_style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field right_style CompStyle|nil|SideStyleFunc|SepStyle
 ---
 --- The right separator of the component
 --- - If string: used as is.
 --- - If nil: no right part.
 --- - If function: called and its return value is used as the right part.
---- - Example of right function: `function(self, session_id) return ">" end`
+--- - Example of right function: `function(self, sid) return ">" end`
 --- @field right string|nil|UpdateFunc
 ---
 --- The padding of the component
@@ -147,15 +147,15 @@ local SepStyle = {
 ---  	- Example: `{left = 2, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
 ---  	- Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
 ---	- If function: called and its return value is used as above.
---- - Example of padding function: `function(self, session_id) return {left = 2, right = 1} end`
---- - Example of padding function: `function(self, session_id) return 2 end` (adds 2 spaces to both sides)
+--- - Example of padding function: `function(self, sid) return {left = 2, right = 1} end`
+--- - Example of padding function: `function(self, sid) return 2 end` (adds 2 spaces to both sides)
 --- @field padding integer|nil|PaddingTable|PaddingFunc
 ---
 --- An initialization function that will be called when the component is first loaded
 --- - If nil: no initialization function will be called.
---- - If string: required the string as a module and called it with the component and session_id as arguments.
---- - If function: called with the component and session_id as arguments.
---- @field init nil|string|fun(self: ManagedComponent, session_id: SessionId)
+--- - If string: required the string as a module and called it with the component and sid as arguments.
+--- - If function: called with the component and sid as arguments.
+--- @field init nil|string|fun(self: ManagedComponent, sid: SessionId)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
@@ -163,7 +163,7 @@ local SepStyle = {
 --- - If nil: No style will be applied.
 --- - If function: called and its return value is used as above.
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
---- - Example of style function: `function(self, session_id) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field style CompStyle|nil|StyleFunc
 ---
 --- @field temp any A temporary field that can be used to store temporary values, will not be cached
@@ -178,27 +178,27 @@ local SepStyle = {
 --- - If nil: no context will be passed.
 --- - If function: called and its return value is used as above.
 --- - If string: required the string as a module and used as is.
---- - Example of context function: `function(self, session_id) return {buffer = vim.api.nvim_get_current_buf()} end`
+--- - Example of context function: `function(self, sid) return {buffer = vim.api.nvim_get_current_buf()} end`
 --- @field context nil|Component.Context|fun(self: ManagedComponent): Component.Context
 ---
 --- A function that will be called before the component is updated
---- @field pre_update nil|fun(self: ManagedComponent, session_id: SessionId)
+--- @field pre_update nil|fun(self: ManagedComponent, sid: SessionId)
 ---
 --- The update function that will be called to get the value of the component
 --- - If string: used as is.
 --- - If nil: the component will not be updated.
 --- - If function: called and its return value and style are used as the new value and style of the component
---- - Example of update function: `function(self, session_id) return "Hello World" end`
---- - Example of update function with style: `function(self, session_id) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of update function: `function(self, sid) return "Hello World" end`
+--- - Example of update function with style: `function(self, sid) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field update nil|string|UpdateFunc
 ---
 --- A function that will be called after the component is updated
---- @field post_update nil|fun(self: ManagedComponent, session_id: SessionId)
+--- @field post_update nil|fun(self: ManagedComponent, sid: SessionId)
 ---
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
---- @field hidden nil|fun(self: ManagedComponent, session_id: SessionId): boolean|nil
+--- @field hidden nil|fun(self: ManagedComponent, sid: SessionId): boolean|nil
 ---
 ---
 --- A function or the name of a global function to call when the component is clicked
@@ -288,34 +288,34 @@ end
 
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
 --- @param comp Component the component to emit the event for
---- @param session_id SessionId the session id to use for the component, used for lazy loading components
-M.emit_pre_update = function(comp, session_id)
+--- @param sid SessionId the session id to use for the component, used for lazy loading components
+M.emit_pre_update = function(comp, sid)
   local pre_update = comp.pre_update
 	if type(pre_update) == "function" then
-		pre_update(comp, session_id)
+		pre_update(comp, sid)
 	end
 end
 
 --- Emits the `post_update` event for the component, calling the post_update function if it exists.
 --- @param comp Component the component to emit the event for
---- @param session_id SessionId the session id to use for the component, used for lazy
-M.emit_post_update = function(comp, session_id)
+--- @param sid SessionId the session id to use for the component, used for lazy
+M.emit_post_update = function(comp, sid)
   local post_update = comp.post_update
 	if type(post_update) == "function" then
-		post_update(comp, session_id)
+		post_update(comp, sid)
 	end
 end
 
 --- Emits the `init` event for the component, calling the init function if it exists.
 --- @param comp Component the component to emit the event for
---- @param session_id SessionId the session id to use for the component, used for lazy loading components
-M.emit_init = function(comp, session_id)
+--- @param sid SessionId the session id to use for the component, used for lazy loading components
+M.emit_init = function(comp, sid)
   local init = comp.init
   local t = type(init)
   if t == "function" then
-    init(comp, session_id)
+    init(comp, sid)
   elseif t == "string" then
-    require(init)(comp, session_id)
+    require(init)(comp, sid)
   end
 end
 
@@ -424,10 +424,10 @@ end
 --- @param side "left"|"right" the side to update
 --- @param main_style CompStyle|nil the main style of the component, used for inheriting styles
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
---- @param session_id SessionId the session id to use for the component
+--- @param sid SessionId the session id to use for the component
 --- @return boolean updated true if the style was updated, false otherwise
-M.update_side_style = function(comp, side, main_style, main_style_updated, session_id)
-	local side_style = resolve(comp[style_field(side)] or SepStyle.SepBg, comp, session_id)
+M.update_side_style = function(comp, side, main_style, main_style_updated, sid)
+	local side_style = resolve(comp[style_field(side)] or SepStyle.SepBg, comp, sid)
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
@@ -465,24 +465,24 @@ end
 
 --- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
 --- @param comp Component the component to resolveuate
---- @param session_id SessionId the session id to use for the component
+--- @param sid SessionId the session id to use for the component
 --- @return string value the new value of the component
 --- @return CompStyle|nil style the new style of the component
-M.evaluate = function(comp, session_id)
-	local result, style = resolve(comp.update, comp, session_id)
+M.evaluate = function(comp, sid)
+	local result, style = resolve(comp.update, comp, sid)
 
 	if type(result) ~= "string" then
 		result = ""
 	elseif result ~= "" then
-		local padding = resolve(comp.padding or 1, comp, session_id)
+		local padding = resolve(comp.padding or 1, comp, sid)
 		local p_type = type(padding)
 		if p_type == "number" and padding > 0 then
 			local pad = str_rep(" ", padding)
 			result = pad .. result .. pad
 		elseif p_type == "table" then
 			local left, right =
-				resolve(padding.left, comp, session_id),
-				resolve(padding.right, comp, session_id)
+				resolve(padding.left, comp, sid),
+				resolve(padding.right, comp, sid)
 
 			if type(left) == "number" and left > 0 then
 				result = str_rep(" ", left) .. result
@@ -499,14 +499,14 @@ end
 --- Evaluates a side style function, ensuring the result is a string.
 --- @param comp Component the component to evaluate
 --- @param side "left"|"right" the side to evaluate, either "left" or "right"
---- @param session_id SessionId the session id to use for the component
+--- @param sid SessionId the session id to use for the component
 --- @return string result The evaluated side of the component, or an empty string if the result is not a string
 --- @return boolean is_func true if the side was a function, false otherwise
-M.evaluate_side = function(comp, side, session_id)
+M.evaluate_side = function(comp, side, sid)
   local value = comp[side]
   local is_func = type(value) == "function"
   if is_func then
-    value = value(comp, session_id)
+    value = value(comp, sid)
   end
 
   if type(value) ~= "string" then
@@ -636,19 +636,19 @@ end
 
 --- Gets the minimum screen width required to display the component.
 --- @param comp Component the component to get the minimum screen width from
---- @param session_id SessionId the session id to use for the component update
+--- @param sid SessionId the session id to use for the component update
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
-M.min_screen_width = function(comp, session_id)
-	local min_screen_width = resolve(comp.min_screen_width, comp, session_id)
+M.min_screen_width = function(comp, sid)
+	local min_screen_width = resolve(comp.min_screen_width, comp, sid)
 	return type(min_screen_width) == "number" and min_screen_width or nil
 end
 
 --- Checks if the component is hidden based on its `hidden` field.
 --- @param comp Component the component to checks
---- @param session_id SessionId the session id to use for the component update
+--- @param sid SessionId the session id to use for the component update
 --- @return boolean hidden whether the component is hidden
-M.hidden = function(comp, session_id)
-	local hidden = resolve(comp.hidden, comp, session_id)
+M.hidden = function(comp, sid)
+	local hidden = resolve(comp.hidden, comp, sid)
 	return hidden == true
 end
 
