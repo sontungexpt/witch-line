@@ -2,6 +2,3 @@
 --- @alias NotString table|number|boolean|function|nil
 --- @alias NotNil string|table|number|boolean|function
 --- @alias NotFunction string|table|number|boolean|nil
---- @alias Side
---- | 1 # Right
---- | -1 # Left

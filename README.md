@@ -5,21 +5,25 @@ The best statusline plugin for neovim. It's very lightweight and super fast.
 This plugin lazy load as much as possible
 
 ## Navigation
-
-- [A few words to say](#a-few-words-to-say)
-- [Preview](#preview)
-- [✨ Features](#-features)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Laststatus](#laststatus)
-  - [Options](#options)
-- [✏️ Default Components Reference](#-default-components-reference)
-  - [🔖 Default Components](#-default-components)
-  - [⚙️ Customizable Fields for Components](#️-customizable-fields-for-components)
-- [📂 Component Structure](#-component-structure)
-- [📚 Public Apis](#-public-apis)
-- [🙌 Community Help & Contributions Wanted](#-community-help--contributions-wanted)
-- [📜 License](#-license)
+- 💬 [A Few Words to Say](#a-few-words-to-say)
+  - 💡 [Concept Ideas](#concept-ideas)
+- 🪄 [Preview](#preview)
+- ✨ [Features](#-features)
+    - 📝 [TODO](#todo)
+    - 📊 [Compare with other statusline plugins](#compare-with-other-statusline-plugins)
+    - 📈 [Benchmarks](#benchmarks)
+- ⚙️ [Installation](#installation)
+- 🚀 [Usage](#usage)
+  - 🧱 [Laststatus](#laststatus)
+  - 🧩 [Options](#options)
+  - 🪄 [Commands](#commands)
+- 🧾 [Default Components Reference](#-default-components-reference)
+  - 🔖 [Default Components](#-default-components)
+  - 🛠️ [Customizable Fields for Components](#️-customizable-fields-for-components)
+- 🧠 [Component Structure](#-component-structure)
+- 📚 [Public APIs](#-public-apis)
+- 🤝 [Community Help & Contributions Wanted](#-community-help--contributions-wanted)
+- 📜 [License](#-license)
 
 ## A few words to say
 
@@ -60,6 +64,8 @@ any idea to create a new component, please open an issue or pull request.
 - 🛠 **Extensible**: Easily extend with custom components.
 
 This plugin is ideal for developers who want full control over the look and feel of their statusline, without sacrificing performance or flexibility.
+
+---
 
 ### TODO
 
@@ -130,6 +136,19 @@ This plugin is ideal for developers who want full control over the look and feel
 
   - [ ] Write unit tests for core functionality
   - [ ] Write performance benchmarks
+
+### Compare with other statusline plugins
+
+---
+
+### Benchmarks
+| Plugin         | Load Time (ms)  | Avg Update Time (ms) |
+| -------------- | --------------- | --------------------- |
+
+
+---
+
+
 
 ## Installation
 
@@ -207,14 +226,21 @@ require("witch-line").setup({
 
 ```
 
-# ✨ Default Components Reference
+### Commands
+
+The plugin provides the following commands:
+
+- `:Witchline clear_cache` - Clear the plugin's cache.
+- `:Witchline inspect` - Use for debugging and inspecting internal state.
+
+## 🧾 Default Components Reference
 
 This section describes the built-in components available in the plugin, their structure, and how to use them.
 Each component is referenced by name and can be composed to build a flexible and performant statusline.
 
 ---
 
-## 🔖 Default Components
+### 🔖 Default Components
 
 | Name               | Module File      | Description                               |
 | ------------------ | ---------------- | ----------------------------------------- |
@@ -243,7 +269,7 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ---
 
-### ⚙️ Customizable Fields for Default Components
+### 🛠️ Customizable Fields for Components
 
 Each component accepts a set of customization fields to control its behavior, style, visibility, and layout.
 
@@ -295,15 +321,15 @@ local my_component = {
 
 ---
 
-## 📂 Component Structure
+## 🧠 Component Structure
 
 Each component is represented as a Lua table with various fields that define its behavior, appearance, and interactions. You can read the [COOKBOOK](./docs/COOKBOOK.md) for more examples of component structure.
 
-## 📚 Public Apis
+## 📚 Public APIs
 
 The plugin exposes a set of public APIs for advanced usage and customization. You can find the API reference in the [API.md](./docs/API.md) file.
 
-## 🙌 Community Help & Contributions Wanted
+## 🤝 Community Help & Contributions Wanted
 
 `witch-line` is a flexible and powerful statusline plugin for Neovim, but there's still a lot of room to improve and grow. I'm actively seeking help and contributions from the community to make this project even better.
 

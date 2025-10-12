@@ -303,7 +303,7 @@ local component = {
       temp = {},
       -- If a temp is not a table, the temp field will be removed when restarting neovim.
       -- or temp = "",
-      init = function(self, ctx, static, session_id)
+      init = function(self, session_id)
         -- If temp is a table, and you set temp as a component field then you can do something like this to initialize the temp.current_state values because the temp field is still be a empty table when restarting neovim.
         self.temp.current_state = "initial"
 
@@ -311,7 +311,7 @@ local component = {
         -- The temp field will be removed when restarting neovim, so you need to set it in init or any function that is called when the component is created.
         -- self.temp = "initial"
       end,
-      update = function(self, ctx, static, session_id)
+      update = function(self, session_id)
           -- You can use self.temp.current_state here
           return "Current State: " .. (self.temp.current_state or "unknown")
       end}

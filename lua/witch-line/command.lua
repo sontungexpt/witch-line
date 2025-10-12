@@ -3,7 +3,7 @@ local M = {}
 local FALLBACK_KEY = "\0fallback\0"
 
 local commands = {
-	uncached = function()
+	clear_cache = function()
 		require("witch-line.cache").clear()
 	end,
 

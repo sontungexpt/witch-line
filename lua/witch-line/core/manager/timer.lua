@@ -57,7 +57,7 @@ M.register_timer = function(comp)
 end
 
 --- Initialize the timer for components that have timers registered.
---- @param work fun(session_id: SessionId, ids: CompId[], interval: uinteger) The function to execute when the timer triggers. It receives the session_id, component IDs, and interval as arguments.
+--- @param work fun(sid: SessionId, ids: CompId[], interval: uinteger) The function to execute when the timer triggers. It receives the sid, component IDs, and interval as arguments.
 M.on_timer_trigger = function(work)
 	if not next(TimerStore) then
 		return
@@ -72,8 +72,8 @@ M.on_timer_trigger = function(work)
 			0,
 			interval,
 			vim.schedule_wrap(function()
-				Session.run_once(function(session_id)
-					work(session_id, ids, interval)
+				Session.with_session(function(sid)
+					work(sid, ids, interval)
 				end)
 			end)
 		)

@@ -81,16 +81,16 @@ end
 
 --- Get the event information for a component in a session.
 --- @param comp Component The component to get the event information for.
---- @param session_id SessionId The session id to get the event information for.
+--- @param sid SessionId The session id to get the event information for.
 --- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event information for the component, or nil if not found.
 --- @see Hook.use_event_info
-M.get_event_info = function(comp, session_id)
-  local store = Session.get_store(session_id, EventInfoStoreId)
+M.get_event_info = function(comp, sid)
+  local store = Session.get_store(sid, EventInfoStoreId)
   return store and store[comp.id] or nil
 end
 
 --- Initialize the autocmd for events and user events.
---- @param work fun(session_id: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the session_id, component IDs, and event information as arguments.
+--- @param work fun(sid: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the sid, component IDs, and event information as arguments.
 M.on_event = function(work)
     local events, user_events = EventStore.events, EventStore.user_events
 
@@ -98,9 +98,9 @@ M.on_event = function(work)
     local id_event_info_map = {}
 
     local emit = require("witch-line.utils").debounce(function()
-        Session.run_once(function(session_id)
-            Session.new_store(session_id, EventInfoStoreId, id_event_info_map)
-            work(session_id, vim.tbl_keys(id_event_info_map), id_event_info_map)
+        Session.with_session(function(sid)
+            Session.new_store(sid, EventInfoStoreId, id_event_info_map)
+            work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
             id_event_info_map = {}
         end)
     end, 120)
