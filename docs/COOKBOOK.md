@@ -908,6 +908,10 @@ An component can reference other components for some of its fields. This allows 
   | `user_events`      | `CompId \| CompId[]` | The component will be updated when the referenced user-defined events are triggered.      |
   | `timing`           | `CompId \| CompId[]` | The component will be updated based on the timing provided by the referenced components.  |
   | `style`            | `CompId`             | The style of the component will be taken from the referenced component.                   |
+  | `left_style`       | `CompId`             | The style of the left separator of component will be taken from the referenced component.                   |
+  | `right_style`      | `CompId`             | The style of the right separator of component will be taken from the referenced component.                   |
+  | `left`             | `CompId`             | The left separator of  the component will be taken from the referenced component.                   |
+  | `right`            | `CompId`             | The right separator of the component will be taken from the referenced component.                   |
   | `static`           | `CompId`             | The component will be updated with static values from the referenced component.           |
   | `context`          | `CompId`             | The component will be updated with context values from the referenced component.          |
   | `hidden`           | `CompId \| CompId[]` | The component will be hidden when the referenced components are hidden.                   |

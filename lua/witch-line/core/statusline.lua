@@ -116,7 +116,7 @@ end
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
-  M.iterate_values(function(idx, segment)
+  M.iterate_values(function(_, segment)
       format_state_before_cache(segment)
   end)
 
@@ -409,7 +409,7 @@ M.set_click_handler = function(idxs, click_handler, force)
   for i = 1, #idxs do
     local seg = Statusline[idxs[i]]
     if force or not seg.click_handler_form then
-      seg.click_handler_form = "%@" .. click_handler .. "@"
+      seg.click_handler_form = "%@v:lua." .. click_handler .. "@"
     else
       return -- Do not overwrite existing click handler
     end

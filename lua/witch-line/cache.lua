@@ -54,8 +54,8 @@ end
 --- Set the checksum for the current user configs
 --- @param user_configs UserConfig|nil The user configs to generate the checksum from
 M.checksum = function(user_configs)
-	local tbl_utils = require("witch-line.utils.tbl")
-  return tbl_utils.fnv1a32_hash(user_configs)
+	local Hash = require("witch-line.utils.hash")
+  return tostring(Hash.fvn1a32(user_configs, "version"))
 	-- local hashs = {}
 	-- for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
 	-- 	hashs[i] = tostring(hash)
@@ -72,8 +72,8 @@ M.save = function(checksum)
 		return
 	end
 
-	local tbl_utils = require("witch-line.utils.tbl")
-	local bytecode = tbl_utils.serialize_table_as_bytecode(Data)
+	local Persist = require("witch-line.utils.persist")
+	local bytecode = Persist.serialize_table_as_bytecode(Data)
 	if not bytecode then
 		M.clear()
 		return nil, nil
@@ -125,7 +125,7 @@ M.read = function(checksum)
 	local content = assert(uv.fs_read(fd, stat.size, 0))
 	assert(uv.fs_close(fd))
 
-	local tbl_utils = require("witch-line.utils.tbl")
+	local Persist = require("witch-line.utils.persist")
 
 	local bytecode = validate_expiration(checksum, content)
 	if not bytecode then
@@ -133,7 +133,7 @@ M.read = function(checksum)
 		return nil
 	end
 
-	local data = tbl_utils.deserialize_table_from_bytecode(bytecode)
+	local data = Persist.deserialize_table_from_bytecode(bytecode)
 	if not data then
 		M.clear()
 		return

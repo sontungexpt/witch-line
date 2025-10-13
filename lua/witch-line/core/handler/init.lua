@@ -24,50 +24,29 @@ local hide_component = function(comp)
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
---- Update the style of a component if necessary. (Called internally by `update_component`.)
---- @param comp Component The component to update.
---- @param style CompStyle|nil The new style to apply. If nil, the style will be fetched from the component's configuration.
---- @param sid SessionId The ID of the process to use for this update.
-local function update_component_style(comp, style, sid)
-  --- Update style
-  local style_updated, ref_comp = false, comp
-  if style then
-    style_updated = Component.update_style(comp, style, ref_comp, true)
+--- Ensure component inherits correctly.
+--- @param comp Component component to ensure inheritance from parent
+local function ensure_inheritance(comp)
+	-- It's just a abstract component then no need to really update
+	if comp.inherit and not Component.has_parent(comp) then
+		local parent = Manager.get_comp(comp.inherit)
+		if parent then Component.inherit_parent(comp, parent) end
+	end
+end
 
-    --- Sync style to session store
-    --- This is make sure that the `use_style` hooks always get the latest style
-    local store = Session.get_store(sid, "style")
-    if store then
-      store[comp.id] = style
-    end
-  else
-    style, ref_comp = Manager.lookup_ref_value(comp, "style", sid, {})
-    if style then
-      style_updated = Component.update_style(comp, style, ref_comp)
-    end
+
+--- Format the side value
+--- @param val any the value of the side
+--- @param is_func boolean|nil Flag indicate that is the side is a function or not
+--- @return nil|string result String if valid, otherwise nil
+local function format_side_value(val, is_func)
+  -- Avoid non-string values if function-type
+  if is_func then
+    return type(val) ~= "string" and "" or val
+  elseif type(val) ~= "string" then
+    return nil
   end
-
-  local indices = comp._indices
-  --- @cast indices number[]
-  Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
-
-  --- WARN: Can not do sorter like this
-  --- ```lua
-  --- Statusline.set_side_value_highlight(
-  ---   indices, -1, comp._left_hl_name, Component.update_side_style(comp, "left", style, style_updated, sid)
-  --- )
-  --- ```
-  --- Because lua evaluate the argument from left to right
-  --- So the comp._left_hl_name may be missing if the update_side_style has not been called yet
-  local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
-  Statusline.set_side_value_highlight(
-    indices, "left", comp._left_hl_name, left_style_updated
-  )
-
-  local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
-  Statusline.set_side_value_highlight(
-    indices, "right", comp._right_hl_name, right_style_updated
-  )
+  return val
 end
 
 --- Update a component and its value in the statusline.
@@ -75,14 +54,7 @@ end
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, sid)
-	-- It's just a abstract component then no need to really update
-	if comp.inherit and not Component.has_parent(comp) then
-		local parent = Manager.get_comp(comp.inherit)
-		if parent then
-			Component.inherit_parent(comp, parent)
-		end
-	end
-
+  ensure_inheritance(comp)
 
 	Component.emit_pre_update(comp, sid)
 
@@ -96,8 +68,8 @@ local function update_component(comp, sid)
 		hide_component(comp)
   else
     local value, style = Component.evaluate(comp, sid)
-    local indices = comp._indices
 
+    local indices = comp._indices
     -- A abstract component will not have indices
     -- It's just call the update function for other purpose and we not affect to the statusline
     -- So we just ignore it even the value is empty string
@@ -106,11 +78,50 @@ local function update_component(comp, sid)
         hide_component(comp)
         hidden = true
       else
-        update_component_style(comp, style, sid)
-
         --- Update statusline value
+        -- Main part
         Statusline.set_value(indices, value)
-        Statusline.set_side_value(indices, "left", Component.evaluate_side(comp, "left", sid))
+        local style_updated, ref_comp = false, comp
+        if style then
+          style_updated = Component.update_style(comp, style, ref_comp, true)
+          --- Sync style to session store
+          --- This is make sure that the `use_style` hooks always get the latest style
+          local store = Session.get_store(sid, "style")
+          if store then
+            store[comp.id] = style
+          end
+        else
+          style, ref_comp = Manager.lookup_ref_value(comp, "style", sid, {})
+          if style then
+            style_updated = Component.update_style(comp, style, ref_comp)
+          end
+        end
+        Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
+
+        --- Left part
+        local lval, lref = Manager.lookup_ref_value(comp, "left", sid, {})
+        local is_left_func = type(lref.left) == "function"
+        lval = format_side_value(lval, is_left_func)
+        if lval then
+          Statusline.set_side_value(indices, "left", lval, is_left_func)
+          local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
+          Statusline.set_side_value_highlight(
+            indices, "left", comp._left_hl_name, left_style_updated
+          )
+        end
+
+        --- Right part
+        local rval, rref = Manager.lookup_ref_value(comp, "right", sid, {})
+        local is_right_func = type(rref.right) == "function"
+        rval = format_side_value(rval, is_right_func)
+        if rval then
+          Statusline.set_side_value(indices, "right", rval, is_right_func)
+          local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
+          Statusline.set_side_value_highlight(
+            indices, "right", comp._right_hl_name, right_style_updated
+          )
+        end
+
         if comp.on_click then
           Statusline.set_click_handler(indices, Component.register_click_handler(comp))
         end
@@ -271,6 +282,10 @@ local function pull_missing_dependencies(comp)
 		dependency_ids[#dependency_ids + 1] = ref.context
 		dependency_ids[#dependency_ids + 1] = ref.static
 		dependency_ids[#dependency_ids + 1] = ref.style
+		dependency_ids[#dependency_ids + 1] = ref.left
+		dependency_ids[#dependency_ids + 1] = ref.left_style
+		dependency_ids[#dependency_ids + 1] = ref.right
+		dependency_ids[#dependency_ids + 1] = ref.right_style
 		for _, dep_id in ipairs(dependency_ids) do
 			if not Manager.is_existed(dep_id) then
 				local c = Component.require_by_id(dep_id)

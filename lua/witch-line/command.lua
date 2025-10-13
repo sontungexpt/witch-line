@@ -93,7 +93,7 @@ api.nvim_create_user_command("WitchLine", function(a)
     if type(fallback) == "function" then
       fallback(arg, a)
     else
-      api.nvim_err_writeln("WitchLine: Incomplete command. Subcommand required.")
+      require("witch-line.utils.notifier").error("WitchLine: Incomplete command. Subcommand required.")
     end
 	end
 end, {

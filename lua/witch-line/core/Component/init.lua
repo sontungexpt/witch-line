@@ -24,9 +24,13 @@ local SepStyle = {
 --- @field timing CompId|CompId[]|nil A table of ids of components that this component references
 --- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
 --- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
---- @field style CompId|nil A id of a component that this component references for its style
 --- @field static CompId|nil A id of a component that this component references for its static values
 --- @field context CompId|nil A id of a component that this component references for its context
+--- @field style CompId|nil A id of a component that this component references for its style
+--- @field left CompId|nil A id of a component that this components references for left separator
+--- @field left_style CompId|nil A id of a component that this component references for its left_style
+--- @field right CompId|nil A id of a component that this components references for right separator
+--- @field right_style CompId|nil A id of a component that this component references for its right_style
 
 --- @class LiteralComponent : string
 
@@ -48,7 +52,7 @@ local SepStyle = {
 --- @alias StyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle|SepStyle
 ---
---- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
+--- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 ---
 --- @alias Component.Static table|string
@@ -271,11 +275,10 @@ end
 --- @param comp Component the component to inherit from
 --- @param parent Component the parent component to inherit from
 M.inherit_parent = function(comp, parent)
-	local inheritable_fields = require("witch-line.core.Component.inheritable_fields")
 	setmetatable(comp, {
-		---@diagnostic disable-next-line: unused-local
-		__index = function(t, key)
-			return inheritable_fields[key] and parent[key] or nil
+		__index = function(_, key)
+			return require("witch-line.core.Component.inheritable_fields")[key]
+        and parent[key] or nil
 		end,
 	})
 end
@@ -325,31 +328,32 @@ end
 --- If it doesn't, it will be inherited from the reference component or generated.
 --- @param comp Component the component to ensure has a highlight name
 --- @param ref_comp Component the reference component to inherit from if necessary
-M.ensure_hl_name = function(comp, ref_comp)
-	if comp._hl_name then
-		return
+--- @return string hl_name The highlight name of the component
+local ensure_hl_name = function(comp, ref_comp)
+  local hl_name = comp._hl_name
+	if hl_name then
+		return hl_name
 	elseif comp ~= ref_comp then
-		if not ref_comp._hl_name then
-			rawset(ref_comp, "_hl_name", Highlight.make_hl_name_from_id(ref_comp.id))
+    hl_name = ref_comp._hl_name
+		if not hl_name then
+      hl_name = Highlight.make_hl_name_from_id(ref_comp.id)
+			rawset(ref_comp, "_hl_name", hl_name)
 		end
-		rawset(comp, "_hl_name", ref_comp._hl_name)
 	else
-		rawset(comp, "_hl_name", Highlight.make_hl_name_from_id(comp.id))
+    hl_name = Highlight.make_hl_name_from_id(comp.id)
 	end
+  rawset(comp, "_hl_name", hl_name)
+  return hl_name
 end
 
 --- Determines if the component's style should be updated.
 --- @param comp Component the component to checks
 --- @param ref_comp Component the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
-M.needs_style_update = function(comp, ref_comp)
-	if not comp._hl_name then
-		return true
-	elseif type(ref_comp.style) == "function" then
-		return true
-	end
-	return false
+local needs_style_update = function(comp, ref_comp)
+  return comp._hl_name == nil or type(ref_comp.style) == "function"
 end
+M.needs_style_update = needs_style_update
 
 --- Updates the style of the component.
 --- @param comp Component the component to update
@@ -360,11 +364,10 @@ end
 M.update_style = function(comp, style, ref_comp, force)
   if not style then
     return false
-  elseif not force and not M.needs_style_update(comp,  ref_comp) then
+  elseif not force and not needs_style_update(comp,  ref_comp) then
 		return false
 	end
-	M.ensure_hl_name(comp, ref_comp)
-	return Highlight.highlight(comp._hl_name, style)
+	return Highlight.highlight(ensure_hl_name(comp, ref_comp), style)
 end
 
 
@@ -389,9 +392,7 @@ end
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
 --- @return boolean needs_update true if the style needs to be updated, false otherwise
 M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-  if not comp[side] then -- no side, no need to update
-    return false
-  elseif not comp[hl_name_field(side)] then
+  if not comp[hl_name_field(side)] then
 		return true
 	elseif type(comp[style_field(side)]) == "function" then
 		return true
@@ -412,12 +413,15 @@ end
 --- If it doesn't, it will be generated based on the component's id.
 --- @param comp Component the component to ensure has a highlight name for the specified side
 --- @param side "left"|"right" the side to ensure has a highlight name, either "left" or "right"
-M.ensure_side_hl_name = function(comp, side)
+local ensure_side_hl_name = function(comp, side)
   local field = hl_name_field(side)
-	if not comp[field] then
+  local hl_name = comp[field]
+	if not hl_name then
 		--- If the component already has a main highlight name, use it as the base
-		rawset(comp, field, (comp._hl_name or Highlight.make_hl_name_from_id(comp.id)) .. side)
+    hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
+		rawset(comp, field, hl_name)
 	end
+  return hl_name
 end
 
 --- Updates the style of a side (left or right) of the component.
@@ -432,8 +436,6 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sid)
 	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
-
-	M.ensure_side_hl_name(comp, side)
 
 	if type(side_style) == "number" and main_style then
 		if side_style == SepStyle.SepFg then
@@ -459,8 +461,7 @@ M.update_side_style = function(comp, side, main_style, main_style_updated, sid)
 			return false
 		end
 	end
-
-  return Highlight.highlight(comp[hl_name_field(side)], side_style)
+  return Highlight.highlight(ensure_side_hl_name(comp, side), side_style)
 end
 
 
@@ -685,9 +686,7 @@ M.register_click_handler = function(comp)
   end
 
   if t == "string" and _G[on_click] then
-    click_handler = "v:lua." .. on_click
-    comp._click_handler = click_handler
-    return click_handler
+    click_handler =  on_click
   elseif t == "function" then
     -- Fastest possible func_name derivation
     if not click_handler then
@@ -698,13 +697,13 @@ M.register_click_handler = function(comp)
         on_click(comp, ...)
       end
     end
-    click_handler = "v:lua." .. click_handler
-    comp._click_handler = click_handler
-    return click_handler
   else
     require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
     return ""
   end
+
+  comp._click_handler = click_handler
+  return click_handler
 end
 
 return M
