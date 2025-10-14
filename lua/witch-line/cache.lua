@@ -55,7 +55,7 @@ end
 --- @param user_configs UserConfig|nil The user configs to generate the checksum from
 M.checksum = function(user_configs)
 	local Hash = require("witch-line.utils.hash")
-  return tostring(Hash.fvn1a32(user_configs, "version"))
+  return tostring(Hash.fnv1a32(user_configs, "version"))
 	-- local hashs = {}
 	-- for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
 	-- 	hashs[i] = tostring(hash)

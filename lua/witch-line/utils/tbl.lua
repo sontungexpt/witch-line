@@ -7,12 +7,18 @@ local type, pairs = type, pairs
 --- @generic T
 --- @param list T[] The list to process.
 --- @return T[] unique A new list containing only unique elements from the input list.
+--- @return integer number The size of the result
 M.unique_list = function(list)
   local set = {}
-  for _, v in ipairs(list) do
-    set[v] = true
+  for i = 1, #list do
+    set[list[i]] = true
   end
-  return vim.tbl_keys(set)
+  local keys, n = {},0
+  for k in pairs(set) do
+    n = n +1
+    keys[n] = k
+  end
+  return keys, n
 end
 
 --- Creates a shallow copy of a table.

@@ -1,6 +1,6 @@
+local type, pairs, string_dump = type, pairs, string.dump
 local ffi = require("ffi")
 local bit = require("bit")
-local jit_util = require("jit.util")
 
 local FNV_PRIME_32  = 0x01000193
 local FNV_OFFSET_32 = 0x811C9DC5
@@ -10,7 +10,7 @@ local FNV_MASK_32   = 0xffffffff
 --- Uses FFI uint32_t for automatic 32-bit overflow (no bit.band needed).
 --- @param str string The input string to hash.
 --- @return integer hash The resulting FNV-1a 32-bit hash.
-local fvn1a32_str = function(str)
+local fnv1a32_str = function(str)
     local len = #str
     local ptr = ffi.cast("const uint8_t*", str)
     local hash = FNV_OFFSET_32
@@ -30,7 +30,7 @@ end
 local fnv1a32_str_fold = function(strs, i, j)
     local last = j or #strs
     if last > 100 then
-        return fvn1a32_str(table.concat(strs, "", i or 1, last))
+        return fnv1a32_str(table.concat(strs, "", i or 1, last))
     end
 
     local hash = FNV_OFFSET_32
@@ -46,26 +46,6 @@ local fnv1a32_str_fold = function(strs, i, j)
     return hash
 end
 
---- Hash a function by fnv1a32
---- @param func function function to hash
---- @return  integer hash the hash result
-local fnv1a32_func = function(func)
-  local info = jit_util.funcinfo(func)
-  if not info or not info.bytecodes then return 0 end
-  local hash = FNV_OFFSET_32
-
-    local bxor, band = bit.bxor, bit.band
-  for i = 1, info.bytecodes do
-    local ins, a,b,c = jit_util.funcbc(func,i)
-    hash = bxor(hash,ins or 0)
-    hash = bxor(hash,a or 0)
-    hash = bxor(hash,b or 0)
-    hash = bxor(hash,c or 0)
-    hash = band(hash * FNV_PRIME_32, FNV_MASK_32)
-  end
-  return hash
-end
-
 -- Serialize value for hashing
 local function simple_serialize(v)
 	local t = type(v)
@@ -76,8 +56,7 @@ local function simple_serialize(v)
 	elseif t == "boolean" then
 		return v and "1" or "0"
 	elseif t == "function" then
-    -- return tostring(fnv1a32_func(v))
-		return string.dump(v, true)
+		return string_dump(v, true)
 	end
 	return t
 end
@@ -97,7 +76,7 @@ local fnv1a32_tbl= function(tbl, hash_key)
 	-- invalid type then return an 32 bit constant number
 	if not next(tbl) then return 0xFFFFFFFF end
 
-	local str_buffer, str_buffer_size = {}, 0
+	local buffer, buffer_size = {}, 0
 	local stack, stack_size = { tbl }, 1
 	local seen = { [tbl] = true }
 	local current, keys, keys_size -- instance
@@ -105,10 +84,11 @@ local fnv1a32_tbl= function(tbl, hash_key)
 	while stack_size > 0 do
 		current = stack[stack_size]
 		stack_size = stack_size - 1
+
 		if hash_key and current[hash_key] then
 			-- use specific hash for table if available
-			str_buffer_size = str_buffer_size + 1
-			str_buffer[str_buffer_size] = simple_serialize(current[hash_key])
+			buffer_size = buffer_size + 1
+			buffer[buffer_size] = simple_serialize(current[hash_key])
 		else
 			-- asign the default values
 			keys, keys_size = {}, 0
@@ -127,25 +107,25 @@ local fnv1a32_tbl= function(tbl, hash_key)
 				local v = current[k]
 
 				--- Add key
-				str_buffer_size = str_buffer_size + 1
-				str_buffer[str_buffer_size] = simple_serialize(k)
+				buffer_size = buffer_size + 1
+				buffer[buffer_size] = simple_serialize(k)
 
 				-- Add value
-				str_buffer_size = str_buffer_size + 1
+				buffer_size = buffer_size + 1
 				if type(v) == "table" then
 					if not seen[v] then
 						seen[v] = true
 						stack_size = stack_size + 1
 						stack[stack_size] = v
 					end
-					str_buffer[str_buffer_size] = "vtable"
+					buffer[buffer_size] = "vtable"
 				else
-					str_buffer[str_buffer_size] = simple_serialize(v)
+					buffer[buffer_size] = simple_serialize(v)
 				end
 			end
 		end
 	end
-	return fnv1a32_str_fold(str_buffer, 1, str_buffer_size)
+	return fnv1a32_str_fold(buffer, 1, buffer_size)
 end
 
 --- Gradually computes the FNV-1a 32-bit hash of a table.
@@ -251,24 +231,23 @@ local fnv1a32_tbl_gradually = function(tbl, bulk_size, hash_key)
 	end
 end
 
-local fvn1a32 = function (v, hash_key)
+local fnv1a32 = function (v, hash_key)
   local t = type(v)
   if t == "table" then
     return fnv1a32_tbl(v,hash_key)
   elseif t == "string" then
-    return fvn1a32_str(v)
+    return fnv1a32_str(v)
   elseif t == "function" then
-    return fnv1a32_func(v)
+    return fnv1a32_str(string.dump(v, true))
   end
   return 0xFFFFFFFF
 end
 
 return {
-  fvn1a32_str = fvn1a32_str,
+  fnv1a32_str = fnv1a32_str,
   fnv1a32_str_fold = fnv1a32_str_fold,
-  fvn1a32_func = fnv1a32_func,
   fvn1a32_tbl = fnv1a32_tbl,
   fnv1a32_tbl_gradually = fnv1a32_tbl_gradually,
-  fvn1a32 = fvn1a32,
+  fnv1a32 = fnv1a32,
 }
 

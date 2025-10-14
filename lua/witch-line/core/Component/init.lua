@@ -498,25 +498,6 @@ M.evaluate = function(comp, sid)
 	return result, style
 end
 
---- Evaluates a side style function, ensuring the result is a string.
---- @param comp Component the component to evaluate
---- @param side "left"|"right" the side to evaluate, either "left" or "right"
---- @param sid SessionId the session id to use for the component
---- @return string result The evaluated side of the component, or an empty string if the result is not a string
---- @return boolean is_func true if the side was a function, false otherwise
-M.evaluate_side = function(comp, side, sid)
-  local value = comp[side]
-  local is_func = type(value) == "function"
-  if is_func then
-    value = value(comp, sid)
-  end
-
-  if type(value) ~= "string" then
-    value = ""
-  end
-  return value, is_func
-end
-
 --- Requires a default component by its id.
 --- @param id CompId the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not

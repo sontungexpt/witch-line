@@ -78,6 +78,7 @@ local function update_component(comp, sid)
         hide_component(comp)
         hidden = true
       else
+
         --- Update statusline value
         -- Main part
         Statusline.set_value(indices, value)
