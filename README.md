@@ -39,7 +39,7 @@ any idea to create a new component, please open an issue or pull request.
 
 ## Preview
 
-- Basic style (No separator, I aprreciate basic)
+- Basic style (No separator, I aprreciate basic but you can create it or do many things else by yourself (like add separator) or you can create new PR for your feature you wantc)
 <img width="1899" height="128" alt="image" src="https://github.com/user-attachments/assets/6bfcc79b-5db6-4419-aced-34deef1fd8c5" />
 
 ## ✨ Features
@@ -86,6 +86,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Use checksum to detect config changes with FNV-1a
   - [ ] Support up-value for component function caching
   - [ ] Support paritial cache loading
+  - [ ] Detect default component changed automatically when plugin was updated
 
 - Customization
 

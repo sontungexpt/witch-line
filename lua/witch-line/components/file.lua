@@ -119,7 +119,7 @@ local Icon = {
 local Modifier = {
 	id = Id["file.modifier"],
 	_plug_provided = true,
-	events = { "TextChangedI", "TextChanged" },
+	events = { "BufEnter","BufWritePost", "TextChangedI", "TextChanged" },
 	style = {
 		fg = colors.fg,
 	},
