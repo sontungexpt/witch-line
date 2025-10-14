@@ -1,5 +1,4 @@
-local vim, type, next, pcall, pairs = vim, type, next, pcall, pairs
-local api = vim.api
+local api, type, next, pcall, pairs = vim.api, type, next, pcall, pairs
 local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name = api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
 
 local shallow_copy = require("witch-line.utils.tbl").shallow_copy

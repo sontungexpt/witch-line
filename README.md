@@ -82,6 +82,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Cache all needed data
   - [x] Use checksum to detect config changes with FNV-1a
   - [ ] Support up-value for component function caching
+  - [ ] Support paritial cache loading
 
 - Customization
 

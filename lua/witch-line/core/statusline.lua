@@ -116,7 +116,7 @@ end
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
-  M.iterate_values(function(idx, segment)
+  M.iterate_values(function(_, segment)
       format_state_before_cache(segment)
   end)
 
@@ -409,7 +409,7 @@ M.set_click_handler = function(idxs, click_handler, force)
   for i = 1, #idxs do
     local seg = Statusline[idxs[i]]
     if force or not seg.click_handler_form then
-      seg.click_handler_form = "%@" .. click_handler .. "@"
+      seg.click_handler_form = "%@v:lua." .. click_handler .. "@"
     else
       return -- Do not overwrite existing click handler
     end
@@ -419,7 +419,7 @@ end
 
 --- Determines if a buffer is disabled based on its filetype and buftype.
 --- @param bufnr integer The buffer number to check.
---- @param disabled BufDisabledConfig|nil The disabled configuration to check against. If nil, the buffer is not disabled.
+--- @param disabled UserConfig.Disabled|nil The disabled configuration to check against. If nil, the buffer is not disabled.
 --- @return boolean
 M.is_buf_disabled = function(bufnr, disabled)
 	if type(disabled) ~= "table" then
@@ -450,7 +450,7 @@ M.is_buf_disabled = function(bufnr, disabled)
 end
 
 --- Setup the necessary things for statusline rendering.
---- @param disabled_config BufDisabledConfig|nil The disabled configuration to apply.
+--- @param disabled_config UserConfig.Disabled|nil The disabled configuration to apply.
 M.setup = function(disabled_config)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
   local render_debounce = require("witch-line.utils").debounce(M.render, 100)
