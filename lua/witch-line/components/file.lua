@@ -28,6 +28,9 @@ local Name = {
 				["mason"] = "Mason",
 				["lazy"] = "Lazy",
 				["checkhealth"] = "CheckHealth",
+        ["toggleterm"] = function ()
+          return "ToggleTerm " .. vim.b.toggle_number
+        end
 			},
 			buftype = {
 				["terminal"] = "Terminal",
@@ -35,24 +38,19 @@ local Name = {
 		},
 	},
 	padding = { left = 1, right = 0 },
-	update = function(self, session_id)
+	update = function(self, sid)
     local bo = vim.bo
-    local static = self.static
-    --- @cast static {formatter: {filetype: table<string, string>, buftype: table<string, string>}}
+		local formatter = self.static.formatter
 
-		local formatter = static.formatter
-
+    --- @cast formatter {filetype: table<string, string>, buftype: table<string, string>}
 		local filename = formatter.filetype[bo.filetype]
-		if filename then
-			return filename
-		end
+      or formatter.buftype[bo.buftype]
+      or vim.fs.basename(vim.api.nvim_buf_get_name(0))
 
-		filename = formatter.buftype[bo.buftype]
-		if filename then
-			return filename
-		end
+    if type(filename) == "function" then
+      filename = filename()
+    end
 
-		filename = vim.fs.basename(vim.api.nvim_buf_get_name(0))
 		return filename ~= "" and filename or "No File"
 	end,
 }
@@ -92,18 +90,13 @@ local Icon = {
 		end
 
 		if not icon then
-      local static = self.static
-      --- @cast static {extensions: {filetypes: table<string, {[1]:string, [2]:string}>, buftypes: table<string, {[1]:string, [2]:string}>}}
-			local extensions = static.extensions
-			local extension = extensions.buftypes[vim.bo.buftype]
+			local extensions = self.static.extensions
+      --- @cast extensions {filetypes: table<string, {[1]:string, [2]:string}>, buftypes: table<string, {[1]:string, [2]:string}>}
+			local extension = extensions.filetypes[vim.bo.filetype]
+        or extensions.buftypes[vim.bo.buftype]
+
 			if extension then
 				icon, color_icon = extension[1], extension[2]
-			else
-				local filetype = vim.bo.filetype
-        extension = extensions.filetypes[filetype]
-				if extension then
-					icon, color_icon = extension[1], extension[2]
-				end
 			end
 		end
 
@@ -112,12 +105,12 @@ local Icon = {
 			color = color_icon or "#ffffff",
 		}
 	end,
-	style = function(self, session_id)
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+	style = function(self, sid)
+    local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
 		return { fg = ctx.color }
 	end,
-	update = function(self, session_id)
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+	update = function(self, sid)
+    local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
 		return ctx.icon
 	end,
 }
@@ -130,7 +123,7 @@ local Modifier = {
 	style = {
 		fg = colors.fg,
 	},
-	update = function(self, session_id)
+	update = function(self, sid)
     local bo = vim.bo
 		if bo.buftype == "prompt" then
 			return ""
@@ -157,7 +150,7 @@ local Size =  {
 	static = {
 		icon = "",
 	},
-  update = function (self, session_id)
+  update = function (self, sid)
 		local current_file = vim.api.nvim_buf_get_name(0)
     if current_file == "" then return "" end
 
