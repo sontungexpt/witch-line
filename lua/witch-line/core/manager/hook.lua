@@ -43,14 +43,13 @@ end
 --- @return CompStyle style The style for the component
 Hook.use_style = function(comp, session_id)
   local style = lookup_ref_value(comp, "style", session_id, {})
-  local Highlight = require("witch-line.core.highlight")
   return setmetatable({}, {
     __index = style,
     __newindex = function(_, k, v)
         style[k] = v
         local hl_name = comp._hl_name
         if hl_name then
-          Highlight.highlight(hl_name, style)
+          require("witch-line.core.highlight").highlight(hl_name, style)
         end
     end,
   })

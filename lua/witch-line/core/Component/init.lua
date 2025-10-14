@@ -5,7 +5,7 @@ local Highlight = require("witch-line.core.highlight")
 
 local COMP_MODULE_PATH = "witch-line.components."
 
-local M = {}
+local Component = {}
 
 --- @enum SepStyle
 local SepStyle = {
@@ -245,7 +245,7 @@ local SepStyle = {
 
 --- Check if is default component
 --- @param comp Component the component to get the id from
-M.is_default = function(comp)
+Component.is_default = function(comp)
 	return require("witch-line.constant.id").existed(comp.id)
 end
 
@@ -253,7 +253,7 @@ end
 --- @param comp Component|DefaultComponent the component to get the id from
 --- @return CompId id the id of the component
 --- @return Component|DefaultComponent|nil comp the component itself, or nil if it is a default component
-M.setup = function(comp)
+Component.setup = function(comp)
   require("witch-line.core.Component.initial_state").save_initial_context(comp)
 
 	local id = comp.id
@@ -274,7 +274,7 @@ end
 --- Inherits the parent component's fields and methods, allowing for component extension.
 --- @param comp Component the component to inherit from
 --- @param parent Component the parent component to inherit from
-M.inherit_parent = function(comp, parent)
+Component.inherit_parent = function(comp, parent)
 	setmetatable(comp, {
 		__index = function(_, key)
 			return require("witch-line.core.Component.inheritable_fields")[key]
@@ -286,14 +286,14 @@ end
 --- Checks if the component has a parent, which is used for lazy loading components.
 --- @param comp Component the component to check
 --- @return boolean has_parent true if the component has a parent, false otherwise
-M.has_parent = function(comp)
+Component.has_parent = function(comp)
 	return getmetatable(comp) ~= nil
 end
 
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
-M.emit_pre_update = function(comp, sid)
+Component.emit_pre_update = function(comp, sid)
   local pre_update = comp.pre_update
 	if type(pre_update) == "function" then
 		pre_update(comp, sid)
@@ -303,7 +303,7 @@ end
 --- Emits the `post_update` event for the component, calling the post_update function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy
-M.emit_post_update = function(comp, sid)
+Component.emit_post_update = function(comp, sid)
   local post_update = comp.post_update
 	if type(post_update) == "function" then
 		post_update(comp, sid)
@@ -313,7 +313,7 @@ end
 --- Emits the `init` event for the component, calling the init function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
-M.emit_init = function(comp, sid)
+Component.emit_init = function(comp, sid)
   local init = comp.init
   local t = type(init)
   if t == "function" then
@@ -353,7 +353,7 @@ end
 local needs_style_update = function(comp, ref_comp)
   return comp._hl_name == nil or type(ref_comp.style) == "function"
 end
-M.needs_style_update = needs_style_update
+Component.needs_style_update = needs_style_update
 
 --- Updates the style of the component.
 --- @param comp Component the component to update
@@ -361,7 +361,7 @@ M.needs_style_update = needs_style_update
 --- @param ref_comp Component the reference component to inherit from if necessary
 --- @param force boolean|nil if true, forces the style to be updated even if it doesn't need to be
 --- @return boolean updated true if the style was updated, false otherwise
-M.update_style = function(comp, style, ref_comp, force)
+Component.update_style = function(comp, style, ref_comp, force)
   if not style then
     return false
   elseif not force and not needs_style_update(comp,  ref_comp) then
@@ -391,7 +391,7 @@ end
 --- @param side_style CompStyle|SepStyle the style of the side to check
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
 --- @return boolean needs_update true if the style needs to be updated, false otherwise
-M.needs_side_style_update = function(comp, side, side_style, main_style_updated)
+Component.needs_side_style_update = function(comp, side, side_style, main_style_updated)
   if not comp[hl_name_field(side)] then
 		return true
 	elseif type(comp[style_field(side)]) == "function" then
@@ -431,9 +431,9 @@ end
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
 --- @param sid SessionId the session id to use for the component
 --- @return boolean updated true if the style was updated, false otherwise
-M.update_side_style = function(comp, side, main_style, main_style_updated, sid)
+Component.update_side_style = function(comp, side, main_style, main_style_updated, sid)
 	local side_style = resolve(comp[style_field(side)] or SepStyle.SepBg, comp, sid)
-	if not M.needs_side_style_update(comp, side, side_style, main_style_updated) then
+	if not Component.needs_side_style_update(comp, side, side_style, main_style_updated) then
 		return false
 	end
 
@@ -470,7 +470,7 @@ end
 --- @param sid SessionId the session id to use for the component
 --- @return string value the new value of the component
 --- @return CompStyle|nil style the new style of the component
-M.evaluate = function(comp, sid)
+Component.evaluate = function(comp, sid)
 	local result, style = resolve(comp.update, comp, sid)
 
 	if type(result) ~= "string" then
@@ -501,18 +501,18 @@ end
 --- Requires a default component by its id.
 --- @param id CompId the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
-M.require_by_id = function(id)
+Component.require_by_id = function(id)
   local path = require("witch-line.constant.id").path(id)
   if not path then
     return nil
   end
-	return M.require(path)
+	return Component.require(path)
 end
 
 --- Requires a default component by its path.
 --- @param path DefaultComponentPath the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
-M.require = function(path)
+Component.require = function(path)
   local pos = path:find("\0", 1, true)
   if not pos then
     return require(COMP_MODULE_PATH .. path)
@@ -535,7 +535,7 @@ end
 
 --- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
 --- @param comp Component the component to remove the state from
-M.format_state_before_cache = function(comp)
+Component.format_state_before_cache = function(comp)
   require("witch-line.core.Component.initial_state").restore_initial_context(comp)
 	rawset(comp, "_hidden", nil)
 	local temp = comp.temp
@@ -591,7 +591,7 @@ end
 --- @param comp Component the component to create the statistic for
 --- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
 --- @return Component stat_comp the statistic component with the necessary fields set
-M.overrides = function(comp, override)
+Component.overrides = function(comp, override)
 	if type(override) ~= "table" then
 		return comp
 	end
@@ -621,7 +621,7 @@ end
 --- @param comp Component the component to get the minimum screen width from
 --- @param sid SessionId the session id to use for the component update
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
-M.min_screen_width = function(comp, sid)
+Component.min_screen_width = function(comp, sid)
 	local min_screen_width = resolve(comp.min_screen_width, comp, sid)
 	return type(min_screen_width) == "number" and min_screen_width or nil
 end
@@ -630,7 +630,7 @@ end
 --- @param comp Component the component to checks
 --- @param sid SessionId the session id to use for the component update
 --- @return boolean hidden whether the component is hidden
-M.hidden = function(comp, sid)
+Component.hidden = function(comp, sid)
 	local hidden = resolve(comp.hidden, comp, sid)
 	return hidden == true
 end
@@ -639,7 +639,7 @@ end
 --- @param comp Component The component to register the click event for.
 --- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
 --- @throws if has an invalid field type
-M.register_click_handler = function(comp)
+Component.register_click_handler = function(comp)
   local click_handler = comp._click_handler
   if click_handler then
     return click_handler
@@ -687,4 +687,4 @@ M.register_click_handler = function(comp)
   return click_handler
 end
 
-return M
+return Component

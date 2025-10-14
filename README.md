@@ -138,6 +138,11 @@ This plugin is ideal for developers who want full control over the look and feel
   - [ ] Write unit tests for core functionality
   - [ ] Write performance benchmarks
 
+- Theme
+
+  - [ ] Create a theme systems
+  - [ ] Auto adjust color of components based on theme
+
 ### Compare with other statusline plugins
 
 ---

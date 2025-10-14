@@ -2,9 +2,10 @@ local type, pairs, string_dump = type, pairs, string.dump
 local ffi = require("ffi")
 local bit = require("bit")
 
+local uint32_t = ffi.typeof("uint32_t")
+
 local FNV_PRIME_32  = 0x01000193
 local FNV_OFFSET_32 = 0x811C9DC5
-local FNV_MASK_32   = 0xffffffff
 
 --- Calculates the FNV-1a 32-bit hash of a string.
 --- Uses FFI uint32_t for automatic 32-bit overflow (no bit.band needed).
@@ -13,12 +14,13 @@ local FNV_MASK_32   = 0xffffffff
 local fnv1a32_str = function(str)
     local len = #str
     local ptr = ffi.cast("const uint8_t*", str)
-    local hash = FNV_OFFSET_32
-    local bxor, band = bit.bxor, bit.band
+    local hash = uint32_t(FNV_OFFSET_32)
+    local bxor = bit.bxor
     for i = 0, len - 1 do
-      hash = band((bxor(hash, ptr[i]) * FNV_PRIME_32), FNV_MASK_32)
+      hash = bxor(hash, ptr[i]) * FNV_PRIME_32
     end
-    return hash
+    ---@diagnostic disable-next-line: return-type-mismatch
+    return tonumber(hash)
 end
 
 --- Calculates the FNV-1a 32-bit hash of concatenated strings.
@@ -33,17 +35,18 @@ local fnv1a32_str_fold = function(strs, i, j)
         return fnv1a32_str(table.concat(strs, "", i or 1, last))
     end
 
-    local hash = FNV_OFFSET_32
-    local bxor, band = bit.bxor, bit.band
+    local hash = uint32_t(FNV_OFFSET_32)
+    local bxor = bit.bxor
     for l = i or 1, last do
         local str = strs[l]
         local len = #str
         local ptr = ffi.cast("const uint8_t*", str)
         for k = 0, len - 1 do
-          hash = band((bxor(hash, ptr[k]) * FNV_PRIME_32), FNV_MASK_32)
+          hash = bxor(hash, ptr[k]) * FNV_PRIME_32
         end
     end
-    return hash
+    ---@diagnostic disable-next-line: return-type-mismatch
+    return tonumber(hash)
 end
 
 -- Serialize value for hashing
@@ -72,6 +75,7 @@ end
 --- @param tbl table The value to hash. If it's not a table, a constant hash is returned.
 --- @param hash_key string|nil A specific key in the table to use for hashing. If provided and the table contains this key, its value will be used as the hash representation of the table.
 --- @return number hash The computed FNV-1a 32-bit hash of the table.
+--- @note If speed is very important consider directly hash inside this function instead of calling fnv1a32 hash
 local fnv1a32_tbl= function(tbl, hash_key)
 	-- invalid type then return an 32 bit constant number
 	if not next(tbl) then return 0xFFFFFFFF end
