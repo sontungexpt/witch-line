@@ -276,34 +276,46 @@ end
 --- will call functions and cache the result in the session store, while `lookup_inherited_value`
 --- will only look for static values without calling functions or caching.
 M.lookup_ref_value = function(comp, key, sid, seen, ...)
-  local store = get_session_store(sid, key)
+  -- local store = get_session_store(sid, key)
   local id = comp.id
   ---@cast id CompId
-  local cached, value, ref, ref_comp
+  -- local cached
+  local value, ref, ref_comp
 
   -- Do as least one loop
   repeat
-    if store then
-      cached = store[id]
-      if cached ~= nil then
-        return cached, comp
-      end
-    end
-
     value = rawget(comp, key)
     if value ~= nil then
       if type(value) == "function" then
         value = value(comp, sid, ...)
       end
       --- @cast id CompId
-      if not store then
-        store = new_session_store(sid, key, { [id] = value })
-      else
-        store[id] = value
-      end
+      -- if not store then
+      --   store = new_session_store(sid, key, { [id] = value })
+      -- else
+      --   store[id] = value
+      -- end
       return value, comp
     end
     seen[id] = true
+
+    -- NOTE: Remove cache temporately because of inheritance problems
+    -- Problem Detail: (Use the detail example for understand easily)
+    -- If a child reference to a `context`
+    -- and `context` call a `use_static` hook
+    -- Both of child and parent has `static` field (means the child is ovveride `static` from parent)
+    -- So the cache was invalid because it may be use the static of the parent instead of using the static field of the child
+    -- So we need to find the new solution here
+    -- Idea is creating a profile that manage if the child is ovveride field or not and if the `context` is using the hook or not
+    -- Consider is it's worth or not
+    --
+    -- if store then
+    --   cached = store[id]
+    --   if cached ~= nil then
+    --     return cached, comp
+    --   end
+    -- end
+
 
     --- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
     --- This enables function-based field inheritance without recalculating values.
@@ -330,42 +342,53 @@ M.lookup_ref_value = function(comp, key, sid, seen, ...)
 end
 
 
---- Recursively look up a static value in a component and its references.
---- If the value is found, it is returned along with the component that provides it.
---- This function does not call functions or cache results; it only looks for static values.
---- @param comp Component The component to start the lookup from.
---- @param key string The key to look for in the component.
---- @param seen table<CompId, boolean> A table to keep track of already seen values to avoid infinite recursion.
---- @return any value The static value of the component.
---- @return Component inheritted The component that provides the static value
---- @note
---- The difference between this function and `lookup_ref_value` is that this function
---- will only look for static values without calling functions or caching, while `lookup_ref_value`
---- will call functions and cache the result in the session store.
-M.lookup_inherited_value = function(comp, key, seen)
-  local id = comp.id
-  ---@cast id CompId
-  local val, ref, ref_comp
-  repeat
-    val = comp[key]
-    if val ~= nil then
-      return val, comp
-    end
-    seen[id] = true
+do
+  local inheritted_cache = {}
+  --- Recursively look up a static value in a component and its references.
+  --- If the value is found, it is returned along with the component that provides it.
+  --- This function does not call functions or cache results; it only looks for static values.
+  --- @param comp Component The component to start the lookup from.
+  --- @param key string The key to look for in the component.
+  --- @param seen table<CompId, boolean> A table to keep track of already seen values to avoid infinite recursion.
+  --- @return any value The static value of the component.
+  --- @return Component inheritted The component that provides the static value
+  --- @note
+  --- The difference between this function and `lookup_ref_value` is that this function
+  --- will only look for static values without calling functions or caching, while `lookup_ref_value`
+  --- will call functions and cache the result in the session store.
+  M.lookup_inherited_value = function(comp, key, seen)
+    local id = comp.id
+    ---@cast id CompId
+    local cached, val, ref, ref_comp
+    repeat
+      cached = inheritted_cache[id]
+      val = cached and cached[key]
+      if val then
+        return val, comp
+      end
+      val = comp[key]
+      if val ~= nil then
+        local cache = inheritted_cache[id] or {}
+        cache[key] = val
+        inheritted_cache[id] = cache
+        return val, comp
+      end
+      seen[id] = true
 
-    ref = comp.ref
-    id = type(ref) == "table" and ref[key] or nil
-    if not id or seen[id] then
-      return nil, comp
-    end
-    ref_comp = Comps[id]
-    if not ref_comp then
-      return nil, comp
-    end
-    comp = ref_comp
-  until false -- until not comp -- never happens because of the return above
+      ref = comp.ref
+      id = type(ref) == "table" and ref[key] or nil
+      if not id or seen[id] then
+        return nil, comp
+      end
+      ref_comp = Comps[id]
+      if not ref_comp then
+        return nil, comp
+      end
+      comp = ref_comp
+    until false -- until not comp -- never happens because of the return above
 
-  return nil, comp
+    return nil, comp
+  end
 end
 
 
