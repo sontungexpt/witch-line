@@ -5,8 +5,56 @@ local Id = require("witch-line.constant.id").Id
 local Interface = {
 	id = Id["file.interface"],
 	_plug_provided = true,
-  user_events = { "VeryLazy" },
-	events = { "BufEnter", "WinEnter" },
+	events = { "BufEnter" },
+	static = {
+		formatter = {
+			filetype = {
+				["NvimTree"] = { "NvimTree", "", colors.red },
+				["TelescopePrompt"] = { "Telescope", "", colors.red },
+				["mason"] = {"Mason", "󰏔", colors.red },
+				["lazy"] = {"Lazy", "󰏔", colors.red },
+				["checkhealth"] = { "Health", "", colors.red },
+				["plantuml"] = { nil, "", colors.green },
+				["dashboard"] = { "", colors.red },
+        ["toggleterm"] = { function ()
+          return "ToggleTerm " .. vim.b.toggle_number
+        end, "", colors.red}
+			},
+			buftype = {
+				["terminal"] = { "Terminal", "", colors.red },
+			},
+		},
+	},
+  context = function (self)
+    local api, fs, bo = vim.api, vim.fs, vim.bo
+    local static = self.static
+      --- @cast static {formatter: {filetype: table<string, string>, buftype: table<string, string>}, extensions:{filetypes: table<string, {[1]:string, [2]:string, [3]:string}>}}
+    local fmt = static.formatter
+    local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
+    if formatter then
+      local resolve = require("witch-line.utils").resolve
+      local basename = resolve(formatter[1]) or fs.basename(api.nvim_buf_get_name(0))
+      return {
+        basename = basename ~= "" and basename or "No File",
+        icon = resolve(formatter[2]) or "",
+        color = resolve(formatter[3]) or "#ffffff",
+      }
+    end
+    local basename, icon, color_icon
+    basename = vim.fs.basename(vim.api.nvim_buf_get_name(0))
+
+    local ok, devicons = pcall(require, "nvim-web-devicons")
+    if ok then
+      local extension = basename:match("%.([^%.]+)$")
+      icon, color_icon = devicons.get_icon_color(basename, extension)
+    end
+
+		return {
+      basename = basename ~= "" and basename or "No File",
+			icon = icon or "",
+			color = color_icon or "#ffffff",
+		}
+  end
 }
 
 ---@type DefaultComponent
@@ -14,44 +62,17 @@ local Name = {
 	id = Id["file.name"],
 	_plug_provided = true,
 	ref = {
-    user_events = Id["file.interface"],
 		events = Id["file.interface"],
+    context = Id["file.interface"],
+    static = Id["file.interface"]
 	},
 	style = {
 		fg = colors.orange,
 	},
-	static = {
-		formatter = {
-			filetype = {
-				["NvimTree"] = "NvimTree",
-				["TelescopePrompt"] = "Telescope",
-				["mason"] = "Mason",
-				["lazy"] = "Lazy",
-				["checkhealth"] = "CheckHealth",
-        ["toggleterm"] = function ()
-          return "ToggleTerm " .. vim.b.toggle_number
-        end
-			},
-			buftype = {
-				["terminal"] = "Terminal",
-			},
-		},
-	},
 	padding = { left = 1, right = 0 },
 	update = function(self, sid)
-    local bo = vim.bo
-		local formatter = self.static.formatter
-
-    --- @cast formatter {filetype: table<string, string>, buftype: table<string, string>}
-		local filename = formatter.filetype[bo.filetype]
-      or formatter.buftype[bo.buftype]
-      or vim.fs.basename(vim.api.nvim_buf_get_name(0))
-
-    if type(filename) == "function" then
-      filename = filename()
-    end
-
-		return filename ~= "" and filename or "No File"
+    local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
+    return ctx.basename
 	end,
 }
 
@@ -61,50 +82,9 @@ local Icon = {
 	_plug_provided = true,
 	ref = {
 		events = Id["file.interface"],
-		user_events = Id["file.interface"],
+    context = Id["file.interface"],
+    static = Id["file.interface"]
 	},
-	static = {
-		extensions = {
-			filetypes = {
-				["NvimTree"] = { "", colors.red },
-				["TelescopePrompt"] = { "", colors.red },
-				["mason"] = { "󰏔", colors.red },
-				["lazy"] = { "󰏔", colors.red },
-				["checkhealth"] = { "", colors.red },
-				["plantuml"] = { "", colors.green },
-				["dashboard"] = { "", colors.red },
-			},
-			buftypes = {
-				["terminal"] = { "", colors.red },
-			},
-		},
-	},
-	context = function(self)
-		local fn = vim.fn
-		local filename = fn.expand("%:t")
-
-		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
-		local icon, color_icon = nil, nil
-		if has_devicons then
-			icon, color_icon = devicons.get_icon_color(filename, fn.expand("%:e"))
-		end
-
-		if not icon then
-			local extensions = self.static.extensions
-      --- @cast extensions {filetypes: table<string, {[1]:string, [2]:string}>, buftypes: table<string, {[1]:string, [2]:string}>}
-			local extension = extensions.filetypes[vim.bo.filetype]
-        or extensions.buftypes[vim.bo.buftype]
-
-			if extension then
-				icon, color_icon = extension[1], extension[2]
-			end
-		end
-
-		return {
-			icon = icon or "",
-			color = color_icon or "#ffffff",
-		}
-	end,
 	style = function(self, sid)
     local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
 		return { fg = ctx.color }

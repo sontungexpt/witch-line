@@ -1,4 +1,4 @@
-local type, unpack, rawget = type, unpack, rawget
+local type, rawget = type, rawget
 local Session = require("witch-line.core.Session")
 local get_session_store, new_session_store = Session.get_store, Session.new_store
 

@@ -17,10 +17,7 @@ local Encoding = {
 	style = { fg = colors.yellow },
 	update = function(self, session_id)
 		local enc = vim.bo.fenc ~= "" and vim.bo.fenc or vim.o.enc
-    if enc then
-      return self.static[enc] or enc
-    end
-    return  enc
+    return enc and self.static[enc] or enc or ""
 	end,
 }
 return Encoding
