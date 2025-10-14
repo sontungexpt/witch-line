@@ -272,30 +272,25 @@ local function pull_missing_dependencies(comp)
 	for dep_id in Manager.iterate_all_dependency_ids(comp.id) do
 		if not Manager.is_existed(dep_id) then
 			local c = Component.require_by_id(dep_id)
-			if c then
-				M.register_abstract_component(c)
-			end
+			if c then M.register_abstract_component(c) end
 		end
 	end
+
 	local ref = comp.ref
-	if type(ref) == "table" then
-		local dependency_ids = {}
-		dependency_ids[#dependency_ids + 1] = ref.context
-		dependency_ids[#dependency_ids + 1] = ref.static
-		dependency_ids[#dependency_ids + 1] = ref.style
-		dependency_ids[#dependency_ids + 1] = ref.left
-		dependency_ids[#dependency_ids + 1] = ref.left_style
-		dependency_ids[#dependency_ids + 1] = ref.right
-		dependency_ids[#dependency_ids + 1] = ref.right_style
-		for _, dep_id in ipairs(dependency_ids) do
-			if not Manager.is_existed(dep_id) then
-				local c = Component.require_by_id(dep_id)
-				if c then
-					M.register_abstract_component(c)
-				end
-			end
-		end
-	end
+	if type(ref) ~= "table" then return end
+
+  local ref_keys = {
+     "context", "static", "style",
+     "left", "left_style", "right", "right_style"
+  }
+
+  for i = 1, #ref_keys do
+    local dep_id = ref[ref_keys[i]]
+    if dep_id and not Manager.is_existed(dep_id) then
+      local c = Component.require_by_id(dep_id)
+      if c then M.register_abstract_component(c) end
+    end
+  end
 end
 
 --- Register an abstract component that is not directly rendered in the statusline.
