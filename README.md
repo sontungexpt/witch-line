@@ -142,10 +142,14 @@ This plugin is ideal for developers who want full control over the look and feel
   - [ ] Write unit tests for core functionality
   - [ ] Write performance benchmarks
 
-- Theme
+- Themes
 
   - [ ] Create a theme systems
   - [ ] Auto adjust color of components based on theme
+
+- Bug fixs (Will fix soon this important)
+
+  - [ ] A probably inheritance logic when conflicting between parent and child happens
 
 ### Compare with other statusline plugins
 
