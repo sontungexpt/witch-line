@@ -212,36 +212,36 @@ end
 --- Link dependencies for a component based on its ref and inherit fields.
 --- @param comp Component The component to link dependencies for.
 local function bind_dependencies(comp)
-	local link_ref_field = Manager.link_ref_field
+	local link_dependency = Manager.link_dependency
 	local ref = comp.ref
 
 	if type(ref) == "table" then
 		if ref.events then
-			link_ref_field(comp, ref.events, DepGraphKind.Event)
+			link_dependency(comp, ref.events, DepGraphKind.Event)
 		end
 
 		if ref.user_events then
-			link_ref_field(comp, ref.user_events, DepGraphKind.Event)
+			link_dependency(comp, ref.user_events, DepGraphKind.Event)
 		end
 
 		if ref.timing then
-			link_ref_field(comp, ref.timing, DepGraphKind.Timer)
+			link_dependency(comp, ref.timing, DepGraphKind.Timer)
 		end
 
 		if ref.hidden then
-			link_ref_field(comp, ref.hidden, DepGraphKind.Visible)
+			link_dependency(comp, ref.hidden, DepGraphKind.Visible)
 		end
 
 		if ref.min_screen_width then
-			link_ref_field(comp, ref.min_screen_width, DepGraphKind.Visible)
+			link_dependency(comp, ref.min_screen_width, DepGraphKind.Visible)
 		end
 	end
 
 	local inherit = comp.inherit
 	if inherit then
-		link_ref_field(comp, inherit, DepGraphKind.Event)
-		link_ref_field(comp, inherit, DepGraphKind.Timer)
-		link_ref_field(comp, inherit, DepGraphKind.Visible)
+		link_dependency(comp, inherit, DepGraphKind.Event)
+		link_dependency(comp, inherit, DepGraphKind.Timer)
+		link_dependency(comp, inherit, DepGraphKind.Visible)
 	end
 end
 

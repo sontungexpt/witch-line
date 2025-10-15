@@ -4,8 +4,11 @@ local bit = require("bit")
 
 local uint32_t = ffi.typeof("uint32_t")
 
-local FNV_PRIME_32  = 0x01000193
-local FNV_OFFSET_32 = 0x811C9DC5
+-- local FNV_PRIME_32  = 0x01000193
+-- local FNV_OFFSET_32 = 0x811C9DC5
+local FNV_PRIME_32_FFI  = uint32_t(0x01000193)
+local FNV_OFFSET_32_FFI = uint32_t(0x811C9DC5)
+
 
 --- Calculates the FNV-1a 32-bit hash of a string.
 --- Uses FFI uint32_t for automatic 32-bit overflow (no bit.band needed).
@@ -14,10 +17,10 @@ local FNV_OFFSET_32 = 0x811C9DC5
 local fnv1a32_str = function(str)
     local len = #str
     local ptr = ffi.cast("const uint8_t*", str)
-    local hash = uint32_t(FNV_OFFSET_32)
+    local hash = FNV_OFFSET_32_FFI
     local bxor = bit.bxor
     for i = 0, len - 1 do
-      hash = bxor(hash, ptr[i]) * FNV_PRIME_32
+      hash = bxor(hash, ptr[i]) * FNV_PRIME_32_FFI
     end
     ---@diagnostic disable-next-line: return-type-mismatch
     return tonumber(hash)
@@ -35,14 +38,14 @@ local fnv1a32_str_fold = function(strs, i, j)
         return fnv1a32_str(table.concat(strs, "", i or 1, last))
     end
 
-    local hash = uint32_t(FNV_OFFSET_32)
+    local hash = FNV_OFFSET_32_FFI
     local bxor = bit.bxor
     for l = i or 1, last do
         local str = strs[l]
         local len = #str
         local ptr = ffi.cast("const uint8_t*", str)
         for k = 0, len - 1 do
-          hash = bxor(hash, ptr[k]) * FNV_PRIME_32
+          hash = bxor(hash, ptr[k]) * FNV_PRIME_32_FFI
         end
     end
     ---@diagnostic disable-next-line: return-type-mismatch

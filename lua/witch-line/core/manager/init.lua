@@ -237,7 +237,7 @@ end
 --- @param comp Component The component to add the dependency for.
 --- @param ref CompId|CompId[] The ID or IDs that this component depends on.
 --- @param dep_graph_kind DepGraphKind The ID of the dependency store to use.
-M.link_ref_field = function(comp, ref, dep_graph_kind)
+M.link_dependency = function(comp, ref, dep_graph_kind)
 	local store = get_dependency_graph(dep_graph_kind)
 	local id = comp.id
   --- @cast id CompId Id never nil
@@ -245,6 +245,7 @@ M.link_ref_field = function(comp, ref, dep_graph_kind)
 	if type(ref) ~= "table" then
 		ref = { ref }
 	end
+
 	for i = 1, #ref do
 		local r = ref[i]
 		local dependents = store[r] or {}
@@ -342,6 +343,7 @@ M.lookup_ref_value = function(comp, key, sid, seen, ...)
 end
 
 
+--- Create a scope
 do
   local inheritted_cache = {}
   --- Recursively look up a static value in a component and its references.

@@ -64,7 +64,6 @@ local Name = {
 	ref = {
 		events = Id["file.interface"],
     context = Id["file.interface"],
-    static = Id["file.interface"]
 	},
 	style = {
 		fg = colors.orange,
@@ -83,7 +82,6 @@ local Icon = {
 	ref = {
 		events = Id["file.interface"],
     context = Id["file.interface"],
-    static = Id["file.interface"]
 	},
 	style = function(self, sid)
     local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
@@ -123,7 +121,6 @@ local Size =  {
   _plug_provided = true,
 	ref = {
 		events = Id["file.interface"],
-		user_events = Id["file.interface"],
 	},
 	style = {
 		fg = colors.green,
