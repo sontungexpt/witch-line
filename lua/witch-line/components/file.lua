@@ -110,6 +110,7 @@ local Modifier = {
     elseif not bo.modifiable or bo.readonly then
 			return ""
 		elseif bo.modified then
+      -- ●
 			return ""
 		end
 		return ""

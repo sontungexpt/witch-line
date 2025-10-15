@@ -358,29 +358,34 @@ do
   --- will call functions and cache the result in the session store.
   M.lookup_inherited_value = function(comp, key, seen)
     local id = comp.id
-    ---@cast id CompId
-    local cached, val, ref, ref_comp
+    local ref_id = id -- The id of the component contains the value
+    local cache, val, ref, ref_comp
     repeat
-      cached = inheritted_cache[id]
-      val = cached and cached[key]
+      ---@cast ref_id CompId
+      val = comp[key]
+      if val ~= nil then
+        ---@cast id CompId
+        if id ~= ref_id then -- Only cache value if the component inherit value from other component
+          inheritted_cache[id] = { [key] = val }
+        end
+        return val, comp
+      end
+      seen[ref_id] = true
+
+      -- Check cache before lookup parent
+      cache = inheritted_cache[ref_id]
+      val = cache and cache[key]
       if val then
         return val, comp
       end
-      val = comp[key]
-      if val ~= nil then
-        local cache = inheritted_cache[id] or {}
-        cache[key] = val
-        inheritted_cache[id] = cache
-        return val, comp
-      end
-      seen[id] = true
 
       ref = comp.ref
-      id = type(ref) == "table" and ref[key] or nil
-      if not id or seen[id] then
+      ref_id = type(ref) == "table" and ref[key] or nil
+      if not ref_id or seen[ref_id] then
         return nil, comp
       end
-      ref_comp = Comps[id]
+
+      ref_comp = Comps[ref_id]
       if not ref_comp then
         return nil, comp
       end
