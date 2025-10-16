@@ -1,7 +1,7 @@
 local require, type, str_rep, rawset = require, type, string.rep, rawset
-local resolve = require("witch-line.utils").resolve
 
 local Highlight = require("witch-line.core.highlight")
+local resolve = require("witch-line.utils").resolve
 
 local COMP_MODULE_PATH = "witch-line.components."
 
@@ -18,12 +18,13 @@ local SepStyle = {
 
 --- @class CompId : Id
 
---- @class Ref : table
+--- @class Reference : table
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field user_events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field timing CompId|CompId[]|nil A table of ids of components that this component references
 --- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
 --- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
+---
 --- @field static CompId|nil A id of a component that this component references for its static values
 --- @field context CompId|nil A id of a component that this component references for its context
 --- @field style CompId|nil A id of a component that this component references for its style
@@ -94,7 +95,7 @@ local SepStyle = {
 --- - Example of min_screen_width function: `function(self: ManagedComponent, sid: SessionId) return 80 end`
 --- @field min_screen_width integer|nil|fun(self: ManagedComponent, sid: SessionId):number|nil
 ---
---- @field ref Ref|nil A table of references to other components that this component depends on
+--- @field ref Reference|nil A table of references to other components that this component depends on
 ---
 --- @field neighbors Neighbor[]|nil A table of neighbor components that this component is related to ( Not implemented yet )
 ---

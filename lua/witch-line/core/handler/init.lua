@@ -24,15 +24,15 @@ local hide_component = function(comp)
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
---- Ensure component inherits correctly.
---- @param comp Component component to ensure inheritance from parent
-local function ensure_inheritance(comp)
-	-- It's just a abstract component then no need to really update
-	if comp.inherit and not Component.has_parent(comp) then
-		local parent = Manager.get_comp(comp.inherit)
-		if parent then Component.inherit_parent(comp, parent) end
-	end
-end
+-- --- Ensure component inherits correctly.
+-- --- @param comp Component component to ensure inheritance from parent
+-- local function ensure_inheritance(comp)
+-- 	-- It's just a abstract component then no need to really update
+-- 	if comp.inherit and not Component.has_parent(comp) then
+-- 		local parent = Manager.get_comp(comp.inherit)
+-- 		if parent then Component.inherit_parent(comp, parent) end
+-- 	end
+-- end
 
 
 --- Format the side value
@@ -54,7 +54,7 @@ end
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, sid)
-  ensure_inheritance(comp)
+  -- ensure_inheritance(comp)
 
 	Component.emit_pre_update(comp, sid)
 
@@ -92,7 +92,7 @@ local function update_component(comp, sid)
             store[comp.id] = style
           end
         else
-          style, ref_comp = Manager.lookup_ref_value(comp, "style", sid, {})
+          style, ref_comp = Manager.lookup_dynamic_value(comp, "style", sid, {})
           if style then
             style_updated = Component.update_style(comp, style, ref_comp)
           end
@@ -100,7 +100,7 @@ local function update_component(comp, sid)
         Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
         --- Left part
-        local lval, lref = Manager.lookup_ref_value(comp, "left", sid, {})
+        local lval, lref = Manager.lookup_dynamic_value(comp, "left", sid, {})
         local is_left_func = type(lref.left) == "function"
         lval = format_side_value(lval, is_left_func)
         if lval then
@@ -112,7 +112,7 @@ local function update_component(comp, sid)
         end
 
         --- Right part
-        local rval, rref = Manager.lookup_ref_value(comp, "right", sid, {})
+        local rval, rref = Manager.lookup_dynamic_value(comp, "right", sid, {})
         local is_right_func = type(rref.right) == "function"
         rval = format_side_value(rval, is_right_func)
         if rval then
