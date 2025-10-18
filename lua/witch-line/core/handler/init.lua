@@ -140,7 +140,7 @@ M.update_component = update_component
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param sid SessionId The ID of the process to use for this update.
---- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[] The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 	seen = seen or {}
@@ -166,8 +166,12 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 	end
 
  if type(dep_graph_kind) ~= "table" then
-		dep_graph_kind = { dep_graph_kind }
-	end
+		for dep_id, dep_comp in Manager.iterate_dependents(dep_graph_kind, id) do
+			if not seen[dep_id] then
+				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
+			end
+		end
+ else
 	for _, kind in ipairs(dep_graph_kind) do
 		for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
 			if not seen[dep_id] then
