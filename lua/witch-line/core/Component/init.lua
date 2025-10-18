@@ -16,7 +16,7 @@ local SepStyle = {
 }
 
 
---- @class CompId : Id
+--- @class CompId : string
 
 --- @class Reference : table
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references

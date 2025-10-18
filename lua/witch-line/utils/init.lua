@@ -11,13 +11,15 @@ local M = {}
 --- @param delay number The delay in milliseconds.
 --- @return function debounced_func A debounced version of the input function.
 M.debounce = function(func, delay)
-	local timer, is_running = (vim.uv or vim.loop).new_timer(), false
+	local timer, running = nil, false
 	return function(...)
-		if is_running then
+    if not timer then
+      timer = (vim.uv or vim.loop).new_timer()
+    elseif running then
 			---@diagnostic disable-next-line: need-check-nil
 			timer:stop()
 		end
-		is_running = true
+		running = true
 
 		local args = { ... }
 		---@diagnostic disable-next-line: need-check-nil
@@ -25,7 +27,7 @@ M.debounce = function(func, delay)
 			delay,
 			0,
 			vim.schedule_wrap(function()
-				is_running = false
+				running = false
 				func(unpack(args))
 			end)
 		)
