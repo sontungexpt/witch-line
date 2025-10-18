@@ -27,7 +27,6 @@ local M = {}
 --- @field _merged_hl_value_left string|nil The cached merged left value with highlight group name. ( Not be cached )
 --- @field _merged_hl_value_right string|nil The cached merged right value with highlight group name. ( Not be cached )
 
-local Disabled = o.laststatus == 0
 
 --- @type Segment[] The list of statusline components.
 local Statusline = {
@@ -286,7 +285,7 @@ end
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param max_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
 M.render = function(max_width)
-  if Disabled then
+  if o.laststatus == 0 then
     return
   elseif FlexiblePrioritySortedLen == 0 then
 		local str = concat(build_values())
@@ -465,16 +464,6 @@ M.setup = function(disabled_config)
 	--- For automatically toggle `laststatus` based on buffer filetype and buftype.
 	local user_laststatus = o.laststatus or 3
 
-	api.nvim_create_autocmd("OptionSet", {
-		pattern = "laststatus",
-		callback = function()
-			local new_status = o.laststatus
-			if new_status ~= 0 then
-				user_laststatus = new_status
-			end
-		end,
-	})
-
 	api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 		callback = function(e)
 			local bufnr = e.buf
@@ -483,12 +472,13 @@ M.setup = function(disabled_config)
           return
         end
 
-				Disabled = M.is_buf_disabled(bufnr, disabled_config)
+				local disabled = M.is_buf_disabled(bufnr, disabled_config)
 
-				if not Disabled and o.laststatus == 0 then
+				if not disabled and o.laststatus == 0 then
 					api.nvim_set_option_value("laststatus", user_laststatus, {})
           render_debounce(o.columns) -- rerender statusline after enabling
-				elseif Disabled and o.laststatus ~= 0 then
+				elseif disabled and o.laststatus ~= 0 then
+          user_laststatus = o.laststatus
 					api.nvim_set_option_value("laststatus", 0, {})
 				else
 					return -- no change no need to redrawstatus

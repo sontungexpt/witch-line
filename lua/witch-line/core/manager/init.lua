@@ -261,6 +261,30 @@ M.get_comp = function(id)
 	return id and Comps[id]
 end
 
+local inherit = function (comp, field, seen)
+  -- Collect inheritance chain upward
+  local merged_val = comp[field]
+  local inherit_id = comp.inherit
+  while inherit_id and not seen[inherit_id] do
+    local parent = Comps[inherit_id]
+    if not parent then
+      break
+    end
+    local parent_val = parent[field]
+    if parent_val ~= nil then
+      if merged_val == nil then
+        merged_val = parent_val
+      elseif type(parent_val) == "table" and type(merged_val) == "table" then
+        merged_val = vim.tbl_deep_extend('keep', merged_val, parent_val)
+      else
+        break -- difference type
+      end
+    end
+    inherit_id = parent.inherit
+  end
+
+  return merged_val, comp
+end
 
 do
   local inherited_cache = {}
