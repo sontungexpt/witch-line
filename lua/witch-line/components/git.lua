@@ -219,40 +219,79 @@ Diff.Interface = {
       return diff[bufnr or api.nvim_get_current_buf()]
     end
 
-    local process_diff = function(lines)
-      -- Adapted from https://github.com/wbthomason/nvim-vcs.lua
-      local added, removed, modified = 0, 0, 0
-      for i = 1, #lines do
-        -- match hunk header like: @@ -12,3 +14,4 @@
-        -- captures: old_start, old_count, new_start, new_count
-        local old_start, old_count, new_start, new_count = lines[i]:match(
-          "^@@ %-([0-9]+),?([0-9]*) %+([0-9]+),?([0-9]*)")
+    local ffi = require("ffi")
+ffi.cdef[[
+  const char* strstr(const char *haystack, const char *needle);
+  const char* strchr(const char *s, int c);
+  long strtol(const char *nptr, char **endptr, int base);
+]]
 
-        if old_start then
-          -- convert captures to numbers using same rules as original:
-          -- nil → 0, "" → 1, else → tonumber
-          local mod_count = (old_count == nil and 0)
-              or (old_count == "" and 1)
-              or tonumber(old_count) or 0
+local C = ffi.C
 
-          new_count = (new_count == nil and 0)
-              or (new_count == "" and 1)
-              or tonumber(new_count) or 0
+local function process_diff(stdout)
+  local added, removed, modified = 0, 0, 0
+  local base = ffi.cast("const char*", stdout)
+  if base == nil then
+    return { added = 0, modified = 0, removed = 0 }
+  end
 
-          if mod_count == 0 and new_count > 0 then
-            added = added + new_count
-          elseif mod_count > 0 and new_count == 0 then
-            removed = removed + mod_count
-          else
-            local minv = min(mod_count, new_count)
-            modified = modified + minv
-            added = added + (new_count - minv)
-            removed = removed + (mod_count - minv)
-          end
-        end
-      end
-      return { added = added, modified = modified, removed = removed }
+  -- ASCII codes trực tiếp
+  local CHAR_MINUS = 45    -- '-'
+  local CHAR_PLUS = 43     -- '+'
+  local CHAR_COMMA = 44    -- ','
+
+  local hunk_ptr = C.strstr(base, "@@")
+  while hunk_ptr ~= nil do
+    local minus_ptr = C.strchr(hunk_ptr, CHAR_MINUS)
+    if minus_ptr == nil then
+      hunk_ptr = C.strstr(hunk_ptr + 2, "@@")
+      goto continue
     end
+
+    local plus_ptr = C.strchr(minus_ptr, CHAR_PLUS)
+    if plus_ptr == nil then
+      hunk_ptr = C.strstr(hunk_ptr + 2, "@@")
+      goto continue
+    end
+
+    local old_start = C.strtol(minus_ptr + 1, nil, 10)
+    local comma1 = C.strchr(minus_ptr, CHAR_COMMA)
+    local old_count = 0
+    if comma1 ~= nil and comma1 < plus_ptr then
+      old_count = C.strtol(comma1 + 1, nil, 10)
+    else
+      old_count = 1
+    end
+
+    local new_start = C.strtol(plus_ptr + 1, nil, 10)
+    local comma2 = C.strchr(plus_ptr, CHAR_COMMA)
+    local new_count = 0
+    if comma2 ~= nil then
+      new_count = C.strtol(comma2 + 1, nil, 10)
+    else
+      new_count = 1
+    end
+
+    -- cộng tổng
+    if old_count == 0 and new_count > 0 then
+      added = added + new_count
+    elseif old_count > 0 and new_count == 0 then
+      removed = removed + old_count
+    else
+      local minv = math.min(old_count, new_count)
+      modified = modified + minv
+      added = added + (new_count - minv)
+      removed = removed + (old_count - minv)
+    end
+
+    hunk_ptr = C.strstr(hunk_ptr + 2, "@@")
+    ::continue::
+  end
+
+  return { added = added, modified = modified, removed = removed }
+end
+
+
 
     api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
       callback = function(e)
@@ -306,8 +345,7 @@ Diff.Interface = {
             elseif stdout and #stdout > 0 then
               vim.schedule(function()
                 if api.nvim_buf_is_valid(bufnr) then
-                  local lines = vim.split(stdout, "\n", { trimempty = true })
-                  diff[bufnr] = process_diff(lines)
+    diff[bufnr] = process_diff(stdout)
                   refresh_component_graph(self) -- trigger update
                 end
               end)
