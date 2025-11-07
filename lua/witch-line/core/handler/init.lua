@@ -34,19 +34,18 @@ end
 -- 	end
 -- end
 
-
 --- Format the side value
 --- @param val any the value of the side
 --- @param is_func boolean|nil Flag indicate that is the side is a function or not
 --- @return nil|string result String if valid, otherwise nil
 local function format_side_value(val, is_func)
-  -- Avoid non-string values if function-type
-  if is_func then
-    return type(val) ~= "string" and "" or val
-  elseif type(val) ~= "string" then
-    return nil
-  end
-  return val
+	-- Avoid non-string values if function-type
+	if is_func then
+		return type(val) ~= "string" and "" or val
+	elseif type(val) ~= "string" then
+		return nil
+	end
+	return val
 end
 
 --- Update a component and its value in the statusline.
@@ -54,83 +53,77 @@ end
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, sid)
-  -- ensure_inheritance(comp)
+	-- ensure_inheritance(comp)
 
 	Component.emit_pre_update(comp, sid)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
 	local min_screen_width = Component.min_screen_width(comp, sid)
 
-	local hidden = min_screen_width and o.columns < min_screen_width
-    or Component.hidden(comp, sid)
+	local hidden = min_screen_width and o.columns < min_screen_width or Component.hidden(comp, sid)
 
 	if hidden then
 		hide_component(comp)
-  else
-    local value, style = Component.evaluate(comp, sid)
+	else
+		local value, style = Component.evaluate(comp, sid)
 
-    local indices = comp._indices
-    -- A abstract component will not have indices
-    -- It's just call the update function for other purpose and we not affect to the statusline
-    -- So we just ignore it even the value is empty string
-    if indices then
-      if value == "" then
-        hide_component(comp)
-        hidden = true
-      else
+		local indices = comp._indices
+		-- A abstract component will not have indices
+		-- It's just call the update function for other purpose and we not affect to the statusline
+		-- So we just ignore it even the value is empty string
+		if indices then
+			if value == "" then
+				hide_component(comp)
+				hidden = true
+			else
+				--- Update statusline value
+				-- Main part
+				Statusline.set_value(indices, value)
+				local style_updated, ref_comp = false, comp
+				if style then
+					style_updated = Component.update_style(comp, style, ref_comp, true)
+					--- Sync style to session store
+					--- This is make sure that the `use_style` hooks always get the latest style
+					local store = Session.get_store(sid, "style")
+					if store then
+						store[comp.id] = style
+					end
+				else
+					style, ref_comp = Manager.lookup_dynamic_value(comp, "style", sid, {})
+					if style then
+						style_updated = Component.update_style(comp, style, ref_comp)
+					end
+				end
+				Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
-        --- Update statusline value
-        -- Main part
-        Statusline.set_value(indices, value)
-        local style_updated, ref_comp = false, comp
-        if style then
-          style_updated = Component.update_style(comp, style, ref_comp, true)
-          --- Sync style to session store
-          --- This is make sure that the `use_style` hooks always get the latest style
-          local store = Session.get_store(sid, "style")
-          if store then
-            store[comp.id] = style
-          end
-        else
-          style, ref_comp = Manager.lookup_dynamic_value(comp, "style", sid, {})
-          if style then
-            style_updated = Component.update_style(comp, style, ref_comp)
-          end
-        end
-        Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
+				--- Left part
+				local lval, lref = Manager.lookup_dynamic_value(comp, "left", sid, {})
+				local is_left_func = type(lref.left) == "function"
+				lval = format_side_value(lval, is_left_func)
+				if lval then
+					Statusline.set_side_value(indices, "left", lval, is_left_func)
+					local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
+					Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name, left_style_updated)
+				end
 
-        --- Left part
-        local lval, lref = Manager.lookup_dynamic_value(comp, "left", sid, {})
-        local is_left_func = type(lref.left) == "function"
-        lval = format_side_value(lval, is_left_func)
-        if lval then
-          Statusline.set_side_value(indices, "left", lval, is_left_func)
-          local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
-          Statusline.set_side_value_highlight(
-            indices, "left", comp._left_hl_name, left_style_updated
-          )
-        end
+				--- Right part
+				local rval, rref = Manager.lookup_dynamic_value(comp, "right", sid, {})
+				local is_right_func = type(rref.right) == "function"
+				rval = format_side_value(rval, is_right_func)
+				if rval then
+					Statusline.set_side_value(indices, "right", rval, is_right_func)
+					local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
+					Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name, right_style_updated)
+				end
 
-        --- Right part
-        local rval, rref = Manager.lookup_dynamic_value(comp, "right", sid, {})
-        local is_right_func = type(rref.right) == "function"
-        rval = format_side_value(rval, is_right_func)
-        if rval then
-          Statusline.set_side_value(indices, "right", rval, is_right_func)
-          local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
-          Statusline.set_side_value_highlight(
-            indices, "right", comp._right_hl_name, right_style_updated
-          )
-        end
+				if comp.on_click then
+					Statusline.set_click_handler(indices, Component.register_click_handler(comp))
+				end
 
-        if comp.on_click then
-          Statusline.set_click_handler(indices, Component.register_click_handler(comp))
-        end
-
-        rawset(comp, "_hidden", false) -- Reset hidden state
-      end
-    end
-  end
+				rawset(comp, "_hidden", false) -- Reset hidden state
+			end
+		end
+	end
 
 	Component.emit_post_update(comp, sid)
 	return hidden
@@ -165,17 +158,18 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 		end
 	end
 
- if type(dep_graph_kind) ~= "table" then
+	if type(dep_graph_kind) ~= "table" then
 		for dep_id, dep_comp in Manager.iterate_dependents(dep_graph_kind, id) do
 			if not seen[dep_id] then
 				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
 			end
 		end
- else
-	for _, kind in ipairs(dep_graph_kind) do
-		for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
-			if not seen[dep_id] then
-				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
+	else
+		for _, kind in ipairs(dep_graph_kind) do
+			for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
+				if not seen[dep_id] then
+					M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
+				end
 			end
 		end
 	end
@@ -188,13 +182,12 @@ end
 M.refresh_component_graph = function(comp, dep_graph_kind, seen)
 	require("witch-line.core.Session").with_session(function(sid)
 		M.update_comp_graph(comp, sid, dep_graph_kind or {
-      DepGraphKind.Event,
-      DepGraphKind.Timer,
-    }, seen)
+			DepGraphKind.Event,
+			DepGraphKind.Timer,
+		}, seen)
 		Statusline.render()
 	end)
 end
-
 
 --- Update multiple components by their IDs.
 --- @param ids CompId[] The IDs of the components to update.
@@ -276,25 +269,36 @@ local function pull_missing_dependencies(comp)
 	for dep_id in Manager.iterate_all_dependency_ids(comp.id) do
 		if not Manager.is_existed(dep_id) then
 			local c = Component.require_by_id(dep_id)
-			if c then M.register_abstract_component(c) end
+			if c then
+				M.register_abstract_component(c)
+			end
 		end
 	end
 
 	local ref = comp.ref
-	if type(ref) ~= "table" then return end
+	if type(ref) ~= "table" then
+		return
+	end
 
-  local ref_keys = {
-     "context", "static", "style",
-     "left", "left_style", "right", "right_style"
-  }
+	local ref_keys = {
+		"context",
+		"static",
+		"style",
+		"left",
+		"left_style",
+		"right",
+		"right_style",
+	}
 
-  for i = 1, #ref_keys do
-    local dep_id = ref[ref_keys[i]]
-    if dep_id and not Manager.is_existed(dep_id) then
-      local c = Component.require_by_id(dep_id)
-      if c then M.register_abstract_component(c) end
-    end
-  end
+	for i = 1, #ref_keys do
+		local dep_id = ref[ref_keys[i]]
+		if dep_id and not Manager.is_existed(dep_id) then
+			local c = Component.require_by_id(dep_id)
+			if c then
+				M.register_abstract_component(c)
+			end
+		end
+	end
 end
 
 --- Register an abstract component that is not directly rendered in the statusline.
@@ -322,17 +326,17 @@ end
 --- Build statusline indices for a component.
 --- @param comp Component The component to build indices for.
 local function build_indices(comp)
-  -- Why not support left and right indpendently?
-  -- Because the update id the main part   --
-  -- The left and right are just the decoration of the main part
-  -- So if the main part is not renderable then the left and right are not renderable too
-  -- If really need the left and right we just add them as a separate component
+	-- Why not support left and right indpendently?
+	-- Because the update id the main part   --
+	-- The left and right are just the decoration of the main part
+	-- So if the main part is not renderable then the left and right are not renderable too
+	-- If really need the left and right we just add them as a separate component
 	local update = comp.update
 	if not update then
 		return
 	end
 
-  local idx = Statusline.push("")
+	local idx = Statusline.push("")
 
 	local indices = comp._indices
 	if not indices then
@@ -341,7 +345,7 @@ local function build_indices(comp)
 		indices[#indices + 1] = idx
 	end
 
-  local flexible = comp.flexible
+	local flexible = comp.flexible
 	if flexible then
 		Statusline.track_flexible(idx, flexible)
 	end
@@ -356,7 +360,6 @@ local function register_component(comp, parent_id)
 		build_indices(comp)
 		return comp
 	end
-
 
 	-- Example for this case: comp = {
 	--  [0] = "mode",
@@ -419,7 +422,7 @@ end
 --- @param comp LiteralComponent The string component to register.
 local function register_literal_comp(comp)
 	if comp ~= "" then
-		Statusline.push(comp,true)
+		Statusline.push(comp, true)
 	end
 	return comp
 end
@@ -490,7 +493,7 @@ M.setup = function(user_configs, DataAccessor)
 
 	Session.with_session(function(sid)
 		for _, comp in Manager.iter_pending_init_components() do
-      Component.emit_init(comp, sid)
+			Component.emit_init(comp, sid)
 		end
 		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), sid, {
 			DepGraphKind.Event,
