@@ -567,4 +567,34 @@ do
 	end
 end
 
+--- Merge the full inheritance chain of a component dynamically.
+--- It resolves all parents recursively and merges their values
+--- using dynamic lookups (`hfind_raw`) for correctness with refs and inheritance.
+---
+--- @param comp ManagedComponent The component to resolve inheritance for.
+--- @return table merged The dynamically merged table result.
+--- @return boolean had_func The dynamically merged table result.
+function M.inherit_merge_pipeline(comp, key, sid, merge)
+	local merged = {}
+	local chain, n = {}, 0
+	local pid = comp.inherit
+	while pid do
+		local c = Comps[pid]
+		n = n + 1
+		chain[n] = c
+		pid = c.inherit
+	end
+
+	local val = comp[key]
+	local had_func = false
+	for i = 1, n do
+		local p = M.lookup_dynamic_value(chain[i], key, sid)
+		if p then
+			val = merge(val, p[1])
+			had_func = had_func or p[4] or false
+		end
+	end
+
+	return merged, had_func
+end
 return M
