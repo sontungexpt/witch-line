@@ -574,7 +574,7 @@ end
 --- @param comp ManagedComponent The component to resolve inheritance for.
 --- @return table merged The dynamically merged table result.
 --- @return boolean had_func The dynamically merged table result.
-function M.inherit_merge_pipeline(comp, key, sid, merge)
+function M.inherit(comp, key, sid, merge)
 	local merged = {}
 	local chain, n = {}, 0
 	local pid = comp.inherit
@@ -585,8 +585,14 @@ function M.inherit_merge_pipeline(comp, key, sid, merge)
 		pid = c.inherit
 	end
 
-	local val = comp[key]
-	local had_func = false
+
+local val, had_func = nil, false
+
+	local r M.lookup_dynamic_value(comp, key, sid)
+if r then
+val, had_func =  r[1], r[4] or false
+end
+
 	for i = 1, n do
 		local p = M.lookup_dynamic_value(chain[i], key, sid)
 		if p then
