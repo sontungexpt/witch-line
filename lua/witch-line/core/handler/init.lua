@@ -217,10 +217,6 @@ local function bind_dependencies(comp)
 			link_dependency(comp, ref.events, DepGraphKind.Event)
 		end
 
-		if ref.user_events then
-			link_dependency(comp, ref.user_events, DepGraphKind.Event)
-		end
-
 		if ref.timing then
 			link_dependency(comp, ref.timing, DepGraphKind.Timer)
 		end
@@ -250,15 +246,11 @@ local function bind_update_conditions(comp)
 	end
 
 	if comp.events then
-		Event.register_events(comp, "events")
+		Event.register_events(comp)
 	end
 
 	if comp.min_screen_width then
 		Event.register_vim_resized(comp)
-	end
-
-	if comp.user_events then
-		Event.register_events(comp, "user_events")
 	end
 end
 

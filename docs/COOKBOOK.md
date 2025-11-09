@@ -218,13 +218,15 @@ local component = {
 
   **Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
 
+  **Syntax**: "EventName pattern1,pattern2"
+
   **Example**:
 
   - Type: `string[]`
 
   ```lua
   local component = {
-      events = {"BufEnter", "CursorHold"}
+      events = {"BufEnter", "CursorHold", "User VeryLazy,LazyLoad", "BufEnter *lua,*js"}
   }
   ```
 
@@ -233,34 +235,6 @@ local component = {
   ```lua
   local component = {
       events = "BufEnter"
-  }
-  ```
-
-- **user_events**:
-
-  | **Type**   | **Description**                                                     |
-  | ---------- | ------------------------------------------------------------------- |
-  | `string[]` | A list of user-defined events that the component listens to.        |
-  | `string`   | A single user-defined event that the component listens to.          |
-  | `nil`      | The component will not listen to any user-defined events (default). |
-
-  **Description**: A list of user-defined events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any user-defined events. You can trigger a user-defined event using `vim.api.nvim_exec_autocmds("User", {pattern = "YourEventName"})`.
-
-  **Example**:
-
-  - Type: `string[]`
-
-  ```lua
-  local component = {
-      user_events = {"LazyLoad", "AnotherEvent"}
-  }
-  ```
-
-  - Type: `string`
-
-  ```lua
-  local component = {
-      user_events = "LazyLoad"
   }
   ```
 
@@ -406,7 +380,7 @@ local component = {
 
   **Example**:
 
-   - Type: `fun(self, session_id): nil`
+  - Type: `fun(self, session_id): nil`
 
   ```lua
   local component = {
@@ -416,7 +390,7 @@ local component = {
   }
   ```
 
-    - Type: `string`
+  - Type: `string`
 
   ```lua
   -- my/module/path.lua
@@ -902,20 +876,20 @@ An component can reference other components for some of its fields. This allows 
 
   **Description**: A table that maps fields of the current component to the ids of other components. This allows for referencing specific fields from other components without inheriting all their fields. The fields that can be referenced are:
 
-  | Field              | Type                 | Description                                                                               |
-  | ------------------ | -------------------- | ----------------------------------------------------------------------------------------- |
-  | `events`           | `CompId \| CompId[]` | The component will be updated when the referenced events are triggered.                   |
-  | `user_events`      | `CompId \| CompId[]` | The component will be updated when the referenced user-defined events are triggered.      |
-  | `timing`           | `CompId \| CompId[]` | The component will be updated based on the timing provided by the referenced components.  |
-  | `style`            | `CompId`             | The style of the component will be taken from the referenced component.                   |
-  | `left_style`       | `CompId`             | The style of the left separator of component will be taken from the referenced component.                   |
-  | `right_style`      | `CompId`             | The style of the right separator of component will be taken from the referenced component.                   |
-  | `left`             | `CompId`             | The left separator of  the component will be taken from the referenced component.                   |
-  | `right`            | `CompId`             | The right separator of the component will be taken from the referenced component.                   |
-  | `static`           | `CompId`             | The component will be updated with static values from the referenced component.           |
-  | `context`          | `CompId`             | The component will be updated with context values from the referenced component.          |
-  | `hidden`           | `CompId \| CompId[]` | The component will be hidden when the referenced components are hidden.                   |
-  | `min_screen_width` | `CompId \| CompId[]` | The component will be updated with min screen width logic from the referenced components. |
+  | Field              | Type                 | Description                                                                                |
+  | ------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
+  | `events`           | `CompId \| CompId[]` | The component will be updated when the referenced events are triggered.                    |
+  | `user_events`      | `CompId \| CompId[]` | The component will be updated when the referenced user-defined events are triggered.       |
+  | `timing`           | `CompId \| CompId[]` | The component will be updated based on the timing provided by the referenced components.   |
+  | `style`            | `CompId`             | The style of the component will be taken from the referenced component.                    |
+  | `left_style`       | `CompId`             | The style of the left separator of component will be taken from the referenced component.  |
+  | `right_style`      | `CompId`             | The style of the right separator of component will be taken from the referenced component. |
+  | `left`             | `CompId`             | The left separator of the component will be taken from the referenced component.           |
+  | `right`            | `CompId`             | The right separator of the component will be taken from the referenced component.          |
+  | `static`           | `CompId`             | The component will be updated with static values from the referenced component.            |
+  | `context`          | `CompId`             | The component will be updated with context values from the referenced component.           |
+  | `hidden`           | `CompId \| CompId[]` | The component will be hidden when the referenced components are hidden.                    |
+  | `min_screen_width` | `CompId \| CompId[]` | The component will be updated with min screen width logic from the referenced components.  |
 
   **Example**:
 
