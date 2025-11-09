@@ -89,31 +89,39 @@ local function update_component(comp, sid)
 						store[comp.id] = style
 					end
 				else
-					style, ref_comp = Manager.lookup_dynamic_value(comp, "style", sid, {})
-					if style then
-						style_updated = Component.update_style(comp, style, ref_comp)
+					local result = Manager.lookup_dynamic_value(comp, "style", sid, {})
+					if result then
+						style_updated = Component.update_style(comp, result[1], result[2])
 					end
 				end
 				Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
 				--- Left part
-				local lval, lref = Manager.lookup_dynamic_value(comp, "left", sid, {})
-				local is_left_func = type(lref.left) == "function"
-				lval = format_side_value(lval, is_left_func)
-				if lval then
-					Statusline.set_side_value(indices, "left", lval, is_left_func)
-					local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
-					Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name, left_style_updated)
+				local result = Manager.lookup_dynamic_value(comp, "left", sid, {})
+				if result then
+					local lval, lref = result[1], result[2]
+					local is_left_func = type(lref.left) == "function"
+					lval = format_side_value(lval, is_left_func)
+					if lval then
+						Statusline.set_side_value(indices, "left", lval, is_left_func)
+						local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
+						Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name, left_style_updated)
+					end
 				end
 
 				--- Right part
-				local rval, rref = Manager.lookup_dynamic_value(comp, "right", sid, {})
-				local is_right_func = type(rref.right) == "function"
-				rval = format_side_value(rval, is_right_func)
-				if rval then
-					Statusline.set_side_value(indices, "right", rval, is_right_func)
-					local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
-					Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name, right_style_updated)
+
+				result = Manager.lookup_dynamic_value(comp, "right", sid, {})
+				if result then
+					local rval, rref = result[1], result[2]
+					local is_right_func = type(rref.right) == "function"
+					rval = format_side_value(rval, is_right_func)
+					if rval then
+						Statusline.set_side_value(indices, "right", rval, is_right_func)
+						local right_style_updated =
+							Component.update_side_style(comp, "right", style, style_updated, sid)
+						Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name, right_style_updated)
+					end
 				end
 
 				if comp.on_click then
@@ -192,7 +200,7 @@ end
 --- Update multiple components by their IDs.
 --- @param ids CompId[] The IDs of the components to update.
 --- @param sid SessionId The ID of the process to use for this update.
---- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[] Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 M.update_comp_graph_by_ids = function(ids, sid, dep_graph_kind, seen)
 	seen = seen or {}

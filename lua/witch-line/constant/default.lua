@@ -19,7 +19,6 @@ return {
 	"diagnostic.warn",
 	"diagnostic.info",
 
-
 	"indent",
 	"encoding",
 	"cursor.pos",

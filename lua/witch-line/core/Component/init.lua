@@ -235,6 +235,7 @@ local SepStyle = {
 --- @field _plug_provided true Mark as created by witch-line
 
 --- @class ManagedComponent : Component, DefaultComponent
+--- @field id CompId the id of component
 --- @field [integer] CompId -- Child components by their IDs
 --- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
 --- @field _loaded true Always true, indicates that the component has been loaded
