@@ -5,6 +5,7 @@ local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
+local Highlight = require("witch-line.core.highlight")
 local Session = require("witch-line.core.Session")
 local Manager = require("witch-line.core.manager")
 local DepGraphKind = Manager.DepGraphKind
@@ -23,16 +24,6 @@ local hide_component = function(comp)
 	Statusline.hide_segment(indices)
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
-
--- --- Ensure component inherits correctly.
--- --- @param comp Component component to ensure inheritance from parent
--- local function ensure_inheritance(comp)
--- 	-- It's just a abstract component then no need to really update
--- 	if comp.inherit and not Component.has_parent(comp) then
--- 		local parent = Manager.get_comp(comp.inherit)
--- 		if parent then Component.inherit_parent(comp, parent) end
--- 	end
--- end
 
 --- Format the side value
 --- @param val any the value of the side
@@ -53,8 +44,6 @@ end
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, sid)
-	-- ensure_inheritance(comp)
-
 	Component.emit_pre_update(comp, sid)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
@@ -89,7 +78,7 @@ local function update_component(comp, sid)
 						store[comp.id] = style
 					end
 				else
-					local result = Manager.lookup_dynamic_value(comp, "style", sid, {})
+					local result = Manager.lookup_dynamic_value(comp, "style", sid)
 					if result then
 						style_updated = Component.update_style(comp, result[1], result[2])
 					end
@@ -97,7 +86,7 @@ local function update_component(comp, sid)
 				Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
 				--- Left part
-				local result = Manager.lookup_dynamic_value(comp, "left", sid, {})
+				local result = Manager.lookup_dynamic_value(comp, "left", sid)
 				if result then
 					local lval, lref = result[1], result[2]
 					local is_left_func = type(lref.left) == "function"
@@ -378,8 +367,9 @@ local function register_component(comp, parent_id)
 	-- }
 	-- If a component is made base on other component with some overrided fields
 	local comp_path = comp[0]
+	--- @cast comp_path DefaultId
 	if type(comp_path) == "string" then
-		local c = require("witch-line.core.Component").require(comp_path)
+		local c = require("witch-line.core.Component").require_by_id(comp_path)
 		-- If c is nil, assume that the user is trying to add the [0] field for other purpose
 		-- so we just ignore it
 		if c then
@@ -428,18 +418,20 @@ local function register_literal_comp(comp)
 end
 
 --- Register a component by its type.
---- @param comp Component The component to register.
+--- @param comp Component|LiteralComponent The component to register.
 --- @param parent_id CompId|nil The ID of the parent component, if any.
 --- @return Component|LiteralComponent|nil comp The registered component. Nil if registration failed.
 function M.register_combined_component(comp, parent_id)
 	local kind = type(comp)
 	if kind == "string" then
+		--- @cast comp DefaultId
 		local c = Component.require_by_id(comp)
 		if not c then
 			return register_literal_comp(comp)
 		end
 		comp = register_component(c, parent_id)
 	elseif kind == "table" and next(comp) then
+		--- @cast comp Component
 		comp = register_component(comp, parent_id)
 	else
 		-- Invalid component type

@@ -54,8 +54,6 @@ local SepStyle = {
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 ---
---- @alias Component.Static table|string
---- @alias Component.Context table|string
 ---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
@@ -156,7 +154,7 @@ local SepStyle = {
 --- - If nil: no initialization function will be called.
 --- - If string: required the string as a module and called it with the component and sid as arguments.
 --- - If function: called with the component and sid as arguments.
---- @field init nil|string|fun(self: ManagedComponent, sid: SessionId)
+--- @field init nil|fun(self: ManagedComponent, sid: SessionId)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
@@ -172,15 +170,14 @@ local SepStyle = {
 --- A static field that can be accessed by the`use_static` hook
 --- - If nil: no static will be passed.
 --- - If table: used as is.
---- - If string: required the string as a module and used as is.
---- @field static nil|Component.Static
+--- @field static nil|table
 ---
 --- A context field that can be accessed by the `use_context` hook
 --- - If nil: no context will be passed.
 --- - If function: called and its return value is used as above.
 --- - If string: required the string as a module and used as is.
 --- - Example of context function: `function(self, sid) return {buffer = vim.api.nvim_get_current_buf()} end`
---- @field context nil|Component.Context|fun(self: ManagedComponent): Component.Context
+--- @field context nil|table|fun(self: ManagedComponent): table
 ---
 --- A function that will be called before the component is updated
 --- @field pre_update nil|fun(self: ManagedComponent, sid: SessionId)
@@ -268,24 +265,6 @@ Component.setup = function(comp)
 	return id, comp
 end
 
---- Inherits the parent component's fields and methods, allowing for component extension.
---- @param comp Component the component to inherit from
---- @param parent Component the parent component to inherit from
-Component.inherit_parent = function(comp, parent)
-	setmetatable(comp, {
-		__index = function(_, key)
-			return require("witch-line.core.Component.inheritable_fields")[key] and parent[key] or nil
-		end,
-	})
-end
-
---- Checks if the component has a parent, which is used for lazy loading components.
---- @param comp Component the component to check
---- @return boolean has_parent true if the component has a parent, false otherwise
-Component.has_parent = function(comp)
-	return getmetatable(comp) ~= nil
-end
-
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
@@ -315,7 +294,14 @@ Component.emit_init = function(comp, sid)
 	if t == "function" then
 		init(comp, sid)
 	elseif t == "string" then
-		require(init)(comp, sid)
+		local msg
+		init, msg = load(init, nil, "b")
+		if init then
+			rawset(comp, "init", init)
+			init(comp, sid)
+		else
+			error(msg)
+		end
 	end
 end
 
@@ -503,19 +489,16 @@ end
 --- @param path DefaultComponentPath the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require = function(path)
-	local pos = path:find("\0", 1, true)
-	if not pos then
+	local zero = path:find("\0", 2, true)
+	if not zero then
 		return require(COMP_MODULE_PATH .. path)
 	end
 
-	local module_path, idx_path = path:sub(1, pos - 1), path:sub(pos + 1)
+	local module_path, idx_path = path:sub(1, zero - 1), path:sub(zero + 1)
 	local component = require(COMP_MODULE_PATH .. module_path)
 
-	local idxs = vim.split(idx_path, ".", { plain = true })
-	local size = #idxs
-
-	for i = 1, size do
-		component = component[idxs[i]]
+	for key in idx_path:gmatch("[^%.]+") do
+		component = component[key]
 		if not component then
 			return nil
 		end
@@ -675,6 +658,18 @@ Component.register_click_handler = function(comp)
 
 	comp._click_handler = click_handler
 	return click_handler
+end
+
+--- Determine whether a function-type value should receive the `sid` argument
+--- when being evaluated for a given key.
+---
+--- Some keys (like "context") should not receive a session ID, since
+--- their logic is independent of the session state.
+---
+--- @param key string  The key name to check
+--- @return boolean    True if the `sid` argument should be passed to the function
+Component.should_pass_sid = function(key)
+	return key ~= "context"
 end
 
 return Component

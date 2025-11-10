@@ -3,9 +3,9 @@ local fn, uv = vim.fn, vim.uv or vim.loop
 ---@class Cache
 local M = {}
 
-local sep = package.config:sub(1,1)
-local CACHED_DIR = fn.stdpath("cache") .. sep ..  "witch-line"
-local CACHED_FILE = CACHED_DIR .. sep ..  "cache.luac"
+local sep = package.config:sub(1, 1)
+local CACHED_DIR = fn.stdpath("cache") .. sep .. "witch-line"
+local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
 
 local loaded = false
 
@@ -20,7 +20,6 @@ end
 M.cache_file_readable = function()
 	return uv.fs_access(CACHED_FILE, 4) == true
 end
-
 
 --- @alias DataKey string|number
 --- @type table<DataKey, any>
@@ -42,9 +41,8 @@ M.DataAccessor = {
 	end,
 	set = function(key, value)
 		Data[key] = value
-	end
+	end,
 }
-
 
 --- Inspect the Data table
 M.inspect = function()
@@ -55,7 +53,7 @@ end
 --- @param user_configs UserConfig|nil The user configs to generate the checksum from
 M.checksum = function(user_configs)
 	local Hash = require("witch-line.utils.hash")
-  return tostring(Hash.fnv1a32(user_configs, "version"))
+	return tostring(Hash.fnv1a32(user_configs, "version"))
 	-- local hashs = {}
 	-- for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
 	-- 	hashs[i] = tostring(hash)
@@ -79,7 +77,6 @@ M.save = function(checksum)
 		return nil, nil
 	end
 
-
 	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
 	assert(uv.fs_write(fd, checksum .. "\0" .. bytecode, 0))
 	assert(uv.fs_close(fd))
@@ -87,13 +84,15 @@ end
 
 --- Clear the cache file and reset the Data table
 M.clear = function()
-	uv.fs_unlink(CACHED_FILE, function (err)
-    if err then
-      require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
-    else
-      Data = {}
-      require("witch-line.utils.notifier").info("Cache deleted successfully. Please restart Neovim for changes to take effect.")
-    end
+	uv.fs_unlink(CACHED_FILE, function(err)
+		if err then
+			require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
+		else
+			Data = {}
+			require("witch-line.utils.notifier").info(
+				"Cache deleted successfully. Please restart Neovim for changes to take effect."
+			)
+		end
 	end)
 end
 

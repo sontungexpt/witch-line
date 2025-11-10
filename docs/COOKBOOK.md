@@ -56,11 +56,10 @@ WitchLine provides some hooks to access data in module `witch-line.core.manager.
 
 - **static**:
 
-| **Type** | **Description**                                                                                                                           |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `table`  | A table that holds static data for the component.                                                                                         |
-| `string` | A module path that returns a table. This is useful when you want to lazily load the static data. (This also helps reduce cache file size) |
-| `nil`    | No static data for the component.                                                                                                         |
+| **Type** | **Description**                                   |
+| -------- | ------------------------------------------------- |
+| `table`  | A table that holds static data for the component. |
+| `nil`    | No static data for the component.                 |
 
 **Description**: A table that holds static data for the component. It can be used to store configuration or other immutable values of component.
 
@@ -92,11 +91,10 @@ local component = {
 
 - **context**:
 
-  | **Type**:                                | **Description**                                                                                                                         |
-  | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-  | `table`                                  | A table that holds dynamic data for the component.                                                                                      |
-  | `string`                                 | A module path that returns a table. It's useful when you want to lazily load the context data. (This also helps reduce cache file size) |
-  | `fun(self, session_id): table \| string` | A function that returns a table or a module path.                                                                                       |
+  | **Type**:                                | **Description**                                    |
+  | ---------------------------------------- | -------------------------------------------------- |
+  | `table`                                  | A table that holds dynamic data for the component. |
+  | `fun(self, session_id): table \| string` | A function that returns a table or a module path.  |
 
   **Description**: A table or a function that holds dynamic data for the component. It can be used to store values that can change frequently and are reactive.
 
@@ -107,20 +105,6 @@ local component = {
   - If you ensure that the context is same for all sessions by self not referencing other components (usually when context is a static table or a string path), then you can use the `self.context` directly in any function of the component like `init`, `update`, etc for better performance.
 
   **Example**:
-
-  - Type: `string`
-
-  ```lua
-  local component = {
-    context = "my.module.path",
-
-    update = function(self, session_id)
-        local hook = require("witch-line.core.manager.hook") -- Use hook to access context
-        local ctx = hook.use_context(self, session_id) --- The ctx is the table returned by the module path
-        return "Dynamic Value: " .. ctx.dynamic_value
-    end
-  }
-  ```
 
   - Type: `table`
 
@@ -371,10 +355,9 @@ local component = {
 
 - **init**:
 
-  | **Type**                     | **Description**                                                                                  |
-  | ---------------------------- | ------------------------------------------------------------------------------------------------ |
-  | `string`                     | A module path that returns a function. This is useful when you want to lazily load the function. |
-  | `fun(self, session_id): nil` | A function that initializes the component. It is called once when the component is created.      |
+  | **Type**                     | **Description**                                                                             |
+  | ---------------------------- | ------------------------------------------------------------------------------------------- |
+  | `fun(self, session_id): nil` | A function that initializes the component. It is called once when the component is created. |
 
   **Description**: A function that initializes the component. It is called once when the component is created right after the component is managed by WitchLine.
 
@@ -387,22 +370,6 @@ local component = {
       init = function(self, session_id)
           -- Initialization code here
       end
-  }
-  ```
-
-  - Type: `string`
-
-  ```lua
-  -- my/module/path.lua
-  local vim = vim
-  return function(self, session_id)
-    -- Initialization code here
-  end
-
-
-  -- In your component definition
-  local component = {
-    init = "my.module.path" -- The module should return a function
   }
   ```
 

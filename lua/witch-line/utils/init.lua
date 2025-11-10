@@ -13,9 +13,9 @@ local M = {}
 M.debounce = function(func, delay)
 	local timer, running = nil, false
 	return function(...)
-    if not timer then
-      timer = (vim.uv or vim.loop).new_timer()
-    elseif running then
+		if not timer then
+			timer = (vim.uv or vim.loop).new_timer()
+		elseif running then
 			---@diagnostic disable-next-line: need-check-nil
 			timer:stop()
 		end
@@ -52,33 +52,32 @@ end
 --- -- Returns 42 (function result)
 --- local result2 = M.resolve(function(x) return x * 2 end, 21)
 M.resolve = function(value, ...)
-  --- Why don't use 3 opearator expression?
-  --- Because when a value is a function and returns more than one value,
-  --- the 3 operator expression will only return the first value.
-  --- So we have to use if statement here.
-  if type(value) == "function" then
-    return value(...)
-  end
-  return value
+	--- Why don't use 3 opearator expression?
+	--- Because when a value is a function and returns more than one value,
+	--- the 3 operator expression will only return the first value.
+	--- So we have to use if statement here.
+	if type(value) == "function" then
+		return value(...)
+	end
+	return value
 end
 
 M.benchmark = function(cb, name, file_path)
-  local uv = vim.uv or vim.loop
+	local uv = vim.uv or vim.loop
 	local start = uv.hrtime()
 	cb()
 	local elapsed = (uv.hrtime() - start) / 1e6 -- Convert to milliseconds
-  local text = string.format("%s took %.2f ms\n", name, elapsed)
-  if file_path then
-    local file = io.open(file_path, "a")
-    if file then
-      --- get ms from elapsed
-      file:write(text)
-      file:close()
-    end
-  else
-    require("witch-line.utils.notifier").info(text)
-  end
+	local text = string.format("%s took %.2f ms\n", name, elapsed)
+	if file_path then
+		local file = io.open(file_path, "a")
+		if file then
+			--- get ms from elapsed
+			file:write(text)
+			file:close()
+		end
+	else
+		require("witch-line.utils.notifier").info(text)
+	end
 end
-
 
 return M

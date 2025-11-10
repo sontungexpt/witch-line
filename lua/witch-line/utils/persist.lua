@@ -1,7 +1,6 @@
 local type, pairs, tostring, load = type, pairs, tostring, load
 
-local M= {}
----Urly name to reduce collision with t==able key
+local M = {} ---Urly name to reduce collision with t==able key
 local META_FUNC = "V_REF@@__q@@$$whaw2EWdjDSldkvj23@@19"
 local META_TBL = "TBL_KEYS__dcjvlwkiwEEW3df2df ##S"
 
@@ -120,7 +119,6 @@ function M.deserialize_function(value, seen)
 		end
 	end
 
-
 	--- Start decoding functions in the current table
 	local funs = value[META_FUNC]
 	if funs then
@@ -148,69 +146,76 @@ end
 --- @param tbl table The table to serialize
 --- @return string str The serialized table as a string
 M.serialize_table = function(tbl, pretty)
-  assert(type(tbl) == "table")
-  local ffi = require("ffi")
-  local L = {}
-  function L.serialize_value(v,indent)
-    local t = type(v)
-    if t == "number" or t == "boolean" then
-      return tostring(v)
-    elseif t == "string" then
-      return string.format("%q", v)
-    elseif t == "table" then
-      return L.serialize_table(v,indent)
-      --- Support ffi style
-    elseif t == "cdata" then
-      -- Check if it's a string
-      if ffi.istype("const char*", v) or ffi.istype("char*", v) then
-        return string.format("%q", ffi.string(v))
-      elseif ffi.istype("int8_t", v) or ffi.istype("uint8_t", v) or
-             ffi.istype("int16_t", v) or ffi.istype("uint16_t", v) or
-             ffi.istype("int32_t", v) or ffi.istype("uint32_t", v) or
-             ffi.istype("int64_t", v) or ffi.istype("uint64_t", v) or
-             ffi.istype("float", v) or ffi.istype("double", v) then
-        return tostring(v)
-      elseif ffi.istype("bool", v) then
-        return tostring(v)
-      else
-        error("Unsupported cdata type: " .. tostring(ffi.typeof(v)))
-      end
-    else
-      error("Unsupported type: " .. t)
-    end
-  end
+	assert(type(tbl) == "table")
+	local ffi = require("ffi")
+	local L = {}
+	function L.serialize_value(v, indent)
+		local t = type(v)
+		if t == "number" or t == "boolean" then
+			return tostring(v)
+		elseif t == "string" then
+			return string.format("%q", v)
+		elseif t == "table" then
+			return L.serialize_table(v, indent)
+		--- Support ffi style
+		elseif t == "cdata" then
+			-- Check if it's a string
+			if ffi.istype("const char*", v) or ffi.istype("char*", v) then
+				return string.format("%q", ffi.string(v))
+			elseif
+				ffi.istype("int8_t", v)
+				or ffi.istype("uint8_t", v)
+				or ffi.istype("int16_t", v)
+				or ffi.istype("uint16_t", v)
+				or ffi.istype("int32_t", v)
+				or ffi.istype("uint32_t", v)
+				or ffi.istype("int64_t", v)
+				or ffi.istype("uint64_t", v)
+				or ffi.istype("float", v)
+				or ffi.istype("double", v)
+			then
+				return tostring(v)
+			elseif ffi.istype("bool", v) then
+				return tostring(v)
+			else
+				error("Unsupported cdata type: " .. tostring(ffi.typeof(v)))
+			end
+		else
+			error("Unsupported type: " .. t)
+		end
+	end
 
-  function L.serialize_table(t,indent)
-    ---@diagnostic disable-next-line
-    indent = indent or 0
-    local parts = { "{" }
-    local first = true
+	function L.serialize_table(t, indent)
+		---@diagnostic disable-next-line
+		indent = indent or 0
+		local parts = { "{" }
+		local first = true
 
-    for k, v in pairs(t) do
-      local key
-      if type(k) == "string" and k:match("^[_%a][_%w]*$") then
-        key = k .. "="
-      else
-        key = "[" .. L.serialize_value(k) .. "]="
-      end
-      if pretty then
-        if first then
-          parts[#parts + 1] = "\n"
-          first = false
-        end
-        parts[#parts + 1] = string.rep(" ", indent + 2)
-        parts[#parts + 1] = key .. L.serialize_value(v, indent + 2) .. ",\n"
-      else
-        parts[#parts + 1] = key .. L.serialize_value(v, indent + 2) .. ","
-      end
-    end
-    if pretty and not first then
-      parts[#parts + 1] = string.rep(" ", indent)
-    end
-    parts[#parts + 1] = "}"
-    return table.concat(parts)
-  end
-  return L.serialize_table(M.serialize_function(tbl))
+		for k, v in pairs(t) do
+			local key
+			if type(k) == "string" and k:match("^[_%a][_%w]*$") then
+				key = k .. "="
+			else
+				key = "[" .. L.serialize_value(k) .. "]="
+			end
+			if pretty then
+				if first then
+					parts[#parts + 1] = "\n"
+					first = false
+				end
+				parts[#parts + 1] = string.rep(" ", indent + 2)
+				parts[#parts + 1] = key .. L.serialize_value(v, indent + 2) .. ",\n"
+			else
+				parts[#parts + 1] = key .. L.serialize_value(v, indent + 2) .. ","
+			end
+		end
+		if pretty and not first then
+			parts[#parts + 1] = string.rep(" ", indent)
+		end
+		parts[#parts + 1] = "}"
+		return table.concat(parts)
+	end
+	return L.serialize_table(M.serialize_function(tbl))
 end
 
 --- Deserialize a table from a strings
@@ -222,9 +227,9 @@ function M.deserialize_table(str)
 		error("Failed to load table from string: " .. err)
 	end
 	local result = M.deserialize_function(func())
-  if type(result) ~= "table" then
-    error("Deserialized string did not return a table")
-  end
+	if type(result) ~= "table" then
+		error("Deserialized string did not return a table")
+	end
 	return result
 end
 
@@ -232,7 +237,7 @@ end
 --- @param tbl table The table to serialize
 --- @return string bytecode The serialized table as Lua bytecode
 function M.serialize_table_as_bytecode(tbl)
-	local str = M.serialize_table(tbl,false)
+	local str = M.serialize_table(tbl, false)
 
 	local func, err = load("return " .. str)
 	if not func then
@@ -252,9 +257,9 @@ function M.deserialize_table_from_bytecode(bytecode)
 	end
 
 	local result = M.deserialize_function(func())
-  if type(result) ~= "table" then
-    error("Deserialized bytecode did not return a table")
-  end
+	if type(result) ~= "table" then
+		error("Deserialized bytecode did not return a table")
+	end
 	return result
 end
 

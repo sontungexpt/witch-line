@@ -34,12 +34,12 @@ local commands = {
 			flexible_priority_sorted = function()
 				require("witch-line.core.statusline").inspect("flexible_priority_sorted")
 			end,
-      values = function()
-        require("witch-line.core.statusline").inspect("statusline")
-      end,
-      [FALLBACK_KEY] = function()
-        require("witch-line.core.statusline").inspect("statusline")
-      end,
+			values = function()
+				require("witch-line.core.statusline").inspect("statusline")
+			end,
+			[FALLBACK_KEY] = function()
+				require("witch-line.core.statusline").inspect("statusline")
+			end,
 		},
 	},
 }
@@ -88,13 +88,13 @@ api.nvim_create_user_command("WitchLine", function(a)
 
 	if type(work) == "function" then
 		work(arg, a)
-  elseif type(work) == "table" then
-    local fallback = work[FALLBACK_KEY]
-    if type(fallback) == "function" then
-      fallback(arg, a)
-    else
-      require("witch-line.utils.notifier").error("WitchLine: Incomplete command. Subcommand required.")
-    end
+	elseif type(work) == "table" then
+		local fallback = work[FALLBACK_KEY]
+		if type(fallback) == "function" then
+			fallback(arg, a)
+		else
+			require("witch-line.utils.notifier").error("WitchLine: Incomplete command. Subcommand required.")
+		end
 	end
 end, {
 	nargs = "*",

@@ -26,7 +26,7 @@ local EventStore = {
 	-- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for user-defined events
 	-- },
 
-	-- spectial_events = {
+	-- special_events = {
 	--   {
 	--     name = "BufEnter",
 	--     pattern = "*lua"
