@@ -14,6 +14,7 @@ local SepStyle = {
 	SepBg = 2,
 	Reverse = 3, -- use the reverse style of the component }
 }
+Component.SepStyle = SepStyle
 
 --- @class CompId : string
 
@@ -305,142 +306,18 @@ Component.emit_init = function(comp, sid)
 	end
 end
 
---- Ensures that a component has a highlight name.
---- If it doesn't, it will be inherited from the reference component or generated.
---- @param comp Component the component to ensure has a highlight name
---- @param ref_comp Component the reference component to inherit from if necessary
---- @return string hl_name The highlight name of the component
-local ensure_hl_name = function(comp, ref_comp)
-	local hl_name = comp._hl_name
-	if hl_name then
-		return hl_name
-	elseif comp ~= ref_comp then
-		hl_name = ref_comp._hl_name
-		if not hl_name then
-			hl_name = Highlight.make_hl_name_from_id(ref_comp.id)
-			rawset(ref_comp, "_hl_name", hl_name)
-		end
-	else
-		hl_name = Highlight.make_hl_name_from_id(comp.id)
-	end
-	rawset(comp, "_hl_name", hl_name)
-	return hl_name
-end
-
---- Determines if the component's style should be updated.
---- @param comp Component the component to checks
---- @param ref_comp Component the reference component to compare against
---- @return boolean should_update true if the style should be updated, false otherwise
-local needs_style_update = function(comp, ref_comp)
-	return comp._hl_name == nil or type(ref_comp.style) == "function"
-end
-Component.needs_style_update = needs_style_update
-
---- Updates the style of the component.
---- @param comp Component the component to update
---- @param style CompStyle the style to apply to the component
---- @param ref_comp Component the reference component to inherit from if necessary
---- @param force boolean|nil if true, forces the style to be updated even if it doesn't need to be
---- @return boolean updated true if the style was updated, false otherwise
-Component.update_style = function(comp, style, ref_comp, force)
-	if not style then
-		return false
-	elseif not force and not needs_style_update(comp, ref_comp) then
-		return false
-	end
-	return Highlight.highlight(ensure_hl_name(comp, ref_comp), style)
-end
-
 --- Returns the field name for the highlight name of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
 --- @return string field_name the field name for the highlight name of the specified side
-local function hl_name_field(side)
+Component.hl_name_field = function(side)
 	return side == "left" and "_left_hl_name" or "_right_hl_name"
 end
 
 --- Returns the field name for the style of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
 --- @return string field_name the field name for the style of the specified side
-local function style_field(side)
+Component.side_style_field = function(side)
 	return side == "left" and "left_style" or "right_style"
-end
-
---- Determines if the separator style needs to be updated.
---- @param comp Component the component to checks
---- @param side "left"|"right" the side to check, either "left" or "right"
---- @param side_style CompStyle|SepStyle the style of the side to check
---- @param main_style_updated boolean true if the main style was updated, false otherwise
---- @return boolean needs_update true if the style needs to be updated, false otherwise
-Component.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-	if not comp[hl_name_field(side)] then
-		return true
-	elseif type(comp[style_field(side)]) == "function" then
-		return true
-	elseif main_style_updated then
-		return type(side_style) == "number"
-			and (
-				side_style == SepStyle.SepFg
-				or side_style == SepStyle.SepBg
-				or side_style == SepStyle.Reverse
-				or side_style == SepStyle.Inherited
-			)
-	end
-	return false
-end
-
---- Ensures that a component has a highlight name for the specified side (left or right).
---- If it doesn't, it will be generated based on the component's id.
---- @param comp Component the component to ensure has a highlight name for the specified side
---- @param side "left"|"right" the side to ensure has a highlight name, either "left" or "right"
-local ensure_side_hl_name = function(comp, side)
-	local field = hl_name_field(side)
-	local hl_name = comp[field]
-	if not hl_name then
-		--- If the component already has a main highlight name, use it as the base
-		hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
-		rawset(comp, field, hl_name)
-	end
-	return hl_name
-end
-
---- Updates the style of a side (left or right) of the component.
---- @param comp Component the component to update
---- @param side "left"|"right" the side to update
---- @param main_style CompStyle|nil the main style of the component, used for inheriting styles
---- @param main_style_updated boolean true if the main style was updated, false otherwise
---- @param sid SessionId the session id to use for the component
---- @return boolean updated true if the style was updated, false otherwise
-Component.update_side_style = function(comp, side, main_style, main_style_updated, sid)
-	local side_style = resolve(comp[style_field(side)] or SepStyle.SepBg, comp, sid)
-	if not Component.needs_side_style_update(comp, side, side_style, main_style_updated) then
-		return false
-	end
-
-	if type(side_style) == "number" and main_style then
-		if side_style == SepStyle.SepFg then
-			side_style = {
-				fg = main_style.fg,
-				bg = "NONE",
-			}
-		elseif side_style == SepStyle.SepBg then
-			side_style = {
-				fg = main_style.bg,
-				bg = "NONE",
-			}
-		elseif side_style == SepStyle.Reverse then
-			side_style = {
-				fg = main_style.bg,
-				bg = main_style.fg,
-			}
-		elseif side_style == SepStyle.Inherited then
-			rawset(comp, hl_name_field(side), comp._hl_name)
-			return true
-		else
-			--- invalid styles
-			return false
-		end
-	end
-	return Highlight.highlight(ensure_side_hl_name(comp, side), side_style)
 end
 
 --- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
