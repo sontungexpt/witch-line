@@ -435,55 +435,6 @@ end
 do
 	local inherited_cache = {}
 
-	--- Internal helper: Build the inheritance chain for a component.
-	---
-	--- This function walks upward through the component’s `inherit` hierarchy,
-	--- collecting all ancestor components in **inheritance order**
-	--- (i.e., starting from the immediate parent → grandparent → ...).
-	---
-	--- ### Behavior
-	--- - Starts from `comp.inherit`, and continues until a component has no further parent.
-	--- - Each resolved parent component (via `Comps[pid]`) is added to the `chain` array.
-	--- - If a missing parent (`Comps[pid] == nil`) is encountered, the traversal stops early.
-	--- - The function does **not** detect cycles — it assumes that inheritance graphs are acyclic.
-	---
-	--- ### Example
-	--- ```
-	--- A (root)
-	---  ↑
-	---  B (inherits A)
-	---  ↑
-	---  C (inherits B)
-	---
-	--- build_chain(C)  -->  { B, A }, 2
-	--- ```
-	---
-	--- ### Returns
-	--- - `chain`: table[] — An array of parent components in order of inheritance.
-	--- - `count`: integer — The total number of parent components collected.
-	---
-	--- ### Notes
-	--- - This function is used internally by both `M.plain_inherit()` and `M.dynamic_inherit()`
-	---   to determine which components’ values should be merged.
-	--- - The chain is ordered so that merges can be performed in child → parent order.
-	---
-	--- @param comp ManagedComponent  The component whose inheritance chain should be built.
-	--- @return table chain           List of parent components (ordered by inheritance).
-	--- @return integer count         The number of parent components found.
-	local function build_chain(comp)
-		local chain, i, pid = {}, 0, comp.inherit
-		while pid do
-			local c = Comps[pid]
-			if not c then
-				break
-			end
-			i = i + 1
-			chain[i] = c
-			pid = c.inherit
-		end
-		return chain, i
-	end
-
 	--- Resolve and merge inherited values for a given component key (static version).
 	---
 	--- This function performs a **static inheritance resolution**, meaning it only
@@ -509,11 +460,15 @@ do
 	--- - Suitable for configuration-style data that is fixed at definition time
 	---   and does not depend on session context or function evaluation.
 	---
-	--- @param comp ManagedComponent           The component whose key should be resolved.
-	--- @param key string                      The key name to resolve and merge.
-	--- @param merge fun(a: any, b: any): any  Function used to merge values along the inheritance chain.
-	--- @param self_val any|nil                Optional value to replace the component’s own key before merging.
-	--- @return any val                        The final merged (static) result.
+	--- @param comp ManagedComponent The component whose key should be resolved.
+	--- @param key string The key name to resolve and merge.
+	--- @param merge fun(a: any, b: any, n: integer): any Function used to combine two values (`a` and `b`) in inheritance order.
+	--- - `a` → the previously merged value (or the component’s own value at first)
+	--- - `b` → the parent component’s value being merged
+	--- - `n` → the total number of parents in the inheritance chain
+	--- Must return the merged result.
+	--- @param self_val any|nil Optional value to replace the component’s own key before merging.
+	--- @return any val The final merged (static) result.
 	function M.plain_inherit(comp, key, merge, self_val)
 		local cid = comp.id
 		local key_cache = inherited_cache[key]
@@ -522,21 +477,30 @@ do
 			return val
 		end
 
-		local chain, n = build_chain(comp)
-
 		local seen = {}
 		local lookup_plain_value = M.lookup_plain_value
 		local r = self_val or lookup_plain_value(comp, key, seen)
 		if r then
 			val = r[1]
 		end
+		local chain, n, pid = {}, 0, comp.inherit
+		while pid do
+			local c = Comps[pid]
+			if not c then
+				break
+			end
+			r = lookup_plain_value(c, key, seen)
+			if r then
+				n = n + 1
+				chain[n] = r[1]
+			end
+			pid = c.inherit
+		end
 
 		for i = 1, n do
-			r = lookup_plain_value(chain[i], key, seen)
-			if r then
-				val = merge(val, r[1])
-			end
+			val = merge(val, chain[i], n)
 		end
+
 		if not self_val then
 			if key_cache then
 				key_cache[cid] = val
@@ -578,13 +542,16 @@ do
 	---   depends on runtime/session context.
 	--- - The optional `initial_val` is used **instead of** the value resolved from the component itself.
 	---
-	--- @param comp ManagedComponent            The component whose key should be resolved.
-	--- @param key string                       The key name to resolve and merge along the inheritance chain.
-	--- @param sid SessionId                    The session ID used for caching dynamic values.
-	--- @param merge fun(a: any, b: any): any   Function that merges two values in inheritance order.
-	--- @param self_val any|nil                 Optional value to replace the component’s own key before merging.
-	--- @return any merged                      The final merged value after inheritance resolution.
-	--- @return boolean dynamic                 Whether the result is dynamic (true if function-evaluated or session-based).
+	--- @param comp ManagedComponent The component whose key should be resolved.
+	--- @param key string The key name to resolve and merge.
+	--- @param merge fun(a: any, b: any, n: integer): any Function used to combine two values (`a` and `b`) in inheritance order.
+	--- - `a` → the previously merged value (or the component’s own value at first)
+	--- - `b` → the parent component’s value being merged
+	--- - `n` → the total number of parents in the inheritance chain
+	--- Must return the merged result.
+	--- @param self_val any|nil Optional value to replace the component’s own key before merging.
+	--- @return any val The final merged (static) result.
+	--- @return boolean dynamic Whether the result is dynamic (true if function-evaluated or session-based).
 	function M.dynamic_inherit(comp, key, sid, merge, self_val)
 		local cid = comp.id
 		local key_cache = inherited_cache[key]
@@ -600,9 +567,6 @@ do
 		if val then
 			return val, true
 		end
-
-		local chain, n = build_chain(comp)
-
 		local dynamic, seen = nil, {}
 		local lookup_dynamic_value = M.lookup_dynamic_value
 		local r = self_val or lookup_dynamic_value(comp, key, sid, seen)
@@ -610,12 +574,23 @@ do
 			val, dynamic = r[1], r[4]
 		end
 
-		for i = 1, n do
-			r = lookup_dynamic_value(chain[i], key, sid, seen)
+		local chain, n, pid = {}, 0, comp.inherit
+		while pid do
+			local c = Comps[pid]
+			if not c then
+				break
+			end
+			r = lookup_dynamic_value(c, key, sid, seen)
 			if r then
-				val = merge(val, r[1])
+				n = n + 1
+				chain[n] = r[1]
 				dynamic = dynamic or r[4]
 			end
+			pid = c.inherit
+		end
+
+		for i = 1, n do
+			val = merge(val, chain[i], n)
 		end
 
 		if dynamic then

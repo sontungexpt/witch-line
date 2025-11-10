@@ -129,10 +129,11 @@ end
 --- -- Result: child color kept, inherits missing fields from Comment group
 --- ```
 ---
---- @param child CompStyle|nil   The child highlight definition (fields take precedence).
---- @param parent CompStyle|nil  The parent highlight definition or group name.
---- @return CompStyle            The merged highlight table (or the child table if no merge occurred).
-M.merge_hl = function(child, parent)
+--- @param child CompStyle|nil The child highlight definition (fields take precedence).
+--- @param parent CompStyle|nil The parent highlight definition or group name.
+--- @param n integer The total number of parents in the inheritance chain
+--- @return CompStyle merged The merged highlight table (or the child table if no merge occurred).
+M.merge_hl = function(child, parent, n)
 	local pt = type(parent)
 	if pt == "table" then
 		if not parent.link then

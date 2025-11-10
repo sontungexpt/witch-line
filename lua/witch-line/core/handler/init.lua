@@ -42,6 +42,21 @@ end
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param sid SessionId The ID of the process to use for this update.
+local function update_style(comp, sid)
+	if comp._hl_name then
+		return nil
+	else
+		local result, force = Manager.dynamic_inherit(comp, "style", sid, Highlight.merge_hl)
+		if result then
+			style_updated = Component.update_style(comp, result[1], result[2])
+		end
+		return nil
+	end
+end
+
+--- Update a component and its value in the statusline.
+--- @param comp Component The component to update.
+--- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, sid)
 	Component.emit_pre_update(comp, sid)
@@ -70,6 +85,7 @@ local function update_component(comp, sid)
 				Statusline.set_value(indices, value)
 				local style_updated, ref_comp = false, comp
 				if style then
+					update_style(comp, sid)
 					style_updated = Component.update_style(comp, style, ref_comp, true)
 					--- Sync style to session store
 					--- This is make sure that the `use_style` hooks always get the latest style
