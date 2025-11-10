@@ -69,20 +69,20 @@ return {
 	},
 	context = function(self)
 		return {
-      mode = vim.api.nvim_get_mode().mode
-    }
+			mode = vim.api.nvim_get_mode().mode,
+		}
 	end,
-  style = function (self, session_id)
-    local static = self.static
-    --- @cast static {mode_colors: table<string, {fg: string}>, modes: table<string, { [1]: string, [2]: string}>}
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+	style = function(self, session_id)
+		local static = self.static
+		--- @cast static {mode_colors: table<string, {fg: string}>, modes: table<string, { [1]: string, [2]: string}>}
+		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		local mode_code = ctx.mode
 		return static.mode_colors[static.modes[mode_code][2]] or {}
 	end,
 	update = function(self, session_id)
-    local static = self.static
-    --- @cast static {modes: table<string, { [1]: string, [2]: string}>}
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		local static = self.static
+		--- @cast static {modes: table<string, { [1]: string, [2]: string}>}
+		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		local mode_code = ctx.mode
 		local mode = static.modes[mode_code]
 		return mode and mode[1] or mode_code

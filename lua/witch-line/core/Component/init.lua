@@ -1,7 +1,7 @@
 local require, type, str_rep, rawset = require, type, string.rep, rawset
-local resolve = require("witch-line.utils").resolve
 
 local Highlight = require("witch-line.core.highlight")
+local resolve = require("witch-line.utils").resolve
 
 local COMP_MODULE_PATH = "witch-line.components."
 
@@ -15,15 +15,14 @@ local SepStyle = {
 	Reverse = 3, -- use the reverse style of the component }
 }
 
+--- @class CompId : string
 
---- @class CompId : Id
-
---- @class Ref : table
+--- @class Reference : table
 --- @field events CompId|CompId[]|nil A table of ids of components that this component references
---- @field user_events CompId|CompId[]|nil A table of ids of components that this component references
 --- @field timing CompId|CompId[]|nil A table of ids of components that this component references
 --- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
 --- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
+---
 --- @field static CompId|nil A id of a component that this component references for its static values
 --- @field context CompId|nil A id of a component that this component references for its context
 --- @field style CompId|nil A id of a component that this component references for its style
@@ -55,8 +54,6 @@ local SepStyle = {
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 ---
---- @alias Component.Static table|string
---- @alias Component.Context table|string
 ---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
@@ -84,9 +81,6 @@ local SepStyle = {
 --- A table of events that the component will listen to
 --- @field events string|string[]|nil
 ---
---- A table of user events that the component will listen to
---- @field user_events string|string[]|nil
----
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
 --- - If nil: always visible.
@@ -94,7 +88,7 @@ local SepStyle = {
 --- - Example of min_screen_width function: `function(self: ManagedComponent, sid: SessionId) return 80 end`
 --- @field min_screen_width integer|nil|fun(self: ManagedComponent, sid: SessionId):number|nil
 ---
---- @field ref Ref|nil A table of references to other components that this component depends on
+--- @field ref Reference|nil A table of references to other components that this component depends on
 ---
 --- @field neighbors Neighbor[]|nil A table of neighbor components that this component is related to ( Not implemented yet )
 ---
@@ -160,7 +154,7 @@ local SepStyle = {
 --- - If nil: no initialization function will be called.
 --- - If string: required the string as a module and called it with the component and sid as arguments.
 --- - If function: called with the component and sid as arguments.
---- @field init nil|string|fun(self: ManagedComponent, sid: SessionId)
+--- @field init nil|fun(self: ManagedComponent, sid: SessionId)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
@@ -176,15 +170,14 @@ local SepStyle = {
 --- A static field that can be accessed by the`use_static` hook
 --- - If nil: no static will be passed.
 --- - If table: used as is.
---- - If string: required the string as a module and used as is.
---- @field static nil|Component.Static
+--- @field static nil|table
 ---
 --- A context field that can be accessed by the `use_context` hook
 --- - If nil: no context will be passed.
 --- - If function: called and its return value is used as above.
 --- - If string: required the string as a module and used as is.
 --- - Example of context function: `function(self, sid) return {buffer = vim.api.nvim_get_current_buf()} end`
---- @field context nil|Component.Context|fun(self: ManagedComponent): Component.Context
+--- @field context nil|table|fun(self: ManagedComponent): table
 ---
 --- A function that will be called before the component is updated
 --- @field pre_update nil|fun(self: ManagedComponent, sid: SessionId)
@@ -239,6 +232,7 @@ local SepStyle = {
 --- @field _plug_provided true Mark as created by witch-line
 
 --- @class ManagedComponent : Component, DefaultComponent
+--- @field id CompId the id of component
 --- @field [integer] CompId -- Child components by their IDs
 --- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
 --- @field _loaded true Always true, indicates that the component has been loaded
@@ -254,7 +248,7 @@ end
 --- @return CompId id the id of the component
 --- @return Component|DefaultComponent|nil comp the component itself, or nil if it is a default component
 Component.setup = function(comp)
-  require("witch-line.core.Component.initial_state").save_initial_context(comp)
+	require("witch-line.core.Component.initial_state").save_initial_context(comp)
 
 	local id = comp.id
 	if comp._plug_provided then
@@ -271,30 +265,11 @@ Component.setup = function(comp)
 	return id, comp
 end
 
---- Inherits the parent component's fields and methods, allowing for component extension.
---- @param comp Component the component to inherit from
---- @param parent Component the parent component to inherit from
-Component.inherit_parent = function(comp, parent)
-	setmetatable(comp, {
-		__index = function(_, key)
-			return require("witch-line.core.Component.inheritable_fields")[key]
-        and parent[key] or nil
-		end,
-	})
-end
-
---- Checks if the component has a parent, which is used for lazy loading components.
---- @param comp Component the component to check
---- @return boolean has_parent true if the component has a parent, false otherwise
-Component.has_parent = function(comp)
-	return getmetatable(comp) ~= nil
-end
-
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
 Component.emit_pre_update = function(comp, sid)
-  local pre_update = comp.pre_update
+	local pre_update = comp.pre_update
 	if type(pre_update) == "function" then
 		pre_update(comp, sid)
 	end
@@ -304,7 +279,7 @@ end
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy
 Component.emit_post_update = function(comp, sid)
-  local post_update = comp.post_update
+	local post_update = comp.post_update
 	if type(post_update) == "function" then
 		post_update(comp, sid)
 	end
@@ -314,15 +289,21 @@ end
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
 Component.emit_init = function(comp, sid)
-  local init = comp.init
-  local t = type(init)
-  if t == "function" then
-    init(comp, sid)
-  elseif t == "string" then
-    require(init)(comp, sid)
-  end
+	local init = comp.init
+	local t = type(init)
+	if t == "function" then
+		init(comp, sid)
+	elseif t == "string" then
+		local msg
+		init, msg = load(init, nil, "b")
+		if init then
+			rawset(comp, "init", init)
+			init(comp, sid)
+		else
+			error(msg)
+		end
+	end
 end
-
 
 --- Ensures that a component has a highlight name.
 --- If it doesn't, it will be inherited from the reference component or generated.
@@ -330,20 +311,20 @@ end
 --- @param ref_comp Component the reference component to inherit from if necessary
 --- @return string hl_name The highlight name of the component
 local ensure_hl_name = function(comp, ref_comp)
-  local hl_name = comp._hl_name
+	local hl_name = comp._hl_name
 	if hl_name then
 		return hl_name
 	elseif comp ~= ref_comp then
-    hl_name = ref_comp._hl_name
+		hl_name = ref_comp._hl_name
 		if not hl_name then
-      hl_name = Highlight.make_hl_name_from_id(ref_comp.id)
+			hl_name = Highlight.make_hl_name_from_id(ref_comp.id)
 			rawset(ref_comp, "_hl_name", hl_name)
 		end
 	else
-    hl_name = Highlight.make_hl_name_from_id(comp.id)
+		hl_name = Highlight.make_hl_name_from_id(comp.id)
 	end
-  rawset(comp, "_hl_name", hl_name)
-  return hl_name
+	rawset(comp, "_hl_name", hl_name)
+	return hl_name
 end
 
 --- Determines if the component's style should be updated.
@@ -351,7 +332,7 @@ end
 --- @param ref_comp Component the reference component to compare against
 --- @return boolean should_update true if the style should be updated, false otherwise
 local needs_style_update = function(comp, ref_comp)
-  return comp._hl_name == nil or type(ref_comp.style) == "function"
+	return comp._hl_name == nil or type(ref_comp.style) == "function"
 end
 Component.needs_style_update = needs_style_update
 
@@ -362,27 +343,26 @@ Component.needs_style_update = needs_style_update
 --- @param force boolean|nil if true, forces the style to be updated even if it doesn't need to be
 --- @return boolean updated true if the style was updated, false otherwise
 Component.update_style = function(comp, style, ref_comp, force)
-  if not style then
-    return false
-  elseif not force and not needs_style_update(comp,  ref_comp) then
+	if not style then
+		return false
+	elseif not force and not needs_style_update(comp, ref_comp) then
 		return false
 	end
 	return Highlight.highlight(ensure_hl_name(comp, ref_comp), style)
 end
 
-
 --- Returns the field name for the highlight name of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
 --- @return string field_name the field name for the highlight name of the specified side
 local function hl_name_field(side)
-  return side == "left" and "_left_hl_name" or "_right_hl_name"
+	return side == "left" and "_left_hl_name" or "_right_hl_name"
 end
 
 --- Returns the field name for the style of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
 --- @return string field_name the field name for the style of the specified side
 local function style_field(side)
-  return side == "left" and "left_style" or "right_style"
+	return side == "left" and "left_style" or "right_style"
 end
 
 --- Determines if the separator style needs to be updated.
@@ -392,36 +372,35 @@ end
 --- @param main_style_updated boolean true if the main style was updated, false otherwise
 --- @return boolean needs_update true if the style needs to be updated, false otherwise
 Component.needs_side_style_update = function(comp, side, side_style, main_style_updated)
-  if not comp[hl_name_field(side)] then
+	if not comp[hl_name_field(side)] then
 		return true
 	elseif type(comp[style_field(side)]) == "function" then
 		return true
 	elseif main_style_updated then
-		return type(side_style) == "number" and
-      (
-        side_style == SepStyle.SepFg
-        or side_style == SepStyle.SepBg
-        or side_style == SepStyle.Reverse
-        or side_style == SepStyle.Inherited
-      )
+		return type(side_style) == "number"
+			and (
+				side_style == SepStyle.SepFg
+				or side_style == SepStyle.SepBg
+				or side_style == SepStyle.Reverse
+				or side_style == SepStyle.Inherited
+			)
 	end
 	return false
 end
-
 
 --- Ensures that a component has a highlight name for the specified side (left or right).
 --- If it doesn't, it will be generated based on the component's id.
 --- @param comp Component the component to ensure has a highlight name for the specified side
 --- @param side "left"|"right" the side to ensure has a highlight name, either "left" or "right"
 local ensure_side_hl_name = function(comp, side)
-  local field = hl_name_field(side)
-  local hl_name = comp[field]
+	local field = hl_name_field(side)
+	local hl_name = comp[field]
 	if not hl_name then
 		--- If the component already has a main highlight name, use it as the base
-    hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
+		hl_name = comp._hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
 		rawset(comp, field, hl_name)
 	end
-  return hl_name
+	return hl_name
 end
 
 --- Updates the style of a side (left or right) of the component.
@@ -455,15 +434,14 @@ Component.update_side_style = function(comp, side, main_style, main_style_update
 			}
 		elseif side_style == SepStyle.Inherited then
 			rawset(comp, hl_name_field(side), comp._hl_name)
-      return true
+			return true
 		else
 			--- invalid styles
 			return false
 		end
 	end
-  return Highlight.highlight(ensure_side_hl_name(comp, side), side_style)
+	return Highlight.highlight(ensure_side_hl_name(comp, side), side_style)
 end
-
 
 --- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
 --- @param comp Component the component to resolveuate
@@ -482,9 +460,7 @@ Component.evaluate = function(comp, sid)
 			local pad = str_rep(" ", padding)
 			result = pad .. result .. pad
 		elseif p_type == "table" then
-			local left, right =
-				resolve(padding.left, comp, sid),
-				resolve(padding.right, comp, sid)
+			local left, right = resolve(padding.left, comp, sid), resolve(padding.right, comp, sid)
 
 			if type(left) == "number" and left > 0 then
 				result = str_rep(" ", left) .. result
@@ -502,10 +478,10 @@ end
 --- @param id CompId the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require_by_id = function(id)
-  local path = require("witch-line.constant.id").path(id)
-  if not path then
-    return nil
-  end
+	local path = require("witch-line.constant.id").path(id)
+	if not path then
+		return nil
+	end
 	return Component.require(path)
 end
 
@@ -513,19 +489,16 @@ end
 --- @param path DefaultComponentPath the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require = function(path)
-  local pos = path:find("\0", 1, true)
-  if not pos then
-    return require(COMP_MODULE_PATH .. path)
-  end
+	local zero = path:find("\0", 2, true)
+	if not zero then
+		return require(COMP_MODULE_PATH .. path)
+	end
 
-  local module_path, idx_path = path:sub(1, pos - 1), path:sub(pos + 1)
-  local component = require(COMP_MODULE_PATH .. module_path)
+	local module_path, idx_path = path:sub(1, zero - 1), path:sub(zero + 1)
+	local component = require(COMP_MODULE_PATH .. module_path)
 
-	local idxs = vim.split(idx_path, ".", { plain = true })
-	local size = #idxs
-
-	for i = 1, size do
-		component = component[idxs[i]]
+	for key in idx_path:gmatch("[^%.]+") do
+		component = component[key]
 		if not component then
 			return nil
 		end
@@ -536,7 +509,7 @@ end
 --- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
 --- @param comp Component the component to remove the state from
 Component.format_state_before_cache = function(comp)
-  require("witch-line.core.Component.initial_state").restore_initial_context(comp)
+	require("witch-line.core.Component.initial_state").restore_initial_context(comp)
 	rawset(comp, "_hidden", nil)
 	local temp = comp.temp
 	if type(temp) == "table" then
@@ -548,7 +521,6 @@ Component.format_state_before_cache = function(comp)
 	end
 	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
 end
-
 
 --- Recursively overrides the values of a component with the values from another component.
 --- If the types of the values are different, the value from the original component is kept.
@@ -601,7 +573,8 @@ Component.overrides = function(comp, override)
 		local types_accepted = accepted[k]
 		if types_accepted then
 			local type_v = type(v)
-			if type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
+			if
+				type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
 				or types_accepted == type_v -- single type
 			then
 				if type_v == "table" then
@@ -640,51 +613,63 @@ end
 --- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
 --- @throws if has an invalid field type
 Component.register_click_handler = function(comp)
-  local click_handler = comp._click_handler
-  if click_handler then
-    return click_handler
-  end
+	local click_handler = comp._click_handler
+	if click_handler then
+		return click_handler
+	end
 
-  local on_click = comp.on_click
+	local on_click = comp.on_click
 
-  local t = type(on_click)
-  if t == "table" then
-    -- {
-    --    name = "MyClickHandler", -- optional
-    --    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
-    --    -- If callback is a string, don't care about the name field
-    --    -- or callback = "MyClickHandler" -- the name of a global function
-    -- }
+	local t = type(on_click)
+	if t == "table" then
+		-- {
+		--    name = "MyClickHandler", -- optional
+		--    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
+		--    -- If callback is a string, don't care about the name field
+		--    -- or callback = "MyClickHandler" -- the name of a global function
+		-- }
 
-    local name = on_click.name
-    if name and type(name) ~= "string"  or name == "" then
-      require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
-      return ""
-    end
-    click_handler = type(name) == "string" and name or nil
-    on_click = on_click.callback
-    t = type(on_click)
-  end
+		local name = on_click.name
+		if name and type(name) ~= "string" or name == "" then
+			require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
+			return ""
+		end
+		click_handler = type(name) == "string" and name or nil
+		on_click = on_click.callback
+		t = type(on_click)
+	end
 
-  if t == "string" and _G[on_click] then
-    click_handler =  on_click
-  elseif t == "function" then
-    -- Fastest possible func_name derivation
-    if not click_handler then
-      click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
-    end
-    if not _G[click_handler] then
-      _G[click_handler] = function(...)
-        on_click(comp, ...)
-      end
-    end
-  else
-    require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
-    return ""
-  end
+	if t == "string" and _G[on_click] then
+		click_handler = on_click
+	elseif t == "function" then
+		-- Fastest possible func_name derivation
+		if not click_handler then
+			click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
+		end
+		if not _G[click_handler] then
+			_G[click_handler] = function(...)
+				on_click(comp, ...)
+			end
+		end
+	else
+		require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
+		return ""
+	end
 
-  comp._click_handler = click_handler
-  return click_handler
+	comp._click_handler = click_handler
+	return click_handler
+end
+
+--- Determine whether a function-type value should receive the `sid` argument
+--- when being evaluated for a given key.
+---
+--- Some keys (like "context") should not receive a session ID, since
+--- their logic is independent of the session state.
+---
+--- @param key string  The key name to check
+--- @return boolean    True if the `sid` argument should be passed to the function
+Component.should_pass_sid = function(key)
+	return key ~= "context"
 end
 
 return Component

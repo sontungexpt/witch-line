@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
 ---@type DefaultComponent
-local CursorPos = {
+local Position = {
 	id = Id["cursor.pos"],
 	_plug_provided = true,
 	style = { fg = colors.fg },
@@ -14,7 +14,7 @@ local CursorPos = {
 }
 
 ---@type DefaultComponent
-local CursorProgress = {
+local Progress = {
 	id = Id["cursor.progress"],
 	_plug_provided = true,
 	ref = {
@@ -26,14 +26,18 @@ local CursorProgress = {
 	padding = 0,
 	style = { fg = colors.orange },
 	update = function(self)
-		local line = vim.fn.line
-    local static = self.static
-    ---@diagnostic disable-next-line: need-check-nil
-		return static.chars[math.ceil(line(".") / line("$") * #static.chars)] or ""
+		local api = vim.api
+		local static = self.static
+
+		---@cast static {chars: string[]}
+		local cursor_line = api.nvim_win_get_cursor(0)[1]
+		local total_lines = api.nvim_buf_line_count(0)
+
+		return static.chars[math.ceil(cursor_line / total_lines * #static.chars)] or ""
 	end,
 }
 
 return {
-	pos = CursorPos,
-	progress = CursorProgress,
+	pos = Position,
+	progress = Progress,
 }

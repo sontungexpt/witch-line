@@ -20,7 +20,7 @@ local IdPathMap = {
 	["file.name"] = "file\0name",
 	["file.icon"] = "file\0icon",
 	["file.modifier"] = "file\0modifier",
-  ["file.size"] = "file\0size",
+	["file.size"] = "file\0size",
 	["copilot"] = "copilot",
 	["diagnostic.interface"] = "diagnostic\0interface",
 	["diagnostic.error"] = "diagnostic\0error",
@@ -39,10 +39,10 @@ local IdPathMap = {
 	["git.diff.removed"] = "git\0diff.removed",
 	["git.diff.modified"] = "git\0diff.modified",
 
-  ["battery"] = "battery",
-  ["datetime"] = "datetime",
-  ["os_uname"] = "os_uname",
-  ["nvim_dap"] = "nvim_dap",
+	["battery"] = "battery",
+	["datetime"] = "datetime",
+	["os_uname"] = "os_uname",
+	["nvim_dap"] = "nvim_dap",
 }
 
 --- Metatable to access default component IDs with error handling.
@@ -74,25 +74,25 @@ local IdPathMap = {
 --- @field ["os_uname"] DefaultId
 --- @field ["nvim_dap"] DefaultId
 local Id = setmetatable({}, {
-  __index = function(_, key)
-    if IdPathMap[key] then
-      return key
-    else
-      error("Id '" .. tostring(key) .. "' does not exist in default ids.")
-    end
-  end,
+	__index = function(_, key)
+		if IdPathMap[key] then
+			return key
+		else
+			error("Id '" .. tostring(key) .. "' does not exist in default ids.")
+		end
+	end,
 })
 
 --- @cast IdPathMap table<CompId, DefaultComponentPath>
 return {
-  Id = Id,
+	Id = Id,
 
-  --- Get the path of the id.
-  --- @param id CompId id to get the path
-  --- @return DefaultComponentPath|nil path of the id, or nil if not found
-  path = function (id)
-    return IdPathMap[id]
-  end,
+	--- Get the path of the id.
+	--- @param id CompId id to get the path
+	--- @return DefaultComponentPath|nil path of the id, or nil if not found
+	path = function(id)
+		return IdPathMap[id]
+	end,
 
 	--- Check if the id already exists in the default ids.
 	--- @param id CompId id to check

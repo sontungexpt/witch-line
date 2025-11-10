@@ -32,7 +32,7 @@ end
 --- @param user_configs UserConfig|nil user_configs
 M.setup = function(user_configs)
 	local Cache = require("witch-line.cache")
-  local checksum = Cache.checksum(user_configs)
+	local checksum = Cache.checksum(user_configs)
 
 	user_configs = use_default_config(user_configs)
 

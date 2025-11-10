@@ -48,14 +48,12 @@ api.nvim_create_autocmd("Colorscheme", {
 	callback = restore_highlight_styles,
 })
 
-
 --- The function to be called before Vim exits to save the highlight cache.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the highlight cache.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	CacheDataAccessor.set("ColorRgb24Bit", ColorRgb24Bit)
 	CacheDataAccessor.set("HighlightStyles", Styles)
 end
-
 
 --- Loads the data from cache  from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the highlight cache.
@@ -74,7 +72,6 @@ M.load_cache = function(CacheDataAccessor)
 	end
 end
 
-
 --- Generates a valid highlight group name from an ID.
 --- @param id CompId The ID to generate the highlight name for.
 --- @return string hl_name The generated highlight name.
@@ -82,99 +79,165 @@ M.make_hl_name_from_id = function(id)
 	return "WL" .. string.gsub(tostring(id), "[^%w_]", "")
 end
 
--- Convert color names to 24-bit RGB numbers
---- @param color string The color name to convert.
-local function color_to_24bit(color)
-	local c = ColorRgb24Bit[color]
-	if c then return c end
-	local num = nvim_get_color_by_name(color)
-	if num ~= -1 then
-		ColorRgb24Bit[color] = num
-	end
-	return num
-end
-
---- Adds a highlight name to a string.
+--- Adds a highlight name to a string.hi
 --- @param str string The string to which the highlight name will be added.
 --- @param hl_name string|nil The highlight name to add.
 M.assign_highlight_name = function(str, hl_name)
 	return hl_name and str ~= "" and "%#" .. hl_name .. "#" .. str .. "%*" or str
 end
 
-
---- Retrieves the highlight information for a given highlight group name.
---- @param hl_name string The highlight group name.
---- @return vim.api.keyset.get_hl_info|nil props The highlight properties or nil if not found.
-local get_hlprop = function(hl_name)
-	if hl_name == "" then
-		return nil
-	end
-
-	local ok, style = pcall(nvim_get_hl, 0, {
-		name = hl_name,
-	})
-
+--- Retrieve highlight properties for a given highlight group.
+---
+--- This function safely queries Neovim's highlight table to obtain
+--- the resolved highlight style for a given group name. It uses `pcall`
+--- to avoid throwing errors if the highlight group does not exist.
+---
+--- Example:
+--- ```lua
+--- local fg_color = M.safe_nvim_get_hl({ name = "Comment" })
+--- if fg_color then
+---   print(fg_color.fg) -- e.g. 0xa9b1d6
+--- end
+--- ```
+---
+--- @param opts table      Options passed to `nvim_get_hl`, typically including `{ name = hl_name }`.
+--- @return vim.api.keyset.get_hl_info|nil props  A table containing highlight properties
+---                                               (e.g., `fg`, `bg`, `bold`, `italic`), or `nil` if not found.
+M.safe_nvim_get_hl = function(opts)
+	local ok, style = pcall(nvim_get_hl, 0, opts)
 	return ok and style or nil
 end
 
-M.get_hlprop = get_hlprop
+--- Merge a child highlight definition with a parent highlight or highlight group.
+---
+--- This function combines two highlight sources into one, giving priority to the
+--- child’s properties. The parent can be either:
+---   - A **table** containing highlight fields (e.g. `{ fg = "#ffffff", bold = true }`), or
+---   - A **string** name of an existing highlight group (e.g. `"Comment"`).
+---
+--- Behavior:
+--- 1. If `parent` is a table and has no `link` field, it merges directly with `child`.
+--- 2. If `parent` is a table containing a `link`, it uses that linked group name instead.
+--- 3. If `parent` is a string, it attempts to retrieve the highlight properties of that group
+---    using `nvim_get_hl`, then merges them with the `child` table.
+--- 4. Merge strategy uses `"keep"` mode — child properties take precedence over parent values.
+---
+--- Example:
+--- ```lua
+--- local child = { fg = "#ffffff" }
+--- local merged = M.merge_hl(child, "Comment")
+--- -- Result: child color kept, inherits missing fields from Comment group
+--- ```
+---
+--- @param child CompStyle|nil   The child highlight definition (fields take precedence).
+--- @param parent CompStyle|nil  The parent highlight definition or group name.
+--- @return CompStyle            The merged highlight table (or the child table if no merge occurred).
+M.merge_hl = function(child, parent)
+	local pt = type(parent)
+	if pt == "table" then
+		if not parent.link then
+			---@diagnostic disable-next-line: param-type-mismatch
+			return vim.tbl_deep_extend("keep", child or {}, parent)
+		end
+		---@diagnostic disable-next-line: cast-local-type
+		parent = parent.link
+		pt = "string"
+	end
 
---- Defines or updates a highlight group with the specified styles.
----@param group_name string The highlight group name.
----@param hl_style CompStyle The highlight styles to apply.
----@return boolean success True if the highlight was applied successfully, false otherwise.
+	if pt == "string" then
+		local ok, pstyle = pcall(nvim_get_hl, 0, {
+			name = parent,
+			create = false,
+		})
+		---@diagnostic disable-next-line: param-type-mismatch, return-type-mismatch
+		return ok and vim.tbl_deep_extend("keep", child or {}, pstyle) or child
+	end
+	---@cast child CompStyle
+	return child
+end
+
+--- Resolve a color definition into a concrete 24-bit RGB value or an inherited highlight property.
+---
+--- This function converts a given color specification into an actual numeric RGB value.
+--- The input may be:
+--- - A numeric RGB value (e.g. `0xFFAA00`)
+--- - A named color string (e.g. `"red"`, `"LightGrey"`)
+--- - A highlight group name (e.g. `"Normal"`, `"StatusLine"`)
+--- - The literal string `"NONE"`
+---
+--- ### Lookup Order
+--- 1. **Numeric check:** If `c` is already a number, return it directly.
+--- 2. **Cached lookup:** Try to resolve from the cached table `ColorRgb24Bit`.
+--- 3. **Neovim API:** Use `nvim_get_color_by_name(c)` to resolve standard color names or hex strings.
+--- 4. **Highlight group:** If still unresolved, call `get_hlprop(c)` to fetch another group's color field (`"fg"` or `"bg"`).
+---
+--- ### Notes
+--- - `"NONE"` is returned unchanged to indicate transparent/no color.
+--- - Successfully resolved colors are cached in `ColorRgb24Bit` for reuse.
+--- - Returns `nil` if the color cannot be resolved.
+---
+--- @param c string|integer  Color name, numeric RGB value, or highlight group name.
+--- @param field "fg"|"bg"   The field to extract when resolving from another highlight group.
+--- @return integer|string|nil color  The resolved 24-bit RGB color, `"NONE"`, or `nil` if not found.
+local function resolve_color(c, field)
+	local t = type(c)
+	if t == "number" then
+		return c
+	elseif t ~= "string" or c == "" then
+		return nil
+	elseif c == "NONE" then
+		return "NONE"
+	end
+	local num = ColorRgb24Bit[c]
+	if num then
+		return num
+	end
+	num = nvim_get_color_by_name(c)
+	if num ~= -1 then
+		ColorRgb24Bit[c] = num
+		return num
+	end
+	local ok, style = pcall(nvim_get_hl, 0, {
+		name = c,
+		create = false,
+	})
+	return ok and style[field] or nil
+end
+
+--- Defines or updates a Neovim highlight group with the given style.
+---
+--- This function normalizes and resolves highlight properties (e.g. `fg`, `bg`, `foreground`, `background`)
+--- before calling `nvim_set_hl()`. It also caches the style in `Styles` for persistence and automatic
+--- restoration on colorscheme reload.
+---
+--- Behavior:
+--- - If `hl_style` is a string, it creates a linked highlight group.
+--- - If `hl_style` is a table, it resolves color names and sets the group directly.
+--- - If empty or invalid, the function does nothing and returns false.
+---
+--- @param group_name string The name of the highlight group to define or update.
+--- @param hl_style string|table The style definition — either a link target or a style table.
+--- @return boolean success True if the highlight was applied successfully, false otherwise.
 M.highlight = function(group_name, hl_style)
 	if group_name == "" then
 		return false
 	end
-  local hl_style_type = type(hl_style)
-  if hl_style_type == "string" and hl_style ~="" then
-    nvim_set_hl(0, group_name, { link = hl_style, default = true} )
-    return true
-  elseif hl_style_type ~= "table" or not next(hl_style) then
-    return false
-  end
+	local hl_style_type = type(hl_style)
+	if hl_style_type == "string" and hl_style ~= "" then
+		nvim_set_hl(0, group_name, { link = hl_style, default = true })
+		return true
+	elseif hl_style_type ~= "table" or not next(hl_style) then
+		return false
+	end
 
 	Styles[group_name] = hl_style
 
 	local style = shallow_copy(hl_style)
-	local fg = style.foreground or style.fg
-	local bg = style.background or style.bg
-
-	if type(fg) == "string" then
-		if fg ~= "NONE" then
-			local num = color_to_24bit(fg)
-			if num == -1 then
-				local hl_prop = get_hlprop(fg)
-				fg = hl_prop and hl_prop.fg
-			else
-				fg = num
-			end
-		end
-	end
-
-	if type(bg) == "string" then
-		if bg ~= "NONE" then
-			local num = color_to_24bit(bg)
-			if num == -1 then
-				local hl_prop = get_hlprop(bg)
-				bg = hl_prop and hl_prop.bg
-			else
-				-- 24-bit RGB color
-				bg = num
-			end
-		end
-	end
-
-	if bg == nil then
-		bg = "NONE"
-		-- bg = M.get_hl("StatusLine").bg
-	end
-
-	style.foreground, style.background = fg, bg
+	style.foreground = resolve_color(style.foreground or style.fg, "fg")
+	style.background = resolve_color(style.background or style.bg, "bg") or "NONE"
 	style.fg, style.bg = nil, nil
 	nvim_set_hl(0, group_name, style)
-  return true
+	return true
 end
 
 return M

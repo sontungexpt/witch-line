@@ -5,13 +5,14 @@ The best statusline plugin for neovim. It's very lightweight and super fast.
 This plugin lazy load as much as possible
 
 ## Navigation
+
 - 💬 [A Few Words to Say](#a-few-words-to-say)
   - 💡 [Concept Ideas](#concept-ideas)
 - 🪄 [Preview](#preview)
 - ✨ [Features](#-features)
-    - 📝 [TODO](#todo)
-    - 📊 [Compare with other statusline plugins](#compare-with-other-statusline-plugins)
-    - 📈 [Benchmarks](#benchmarks)
+  - 📝 [TODO](#todo)
+  - 📊 [Compare with other statusline plugins](#compare-with-other-statusline-plugins)
+  - 📈 [Benchmarks](#benchmarks)
 - ⚙️ [Installation](#installation)
 - 🚀 [Usage](#usage)
   - 🧱 [Laststatus](#laststatus)
@@ -40,7 +41,7 @@ any idea to create a new component, please open an issue or pull request.
 ## Preview
 
 - Basic style (No separator, I aprreciate basic but you can create it or do many things else by yourself (like add separator) or you can create new PR for your feature you wantc)
-<img width="1899" height="128" alt="image" src="https://github.com/user-attachments/assets/6bfcc79b-5db6-4419-aced-34deef1fd8c5" />
+  <img width="1899" height="128" alt="image" src="https://github.com/user-attachments/assets/6bfcc79b-5db6-4419-aced-34deef1fd8c5" />
 
 ## ✨ Features
 
@@ -168,15 +169,12 @@ If some one remake your current statusline with "witch-line", could you send me 
 
 The benchmarks is run with `nvim -u` with only the statusline plugin loaded.
 
-| Plugin         | Load Time (ms)  | Avg Update Time (ms)  |
-| -------------- | --------------- | --------------------- |
-| witch-line     | 21.7409090909   |                       |
-| lualine        | 86.0590909      |                       |
-
+| Plugin     | Load Time (ms) | Avg Update Time (ms) |
+| ---------- | -------------- | -------------------- |
+| witch-line | 21.7409090909  |                      |
+| lualine    | 86.0590909     |                      |
 
 ---
-
-
 
 ## Installation
 

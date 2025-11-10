@@ -1,4 +1,4 @@
-local Id     = require("witch-line.constant.id").Id
+local Id = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
 --- @type DefaultComponent
@@ -48,27 +48,33 @@ return {
 		current_charging_index = 0,
 	},
 	init = function(self, session_id)
-    local sysname = (vim.uv or vim.loop).os_uname().sysname
-    local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-    if sysname == "Linux" then
-      local bat_dir = vim.fn.glob("/sys/class/power_supply/BAT*", true, true)[1]
-      if not bat_dir then
-        return
-      end
-      bat_dir = bat_dir:match("(.-)%s*$")
-      local read_battery_file = function(filename)
-        local f = io.open(bat_dir .. "/" .. filename, "r")
-        if not f then return "" end
-        local content = f:read("*all")
-        f:close()
-        return content:match("(.-)%s*$")
-      end
+		local sysname = (vim.uv or vim.loop).os_uname().sysname
+		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		if sysname == "Linux" then
+			local bat_dir = vim.fn.glob("/sys/class/power_supply/BAT*", true, true)[1]
+			if not bat_dir then
+				return
+			end
+			bat_dir = bat_dir:match("(.-)%s*$")
+			local read_battery_file = function(filename)
+				local f = io.open(bat_dir .. "/" .. filename, "r")
+				if not f then
+					return ""
+				end
+				local content = f:read("*all")
+				f:close()
+				return content:match("(.-)%s*$")
+			end
 
-      ctx.get_status = function() return read_battery_file("status") end
-      ctx.get_capacity = function() return read_battery_file("capacity") end
-    elseif sysname == "Windows_NT" then
-      local ffi = require("ffi")
-      ffi.cdef[[
+			ctx.get_status = function()
+				return read_battery_file("status")
+			end
+			ctx.get_capacity = function()
+				return read_battery_file("capacity")
+			end
+		elseif sysname == "Windows_NT" then
+			local ffi = require("ffi")
+			ffi.cdef([[
         typedef struct {
           unsigned char ACLineStatus;
           unsigned char BatteryFlag;
@@ -78,9 +84,9 @@ return {
           unsigned long BatteryFullLifeTime;
         } SYSTEM_POWER_STATUS;
         int GetSystemPowerStatus(SYSTEM_POWER_STATUS *lpSystemPowerStatus);
-      ]]
+      ]])
 
-      local status_struct = ffi.new("SYSTEM_POWER_STATUS[1]")
+			local status_struct = ffi.new("SYSTEM_POWER_STATUS[1]")
 			ctx.get_status = function()
 				if ffi.C.GetSystemPowerStatus(status_struct) == 0 then
 					return "Unknown"
@@ -101,10 +107,10 @@ return {
 				end
 				return tonumber(status_struct[0].BatteryLifePercent) or 0
 			end
-    elseif sysname == "Darwin" then
-      --- macOS IOKit bindings
-      local ffi = require("ffi")
-      ffi.cdef[[
+		elseif sysname == "Darwin" then
+			--- macOS IOKit bindings
+			local ffi = require("ffi")
+			ffi.cdef([[
         CFTypeRef IOPSCopyPowerSourcesInfo(void);
         CFArrayRef IOPSCopyPowerSourcesList(CFTypeRef blob);
         CFDictionaryRef IOPSGetPowerSourceDescription(CFTypeRef blob, CFTypeRef ps);
@@ -116,17 +122,21 @@ return {
         void CFRelease(CFTypeRef cf);
         int CFArrayGetCount(CFArrayRef theArray);
         CFTypeRef CFArrayGetValueAtIndex(CFArrayRef theArray, int idx);
-      ]]
-      -- macOS battery info via IOKit
+      ]])
+			-- macOS battery info via IOKit
 			local iokit = ffi.load("/System/Library/Frameworks/IOKit.framework/IOKit")
 			local core = ffi.load("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
 
 			ctx.get_status = function()
 				local blob = iokit.IOPSCopyPowerSourcesInfo()
 				local list = iokit.IOPSCopyPowerSourcesList(blob)
-				if list == nil then return "Unknown" end
+				if list == nil then
+					return "Unknown"
+				end
 				local count = core.CFArrayGetCount(list)
-				if count == 0 then return "Unknown" end
+				if count == 0 then
+					return "Unknown"
+				end
 
 				local ps = core.CFArrayGetValueAtIndex(list, 0)
 				local desc = iokit.IOPSGetPowerSourceDescription(blob, ps)
@@ -147,9 +157,13 @@ return {
 			ctx.get_capacity = function()
 				local blob = iokit.IOPSCopyPowerSourcesInfo()
 				local list = iokit.IOPSCopyPowerSourcesList(blob)
-				if list == nil then return 0 end
+				if list == nil then
+					return 0
+				end
 				local count = core.CFArrayGetCount(list)
-				if count == 0 then return 0 end
+				if count == 0 then
+					return 0
+				end
 
 				local ps = core.CFArrayGetValueAtIndex(list, 0)
 				local desc = iokit.IOPSGetPowerSourceDescription(blob, ps)
@@ -165,11 +179,11 @@ return {
 				core.CFRelease(blob)
 				return 0
 			end
-    end
+		end
 	end,
 	update = function(self, session_id)
-    local hook = require("witch-line.core.manager.hook")
-    local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+		local hook = require("witch-line.core.manager.hook")
+		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
 		if not ctx.get_status or not ctx.get_capacity then
 			return ""
 		end

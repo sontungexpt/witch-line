@@ -56,11 +56,10 @@ WitchLine provides some hooks to access data in module `witch-line.core.manager.
 
 - **static**:
 
-| **Type** | **Description**                                                                                                                           |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `table`  | A table that holds static data for the component.                                                                                         |
-| `string` | A module path that returns a table. This is useful when you want to lazily load the static data. (This also helps reduce cache file size) |
-| `nil`    | No static data for the component.                                                                                                         |
+| **Type** | **Description**                                   |
+| -------- | ------------------------------------------------- |
+| `table`  | A table that holds static data for the component. |
+| `nil`    | No static data for the component.                 |
 
 **Description**: A table that holds static data for the component. It can be used to store configuration or other immutable values of component.
 
@@ -92,11 +91,10 @@ local component = {
 
 - **context**:
 
-  | **Type**:                                | **Description**                                                                                                                         |
-  | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-  | `table`                                  | A table that holds dynamic data for the component.                                                                                      |
-  | `string`                                 | A module path that returns a table. It's useful when you want to lazily load the context data. (This also helps reduce cache file size) |
-  | `fun(self, session_id): table \| string` | A function that returns a table or a module path.                                                                                       |
+  | **Type**:                                | **Description**                                    |
+  | ---------------------------------------- | -------------------------------------------------- |
+  | `table`                                  | A table that holds dynamic data for the component. |
+  | `fun(self, session_id): table \| string` | A function that returns a table or a module path.  |
 
   **Description**: A table or a function that holds dynamic data for the component. It can be used to store values that can change frequently and are reactive.
 
@@ -107,20 +105,6 @@ local component = {
   - If you ensure that the context is same for all sessions by self not referencing other components (usually when context is a static table or a string path), then you can use the `self.context` directly in any function of the component like `init`, `update`, etc for better performance.
 
   **Example**:
-
-  - Type: `string`
-
-  ```lua
-  local component = {
-    context = "my.module.path",
-
-    update = function(self, session_id)
-        local hook = require("witch-line.core.manager.hook") -- Use hook to access context
-        local ctx = hook.use_context(self, session_id) --- The ctx is the table returned by the module path
-        return "Dynamic Value: " .. ctx.dynamic_value
-    end
-  }
-  ```
 
   - Type: `table`
 
@@ -218,13 +202,15 @@ local component = {
 
   **Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
 
+  **Syntax**: "EventName pattern1,pattern2"
+
   **Example**:
 
   - Type: `string[]`
 
   ```lua
   local component = {
-      events = {"BufEnter", "CursorHold"}
+      events = {"BufEnter", "CursorHold", "User VeryLazy,LazyLoad", "BufEnter *lua,*js"}
   }
   ```
 
@@ -233,34 +219,6 @@ local component = {
   ```lua
   local component = {
       events = "BufEnter"
-  }
-  ```
-
-- **user_events**:
-
-  | **Type**   | **Description**                                                     |
-  | ---------- | ------------------------------------------------------------------- |
-  | `string[]` | A list of user-defined events that the component listens to.        |
-  | `string`   | A single user-defined event that the component listens to.          |
-  | `nil`      | The component will not listen to any user-defined events (default). |
-
-  **Description**: A list of user-defined events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any user-defined events. You can trigger a user-defined event using `vim.api.nvim_exec_autocmds("User", {pattern = "YourEventName"})`.
-
-  **Example**:
-
-  - Type: `string[]`
-
-  ```lua
-  local component = {
-      user_events = {"LazyLoad", "AnotherEvent"}
-  }
-  ```
-
-  - Type: `string`
-
-  ```lua
-  local component = {
-      user_events = "LazyLoad"
   }
   ```
 
@@ -397,38 +355,21 @@ local component = {
 
 - **init**:
 
-  | **Type**                     | **Description**                                                                                  |
-  | ---------------------------- | ------------------------------------------------------------------------------------------------ |
-  | `string`                     | A module path that returns a function. This is useful when you want to lazily load the function. |
-  | `fun(self, session_id): nil` | A function that initializes the component. It is called once when the component is created.      |
+  | **Type**                     | **Description**                                                                             |
+  | ---------------------------- | ------------------------------------------------------------------------------------------- |
+  | `fun(self, session_id): nil` | A function that initializes the component. It is called once when the component is created. |
 
   **Description**: A function that initializes the component. It is called once when the component is created right after the component is managed by WitchLine.
 
   **Example**:
 
-   - Type: `fun(self, session_id): nil`
+  - Type: `fun(self, session_id): nil`
 
   ```lua
   local component = {
       init = function(self, session_id)
           -- Initialization code here
       end
-  }
-  ```
-
-    - Type: `string`
-
-  ```lua
-  -- my/module/path.lua
-  local vim = vim
-  return function(self, session_id)
-    -- Initialization code here
-  end
-
-
-  -- In your component definition
-  local component = {
-    init = "my.module.path" -- The module should return a function
   }
   ```
 
@@ -902,20 +843,20 @@ An component can reference other components for some of its fields. This allows 
 
   **Description**: A table that maps fields of the current component to the ids of other components. This allows for referencing specific fields from other components without inheriting all their fields. The fields that can be referenced are:
 
-  | Field              | Type                 | Description                                                                               |
-  | ------------------ | -------------------- | ----------------------------------------------------------------------------------------- |
-  | `events`           | `CompId \| CompId[]` | The component will be updated when the referenced events are triggered.                   |
-  | `user_events`      | `CompId \| CompId[]` | The component will be updated when the referenced user-defined events are triggered.      |
-  | `timing`           | `CompId \| CompId[]` | The component will be updated based on the timing provided by the referenced components.  |
-  | `style`            | `CompId`             | The style of the component will be taken from the referenced component.                   |
-  | `left_style`       | `CompId`             | The style of the left separator of component will be taken from the referenced component.                   |
-  | `right_style`      | `CompId`             | The style of the right separator of component will be taken from the referenced component.                   |
-  | `left`             | `CompId`             | The left separator of  the component will be taken from the referenced component.                   |
-  | `right`            | `CompId`             | The right separator of the component will be taken from the referenced component.                   |
-  | `static`           | `CompId`             | The component will be updated with static values from the referenced component.           |
-  | `context`          | `CompId`             | The component will be updated with context values from the referenced component.          |
-  | `hidden`           | `CompId \| CompId[]` | The component will be hidden when the referenced components are hidden.                   |
-  | `min_screen_width` | `CompId \| CompId[]` | The component will be updated with min screen width logic from the referenced components. |
+  | Field              | Type                 | Description                                                                                |
+  | ------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
+  | `events`           | `CompId \| CompId[]` | The component will be updated when the referenced events are triggered.                    |
+  | `user_events`      | `CompId \| CompId[]` | The component will be updated when the referenced user-defined events are triggered.       |
+  | `timing`           | `CompId \| CompId[]` | The component will be updated based on the timing provided by the referenced components.   |
+  | `style`            | `CompId`             | The style of the component will be taken from the referenced component.                    |
+  | `left_style`       | `CompId`             | The style of the left separator of component will be taken from the referenced component.  |
+  | `right_style`      | `CompId`             | The style of the right separator of component will be taken from the referenced component. |
+  | `left`             | `CompId`             | The left separator of the component will be taken from the referenced component.           |
+  | `right`            | `CompId`             | The right separator of the component will be taken from the referenced component.          |
+  | `static`           | `CompId`             | The component will be updated with static values from the referenced component.            |
+  | `context`          | `CompId`             | The component will be updated with context values from the referenced component.           |
+  | `hidden`           | `CompId \| CompId[]` | The component will be hidden when the referenced components are hidden.                    |
+  | `min_screen_width` | `CompId \| CompId[]` | The component will be updated with min screen width logic from the referenced components.  |
 
   **Example**:
 

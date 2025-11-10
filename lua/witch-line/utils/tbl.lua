@@ -9,16 +9,16 @@ local type, pairs = type, pairs
 --- @return T[] unique A new list containing only unique elements from the input list.
 --- @return integer number The size of the result
 M.unique_list = function(list)
-  local set = {}
-  for i = 1, #list do
-    set[list[i]] = true
-  end
-  local keys, n = {},0
-  for k in pairs(set) do
-    n = n +1
-    keys[n] = k
-  end
-  return keys, n
+	local set = {}
+	for i = 1, #list do
+		set[list[i]] = true
+	end
+	local keys, n = {}, 0
+	for k in pairs(set) do
+		n = n + 1
+		keys[n] = k
+	end
+	return keys, n
 end
 
 --- Creates a shallow copy of a table.

@@ -7,7 +7,7 @@ local next_id = 0
 
 --- @return SessionId id of new session
 local new = function()
-  next_id = next_id + 1
+	next_id = next_id + 1
 	Store[next_id] = {}
 	return next_id
 end
@@ -39,15 +39,13 @@ Session.get_store = function(sid, store_id)
 	return value
 end
 
-
-
 --- Clears the session data associated with the given session ID.
 --- @param id SessionId
 local remove = function(id)
-  Store[id] = nil
-  if not next(Store) then
-    next_id = 0 -- reset id counter if no sessions exist
-  end
+	Store[id] = nil
+	if not next(Store) then
+		next_id = 0 -- reset id counter if no sessions exist
+	end
 end
 Session.remove = remove
 

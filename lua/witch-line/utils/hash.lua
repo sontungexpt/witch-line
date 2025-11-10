@@ -4,23 +4,25 @@ local bit = require("bit")
 
 local uint32_t = ffi.typeof("uint32_t")
 
-local FNV_PRIME_32  = 0x01000193
-local FNV_OFFSET_32 = 0x811C9DC5
+-- local FNV_PRIME_32  = 0x01000193
+-- local FNV_OFFSET_32 = 0x811C9DC5
+local FNV_PRIME_32_FFI = uint32_t(0x01000193)
+local FNV_OFFSET_32_FFI = uint32_t(0x811C9DC5)
 
 --- Calculates the FNV-1a 32-bit hash of a string.
 --- Uses FFI uint32_t for automatic 32-bit overflow (no bit.band needed).
 --- @param str string The input string to hash.
 --- @return integer hash The resulting FNV-1a 32-bit hash.
 local fnv1a32_str = function(str)
-    local len = #str
-    local ptr = ffi.cast("const uint8_t*", str)
-    local hash = uint32_t(FNV_OFFSET_32)
-    local bxor = bit.bxor
-    for i = 0, len - 1 do
-      hash = bxor(hash, ptr[i]) * FNV_PRIME_32
-    end
-    ---@diagnostic disable-next-line: return-type-mismatch
-    return tonumber(hash)
+	local len = #str
+	local ptr = ffi.cast("const uint8_t*", str)
+	local hash = FNV_OFFSET_32_FFI
+	local bxor = bit.bxor
+	for i = 0, len - 1 do
+		hash = bxor(hash, ptr[i]) * FNV_PRIME_32_FFI
+	end
+	---@diagnostic disable-next-line: return-type-mismatch
+	return tonumber(hash)
 end
 
 --- Calculates the FNV-1a 32-bit hash of concatenated strings.
@@ -30,23 +32,23 @@ end
 --- @param j integer|nil The ending index (1-based). Defaults to #strs.
 --- @return integer hash The resulting FNV-1a 32-bit hash.
 local fnv1a32_str_fold = function(strs, i, j)
-    local last = j or #strs
-    if last > 100 then
-        return fnv1a32_str(table.concat(strs, "", i or 1, last))
-    end
+	local last = j or #strs
+	if last > 100 then
+		return fnv1a32_str(table.concat(strs, "", i or 1, last))
+	end
 
-    local hash = uint32_t(FNV_OFFSET_32)
-    local bxor = bit.bxor
-    for l = i or 1, last do
-        local str = strs[l]
-        local len = #str
-        local ptr = ffi.cast("const uint8_t*", str)
-        for k = 0, len - 1 do
-          hash = bxor(hash, ptr[k]) * FNV_PRIME_32
-        end
-    end
-    ---@diagnostic disable-next-line: return-type-mismatch
-    return tonumber(hash)
+	local hash = FNV_OFFSET_32_FFI
+	local bxor = bit.bxor
+	for l = i or 1, last do
+		local str = strs[l]
+		local len = #str
+		local ptr = ffi.cast("const uint8_t*", str)
+		for k = 0, len - 1 do
+			hash = bxor(hash, ptr[k]) * FNV_PRIME_32_FFI
+		end
+	end
+	---@diagnostic disable-next-line: return-type-mismatch
+	return tonumber(hash)
 end
 
 -- Serialize value for hashing
@@ -76,9 +78,11 @@ end
 --- @param hash_key string|nil A specific key in the table to use for hashing. If provided and the table contains this key, its value will be used as the hash representation of the table.
 --- @return number hash The computed FNV-1a 32-bit hash of the table.
 --- @note If speed is very important consider directly hash inside this function instead of calling fnv1a32 hash
-local fnv1a32_tbl= function(tbl, hash_key)
+local fnv1a32_tbl = function(tbl, hash_key)
 	-- invalid type then return an 32 bit constant number
-	if not next(tbl) then return 0xFFFFFFFF end
+	if not next(tbl) then
+		return 0xFFFFFFFF
+	end
 
 	local buffer, buffer_size = {}, 0
 	local stack, stack_size = { tbl }, 1
@@ -147,7 +151,6 @@ local fnv1a32_tbl_gradually = function(tbl, bulk_size, hash_key)
 			return iteration == 2 and nil or iteration, 0xFFFFFFFF
 		end
 	end
-
 
 	bulk_size = bulk_size or 10
 	local buf, buf_size = {}, 0
@@ -235,23 +238,22 @@ local fnv1a32_tbl_gradually = function(tbl, bulk_size, hash_key)
 	end
 end
 
-local fnv1a32 = function (v, hash_key)
-  local t = type(v)
-  if t == "table" then
-    return fnv1a32_tbl(v,hash_key)
-  elseif t == "string" then
-    return fnv1a32_str(v)
-  elseif t == "function" then
-    return fnv1a32_str(string.dump(v, true))
-  end
-  return 0xFFFFFFFF
+local fnv1a32 = function(v, hash_key)
+	local t = type(v)
+	if t == "table" then
+		return fnv1a32_tbl(v, hash_key)
+	elseif t == "string" then
+		return fnv1a32_str(v)
+	elseif t == "function" then
+		return fnv1a32_str(string.dump(v, true))
+	end
+	return 0xFFFFFFFF
 end
 
 return {
-  fnv1a32_str = fnv1a32_str,
-  fnv1a32_str_fold = fnv1a32_str_fold,
-  fvn1a32_tbl = fnv1a32_tbl,
-  fnv1a32_tbl_gradually = fnv1a32_tbl_gradually,
-  fnv1a32 = fnv1a32,
+	fnv1a32_str = fnv1a32_str,
+	fnv1a32_str_fold = fnv1a32_str_fold,
+	fvn1a32_tbl = fnv1a32_tbl,
+	fnv1a32_tbl_gradually = fnv1a32_tbl_gradually,
+	fnv1a32 = fnv1a32,
 }
-

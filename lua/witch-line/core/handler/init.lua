@@ -5,6 +5,7 @@ local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
+local Highlight = require("witch-line.core.highlight")
 local Session = require("witch-line.core.Session")
 local Manager = require("witch-line.core.manager")
 local DepGraphKind = Manager.DepGraphKind
@@ -24,29 +25,18 @@ local hide_component = function(comp)
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
---- Ensure component inherits correctly.
---- @param comp Component component to ensure inheritance from parent
-local function ensure_inheritance(comp)
-	-- It's just a abstract component then no need to really update
-	if comp.inherit and not Component.has_parent(comp) then
-		local parent = Manager.get_comp(comp.inherit)
-		if parent then Component.inherit_parent(comp, parent) end
-	end
-end
-
-
 --- Format the side value
 --- @param val any the value of the side
 --- @param is_func boolean|nil Flag indicate that is the side is a function or not
 --- @return nil|string result String if valid, otherwise nil
 local function format_side_value(val, is_func)
-  -- Avoid non-string values if function-type
-  if is_func then
-    return type(val) ~= "string" and "" or val
-  elseif type(val) ~= "string" then
-    return nil
-  end
-  return val
+	-- Avoid non-string values if function-type
+	if is_func then
+		return type(val) ~= "string" and "" or val
+	elseif type(val) ~= "string" then
+		return nil
+	end
+	return val
 end
 
 --- Update a component and its value in the statusline.
@@ -54,83 +44,83 @@ end
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_component(comp, sid)
-  ensure_inheritance(comp)
-
 	Component.emit_pre_update(comp, sid)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
 	local min_screen_width = Component.min_screen_width(comp, sid)
 
-	local hidden = min_screen_width and o.columns < min_screen_width
-    or Component.hidden(comp, sid)
+	local hidden = min_screen_width and o.columns < min_screen_width or Component.hidden(comp, sid)
 
 	if hidden then
 		hide_component(comp)
-  else
-    local value, style = Component.evaluate(comp, sid)
+	else
+		local value, style = Component.evaluate(comp, sid)
 
-    local indices = comp._indices
-    -- A abstract component will not have indices
-    -- It's just call the update function for other purpose and we not affect to the statusline
-    -- So we just ignore it even the value is empty string
-    if indices then
-      if value == "" then
-        hide_component(comp)
-        hidden = true
-      else
+		local indices = comp._indices
+		-- A abstract component will not have indices
+		-- It's just call the update function for other purpose and we not affect to the statusline
+		-- So we just ignore it even the value is empty string
+		if indices then
+			if value == "" then
+				hide_component(comp)
+				hidden = true
+			else
+				--- Update statusline value
+				-- Main part
+				Statusline.set_value(indices, value)
+				local style_updated, ref_comp = false, comp
+				if style then
+					style_updated = Component.update_style(comp, style, ref_comp, true)
+					--- Sync style to session store
+					--- This is make sure that the `use_style` hooks always get the latest style
+					local store = Session.get_store(sid, "style")
+					if store then
+						store[comp.id] = style
+					end
+				else
+					local result = Manager.lookup_dynamic_value(comp, "style", sid)
+					if result then
+						style_updated = Component.update_style(comp, result[1], result[2])
+					end
+				end
+				Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
 
-        --- Update statusline value
-        -- Main part
-        Statusline.set_value(indices, value)
-        local style_updated, ref_comp = false, comp
-        if style then
-          style_updated = Component.update_style(comp, style, ref_comp, true)
-          --- Sync style to session store
-          --- This is make sure that the `use_style` hooks always get the latest style
-          local store = Session.get_store(sid, "style")
-          if store then
-            store[comp.id] = style
-          end
-        else
-          style, ref_comp = Manager.lookup_ref_value(comp, "style", sid, {})
-          if style then
-            style_updated = Component.update_style(comp, style, ref_comp)
-          end
-        end
-        Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
+				--- Left part
+				local result = Manager.lookup_dynamic_value(comp, "left", sid)
+				if result then
+					local lval, lref = result[1], result[2]
+					local is_left_func = type(lref.left) == "function"
+					lval = format_side_value(lval, is_left_func)
+					if lval then
+						Statusline.set_side_value(indices, "left", lval, is_left_func)
+						local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
+						Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name, left_style_updated)
+					end
+				end
 
-        --- Left part
-        local lval, lref = Manager.lookup_ref_value(comp, "left", sid, {})
-        local is_left_func = type(lref.left) == "function"
-        lval = format_side_value(lval, is_left_func)
-        if lval then
-          Statusline.set_side_value(indices, "left", lval, is_left_func)
-          local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
-          Statusline.set_side_value_highlight(
-            indices, "left", comp._left_hl_name, left_style_updated
-          )
-        end
+				--- Right part
 
-        --- Right part
-        local rval, rref = Manager.lookup_ref_value(comp, "right", sid, {})
-        local is_right_func = type(rref.right) == "function"
-        rval = format_side_value(rval, is_right_func)
-        if rval then
-          Statusline.set_side_value(indices, "right", rval, is_right_func)
-          local right_style_updated = Component.update_side_style(comp, "right", style, style_updated, sid)
-          Statusline.set_side_value_highlight(
-            indices, "right", comp._right_hl_name, right_style_updated
-          )
-        end
+				result = Manager.lookup_dynamic_value(comp, "right", sid, {})
+				if result then
+					local rval, rref = result[1], result[2]
+					local is_right_func = type(rref.right) == "function"
+					rval = format_side_value(rval, is_right_func)
+					if rval then
+						Statusline.set_side_value(indices, "right", rval, is_right_func)
+						local right_style_updated =
+							Component.update_side_style(comp, "right", style, style_updated, sid)
+						Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name, right_style_updated)
+					end
+				end
 
-        if comp.on_click then
-          Statusline.set_click_handler(indices, Component.register_click_handler(comp))
-        end
+				if comp.on_click then
+					Statusline.set_click_handler(indices, Component.register_click_handler(comp))
+				end
 
-        rawset(comp, "_hidden", false) -- Reset hidden state
-      end
-    end
-  end
+				rawset(comp, "_hidden", false) -- Reset hidden state
+			end
+		end
+	end
 
 	Component.emit_post_update(comp, sid)
 	return hidden
@@ -140,7 +130,7 @@ M.update_component = update_component
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
 --- @param sid SessionId The ID of the process to use for this update.
---- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[] The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 	seen = seen or {}
@@ -165,13 +155,18 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 		end
 	end
 
- if type(dep_graph_kind) ~= "table" then
-		dep_graph_kind = { dep_graph_kind }
-	end
-	for _, kind in ipairs(dep_graph_kind) do
-		for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
+	if type(dep_graph_kind) ~= "table" then
+		for dep_id, dep_comp in Manager.iterate_dependents(dep_graph_kind, id) do
 			if not seen[dep_id] then
 				M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
+			end
+		end
+	else
+		for _, kind in ipairs(dep_graph_kind) do
+			for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
+				if not seen[dep_id] then
+					M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
+				end
 			end
 		end
 	end
@@ -184,18 +179,17 @@ end
 M.refresh_component_graph = function(comp, dep_graph_kind, seen)
 	require("witch-line.core.Session").with_session(function(sid)
 		M.update_comp_graph(comp, sid, dep_graph_kind or {
-      DepGraphKind.Event,
-      DepGraphKind.Timer,
-    }, seen)
+			DepGraphKind.Event,
+			DepGraphKind.Timer,
+		}, seen)
 		Statusline.render()
 	end)
 end
 
-
 --- Update multiple components by their IDs.
 --- @param ids CompId[] The IDs of the components to update.
 --- @param sid SessionId The ID of the process to use for this update.
---- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
+--- @param dep_graph_kind DepGraphKind|DepGraphKind[] Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 M.update_comp_graph_by_ids = function(ids, sid, dep_graph_kind, seen)
 	seen = seen or {}
@@ -212,36 +206,32 @@ end
 --- Link dependencies for a component based on its ref and inherit fields.
 --- @param comp Component The component to link dependencies for.
 local function bind_dependencies(comp)
-	local link_ref_field = Manager.link_ref_field
+	local link_dependency = Manager.link_dependency
 	local ref = comp.ref
 
 	if type(ref) == "table" then
 		if ref.events then
-			link_ref_field(comp, ref.events, DepGraphKind.Event)
-		end
-
-		if ref.user_events then
-			link_ref_field(comp, ref.user_events, DepGraphKind.Event)
+			link_dependency(comp, ref.events, DepGraphKind.Event)
 		end
 
 		if ref.timing then
-			link_ref_field(comp, ref.timing, DepGraphKind.Timer)
+			link_dependency(comp, ref.timing, DepGraphKind.Timer)
 		end
 
 		if ref.hidden then
-			link_ref_field(comp, ref.hidden, DepGraphKind.Visible)
+			link_dependency(comp, ref.hidden, DepGraphKind.Visible)
 		end
 
 		if ref.min_screen_width then
-			link_ref_field(comp, ref.min_screen_width, DepGraphKind.Visible)
+			link_dependency(comp, ref.min_screen_width, DepGraphKind.Visible)
 		end
 	end
 
 	local inherit = comp.inherit
 	if inherit then
-		link_ref_field(comp, inherit, DepGraphKind.Event)
-		link_ref_field(comp, inherit, DepGraphKind.Timer)
-		link_ref_field(comp, inherit, DepGraphKind.Visible)
+		link_dependency(comp, inherit, DepGraphKind.Event)
+		link_dependency(comp, inherit, DepGraphKind.Timer)
+		link_dependency(comp, inherit, DepGraphKind.Visible)
 	end
 end
 
@@ -253,15 +243,11 @@ local function bind_update_conditions(comp)
 	end
 
 	if comp.events then
-		Event.register_events(comp, "events")
+		Event.register_events(comp)
 	end
 
 	if comp.min_screen_width then
 		Event.register_vim_resized(comp)
-	end
-
-	if comp.user_events then
-		Event.register_events(comp, "user_events")
 	end
 end
 
@@ -272,25 +258,36 @@ local function pull_missing_dependencies(comp)
 	for dep_id in Manager.iterate_all_dependency_ids(comp.id) do
 		if not Manager.is_existed(dep_id) then
 			local c = Component.require_by_id(dep_id)
-			if c then M.register_abstract_component(c) end
+			if c then
+				M.register_abstract_component(c)
+			end
 		end
 	end
 
 	local ref = comp.ref
-	if type(ref) ~= "table" then return end
+	if type(ref) ~= "table" then
+		return
+	end
 
-  local ref_keys = {
-     "context", "static", "style",
-     "left", "left_style", "right", "right_style"
-  }
+	local ref_keys = {
+		"context",
+		"static",
+		"style",
+		"left",
+		"left_style",
+		"right",
+		"right_style",
+	}
 
-  for i = 1, #ref_keys do
-    local dep_id = ref[ref_keys[i]]
-    if dep_id and not Manager.is_existed(dep_id) then
-      local c = Component.require_by_id(dep_id)
-      if c then M.register_abstract_component(c) end
-    end
-  end
+	for i = 1, #ref_keys do
+		local dep_id = ref[ref_keys[i]]
+		if dep_id and not Manager.is_existed(dep_id) then
+			local c = Component.require_by_id(dep_id)
+			if c then
+				M.register_abstract_component(c)
+			end
+		end
+	end
 end
 
 --- Register an abstract component that is not directly rendered in the statusline.
@@ -318,17 +315,17 @@ end
 --- Build statusline indices for a component.
 --- @param comp Component The component to build indices for.
 local function build_indices(comp)
-  -- Why not support left and right indpendently?
-  -- Because the update id the main part   --
-  -- The left and right are just the decoration of the main part
-  -- So if the main part is not renderable then the left and right are not renderable too
-  -- If really need the left and right we just add them as a separate component
+	-- Why not support left and right indpendently?
+	-- Because the update id the main part   --
+	-- The left and right are just the decoration of the main part
+	-- So if the main part is not renderable then the left and right are not renderable too
+	-- If really need the left and right we just add them as a separate component
 	local update = comp.update
 	if not update then
 		return
 	end
 
-  local idx = Statusline.push("")
+	local idx = Statusline.push("")
 
 	local indices = comp._indices
 	if not indices then
@@ -337,7 +334,7 @@ local function build_indices(comp)
 		indices[#indices + 1] = idx
 	end
 
-  local flexible = comp.flexible
+	local flexible = comp.flexible
 	if flexible then
 		Statusline.track_flexible(idx, flexible)
 	end
@@ -352,7 +349,6 @@ local function register_component(comp, parent_id)
 		build_indices(comp)
 		return comp
 	end
-
 
 	-- Example for this case: comp = {
 	--  [0] = "mode",
@@ -371,8 +367,9 @@ local function register_component(comp, parent_id)
 	-- }
 	-- If a component is made base on other component with some overrided fields
 	local comp_path = comp[0]
+	--- @cast comp_path DefaultId
 	if type(comp_path) == "string" then
-		local c = require("witch-line.core.Component").require(comp_path)
+		local c = require("witch-line.core.Component").require_by_id(comp_path)
 		-- If c is nil, assume that the user is trying to add the [0] field for other purpose
 		-- so we just ignore it
 		if c then
@@ -415,24 +412,26 @@ end
 --- @param comp LiteralComponent The string component to register.
 local function register_literal_comp(comp)
 	if comp ~= "" then
-		Statusline.push(comp,true)
+		Statusline.push(comp, true)
 	end
 	return comp
 end
 
 --- Register a component by its type.
---- @param comp Component The component to register.
+--- @param comp Component|LiteralComponent The component to register.
 --- @param parent_id CompId|nil The ID of the parent component, if any.
 --- @return Component|LiteralComponent|nil comp The registered component. Nil if registration failed.
 function M.register_combined_component(comp, parent_id)
 	local kind = type(comp)
 	if kind == "string" then
+		--- @cast comp DefaultId
 		local c = Component.require_by_id(comp)
 		if not c then
 			return register_literal_comp(comp)
 		end
 		comp = register_component(c, parent_id)
 	elseif kind == "table" and next(comp) then
+		--- @cast comp Component
 		comp = register_component(comp, parent_id)
 	else
 		-- Invalid component type
@@ -486,7 +485,7 @@ M.setup = function(user_configs, DataAccessor)
 
 	Session.with_session(function(sid)
 		for _, comp in Manager.iter_pending_init_components() do
-      Component.emit_init(comp, sid)
+			Component.emit_init(comp, sid)
 		end
 		M.update_comp_graph_by_ids(Manager.get_emergency_ids(), sid, {
 			DepGraphKind.Event,
