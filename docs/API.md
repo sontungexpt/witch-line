@@ -20,7 +20,7 @@ This module handles the setup and management of statusline components.
   - `dep_graph_kind`: Optional. A list of dependency store IDs to refresh. (Defaults to Timer and Event)
   - `seen`: A set of already processed components to avoid infinite loops.
 
-- `update_component(comp, sid)`: Updates the value and style of a specific component but does not rerender the statusline.
+- `update_comp(comp, sid)`: Updates the value and style of a specific component but does not rerender the statusline.
 
   - `comp`: The component to update.
   - `sid`: The session identifier for the current update.
@@ -73,7 +73,3 @@ This module provides functions to manage sessions for the statusline.
 
   - `sid`: The session identifier.
   - `store_id`: The identifier for the store.
-
-
-
-

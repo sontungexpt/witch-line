@@ -1,14 +1,15 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 local o = vim.o
 
-local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
 local Highlight = require("witch-line.core.highlight")
 local Session = require("witch-line.core.Session")
 local Manager = require("witch-line.core.manager")
+local Component = require("witch-line.core.Component")
 local DepGraphKind = Manager.DepGraphKind
+local SepStyle = Component.SepStyle
 
 local M = {}
 
@@ -39,11 +40,154 @@ local function format_side_value(val, is_func)
 	return val
 end
 
+--- Update or apply the highlight style of a component.
+---
+--- This function resolves a component’s `style` field (including inherited and
+--- referenced styles), generates or reuses its highlight group name (`_hl_name`),
+--- and applies the highlight definition through `Highlight.highlight()`.
+---
+--- Behavior:
+--- 1. Uses `Manager.dynamic_inherit()` to compute the final merged `style` value,
+---    combining local, inherited, and referenced styles with `Highlight.merge_hl()`.
+--- 2. If the component already has a `_hl_name`:
+---    - Reapplies the highlight if the style is dynamic (`force == true`)
+---      or has been externally overridden (`style_overided` provided).
+--- 3. If `_hl_name` is not set:
+---    - Generates a new one via `Highlight.make_hl_name_from_id()`.
+---    - If the component has parents (`pcount > 0`), assigns its own name.
+---    - Otherwise, tries to reuse the deepest referenced component’s `_hl_name`
+---      (if any), caching it for future lookups.
+--- 4. Applies the resolved highlight style and updates the `_hl_name` cache.
+---
+--- @param comp Component          The component whose highlight style should be updated.
+--- @param sid SessionId           The session ID used for dynamic style resolution and caching.
+--- @param override_style CompStyle|nil Optional override style, applied before inheritance.
+--- @return boolean updated        Whether the highlight was updated (`true`) or skipped (`false`).
+--- @return CompStyle style        The resolved and applied highlight style.
+local function update_comp_style(comp, sid, override_style)
+	local style, force, pcount = Manager.dynamic_inherit(comp, "style", sid, Highlight.merge_hl, override_style)
+	local hl_name = comp._hl_name
+	if hl_name then
+		if force or override_style then
+			Highlight.highlight(hl_name, style)
+			return true, style
+		end
+	else
+		if pcount > 0 then
+			hl_name = Highlight.make_hl_name_from_id(comp.id)
+		else
+			local ref_comp = Manager.deepest_reference_component(comp, "style")
+			if ref_comp then
+				hl_name = ref_comp._hl_name or Highlight.make_hl_name_from_id(ref_comp.id)
+				rawset(ref_comp, "_hl_name", hl_name)
+			else
+				hl_name = Highlight.make_hl_name_from_id(comp.id)
+			end
+		end
+		rawset(comp, "_hl_name", hl_name)
+		Highlight.highlight(hl_name, style)
+		return true, style
+	end
+	return false, style
+end
+
+--- Update and apply the highlight style for a component’s side (left or right).
+---
+--- This function determines and applies a side-specific highlight style
+--- (e.g. separators between components in a statusline or UI block).
+--- It reuses the main component style if possible or evaluates dynamic styles.
+---
+--- **Behavior:**
+--- 1. If a custom highlight already exists and doesn’t need re-rendering, it returns early.
+--- 2. If the side style is a function, it’s dynamically evaluated using `(comp, sid)`.
+--- 3. If the side style is a numeric code (`SepStyle`), it derives a new highlight table
+---    based on the main style:
+---    - `SepFg`:  `{ fg = main_style.fg, bg = "NONE" }`
+---    - `SepBg`:  `{ fg = main_style.bg, bg = "NONE" }`
+---    - `Reverse`: `{ fg = main_style.bg, bg = main_style.fg }`
+---    - `Inherited`: Inherit the component’s `_hl_name` directly.
+---
+--- **Return values:**
+--- - `true`:  Style was updated and applied.
+--- - `false`: No change was necessary or style was invalid.
+---
+--- @param comp Component The component whose side style should be updated.
+--- @param sid SessionId The session identifier used for dynamic style evaluation.
+--- @param side "left"|"right" The side to update.
+--- @param main_style_updated boolean Whether the main style was recently updated (forces re-render).
+--- @param main_style? CompStyle The component’s main style used as reference.
+--- @return boolean updated Whether the side highlight was changed.
+local function update_comp_side_style(comp, sid, side, main_style_updated, main_style)
+	local side_style = comp[Component.style_field(side)] or SepStyle.SepBg
+
+	local t = type(side_style)
+	local hl_name_field = Component.hl_name_field(side)
+	local hl_name = comp[hl_name_field]
+
+	-- Return early if no need to update
+	if
+		not (
+			hl_name == nil
+			or t == "function"
+			or (
+				main_style_updated
+				and t == "number"
+				and (
+					side_style == SepStyle.SepFg
+					or side_style == SepStyle.SepBg
+					or side_style == SepStyle.Reverse
+					or side_style == SepStyle.Inherited
+				)
+			)
+		)
+	then
+		return false
+	end
+
+	if t == "function" then
+		side_style = side_style(comp, sid)
+		t = type(side_style)
+	end
+
+	if t == "number" and main_style then
+		if side_style == SepStyle.SepFg then
+			---@diagnostic disable-next-line: cast-local-type
+			side_style = {
+				fg = main_style.fg,
+				bg = "NONE",
+			}
+		elseif side_style == SepStyle.SepBg then
+			---@diagnostic disable-next-line: cast-local-type
+			side_style = {
+				fg = main_style.bg,
+				bg = "NONE",
+			}
+		elseif side_style == SepStyle.Reverse then
+			---@diagnostic disable-next-line: cast-local-type
+			side_style = {
+				fg = main_style.bg,
+				bg = main_style.fg,
+			}
+		elseif side_style == SepStyle.Inherited then
+			rawset(comp, hl_name_field, comp._hl_name)
+			return true
+		else
+			--- invalid styles
+			return false
+		end
+	end
+	-- Ensure highlight name exists and apply the new highlight
+	hl_name = hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
+	rawset(comp, hl_name_field, hl_name)
+	---@diagnostic disable-next-line: param-type-mismatch
+	return Highlight.highlight(hl_name, side_style)
+end
+
 --- Update a component and its value in the statusline.
 --- @param comp Component The component to update.
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
-local function update_component(comp, sid)
+local function update_comp(comp, sid)
 	Component.emit_pre_update(comp, sid)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
@@ -54,7 +198,7 @@ local function update_component(comp, sid)
 	if hidden then
 		hide_component(comp)
 	else
-		local value, style = Component.evaluate(comp, sid)
+		local value, override_style = Component.evaluate(comp, sid)
 
 		local indices = comp._indices
 		-- A abstract component will not have indices
@@ -65,51 +209,34 @@ local function update_component(comp, sid)
 				hide_component(comp)
 				hidden = true
 			else
-				--- Update statusline value
 				-- Main part
-				Statusline.set_value(indices, value)
-				local style_updated, ref_comp = false, comp
-				if style then
-					style_updated = Component.update_style(comp, style, ref_comp, true)
-					--- Sync style to session store
-					--- This is make sure that the `use_style` hooks always get the latest style
-					local store = Session.get_store(sid, "style")
-					if store then
-						store[comp.id] = style
-					end
-				else
-					local result = Manager.lookup_dynamic_value(comp, "style", sid)
-					if result then
-						style_updated = Component.update_style(comp, result[1], result[2])
-					end
-				end
-				Statusline.set_value_highlight(indices, comp._hl_name, style_updated)
+				-- Update style first to make sure comp._hl_name is not nil
+				local style_updated, style = update_comp_style(comp, sid, override_style)
+				Statusline.set_value(indices, value, comp._hl_name)
 
 				--- Left part
 				local result = Manager.lookup_dynamic_value(comp, "left", sid)
 				if result then
-					local lval, lref = result[1], result[2]
-					local is_left_func = type(lref.left) == "function"
-					lval = format_side_value(lval, is_left_func)
+					local lval, force = result[1], result[4]
 					if lval then
-						Statusline.set_side_value(indices, "left", lval, is_left_func)
-						local left_style_updated = Component.update_side_style(comp, "left", style, style_updated, sid)
-						Statusline.set_side_value_highlight(indices, "left", comp._left_hl_name, left_style_updated)
+						update_comp_side_style(comp, sid, "left", style_updated, style)
+					end
+					lval = format_side_value(lval, force)
+					if lval then
+						Statusline.set_side_value(indices, -1, lval, comp._left_hl_name, force)
 					end
 				end
 
 				--- Right part
-
 				result = Manager.lookup_dynamic_value(comp, "right", sid, {})
 				if result then
-					local rval, rref = result[1], result[2]
-					local is_right_func = type(rref.right) == "function"
-					rval = format_side_value(rval, is_right_func)
+					local rval, force = result[1], result[4]
 					if rval then
-						Statusline.set_side_value(indices, "right", rval, is_right_func)
-						local right_style_updated =
-							Component.update_side_style(comp, "right", style, style_updated, sid)
-						Statusline.set_side_value_highlight(indices, "right", comp._right_hl_name, right_style_updated)
+						update_comp_side_style(comp, sid, "right", style_updated, style)
+					end
+					rval = format_side_value(rval, force)
+					if rval then
+						Statusline.set_side_value(indices, 1, rval, comp._right_hl_name, force)
 					end
 				end
 
@@ -125,7 +252,7 @@ local function update_component(comp, sid)
 	Component.emit_post_update(comp, sid)
 	return hidden
 end
-M.update_component = update_component
+M.update_comp = update_comp
 
 --- Update a component and its dependencies.
 --- @param comp Component The component to update.
@@ -144,7 +271,7 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 	---@cast id CompId
 	seen[id] = true
 
-	local hidden = update_component(comp, sid)
+	local hidden = update_comp(comp, sid)
 
 	--- Check if component is loaded and should be render and affect to dependents
 	--- If it's not load. It's just the abstract component and we don't care about updated value of it. The function update is just call for update something for abstract component

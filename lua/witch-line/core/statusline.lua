@@ -4,24 +4,59 @@ local vim, concat, type, ipairs = vim, table.concat, type, ipairs
 local o, bo, api = vim.o, vim.bo, vim.api
 local bor, band, lshift = bit.bor, bit.band, bit.lshift
 local nvim_strwidth = api.nvim_strwidth
+local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
 local M = {}
+-- Constants controlling the relative index positions for layout calculation.
+-- These are typically used to determine horizontal shifts (e.g., for padding, borders, etc.)
+---@type integer  Offset index for the left side.
+local LEFT_SHIFT = -1
+---@type integer  Offset index for the right side
+local RIGHT_SHIFT = -1
+---@type integer  Distance (gap) between consecutive shift indices.
+local SHIFT_GAP = 3
+---@type integer  Base offset applied to value computations.
+local VALUE_SHIFT = 2
+---@type integer  Derived offset for string width calculations
+local STRWIDTH_SHIFT = VALUE_SHIFT + SHIFT_GAP
+
+--- Compute the left-side index based on a given shift value.
+--- Used when aligning or spacing elements to the left.
+--- @param shift integer The base shift amount.
+--- @return integer idx The computed index for the left side.
+local left_idx = function(shift)
+	return shift + LEFT_SHIFT
+end
+
+--- Compute the right-side index based on a given shift value.
+--- Used when aligning or spacing elements to the right.
+--- @param shift integer The base shift amount.
+--- @return integer idx The computed index for the right side.
+local right_idx = function(shift)
+	return shift + RIGHT_SHIFT
+end
+
+--- Compute the side index dynamically based on direction.
+--- This function generalizes `left_idx` and `right_idx` into one,
+--- where `side_shift` determines the direction of offset.
+---
+--- Example:
+--- ```lua
+--- side_idx(5, -1) --> 4   (left side)
+--- side_idx(5,  1) --> 6   (right side)
+--- ```
+---
+--- @param shift_base integer The base shift value to offset from.
+--- @param side_shift 1|-1 Direction multiplier: `-1` for left, `1` for right.
+--- @return integer idx The computed index corresponding to the side.
+local side_idx = function(shift_base, side_shift)
+	return shift_base + side_shift
+end
 
 --- @class Segment A statusline component segment.
---- @field value string The main value of the component.
---- @field hl string|nil The highlight group name for the main value of the component.
---- @field left string|nil The left value of the component.
---- @field left_hl string|nil The highlight group name for the left value of the component.
---- @field right string|nil The right value of the component.
---- @field right_hl string|nil The highlight group name for the main value of the component.
 --- @field frozen true|nil If true, the part is frozen and will not be cleared on Vim exit.
 --- @field click_handler_form string|nil The click handler for the component. ( Not be cached )
----
---- @private cached fields:
---- @field _total_display_width? integer|nil The cached total display width of the component including its left and right parts. ( Not be cached )
---- @field _merged_hl_value string|nil The cached merged main value with highlight group name. ( Not be cached )
---- @field _merged_hl_value_left string|nil The cached merged left value with highlight group name. ( Not be cached )
---- @field _merged_hl_value_right string|nil The cached merged right value with highlight group name. ( Not be cached )
+--- @field total_width integer|nil The click handler for the component. ( Not be cached )
 
 --- @type Segment[] The list of statusline components.
 local Statusline = {
@@ -87,8 +122,13 @@ end
 --- @param segment Segment The statusline component to reset.
 local format_state_before_cache = function(segment)
 	for k, v in pairs(segment) do
-		if k ~= "frozen" and k ~= "click_handler_form" and k ~= "left" and k ~= "right" then
-			if k == "value" then
+		if
+			k ~= "frozen"
+			and k ~= "click_handler_form"
+			and k ~= left_idx(VALUE_SHIFT)
+			and k ~= k ~= right_idx(VALUE_SHIFT)
+		then
+			if k == VALUE_SHIFT then
 				if not segment.frozen then
 					segment[k] = "" -- Clear unfrozen main value
 				end
@@ -154,14 +194,13 @@ local function build_values(skip_bitmasks)
 	skip_bitmasks = skip_bitmasks or 0
 
 	--- Lazy load
-	local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 	local values, n = {}, 0
 
 	for i = 1, ValuesSize do
 		if not is_skipped(skip_bitmasks, i) then
 			local seg = Statusline[i]
 
-			local val = seg.value
+			local val = seg[VALUE_SHIFT] or ""
 			-- If no main value, skip the whole segment including its left and right parts
 			if val ~= "" then
 				local click_handler_form = seg.click_handler_form
@@ -170,39 +209,20 @@ local function build_values(skip_bitmasks)
 					values[n] = click_handler_form
 				end
 
-				local merged_hl_val
-				local left, right = seg.left, seg.right
+				local left, right = seg[left_idx(VALUE_SHIFT)], seg[right_idx(VALUE_SHIFT)]
 				if left and left ~= "" then
 					n = n + 1
-					merged_hl_val = seg._merged_hl_value_left
-					if merged_hl_val then
-						values[n] = merged_hl_val
-					else
-						merged_hl_val = assign_highlight_name(left, seg.left_hl)
-						values[n], seg._merged_hl_value_left = merged_hl_val, merged_hl_val
-					end
+					values[n] = left
 				end
 
 				--- Main part
 				n = n + 1
-				merged_hl_val = seg._merged_hl_value
-				if merged_hl_val then
-					values[n] = merged_hl_val
-				else
-					merged_hl_val = assign_highlight_name(val, seg.hl)
-					values[n], seg._merged_hl_value = merged_hl_val, merged_hl_val
-				end
+				values[n] = val
 
 				--- Right part
 				if right and right ~= "" then
 					n = n + 1
-					merged_hl_val = seg._merged_hl_value_right
-					if merged_hl_val then
-						values[n] = merged_hl_val
-					else
-						merged_hl_val = assign_highlight_name(right, seg.right_hl)
-						values[n], seg._merged_hl_value_right = merged_hl_val, merged_hl_val
-					end
+					values[n] = right
 				end
 
 				if click_handler_form then
@@ -217,26 +237,19 @@ end
 
 --- Computes the total display width of a statusline component including its left and right parts.
 --- This function caches the computed width to optimize performance.
---- @param segment Segment The statusline component to compute the width for.
+--- @param seg Segment The statusline component to compute the width for.
 --- @return integer width The total display width of the component including its left and right parts.
-local compute_segment_width = function(segment)
-	local width = segment._total_display_width
+local compute_segment_width = function(seg)
+	local width = seg.total_width
 	if width then
 		return width
 	end
-
-	local value = segment.value
-	width = value ~= "" and nvim_strwidth(value) or 0
+	width = seg[STRWIDTH_SHIFT] or 0
 	if width ~= 0 then
-		local left, right = segment.left, segment.right
-		if left then
-			width = width + nvim_strwidth(left)
-		end
-		if right then
-			width = width + nvim_strwidth(right)
-		end
+		width = width + seg[left_idx(STRWIDTH_SHIFT)] or 0 + seg[right_idx(STRWIDTH_SHIFT)] or 0
 	end
-	segment._total_display_width = width
+
+	seg.total_width = width
 	return width
 end
 M.compute_segment_width = compute_segment_width
@@ -258,7 +271,9 @@ M.compute_statusline_width = compute_statusline_width
 M.hide_segment = function(idxs)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
-		seg.value, seg._total_display_width, seg._merged_hl_value = "", nil, nil
+		seg[VALUE_SHIFT] = ""
+		seg[STRWIDTH_SHIFT] = 0
+		seg.total_width = 0
 	end
 end
 
@@ -296,83 +311,47 @@ end
 M.push = function(value, frozen)
 	ValuesSize = ValuesSize + 1
 
+	local width = nvim_strwidth(value)
 	--- @type Segment
 	Statusline[ValuesSize] = {
-		value = value,
+		[VALUE_SHIFT] = value,
+		[STRWIDTH_SHIFT] = width,
+		total_width = width,
 		frozen = frozen,
 	}
 	return ValuesSize
 end
 
 --- Sets the value for a specific component.
---- @param idxs integer[] The index of the component to set the value for.
---- @param hl_name string|nil The highlight group name to assign to the specified component.
---- @param force boolean|nil If true, forces the update even if a highlight group name already exists.
-M.set_value_highlight = function(idxs, hl_name, force)
-	for i = 1, #idxs do
-		local seg = Statusline[idxs[i]]
-		local hl = seg.hl
-		if force or not hl then
-			seg.hl, seg._merged_hl_value = hl_name, nil
-		else
-			return -- Do not overwrite existing highlight
-		end
-	end
-end
-
---- Updates the highlight group name for the left or right side of a specific component.
---- @param idxs integer[] The index of the component to update the side highlight for.
---- @param side "left"|"right" The side to set the highlight for. Use "left" for left and "right" for right.
---- @param hl_name string|nil The highlight group name to set for the specified side.
---- @param force boolean|nil If true, forces the update even if a highlight group name already exists for the specified side.
-M.set_side_value_highlight = function(idxs, side, hl_name, force)
-	local hl_key, merged_hl_key
-	if side == "left" then
-		hl_key, merged_hl_key = "left_hl", "_merged_hl_value_left"
-	elseif side == "right" then
-		hl_key, merged_hl_key = "right_hl", "_merged_hl_value_right"
-	else
-		error("Invalid side: " .. tostring(side) .. ". Use 'left' or 'right'.")
-	end
-
-	for i = 1, #idxs do
-		local seg = Statusline[idxs[i]]
-		if force or not seg[hl_key] then
-			seg[hl_key], seg[merged_hl_key] = hl_name, nil
-		else
-			return -- Do not overwrite existing highlight
-		end
-	end
-end
---- Sets the value for a specific component.
 --- @param idxs integer|integer[] The index of the component to set the side value for.
 --- @param value string The value to set for the specified side.
-M.set_value = function(idxs, value)
+--- @param hl_name string|nil The highlight group name to set for the specified side.
+M.set_value = function(idxs, value, hl_name)
+	local width = nvim_strwidth(value)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
-		seg.value, seg._merged_hl_value, seg._total_display_width = value, nil, nil
+		seg.total_width = (seg.total_width or 0) - (seg[STRWIDTH_SHIFT] or 0) + width
+		seg[STRWIDTH_SHIFT] = width
+		seg[VALUE_SHIFT] = assign_highlight_name(value, hl_name)
 	end
 end
 
 --- Sets the left or right side value for a specific component.
 --- @param idxs integer|integer[] The index of the component to set the side value for.
---- @param side "left"|"right" The side to set the value for. Use "left" for left and "right" for right.
+--- @param shift_side -1|1 The shift side value to get the side idx. 1 Right, -1 Left
 --- @param value string The value to set for the specified side.
+--- @param hl_name string|nil The highlight group name to set for the specified side.
 --- @param force boolean|nil If true, forces the update even if a value already exists for the specified side.
-M.set_side_value = function(idxs, side, value, force)
-	local key, merged_key
-	if side == "left" then
-		key, merged_key = "left", "_merged_hl_value_left"
-	elseif side == "right" then
-		key, merged_key = "right", "_merged_hl_value_right"
-	else
-		error("Invalid side: " .. tostring(side) .. ". Use 'left' or 'right'.")
-	end
-
+M.set_side_value = function(idxs, shift_side, value, hl_name, force)
+	local width = nvim_strwidth(value)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
-		if force or not seg[key] then
-			seg[key], seg[merged_key], seg._total_display_width = value, nil, nil
+		local idx = side_idx(VALUE_SHIFT, shift_side)
+		if force or not seg[idx] then
+			seg[idx] = assign_highlight_name(value, hl_name)
+			local strwidth_idx = side_idx(STRWIDTH_SHIFT, shift_side == "left" and -1 or 1)
+			seg.total_width = (seg.total_width or 0) - (seg[strwidth_idx] or 0) + width
+			seg[strwidth_idx] = width
 		else
 			return -- Do not overwrite existing value
 		end
