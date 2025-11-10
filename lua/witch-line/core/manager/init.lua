@@ -250,164 +250,6 @@ M.get_comp = function(id)
 	return id and Comps[id]
 end
 
--- local inherit = function(comp, field, seen)
--- 	-- Collect inheritance chain upward
--- 	local merged_val = comp[field]
--- 	local inherit_id = comp.inherit
--- 	while inherit_id and not seen[inherit_id] do
--- 		local parent = Comps[inherit_id]
--- 		if not parent then
--- 			break
--- 		end
--- 		local parent_val = parent[field]
--- 		if parent_val ~= nil then
--- 			if merged_val == nil then
--- 				merged_val = parent_val
--- 			elseif type(parent_val) == "table" and type(merged_val) == "table" then
--- 				merged_val = vim.tbl_deep_extend("keep", merged_val, parent_val)
--- 			else
--- 				break -- difference type
--- 			end
--- 		end
--- 		inherit_id = parent.inherit
--- 	end
-
--- 	return merged_val, comp
--- end
-
--- do
--- 	local inherited_cache = {}
--- 	--- Recursively look up a static value in a component and its references.
--- 	--- If the value is found, it is returned along with the component that provides it.
--- 	--- This function does not call functions or cache results; it only looks for static values.
--- 	--- @param comp Component The component to start the lookup from.
--- 	--- @param key string The key to look for in the component.
--- 	--- @param seen table<CompId, boolean> A table to keep track of already seen values to avoid infinite recursion.
--- 	--- @return any value The static value of the component.
--- 	--- @return Component inheritted The component that provides the static value
--- 	--- @note
--- 	--- The difference between this function and `lookup_ref_value` is that this function
--- 	--- will only look for static values without calling functions or caching, while `lookup_ref_value`
--- 	--- will call functions and cache the result in the session store.
--- 	M.lookup_plain_value = function(comp, key, seen)
--- 		-- Fast path: direct field hit
--- 		local value = comp[key]
--- 		if value ~= nil then
--- 			return value, comp
--- 		end
-
--- 		-- Handle references
--- 		local origin_id = comp.id
--- 		local ref_id = origin_id
-
--- 		---@cast ref_id CompId
--- 		repeat
--- 			-- Check cache
--- 			local cached_entry = inherited_cache[ref_id]
--- 			value = cached_entry and cached_entry[key]
--- 			if value then
--- 				return value, comp
--- 			end
--- 			seen[ref_id] = true
-
--- 			-- Resolve reference
--- 			local ref = comp.ref
--- 			ref_id = type(ref) == "table" and ref[key] or comp.inherit
--- 			if not ref_id or seen[ref_id] then
--- 				return nil, comp
--- 			end
-
--- 			-- Resolve referenced component
--- 			local ref_comp = Comps[ref_id]
--- 			if not ref_comp then
--- 				return nil, comp
--- 			end
-
--- 			-- Direct value lookup on referenced component
--- 			value = ref_comp[key]
--- 			if value ~= nil then
--- 				---@cast origin_id CompId
--- 				inherited_cache[origin_id] = { [key] = value }
--- 				return value, comp
--- 			end
-
--- 			-- Continue up the reference chain
--- 			comp = ref_comp
--- 		until false
-
--- 		return nil, comp
--- 	end
--- end
-
--- --- Recursively look up a value in a component and its references.
--- --- If the value is a function, it will be called with the component and any additional arguments.
--- --- The result will be cached in the session store to avoid redundant computations.
--- --- @param comp Component The component to start the lookup from.
--- --- @param key string The key to look for in the component.
--- --- @param sid SessionId The ID of the process to use for this retrieval.
--- --- @param seen table<Id, boolean> A table to keep track of already seen values to avoid infinite recursion.
--- --- @param ... any Additional arguments to pass to the value function.
--- --- @return any value The value of the component for the given key, or nil if not found.
--- --- @return Component ref_comp The component that provides the value, or nil if not found.
--- --- @note
--- --- The difference between this function and `lookup_inherited_value` is that this function
--- --- will call functions and cache the result in the session store, while `lookup_inherited_value`
--- --- will only look for static values without calling functions or caching.
--- M.lookup_dynamic_value = function(comp, key, sid, seen, ...)
--- 	local id, value, ref, ref_comp = comp.id, nil, nil, nil
--- 	---@cast id CompId
--- 	local cache = get_session_store(sid, key)
-
--- 	-- Do as least one loop
--- 	repeat
--- 		if cache then
--- 			value = cache[id]
--- 			if value then
--- 				return value, comp
--- 			end
--- 		end
-
--- 		-- Fast path: direct value or function field
--- 		value = comp[key]
--- 		if value then
--- 			if type(value) == "function" then
--- 				value = value(comp, sid, ...)
--- 			end
-
--- 			if cache then
--- 				cache[id] = value
--- 			else
--- 				cache = new_session_store(sid, key, { [id] = value })
--- 			end
--- 			return value, comp
--- 		end
-
--- 		seen[id] = true
-
--- 		--- Provides fallback inheritance via `comp.inherit` when `ref` is not a table.
--- 		--- This enables function-based field inheritance without recalculating values.
--- 		--- Example:
--- 		--- ```lua
--- 		--- local Base = { id = "base", context = function() return { foo = "bar" } end }
--- 		--- local Child = { id = "child", inherit = "base", context = nil }
--- 		--- ```
--- 		--- `Child` will inherit the evaluated context from `Base`, avoiding repeated computation.
--- 		ref = comp.ref
--- 		id = (type(ref) == "table" and ref[key]) or comp.inherit
--- 		if not id or seen[id] then
--- 			return nil, comp
--- 		end
-
--- 		ref_comp = Comps[id]
--- 		if not ref_comp then
--- 			return nil, comp
--- 		end
--- 		comp = ref_comp
--- 	until false -- until not comp -- never happens because of the return above
-
--- 	return nil, comp
--- end
-
 --- Inspect the current state of the component manager.
 --- @param target "dep_store"|"comps"|nil The key to inspect.
 M.inspect = function(target)
@@ -448,7 +290,7 @@ do
 		local key_cache = raw_cache[key]
 		local result = key_cache and key_cache[cid]
 		if result then
-			return result
+			return result == vim.NIL and nil or result
 		end
 
 		-- Local value
@@ -463,7 +305,7 @@ do
 			return result
 		end
 
-		-- 2️⃣ Inherit from parent
+		-- Inherit from parent
 		local inherit_id = comp.inherit
 		if inherit_id then
 			local parent = Comps[inherit_id]
@@ -480,7 +322,7 @@ do
 			end
 		end
 
-		-- 3️⃣ Reference chain lookup
+		-- Reference chain lookup
 		local ref = comp.ref
 		if type(ref) == "table" then
 			local ref_id = ref[key]
@@ -502,7 +344,13 @@ do
 			end
 		end
 
-		return result
+		if key_cache then
+			key_cache[cid] = vim.NIL
+		else
+			raw_cache[key] = { [cid] = vim.NIL }
+		end
+
+		return nil
 	end
 
 	--- Perform a plain lookup for a key within a component hierarchy.
@@ -534,6 +382,9 @@ do
 	--- @return nil|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil, [4]: true|nil} result  The found raw value (static or unevaluated function), the origin component where it is defined, and the final component in the inheritance/reference chain (if any), and true if function
 	M.lookup_dynamic_value = function(comp, key, sid, seen, ...)
 		local cid = comp.id
+		if seen and seen[cid] then
+			return nil
+		end
 		-- Cache evaluated (resolved) value
 		local cache = get_session_store(sid, key)
 		local result = cache and cache[cid]
@@ -567,40 +418,83 @@ do
 	end
 end
 
---- Merge the full inheritance chain of a component dynamically.
---- It resolves all parents recursively and merges their values
---- using dynamic lookups (`hfind_raw`) for correctness with refs and inheritance.
----
---- @param comp ManagedComponent The component to resolve inheritance for.
---- @return table merged The dynamically merged table result.
---- @return boolean had_func The dynamically merged table result.
-function M.inherit(comp, key, sid, merge)
-	local merged = {}
-	local chain, n = {}, 0
-	local pid = comp.inherit
-	while pid do
-		local c = Comps[pid]
-		n = n + 1
-		chain[n] = c
-		pid = c.inherit
-	end
+do
+	local inherited_cache = {}
 
+	--- Resolve and merge inherited values for a given component key.
+	---
+	--- This function dynamically traverses the inheritance chain of a component,
+	--- merging values from all parent components using a provided `merge` function.
+	--- It distinguishes between static (cached) and dynamic (session-based) values.
+	---
+	--- Caching strategy:
+	--- - Static results are stored globally in `inherited_cache`.
+	--- - Dynamic results (dependent on runtime/session state) are stored
+	---   in a session-specific cache via `get_session_store()` / `new_session_store()`.
+	---
+	--- @param comp ManagedComponent The component to resolve inheritance for.
+	--- @param key string The key name to resolve and merge.
+	--- @param sid SessionId The session ID used for caching dynamic results.
+	--- @param merge fun(a: any, b: any): any  A function to merge two values.
+	--- @return any merged The final merged value after inheritance resolution.
+	--- @return boolean dynamic  Whether the result is dynamic (session-dependent).
+	function M.inherit(comp, key, sid, merge)
+		local cid = comp.id
+		local key_cache = inherited_cache[key]
+		local val = key_cache and key_cache[cid]
 
-local val, had_func = nil, false
-
-	local r M.lookup_dynamic_value(comp, key, sid)
-if r then
-val, had_func =  r[1], r[4] or false
-end
-
-	for i = 1, n do
-		local p = M.lookup_dynamic_value(chain[i], key, sid)
-		if p then
-			val = merge(val, p[1])
-			had_func = had_func or p[4] or false
+		if val then
+			return val, false
 		end
-	end
 
-	return merged, had_func
+		local DYNAMIC_CAHCED_KEY = "inherited" .. key
+		local dynamic_key_cache = get_session_store(sid, DYNAMIC_CAHCED_KEY)
+		val = dynamic_key_cache and dynamic_key_cache[cid]
+		if val then
+			return val, true
+		end
+
+		local chain, n = {}, 0
+		local pid = comp.inherit
+		while pid do
+			local c = Comps[pid]
+			n = n + 1
+			chain[n] = c
+			pid = c.inherit
+		end
+
+		local dynamic, seen = nil, nil
+		local lookup_dynamic_value = M.lookup_dynamic_value
+		local r = lookup_dynamic_value(comp, key, sid, seen)
+		if r then
+			val, dynamic = r[1], r[4]
+		end
+
+		for i = 1, n do
+			r = lookup_dynamic_value(chain[i], key, sid, seen)
+			if r then
+				val = merge(val, r[1])
+				dynamic = dynamic or r[4]
+			end
+		end
+
+		if dynamic then
+			-- Cache final evaluated value for this session
+			if dynamic_key_cache then
+				dynamic_key_cache[cid] = val
+			else
+				new_session_store(sid, DYNAMIC_CAHCED_KEY, { [cid] = val })
+			end
+		else
+			if key_cache then
+				key_cache[cid] = val
+			else
+				inherited_cache[key] = { [cid] = val }
+			end
+		end
+
+		return val, dynamic or false
+	end
 end
+
 return M

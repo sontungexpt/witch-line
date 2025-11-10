@@ -26,12 +26,12 @@ local Progress = {
 	padding = 0,
 	style = { fg = colors.orange },
 	update = function(self)
-    local api = vim.api
-    local static = self.static
+		local api = vim.api
+		local static = self.static
 
-    ---@cast static {chars: string[]}
-    local cursor_line = api.nvim_win_get_cursor(0)[1]
-    local total_lines = api.nvim_buf_line_count(0)
+		---@cast static {chars: string[]}
+		local cursor_line = api.nvim_win_get_cursor(0)[1]
+		local total_lines = api.nvim_buf_line_count(0)
 
 		return static.chars[math.ceil(cursor_line / total_lines * #static.chars)] or ""
 	end,

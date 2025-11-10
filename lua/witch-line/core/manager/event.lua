@@ -6,13 +6,13 @@ local EventInfoStoreId = "EventInfo"
 
 ---@class SpecialEvent
 ---@field name  string
----@field patterns string
+---@field patterns string[]
 ---@field ids CompId[]
 
 ---@class EventStore
 ---@field events nil|table<string, CompId[]> Stores component dependencies for nvim events
 ---@field user_events nil|table<string, CompId[]> Stores component dependencies for user-defined events
----@field spectial_events nil|SpecialEvent[] Stores component dependencies for user-defined events
+---@field special_events nil|SpecialEvent[] Stores component dependencies for user-defined events
 local EventStore = {
 	-- Stores component dependencies for events
 	-- Only init if needed
@@ -83,18 +83,32 @@ M.register_events = function(comp)
 						end
 					end
 				elseif patterns and patterns ~= "" then
-					store = EventStore.spectial_events or {}
-					EventStore.spectial_events = store
-					local ps = vim.split(patterns, "[,%s]+", { trimempty = true })
+					store = EventStore.special_events or {}
+					EventStore.special_events = store
+					local ps, n = {}, 0
+					for pat in patterns:gmatch("[^,%s]+") do
+						n = n + 1
+						ps[n] = pat
+					end
 					table.sort(ps)
-					patterns = table.concat(ps)
 					local found = false
 					for k = 1, #store do
 						local entry = store[k]
-						if entry.name == ename and entry.patterns == patterns then
-							entry.ids[#entry.ids + 1] = comp.id
-							found = true
-							break
+						local entry_patterns = entry.patterns
+						local pcount = #entry_patterns
+						if entry.name == ename and pcount == n then
+							local same = true
+							for l = 1, pcount do
+								if ps[l] ~= entry_patterns[l] then
+									same = false
+									break
+								end
+							end
+							if same then
+								entry.ids[#entry.ids + 1] = comp.id
+								found = true
+								break
+							end
 						end
 					end
 					if not found then
@@ -140,7 +154,7 @@ end
 --- Initialize the autocmd for events and user events.
 --- @param work fun(sid: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the sid, component IDs, and event information as arguments.
 M.on_event = function(work)
-	local events, user_events, spectial_events = EventStore.events, EventStore.user_events, EventStore.spectial_events
+	local events, user_events, spectial_events = EventStore.events, EventStore.user_events, EventStore.special_events
 
 	--- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
 	local id_event_info_map = {}
