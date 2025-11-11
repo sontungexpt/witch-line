@@ -1,3 +1,4 @@
+local pairs = pairs
 local M = {}
 
 local ONE_SECOND = 1000 -- 1 second

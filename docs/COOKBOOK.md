@@ -50,7 +50,7 @@ WitchLine provides some hooks to access data in module `witch-line.core.manager.
 - `use_static(comp)`: Access the static field of the component or from referenced component.
 - `use_context(comp, session_id)`: Access the context field of the component or from referenced component for the given session.
 - `use_event_info(comp, session_id)`: Access the data event that triggered the update for the component in the given session. The result is the argument passed to the event callback in vim.api.nvim_create_autocmd.
-- `use_style(comp, session_id)`: Access the style of the component after resolving all the references and function calls for the given session. When the returned style is updated, the highlight will be updated automatically.
+<!-- - `use_style(comp, session_id)`: Access the style of the component after resolving all the references and function calls for the given session. When the returned style is updated, the highlight will be updated automatically. -->
 
 ### 🔡 Global Accessible Fields
 
@@ -889,6 +889,93 @@ An component can reference other components for some of its fields. This allows 
       end
   }
   ```
+
+#### ⚙️ Pipeline Overview
+
+When designing a component in **Witch-Line**, the resolution of a field or behavior follows a strict **pipeline**:
+
+> **Local → Inherit → Reference**
+
+1. **Local** — The value or method defined directly on the current component instance.
+2. **Inherit** — If no local value exists, the component’s parent class (or ancestor chain) is checked.
+   - If the value is a function, it is executed with `self` pointing to the **current component**.
+3. **Reference** — If neither local nor inherited value exists, the reference component (another instance that the current component points to) is checked.
+   - If the value is a function, it is executed with `self` pointing to the **referenced component**.
+
+This pipeline is **recursive**, and Witch-Line ensures correct `self` binding during each step:
+
+- Inheritance calls → `self = current component`
+- Reference calls → `self = referenced component`
+
+---
+
+#### 🔍 Differences Between Reference and Inheritance
+
+Most developers are already familiar with **inheritance**:
+
+> A child component inherits logic and values from its ancestors.
+
+But **reference** works differently — it’s not ownership, it’s _delegation_.
+Let’s illustrate it with a simple analogy 👇
+
+##### 🧠 Analogy
+
+1. You and your friend are preparing for an exam.
+2. You can’t solve a math problem, so you ask your friend for help.
+3. Your friend says: “I’ll share my solution in a **Google Document** and send you a **link**.”
+4. You open the link, see the solution, but you **can’t edit it** — it’s read-only.
+
+That’s how **reference** works:
+
+> A component can _use_ another component’s computed result, but cannot modify or override it.
+
+The shared component executes its logic by itself; the referencing component just receives and uses the result.
+
+---
+
+#### 🧩 Example
+
+```lua
+local Shared = {
+    id = "A",
+    static = {
+        A = "A",
+        B = "B"
+    },
+    style = function(self, sid)
+        -- self here is Shared, not Comp
+        local static = require("witch-line.core.manager.hook").use_static(self)
+        if static.A == "A" then
+            return { fg = "#ffffff" }
+        else
+            return { fg = "#000000" }
+        end
+    end
+}
+
+local Comp = {
+    id = "B",
+    static = {
+        A = "B",
+    },
+    ref = {
+        style = "A"
+    }
+}
+
+```
+
+- You guess what's happen when style of Comp is called.
+- Answer is: Comp will not call any `style` function. It's just read the result from shared component and use it directly.
+  The style function called with the self passed is the `Shared` component instead of `Comp`
+- If it's inherit `Shared` it's a new story. The `Comp` will call `style` with self is `Comp`
+
+#### Tips
+
+- Use `ref` as much as possible instead of `inherit` for performance
+- Don't combine `ref` and `inherit` unless you ensure how it's really executed
+- Try to create less than 2 level of ancestor for manipulation.
+- Remember lookup pipeline : Local > Inherit > Ref
 
 ### 🚀 Advanced Fields
 
