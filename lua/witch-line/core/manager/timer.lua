@@ -135,8 +135,8 @@ M.on_timer_trigger = function(work)
 							queue[qn] = comp_ids[i]
 						end
 					end
-					if interval > threshold then
-						threshold = lcm(base, interval)
+					if threshold % interval ~= 0 then
+						threshold = lcm(threshold, interval)
 					end
 				end
 
