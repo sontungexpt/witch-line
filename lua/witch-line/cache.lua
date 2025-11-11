@@ -1,4 +1,4 @@
-local fn, uv = vim.fn, vim.uv or vim.loop
+local fn, uv, concat, tostring, assert = vim.fn, vim.uv or vim.loop, table.concat, tostring, assert
 
 ---@class Cache
 local M = {}
@@ -6,6 +6,9 @@ local M = {}
 local sep = package.config:sub(1, 1)
 local CACHED_DIR = fn.stdpath("cache") .. sep .. "witch-line"
 local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
+
+--- The witch-line plugin dir stat to check if should expire cacche when update plug
+local config_checksum, msec, mnsec, size = 0, 0, 0, 0
 
 local loaded = false
 
@@ -51,9 +54,9 @@ end
 
 --- Set the checksum for the current user configs
 --- @param user_configs UserConfig|nil The user configs to generate the checksum from
-M.checksum = function(user_configs)
+local create_config_checksum = function(user_configs)
 	local Hash = require("witch-line.utils.hash")
-	return tostring(Hash.fnv1a32(user_configs, "version"))
+	config_checksum = Hash.fnv1a32(user_configs, "version")
 	-- local hashs = {}
 	-- for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
 	-- 	hashs[i] = tostring(hash)
@@ -61,9 +64,37 @@ M.checksum = function(user_configs)
 	-- return table.concat(hashs)
 end
 
+--- Read modification info of the `witch-line` plugin directory.
+--- Used to detect if the plugin was updated (mtime/size changed).
+--- @param deep boolean|nil If true, also scans all subfiles recursively
+local function read_plugin_stat(deep)
+	local root_dir = vim.api.nvim_get_runtime_file("**/witch-line", false)[1]
+	local stat = uv.fs_stat(root_dir)
+	if stat then
+		size = stat.size
+		local mtime = stat.mtime
+		if mtime then
+			msec, mnsec = mtime.sec, mtime.nsec
+		end
+	end
+	if deep then
+		local paths = vim.api.nvim_get_runtime_file("**/witch-line/**", true)
+		for i = 1, #paths do
+			local p = paths[i]
+			stat = uv.fs_stat(p)
+			local mtime = stat and stat.mtime
+			if mtime then
+				local sec, nsec = mtime.sec, mtime.nsec
+				if sec > msec or nsec > mnsec then
+					mnsec, mnsec = sec, nsec
+				end
+			end
+		end
+	end
+end
+
 --- Save the Data table to cache file
---- @param checksum string The checksum to save with the cache file
-M.save = function(checksum)
+M.save = function()
 	local success = fn.mkdir(CACHED_DIR, "p")
 	if success < 0 then
 		error("Failed to create cache directory: " .. CACHED_DIR)
@@ -78,7 +109,13 @@ M.save = function(checksum)
 	end
 
 	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
-	assert(uv.fs_write(fd, checksum .. "\0" .. bytecode, 0))
+	assert(
+		uv.fs_write(
+			fd,
+			concat({ tostring(msec), tostring(mnsec), tostring(size), tostring(config_checksum), "\0", bytecode }),
+			0
+		)
+	)
 	assert(uv.fs_close(fd))
 end
 
@@ -97,10 +134,10 @@ M.clear = function()
 end
 
 --- Validate the cache file content against the user configs
---- @param checksum string The checksum to validate against
 --- @param content string The content of the cache file
 --- @return string|nil bytecode The bytecode part of the cache file if valid, nil otherwise
-local validate_expiration = function(checksum, content)
+local validate_expiration = function(content)
+	local checksum = concat({ tostring(msec), tostring(mnsec), tostring(size), tostring(config_checksum) })
 	local len = #checksum
 
 	if content:sub(1, len) ~= checksum then
@@ -113,9 +150,9 @@ local validate_expiration = function(checksum, content)
 end
 
 --- Read the data from cache file
---- @param checksum string The checksum to validate against
---- @return Cache.DataAccessor|nil The DataAccessor if the cache file is readable and valid, nil otherwise
-M.read = function(checksum)
+--- @param user_configs UserConfig|nil The user configs to generate the checksum from
+--- @return Cache.DataAccessor|nil The DataAccessor if valid, nil otherwise
+M.read = function(user_configs)
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
 	if err and err == "ENOENT" then
 		return nil
@@ -126,7 +163,9 @@ M.read = function(checksum)
 
 	local Persist = require("witch-line.utils.persist")
 
-	local bytecode = validate_expiration(checksum, content)
+	read_plugin_stat(user_configs and user_configs.cache_full_scan)
+	create_config_checksum(user_configs)
+	local bytecode = validate_expiration(content)
 	if not bytecode then
 		M.clear()
 		return nil

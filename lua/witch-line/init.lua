@@ -3,10 +3,27 @@ local require, vim = require, vim
 local M = {}
 
 ---@alias UserConfig.Disabled {filetypes: string[], buftypes: string[]}
+--- The full user configuration for Witch-Line.
+--- This table defines how the statusline is structured, behaves, and cached.
+--- Each field corresponds to a part of the plugin’s behavior or data model.
 ---@class UserConfig : table
----@field abstract CombinedComponent[]|nil Abstract components that are not rendered directly.
----@field components CombinedComponent[] Components that are rendered in the statusline.
----@field disabled UserConfig.Disabled|nil A table containing filetypes and buftypes where the statusline is disabled.
+--- Abstract components that are **not directly rendered**,
+--- but may be inherited or referenced by other components.
+--- Typically used to define shared layouts or reusable base definitions.
+---@field abstract CombinedComponent[]|nil
+---
+--- Components that are **actually rendered** in the statusline.
+--- These can inherit or reference abstract components to build complex layouts.
+---@field components CombinedComponent[]
+---
+--- Defines which filetypes and buftypes should disable the statusline completely.
+--- Useful for temporary, floating, or special-purpose buffers.
+---@field disabled UserConfig.Disabled|nil
+---
+--- Enables deep scanning of the plugin directory for detecting cache expiration.
+--- When `true`, Witch-Line will perform a full recursive scan (slower but more accurate).
+--- When `false` or `nil`, only the main plugin folder’s timestamp and size are checked (faster).
+---@field cache_full_scan boolean|nil
 
 --- Use default configs if missing
 --- @param user_configs UserConfig|nil user_configs to check
@@ -32,7 +49,6 @@ end
 --- @param user_configs UserConfig|nil user_configs
 M.setup = function(user_configs)
 	local Cache = require("witch-line.cache")
-	local checksum = Cache.checksum(user_configs)
 
 	user_configs = use_default_config(user_configs)
 
@@ -44,7 +60,7 @@ M.setup = function(user_configs)
 		"witch-line.core.highlight",
 	}
 
-	local DataAccessor = Cache.read(checksum)
+	local DataAccessor = Cache.read(user_configs)
 
 	if DataAccessor then
 		for i = 1, #CACHE_MODS do
@@ -63,7 +79,7 @@ M.setup = function(user_configs)
 				for i = 1, #CACHE_MODS do
 					require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
 				end
-				Cache.save(checksum)
+				Cache.save()
 			end
 		end,
 	})
