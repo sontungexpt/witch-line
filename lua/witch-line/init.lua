@@ -49,7 +49,7 @@ end
 --- @param user_configs UserConfig|nil user_configs
 M.setup = function(user_configs)
 	local Cache = require("witch-line.cache")
-
+	local DataAccessor = Cache.read(user_configs)
 	user_configs = use_default_config(user_configs)
 
 	local CACHE_MODS = {
@@ -59,8 +59,6 @@ M.setup = function(user_configs)
 		"witch-line.core.statusline",
 		"witch-line.core.highlight",
 	}
-
-	local DataAccessor = Cache.read(user_configs)
 
 	if DataAccessor then
 		for i = 1, #CACHE_MODS do
