@@ -323,9 +323,7 @@ M.compute_statusline_width = compute_statusline_width
 M.hide_segment = function(idxs)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
-		seg[VALUE_SHIFT] = ""
-		seg[WIDTH_SHIFT] = 0
-		seg.total_width = 0
+		seg[VALUE_SHIFT], seg[WIDTH_SHIFT], seg.total_width = "", 0, nil
 	end
 end
 
@@ -405,10 +403,10 @@ M.set_side_value = function(idxs, shift_side, value, hl_name, force)
 		local seg = Statusline[idxs[i]]
 		local idx = side_idx(VALUE_SHIFT, shift_side)
 		if force or not seg[idx] then
-			seg[idx] = assign_highlight_name(value, hl_name)
 			local width_idx = side_idx(WIDTH_SHIFT, shift_side)
 			seg.total_width = (seg.total_width or 0) - (seg[width_idx] or 0) + width
 			seg[width_idx] = width
+			seg[idx] = assign_highlight_name(value, hl_name)
 		else
 			return -- Do not overwrite existing value
 		end
