@@ -426,10 +426,10 @@ local function overrides_component_value(to, from, skip_type_check)
 		-- both are table from here
 	elseif next(to) == nil then
 		return from
-	elseif vim.islist(to) and vim.islist(from) then
-		return from
 	elseif next(from) == nil then
 		return to
+	elseif vim.islist(to) and vim.islist(from) then
+		return from
 	end
 
 	for k, v in pairs(from) do

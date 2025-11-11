@@ -1,8 +1,8 @@
 local bit = require("bit")
+local bor, band, lshift = bit.bor, bit.band, bit.lshift
 
 local vim, concat, type, ipairs = vim, table.concat, type, ipairs
 local o, bo, api = vim.o, vim.bo, vim.api
-local bor, band, lshift = bit.bor, bit.band, bit.lshift
 local nvim_strwidth = api.nvim_strwidth
 local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
 
@@ -18,7 +18,7 @@ local SHIFT_GAP = 3
 ---@type integer  Base offset applied to value computations.
 local VALUE_SHIFT = 2
 ---@type integer  Derived offset for string width calculations
-local STRWIDTH_SHIFT = VALUE_SHIFT + SHIFT_GAP
+local WIDTH_SHIFT = VALUE_SHIFT + SHIFT_GAP
 
 --- Compute the left-side index based on a given shift value.
 --- Used when aligning or spacing elements to the left.
@@ -53,29 +53,19 @@ local side_idx = function(shift_base, side_shift)
 	return shift_base + side_shift
 end
 
---- @class Segment A statusline component segment.
---- @field frozen true|nil If true, the part is frozen and will not be cleared on Vim exit.
---- @field click_handler_form string|nil The click handler for the component. ( Not be cached )
---- @field total_width integer|nil The click handler for the component. ( Not be cached )
+--- Represents a single segment within the statusline layout.
+--- Each segment defines a visual or interactive element, such as text,
+--- icons, or clickable areas.
+--- @class Segment
+--- @field frozen boolean|nil If true, the segment is persistent and will not be cleared on Vim exit.
+--- @field click_handler_form string|nil The name or ID of the click handler assigned to the segment (not cached).
+--- @field total_width integer|nil The total rendered width of the segment (not cached).
 
 --- @type Segment[] The list of statusline components.
-local Statusline = {
-	-- { value = "", hl = nil, left = nil, left_hl = nil, right = nil, right_hl = nil, frozen = nil, click_handler_form = nil },
-	-- { value = "", hl = nil, left = nil, left_hl = nil, right = nil, right_hl = nil, frozen = nil, click_handler_form = nil },
-}
+local Statusline = {}
 
 ---@type integer The size of the Values list.
 local ValuesSize = 0
-
---- @type table<integer, {idx: integer, priority: integer}> A priority queue of flexible components. It's always sorted by priority in ascending order.
---- Components with lower priority values are considered more important and will be retained longer when space is limited
-local FlexiblePrioritySorted = {
-	-- { idx = 1, priority = 1 },
-	-- { idx = 2, priority = 2 },
-}
-
---- @type integer The length of FlexiblePrioritySorted
-local FlexiblePrioritySortedLen = 0
 
 --- Gets the current size of the statusline values.
 --- @return integer size The current size of the statusline values.
@@ -83,20 +73,89 @@ M.get_size = function()
 	return ValuesSize
 end
 
+--- @type integer[] A sorted priority queue of flexible components.
+--- Always sorted in descending order by priority.
+--- Components with *lower priority values* are considered **more important**
+--- and will be retained longer when space is limited.
+local FlexiblePrioritySorted = {}
+
+local IDX_BITS = 8 -- 8 bit for idx, about 255 components
+local IDX_MASK = 0xFF -- 255
+-- local PRIORITY_BITS = 56 -- 56 bit for priority
+-- local PRIORITY_MASK = 0x00FFFFFFFFFFFFFF -- 7.2e16 (72,057,594,037,927,935)
+
+--- Encodes two integer values (`idx` and `priority`) into a single integer using bit manipulation.
+--- This function packs the `priority` value into the higher bits and `idx` into the lower bits.
+--- The number of bits reserved for `idx` is defined by the constant `IDX_BITS`.
+---
+--- Example:
+---   If IDX_BITS = 8, then the lower 8 bits store `idx`, and the higher bits store `priority`.
+---   encode_flexible(5, 2) → (2 << 8) | 5 = 517
+---
+--- @param idx integer       The index value to encode (stored in the lower IDX_BITS bits).
+--- @param priority integer  The priority value to encode (stored in the higher bits).
+--- @return integer packed   The combined 32-bit or 64-bit integer containing both values.
+local function encode_flexible(idx, priority)
+	return bor(lshift(priority, IDX_BITS), idx)
+end
+
+-- --- Decode a packed 64-bit (or 32-bit) integer into its priority and index parts.
+-- --- The lower `IDX_BITS` bits store the index (idx),
+-- --- and the remaining higher bits store the priority value.
+-- ---
+-- --- Example:
+-- ---   local packed = pack_flexible(12345, 17)
+-- ---   local priority, idx = decode_flexible(packed)
+-- ---   --> priority = 12345, idx = 17
+-- ---
+-- --- @param packed integer  The packed integer containing both priority and index.
+-- --- @return integer priority  The extracted priority value.
+-- --- @return integer idx        The extracted index value.
+-- local function decode_flexible(packed)
+-- 	local idx = bit.band(packed, IDX_MASK) -- Extract lower bits for index
+-- 	local priority = bit.rshift(packed, IDX_BITS) -- Extract higher bits for priority
+-- 	return priority, idx
+-- end
+
+-- --- Extract only the priority portion from a packed integer.
+-- --- This performs a right shift by `IDX_BITS`, discarding the lower bits (index).
+-- ---
+-- --- Example:
+-- ---   local priority = get_flexible_priority(packed)
+-- ---
+-- --- @param packed integer  The packed integer containing both values.
+-- --- @return integer priority  The extracted priority value.
+-- local function get_flexible_priority(packed)
+-- 	return bit.rshift(packed, IDX_BITS)
+-- end
+
+--- Extract only the index portion from a packed integer.
+--- This masks out all but the lowest `IDX_BITS` bits to obtain the index.
+---
+--- Example:
+---   local idx = get_flexible_idx(packed)
+---
+--- @param packed integer  The packed integer containing both values.
+--- @return integer idx  The extracted index value.
+local function get_flexible_idx(packed)
+	return band(packed, IDX_MASK)
+end
+
 --- Tracks a component as flexible with a given priority.
 --- Components with lower priority values are considered more important and will be retained longer when space is limited.
 --- @param idx integer The group indexs of the component to track as flexible (including main part and its separators).
 --- @param priority integer The priority of the component; lower values indicate higher importance.
 M.track_flexible = function(idx, priority)
-	FlexiblePrioritySortedLen = FlexiblePrioritySortedLen + 1
+	local new = encode_flexible(idx, priority)
+	-- Insert the component and sort in descending order of priority at the same time using insertion sort
+	local i = #FlexiblePrioritySorted + 1
 
-	-- Insert the component and sort in ascending order of priority at the same time using insertion sort
-	local i = FlexiblePrioritySortedLen
-	while i > 1 and priority < FlexiblePrioritySorted[i].priority do
+	--- Compare directly because priority is place at higher bit
+	while i > 1 and new > FlexiblePrioritySorted[i] do
 		FlexiblePrioritySorted[i] = FlexiblePrioritySorted[i - 1]
 		i = i - 1
 	end
-	FlexiblePrioritySorted[i] = { idx = idx, priority = priority }
+	FlexiblePrioritySorted[i] = new
 end
 
 --- Inspects the current statusline values.
@@ -122,12 +181,7 @@ end
 --- @param segment Segment The statusline component to reset.
 local format_state_before_cache = function(segment)
 	for k, v in pairs(segment) do
-		if
-			k ~= "frozen"
-			and k ~= "click_handler_form"
-			and k ~= left_idx(VALUE_SHIFT)
-			and k ~= k ~= right_idx(VALUE_SHIFT)
-		then
+		if k ~= "frozen" then
 			if k == VALUE_SHIFT then
 				if not segment.frozen then
 					segment[k] = "" -- Clear unfrozen main value
@@ -150,24 +204,22 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 	CacheDataAccessor.set("Statusline", Statusline)
 	CacheDataAccessor.set("StatuslineSize", ValuesSize)
 	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
-	CacheDataAccessor.set("FlexiblePrioritySortedLen", FlexiblePrioritySortedLen)
 end
 
 --- Loads the statusline cache.
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
 --- @return function undo function to restore the previous state
 M.load_cache = function(CacheDataAccessor)
-	local before_values, before_values_size, before_flexible_priority_sorted, before_flexible_priority_sorted_len =
-		Statusline, ValuesSize, FlexiblePrioritySorted, FlexiblePrioritySortedLen
+	local before_values, before_values_size, before_flexible_priority_sorted =
+		Statusline, ValuesSize, FlexiblePrioritySorted
 
 	Statusline = CacheDataAccessor.get("Statusline") or Statusline
 	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
 	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
-	FlexiblePrioritySortedLen = CacheDataAccessor.get("FlexiblePrioritySortedLen") or FlexiblePrioritySortedLen
 
 	return function()
-		Statusline, ValuesSize, FlexiblePrioritySorted, FlexiblePrioritySortedLen =
-			before_values, before_values_size, before_flexible_priority_sorted, before_flexible_priority_sorted_len
+		Statusline, ValuesSize, FlexiblePrioritySorted =
+			before_values, before_values_size, before_flexible_priority_sorted
 	end
 end
 
@@ -244,9 +296,9 @@ local compute_segment_width = function(seg)
 	if width then
 		return width
 	end
-	width = seg[STRWIDTH_SHIFT] or 0
+	width = seg[WIDTH_SHIFT] or 0
 	if width ~= 0 then
-		width = width + seg[left_idx(STRWIDTH_SHIFT)] or 0 + seg[right_idx(STRWIDTH_SHIFT)] or 0
+		width = width + seg[left_idx(WIDTH_SHIFT)] or 0 + seg[right_idx(WIDTH_SHIFT)] or 0
 	end
 
 	seg.total_width = width
@@ -272,34 +324,39 @@ M.hide_segment = function(idxs)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
 		seg[VALUE_SHIFT] = ""
-		seg[STRWIDTH_SHIFT] = 0
+		seg[WIDTH_SHIFT] = 0
 		seg.total_width = 0
 	end
 end
 
 --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
---- @param max_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
-M.render = function(max_width)
+--- @param limit_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
+M.render = function(limit_width)
 	if o.laststatus == 0 then
 		return
-	elseif FlexiblePrioritySortedLen == 0 then
+	end
+
+	local flexible = FlexiblePrioritySorted[1]
+	if not flexible then
 		local str = concat(build_values())
 		o.statusline = str ~= "" and str or " "
 		return
 	end
 
 	local skip_mask = 0
-	local removed_idx = FlexiblePrioritySortedLen
-	local truncated_len = compute_statusline_width()
+	local remove_idx = 1
+	local curr_width = compute_statusline_width()
+	limit_width = limit_width or o.columns
 
-	max_width = max_width or o.columns
-	while removed_idx > 0 and truncated_len > max_width do
-		local value_idx = FlexiblePrioritySorted[removed_idx].idx
-		skip_mask = skip(skip_mask, value_idx)
-		truncated_len = truncated_len - compute_segment_width(Statusline[value_idx])
-		removed_idx = removed_idx - 1
+	while flexible and curr_width > limit_width do
+		local comp_idx = get_flexible_idx(flexible)
+		skip_mask = skip(skip_mask, comp_idx)
+		curr_width = curr_width - compute_segment_width(Statusline[comp_idx])
+		remove_idx = remove_idx + 1
+		flexible = FlexiblePrioritySorted[remove_idx]
 	end
+
 	local str = concat(build_values(skip_mask))
 	o.statusline = str ~= "" and str or " "
 end
@@ -315,7 +372,7 @@ M.push = function(value, frozen)
 	--- @type Segment
 	Statusline[ValuesSize] = {
 		[VALUE_SHIFT] = value,
-		[STRWIDTH_SHIFT] = width,
+		[WIDTH_SHIFT] = width,
 		total_width = width,
 		frozen = frozen,
 	}
@@ -330,8 +387,8 @@ M.set_value = function(idxs, value, hl_name)
 	local width = nvim_strwidth(value)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
-		seg.total_width = (seg.total_width or 0) - (seg[STRWIDTH_SHIFT] or 0) + width
-		seg[STRWIDTH_SHIFT] = width
+		seg.total_width = (seg.total_width or 0) - (seg[WIDTH_SHIFT] or 0) + width
+		seg[WIDTH_SHIFT] = width
 		seg[VALUE_SHIFT] = assign_highlight_name(value, hl_name)
 	end
 end
@@ -349,7 +406,7 @@ M.set_side_value = function(idxs, shift_side, value, hl_name, force)
 		local idx = side_idx(VALUE_SHIFT, shift_side)
 		if force or not seg[idx] then
 			seg[idx] = assign_highlight_name(value, hl_name)
-			local strwidth_idx = side_idx(STRWIDTH_SHIFT, shift_side == "left" and -1 or 1)
+			local strwidth_idx = side_idx(WIDTH_SHIFT, shift_side == "left" and -1 or 1)
 			seg.total_width = (seg.total_width or 0) - (seg[strwidth_idx] or 0) + width
 			seg[strwidth_idx] = width
 		else
@@ -409,7 +466,7 @@ end
 M.setup = function(disabled_config)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
 	local render_debounce = require("witch-line.utils").debounce(M.render, 100)
-	if FlexiblePrioritySortedLen > 0 then
+	if next(FlexiblePrioritySorted) then
 		api.nvim_create_autocmd({ "VimResized" }, {
 			callback = function()
 				render_debounce(o.columns)

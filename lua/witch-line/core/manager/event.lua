@@ -62,14 +62,16 @@ end
 ---@param comp Component
 M.register_events = function(comp)
 	local events = comp.events
-	if type(events) == "string" then
-		events = { events }
+	local t = type(events)
+	if t == "string" then
+		events, t = { events }, "table"
 	end
-	if type(events) == "table" then
+
+	if t == "table" then
 		local store
 		for i = 1, #events do
 			local e = events[i]
-			local ename, patterns = string.match(e, "^(%S+)%s*(.*)$")
+			local ename, patterns = e:match("^(%S+)%s*(.*)$")
 			if ename then
 				if ename == "User" then
 					-- User LazyLoad
