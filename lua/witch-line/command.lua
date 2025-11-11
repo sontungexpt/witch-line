@@ -14,6 +14,9 @@ local commands = {
 		event_store = function()
 			require("witch-line.core.manager.event").inspect()
 		end,
+		timer_store = function()
+			require("witch-line.core.manager.timer").inspect()
+		end,
 		comp_manager = {
 			comps = function()
 				require("witch-line.core.manager").inspect("comps")
