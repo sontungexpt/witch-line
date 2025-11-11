@@ -1,6 +1,5 @@
 local require, type, str_rep, rawset = require, type, string.rep, rawset
 
-local Highlight = require("witch-line.core.highlight")
 local resolve = require("witch-line.utils").resolve
 
 local COMP_MODULE_PATH = "witch-line.components."
@@ -8,13 +7,12 @@ local COMP_MODULE_PATH = "witch-line.components."
 local Component = {}
 
 --- @enum SepStyle
-local SepStyle = {
+Component.SepStyle = {
 	Inherited = 0, -- use the style of the component
 	SepFg = 1,
 	SepBg = 2,
 	Reverse = 3, -- use the reverse style of the component }
 }
-Component.SepStyle = SepStyle
 
 --- @class CompId : string
 

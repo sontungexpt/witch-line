@@ -118,7 +118,7 @@ end
 --- @param main_style? CompStyle The component’s main style used as reference.
 --- @return boolean updated Whether the side highlight was changed.
 local function update_comp_side_style(comp, sid, side, main_style_updated, main_style)
-	local side_style = comp[Component.style_field(side)] or SepStyle.SepBg
+	local side_style = comp[Component.side_style_field(side)] or SepStyle.SepBg
 
 	local t = type(side_style)
 	local hl_name_field = Component.hl_name_field(side)
@@ -153,20 +153,20 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 		if side_style == SepStyle.SepFg then
 			---@diagnostic disable-next-line: cast-local-type
 			side_style = {
-				fg = main_style.fg,
+				fg = main_style.foreground or main_style.fg,
 				bg = "NONE",
 			}
 		elseif side_style == SepStyle.SepBg then
 			---@diagnostic disable-next-line: cast-local-type
 			side_style = {
-				fg = main_style.bg,
+				fg = main_style.background or main_style.bg,
 				bg = "NONE",
 			}
 		elseif side_style == SepStyle.Reverse then
 			---@diagnostic disable-next-line: cast-local-type
 			side_style = {
-				fg = main_style.bg,
-				bg = main_style.fg,
+				fg = main_style.background or main_style.bg,
+				bg = main_style.foreground or main_style.fg,
 			}
 		elseif side_style == SepStyle.Inherited then
 			rawset(comp, hl_name_field, comp._hl_name)

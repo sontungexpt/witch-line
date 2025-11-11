@@ -150,7 +150,7 @@ This plugin is ideal for developers who want full control over the look and feel
 
 - Bug fixs (Will fix soon this important)
 
-  - [ ] A probably inheritance logic when conflicting between parent and child happens
+  - [x] A probably inheritance logic when conflicting between parent and child happens
 
 ### Compare with other statusline plugins
 

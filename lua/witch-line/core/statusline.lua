@@ -12,7 +12,7 @@ local M = {}
 ---@type integer  Offset index for the left side.
 local LEFT_SHIFT = -1
 ---@type integer  Offset index for the right side
-local RIGHT_SHIFT = -1
+local RIGHT_SHIFT = 1
 ---@type integer  Distance (gap) between consecutive shift indices.
 local SHIFT_GAP = 3
 ---@type integer  Base offset applied to value computations.
@@ -406,9 +406,9 @@ M.set_side_value = function(idxs, shift_side, value, hl_name, force)
 		local idx = side_idx(VALUE_SHIFT, shift_side)
 		if force or not seg[idx] then
 			seg[idx] = assign_highlight_name(value, hl_name)
-			local strwidth_idx = side_idx(WIDTH_SHIFT, shift_side == "left" and -1 or 1)
-			seg.total_width = (seg.total_width or 0) - (seg[strwidth_idx] or 0) + width
-			seg[strwidth_idx] = width
+			local width_idx = side_idx(WIDTH_SHIFT, shift_side)
+			seg.total_width = (seg.total_width or 0) - (seg[width_idx] or 0) + width
+			seg[width_idx] = width
 		else
 			return -- Do not overwrite existing value
 		end
