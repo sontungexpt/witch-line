@@ -4,7 +4,7 @@ local Id = require("witch-line.constant.id").Id
 local Interface = {
 	id = Id["diagnostic.interface"],
 	_plug_provided = true,
-	events = { "DiagnosticChanged" },
+	events = "DiagnosticChanged",
 	static = {
 		ERROR = "",
 		WARN = "",
@@ -29,9 +29,15 @@ local Error = {
 	inherit = Id["diagnostic.interface"],
 	update = function(self, session_id)
 		local hook = require("witch-line.core.manager.hook")
-		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
-		local count = ctx[vim.diagnostic.severity.ERROR] or 0
-		return count > 0 and static.ERROR .. " " .. count or ""
+
+		local id = vim.diagnostic.severity.ERROR
+		local signs = vim.diagnostic.config().signs
+		local icon = signs and signs.text[id]
+		if not icon or icon == "" then
+			icon = hook.use_static(self).ERROR
+		end
+		local count = hook.use_context(self, session_id)[id] or 0
+		return count > 0 and icon .. " " .. count or ""
 	end,
 }
 
@@ -45,9 +51,14 @@ local Warn = {
 	},
 	update = function(self, session_id)
 		local hook = require("witch-line.core.manager.hook")
-		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
-		local count = ctx[vim.diagnostic.severity.WARN] or 0
-		return count > 0 and static.WARN .. " " .. count or ""
+		local id = vim.diagnostic.severity.WARN
+		local signs = vim.diagnostic.config().signs
+		local icon = signs and signs.text[id]
+		if not icon or icon == "" then
+			icon = hook.use_static(self).ERROR
+		end
+		local count = hook.use_context(self, session_id)[id] or 0
+		return count > 0 and icon .. " " .. count or ""
 	end,
 }
 
@@ -61,9 +72,14 @@ local Info = {
 	},
 	update = function(self, session_id)
 		local hook = require("witch-line.core.manager.hook")
-		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
-		local count = ctx[vim.diagnostic.severity.INFO] or 0
-		return count > 0 and static.INFO .. " " .. count or ""
+		local id = vim.diagnostic.severity.INFO
+		local signs = vim.diagnostic.config().signs
+		local icon = signs and signs.text[id]
+		if not icon or icon == "" then
+			icon = hook.use_static(self).INFO
+		end
+		local count = hook.use_context(self, session_id)[id] or 0
+		return count > 0 and icon .. " " .. count or ""
 	end,
 }
 
@@ -77,9 +93,14 @@ local Hint = {
 	},
 	update = function(self, session_id)
 		local hook = require("witch-line.core.manager.hook")
-		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
-		local count = ctx[vim.diagnostic.severity.HINT] or 0
-		return count > 0 and static.HINT .. " " .. count or ""
+		local id = vim.diagnostic.severity.HINT
+		local signs = vim.diagnostic.config().signs
+		local icon = signs and signs.text[id]
+		if not icon or icon == "" then
+			icon = hook.use_static(self).HINT
+		end
+		local count = hook.use_context(self, session_id)[id] or 0
+		return count > 0 and icon .. " " .. count or ""
 	end,
 }
 
