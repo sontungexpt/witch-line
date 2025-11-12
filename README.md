@@ -293,6 +293,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `battery`          | `battery.lua`    | Shows battery status (if applicable)      |
 | `os_uname`         | `os_uname.lua`   | Displays the operating system name        |
 | `nvim_dap`         | `nvim_dap.lua`   | Shows nvim-dap status (if available)      |
+| `search.count`     | `search.lua`     | Shows number of searching value           |
 
 ---
 
