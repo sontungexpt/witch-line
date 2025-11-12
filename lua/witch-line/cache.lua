@@ -102,7 +102,7 @@ M.save = function()
 	end
 
 	local Persist = require("witch-line.utils.persist")
-	local bytecode = Persist.serialize_table_as_bytecode(Data)
+	local bytecode = Persist.serialize_table_as_bytecode(Data, true)
 	if not bytecode then
 		M.clear()
 		return nil, nil

@@ -23,10 +23,20 @@ local DepGraphRegistry = {
 	-- }
 }
 
+-- local CachedComps = {}
 ---@type table<CompId, ManagedComponent>
-local Comps = {
-	--[id] = {}
-}
+local ManagedComps = {}
+-- local ManagedComps = setmetatable({
+-- 	--[id] = {}
+-- }, {
+-- 	__index = function(t, k)
+-- 		local comp = CachedComps[k]
+-- 		if comp then
+-- 			t[k] = Persist.deserialize_function(CachedComps[k])
+-- 			CachedComps[k] = nil
+-- 		end
+-- 	end,
+-- })
 
 --- @type CompId[]
 local InitializePendingIds = {}
@@ -47,7 +57,7 @@ M.iter_pending_init_components = function()
 		if not id then
 			return nil
 		end
-		return id, Comps[id]
+		return id, ManagedComps[id]
 	end
 end
 
@@ -76,17 +86,17 @@ M.iter_emergency_components = function()
 		if not id then
 			return nil
 		end
-		return id, Comps[id]
+		return id, ManagedComps[id]
 	end
 end
 
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
 M.on_vim_leave_pre = function(CacheDataAccessor)
-	for _, comp in pairs(Comps) do
+	for _, comp in pairs(ManagedComps) do
 		Component.format_state_before_cache(comp)
 	end
-	CacheDataAccessor.set("Comps", Comps)
+	CacheDataAccessor.set("CachedComps", ManagedComps)
 	CacheDataAccessor.set("DepGraph", DepGraphRegistry)
 	CacheDataAccessor.set("Urgents", EmergencyIds)
 	CacheDataAccessor.set("PendingInit", InitializePendingIds)
@@ -96,15 +106,24 @@ end
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 --- @return function undo Function to restore the previous state of Comps and DepGraph.
 M.load_cache = function(CacheDataAccessor)
-	local before_comps, before_dep_store, before_pending_inits, before_urgents =
-		Comps, DepGraphRegistry, InitializePendingIds, EmergencyIds
+	local before_dep_store, before_pending_inits, before_urgents = DepGraphRegistry, InitializePendingIds, EmergencyIds
+	local CachedComps = CacheDataAccessor.get("CachedComps")
 
-	Comps = CacheDataAccessor.get("Comps") or Comps
+	if CachedComps then
+		setmetatable(ManagedComps, {
+			__index = function(t, k)
+				local comp = require("witch-line.utils.persist").deserialize_function(CachedComps[k])
+				t[k] = comp
+				return comp
+			end,
+		})
+	end
+
 	DepGraphRegistry = CacheDataAccessor.get("DepGraph") or DepGraphRegistry
 	InitializePendingIds = CacheDataAccessor.get("PendingInit") or InitializePendingIds
 	EmergencyIds = CacheDataAccessor.get("Urgents") or EmergencyIds
 	return function()
-		Comps = before_comps
+		ManagedComps = {}
 		DepGraphRegistry = before_dep_store
 		InitializePendingIds = before_pending_inits
 		EmergencyIds = before_urgents
@@ -115,13 +134,13 @@ end
 --- @return fun(): CompId, ManagedComponent iterator Iterator over all components.
 --- @return ManagedComponent[] comps The list of all components.
 M.iterate_comps = function()
-	return pairs(Comps)
+	return pairs(ManagedComps)
 end
 
 --- Get a list of all registered components.
 --- @return ManagedComponent[] The list of all components.
 M.get_list_comps = function()
-	return vim.tbl_values(Comps)
+	return vim.tbl_values(ManagedComps)
 end
 
 --- Register a component with the component manager.
@@ -129,7 +148,7 @@ end
 --- @return CompId The ID of the registered component.
 M.register = function(comp)
 	local id = require("witch-line.core.Component").setup(comp)
-	Comps[id] = comp
+	ManagedComps[id] = comp
 	return id
 end
 
@@ -137,7 +156,7 @@ end
 --- @param id CompId ID to check.
 --- @return boolean existed True if the component exists, false otherwise.
 M.is_existed = function(id)
-	return Comps[id] ~= nil
+	return ManagedComps[id] ~= nil
 end
 
 --- Get the dependency store for a given ID, creating it if it does not exist.
@@ -194,7 +213,7 @@ M.iterate_dependents = function(dep_graph_kind, comp_id)
 	return function()
 		curr_id = next(id_map, curr_id)
 		if curr_id then
-			return curr_id, Comps[curr_id]
+			return curr_id, ManagedComps[curr_id]
 		end
 	end,
 		id_map
@@ -247,7 +266,7 @@ end
 --- @param id CompId The ID of the component to retrieve.
 --- @return Component|nil comp The component with the given ID, or nil if not found.
 M.get_comp = function(id)
-	return id and Comps[id]
+	return id and ManagedComps[id]
 end
 
 --- Inspect the current state of the component manager.
@@ -257,11 +276,11 @@ M.inspect = function(target)
 	if target == "dep_store" then
 		notifier.info("Inspecting DepGraph\n" .. vim.inspect(DepGraphRegistry or {}))
 	elseif target == "comps" then
-		notifier.info("Inspecting Comps\n" .. vim.inspect(Comps or {}))
+		notifier.info("Inspecting Comps\n" .. vim.inspect(ManagedComps or {}))
 	else
 		notifier.info("Inspecting dep_store and comps: \n" .. vim.inspect({
 			DepGraph = DepGraphRegistry or {},
-			Comps = Comps or {},
+			Comps = ManagedComps or {},
 		}))
 	end
 end
@@ -320,7 +339,7 @@ do
 		-- Inherit from parent
 		local inherit_id = comp.inherit
 		if inherit_id then
-			local parent = Comps[inherit_id]
+			local parent = ManagedComps[inherit_id]
 			if parent then
 				result = find_raw_value(parent, key, seen)
 				if result ~= nil then
@@ -339,7 +358,7 @@ do
 		if type(ref) == "table" then
 			local ref_id = ref[key]
 			if ref_id then
-				local ref_comp = Comps[ref_id]
+				local ref_comp = ManagedComps[ref_id]
 				if ref_comp then
 					result = find_raw_value(ref_comp, key, seen)
 					if result ~= nil then
@@ -509,7 +528,7 @@ do
 		end
 		local chain, n, pid = {}, 0, comp.inherit
 		while pid do
-			local c = Comps[pid]
+			local c = ManagedComps[pid]
 			if not c then
 				break
 			end
@@ -602,7 +621,7 @@ do
 
 		local chain, n, pid = {}, 0, comp.inherit
 		while pid do
-			local c = Comps[pid]
+			local c = ManagedComps[pid]
 			if not c then
 				break
 			end

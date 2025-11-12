@@ -116,7 +116,7 @@ end
 --- @param main_style? CompStyle The component’s main style used as reference.
 --- @return boolean updated Whether the side highlight was changed.
 local function update_comp_side_style(comp, sid, side, main_style_updated, main_style)
-	local side_style = comp[Component.side_style_field(side)] or SepStyle.SepBg
+	local side_style = Component.side_style(comp, side)
 
 	local t = type(side_style)
 	local hl_name_field = Component.hl_name_field(side)
