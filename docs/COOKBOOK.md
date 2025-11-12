@@ -94,7 +94,7 @@ local component = {
   | **Type**:                                | **Description**                                    |
   | ---------------------------------------- | -------------------------------------------------- |
   | `table`                                  | A table that holds dynamic data for the component. |
-  | `fun(self, session_id): table \| string` | A function that returns a table or a module path.  |
+  | `fun(self, session_id): table` | A function that returns a table context  |
 
   **Description**: A table or a function that holds dynamic data for the component. It can be used to store values that can change frequently and are reactive.
 
@@ -148,7 +148,7 @@ local component = {
 
 - **id**: (Very Important)
 
-  **Type**: `string | number`
+  **Type**: `string`
 
   **Description**: A unique identifier for the component. It's allow an component to be referenced by other components. The id must be different from default components provided by WitchLine. You can see the list of default ids in the [Default Components](./../README.md#-default-components) section.
 
@@ -194,7 +194,7 @@ local component = {
 
 - **events**:
 
-  - Component.SpecialEvent
+  - Alias: Component.SpecialEvent
 
 | **Field**   | **Type**              | **Description**                                                                                |
 | ----------- | --------------------- | ---------------------------------------------------------------------------------------------- |
@@ -202,6 +202,7 @@ local component = {
 | `once?`     | `boolean`             | _(Optional)_ If `true`, the event triggers only once.                                          |
 | `pattern?`  | `string  \| string[]` | `string[]` (Optional) A pattern or list of patterns the event should match (e.g., `"*.lua"`).  |
 
+  - events tyoe
 | **Type**                   | **Description**                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------- |
 | `string[]`                 | A list of events that the component listens to.                                              |
@@ -211,7 +212,7 @@ local component = {
 
 **Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
 
-**Syntax**: "EventName pattern1,pattern2"
+**Syntax**: "EventName pattern1,pattern2" or {"EventName", ...}
 
 **Example**:
 
