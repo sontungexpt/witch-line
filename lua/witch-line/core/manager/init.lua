@@ -23,20 +23,8 @@ local DepGraphRegistry = {
 	-- }
 }
 
--- local CachedComps = {}
 ---@type table<CompId, ManagedComponent>
 local ManagedComps = {}
--- local ManagedComps = setmetatable({
--- 	--[id] = {}
--- }, {
--- 	__index = function(t, k)
--- 		local comp = CachedComps[k]
--- 		if comp then
--- 			t[k] = Persist.deserialize_function(CachedComps[k])
--- 			CachedComps[k] = nil
--- 		end
--- 	end,
--- })
 
 --- @type CompId[]
 local InitializePendingIds = {}
@@ -95,6 +83,7 @@ end
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	for _, comp in pairs(ManagedComps) do
 		Component.format_state_before_cache(comp)
+		require("witch-line.utils.persist").serialize_function(comp)
 	end
 	CacheDataAccessor.set("CachedComps", ManagedComps)
 	CacheDataAccessor.set("DepGraph", DepGraphRegistry)

@@ -384,7 +384,6 @@ Component.format_state_before_cache = function(comp)
 	else
 		rawset(comp, "temp", nil)
 	end
-	require("witch-line.utils.persist").serialize_function(comp)
 end
 
 --- Recursively overrides the values of a component with the values from another component.
