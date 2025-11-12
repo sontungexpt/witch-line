@@ -1,5 +1,4 @@
 local require, type, str_rep, rawset = require, type, string.rep, rawset
-
 local resolve = require("witch-line.utils").resolve
 
 local COMP_MODULE_PATH = "witch-line.components."
@@ -7,12 +6,13 @@ local COMP_MODULE_PATH = "witch-line.components."
 local Component = {}
 
 --- @enum SepStyle
-Component.SepStyle = {
+local SepStyle = {
 	Inherited = 0, -- use the style of the component
 	SepFg = 1,
 	SepBg = 2,
 	Reverse = 3, -- use the reverse style of the component }
 }
+Component.SepStyle = SepStyle
 
 --- @class CompId : string
 
@@ -289,18 +289,8 @@ end
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
 Component.emit_init = function(comp, sid)
 	local init = comp.init
-	local t = type(init)
-	if t == "function" then
+	if type(init) == "function" then
 		init(comp, sid)
-	elseif t == "string" then
-		local msg
-		init, msg = load(init, nil, "b")
-		if init then
-			rawset(comp, "init", init)
-			init(comp, sid)
-		else
-			error(msg)
-		end
 	end
 end
 
@@ -313,9 +303,9 @@ end
 
 --- Returns the field name for the style of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
---- @return string field_name the field name for the style of the specified side
-Component.side_style_field = function(side)
-	return side == "left" and "left_style" or "right_style"
+--- @return CompStyle|SepStyle field_name the field name for the style of the specified side
+Component.side_style = function(comp, side)
+	return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
 end
 
 --- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
@@ -394,7 +384,7 @@ Component.format_state_before_cache = function(comp)
 	else
 		rawset(comp, "temp", nil)
 	end
-	setmetatable(comp, nil) -- Remove metatable to avoid inheritance issues
+	require("witch-line.utils.persist").serialize_function(comp)
 end
 
 --- Recursively overrides the values of a component with the values from another component.

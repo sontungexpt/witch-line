@@ -85,9 +85,10 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Implement caching mechanism (serialization + deserialization)
   - [x] Cache all needed data
   - [x] Use checksum to detect config changes with FNV-1a
+  - [x] Lazy compile function of component
+  - [x] Detect default component changed automatically when plugin was updated
   - [ ] Support up-value for component function caching
   - [ ] Support paritial cache loading
-  - [ ] Detect default component changed automatically when plugin was updated
 
 - Customization
 
