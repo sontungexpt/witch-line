@@ -24,7 +24,7 @@ local META_TBL = "__WITCH_META::TBL::XpL3w9F@@"
 ---
 --- @param meta_func string[] Sorted list of encoded function key names.
 --- @param key string Key name to search for.
---- @return integer|nil index Index of the key if found, otherwise nil.
+--- @return integer index Index of the key if found, otherwise -1.
 local function find_encoded_key(meta_func, key)
 	local low, high = 1, #meta_func
 	while low <= high do
@@ -40,7 +40,7 @@ local function find_encoded_key(meta_func, key)
 			low = mid + 1
 		end
 	end
-	return nil
+	return -1
 end
 
 M.find_encoded_key = find_encoded_key
@@ -65,14 +65,14 @@ M.find_encoded_key = find_encoded_key
 ---
 --- @param tbl table The table that may contain encoded functions.
 --- @param key string The key name to check.
---- @return integer|nil index Index position of the encoded key, or nil if not encoded.
+--- @return integer index Index position of the encoded key, or -1 if not encoded.
 --- @return table|nil meta_func The metadata table (`META_FUNC`) used for lookup, or `nil` if unavailable.
 local function find_encoded_func(tbl, key)
 	assert(type(tbl) == "table")
 	-- Retrieve metadata list of encoded function keys
 	local meta_func = tbl[META_FUNC]
 	if not meta_func then
-		return nil, meta_func
+		return -1, meta_func
 	end
 	-- Use binary search to locate index of the key
 	return find_encoded_key(meta_func, key), meta_func
@@ -112,7 +112,7 @@ M.lazy_decode = function(tbl, key)
 		return val
 	end
 	local idx, meta_func = find_encoded_func(tbl, key)
-	if not idx then
+	if idx < 1 then
 		-- raw string
 		return val
 	end

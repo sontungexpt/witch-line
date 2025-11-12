@@ -54,6 +54,11 @@ Component.SepStyle = SepStyle
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 ---
 ---
+--- @class Component.SpecialEvent
+--- @field [integer] string event name
+--- @field once? boolean
+--- @field pattern? string|string[]
+---
 --- @class Component : table
 --- @field id CompId|nil The unique identifier for the component, can be a string or a number
 ---
@@ -78,7 +83,8 @@ Component.SepStyle = SepStyle
 --- @field flexible number|nil
 ---
 --- A table of events that the component will listen to
---- @field events string|string[]|nil
+---
+--- @field events string|string[]|nil|Component.SpecialEvent[]
 ---
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
