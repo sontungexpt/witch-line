@@ -1,4 +1,4 @@
-The cookbook is a collection of recipes that demonstrate how to use various features of the software. Each recipe provides step-by-step instructions, code examples, and explanations to help you understand and implement specific functionalities.
+Thể cookbook is a collection of recipes that demonstrate how to use various features of the software. Each recipe provides step-by-step instructions, code examples, and explanations to help you understand and implement specific functionalities.
 
 ## Navigation
 
@@ -203,6 +203,7 @@ local component = {
 | `pattern?`  | `string  \| string[]` | `string[]` (Optional) A pattern or list of patterns the event should match (e.g., `"*.lua"`).  |
 
   - events tyoe
+
 | **Type**                   | **Description**                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------- |
 | `string[]`                 | A list of events that the component listens to.                                              |
