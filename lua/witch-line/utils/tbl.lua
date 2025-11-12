@@ -21,6 +21,62 @@ M.unique_list = function(list)
 	return keys, n
 end
 
+--- Check if two arrays contain the same elements (order does not matter)
+--- The function works by:
+--- 1. Counting occurrences of each element in array `a`
+--- 2. Decreasing those counts based on elements in array `b`
+--- 3. If all counts cancel out (i.e., table `count` is empty) → arrays are equal
+---
+--- ⚙️ Complexity:
+--- - Time: O(n)
+--- - Space: O(n)
+--- - Ignores element order
+--- - Suitable for primitive types (number, string, boolean)
+---
+--- 🧩 Example:
+--- ```lua
+--- arrays_equal({1, 2, 3}, {3, 1, 2})   --> true
+--- arrays_equal({1, 2, 3}, {1, 2, 4})   --> false
+--- arrays_equal({"a", "b"}, {"b", "a"}) --> true
+--- ```
+---
+--- @param a table The first array
+--- @param b table The second array
+--- @return boolean True if both arrays contain the same elements (regardless of order)
+M.array_equal = function(a, b)
+	local len = #a
+	if len ~= #b then
+		return false
+	end
+
+	-- Count element occurrences in array `a`
+	local count = {}
+
+	for i = 1, len do
+		local v = a[i]
+		count[v] = (count[v] or 0) + 1
+	end
+
+	-- Decrease the count for each element found in array `b`
+	for i = 1, len do
+		local v = b[i]
+		local c = count[v]
+		if not c then
+			-- Element in `b` not found in `a`
+			return false
+		end
+		if c == 1 then
+			-- Remove entry when count reaches zero to keep table small
+			count[v] = nil
+		else
+			count[v] = c - 1
+		end
+	end
+
+	-- If `count` is empty, both arrays are identical
+	return next(count) == nil
+end
+
 --- Creates a shallow copy of a table.
 --- @generic T
 --- @param tbl T The table to copy.

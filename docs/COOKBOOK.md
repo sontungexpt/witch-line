@@ -194,33 +194,54 @@ local component = {
 
 - **events**:
 
-  | **Type**   | **Description**                                              |
-  | ---------- | ------------------------------------------------------------ |
-  | `string[]` | A list of events that the component listens to.              |
-  | `string`   | A single event that the component listens to.                |
-  | `nil`      | The component will not listen to any events (default value). |
+  - Component.SpecialEvent
 
-  **Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
+| **Field**   | **Type**           | **Description**                                                                                |
+| ----------- | ------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `[integer]` | `string`           | Event name (e.g., `"BufEnter"`, `"InsertLeave"`). Each entry in the array represents an event. |
+| `once?`     | `boolean`          | _(Optional)_ If `true`, the event triggers only once.                                          |
+| `pattern?`  | `string\|stirng[]` | `string[]`                                                                                     | _(Optional)_ A pattern or list of patterns the event should match (e.g., `"*.lua"`). |
 
-  **Syntax**: "EventName pattern1,pattern2"
+| **Type**                   | **Description**                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------- |
+| `string[]`                 | A list of events that the component listens to.                                              |
+| `string`                   | A single event that the component listens to.                                                |
+| `Component.SpecialEvent[]` | A list of detailed special event definitions with extra options such as `pattern` or `once`. |
+| `nil`                      | The component will not listen to any events (default value).                                 |
 
-  **Example**:
+**Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
 
-  - Type: `string[]`
+**Syntax**: "EventName pattern1,pattern2"
 
-  ```lua
-  local component = {
-      events = {"BufEnter", "CursorHold", "User VeryLazy,LazyLoad", "BufEnter *lua,*js"}
-  }
-  ```
+**Example**:
 
-  - Type: `string`
+- Type: `string[]`, `Component.SpecialEvent[]`
 
-  ```lua
-  local component = {
-      events = "BufEnter"
-  }
-  ```
+```lua
+local component = {
+    events = {
+        "BufEnter",
+        "User VeryLazy,LazyLoad",
+        "BufEnter *lua,*js",
+        {
+            "User",
+            pattern = { "VeryLazy", "LazyLoad"}
+        },
+        {
+            "CursorHold",
+            once = true,
+        }
+    }
+}
+```
+
+- Type: `string`
+
+```lua
+local component = {
+    events = "BufEnter"
+}
+```
 
 - **timing**:
 
