@@ -592,10 +592,7 @@ M.setup = function(user_configs, DataAccessor)
 			end
 		end
 
-		local comps = user_configs.components
-		for i = 1, #comps do
-			M.register_combined_component(comps[i])
-		end
+		M.register_combined_component(user_configs.components)
 	end
 
 	Event.on_event(function(sid, ids)

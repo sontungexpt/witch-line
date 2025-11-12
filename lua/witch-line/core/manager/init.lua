@@ -1,6 +1,6 @@
 local type = type
-local Session = require("witch-line.core.Session")
 local Component = require("witch-line.core.Component")
+local Session = require("witch-line.core.Session")
 local get_session_store, new_session_store = Session.get_store, Session.new_store
 
 local M = {}
@@ -136,7 +136,7 @@ end
 --- @param comp Component The component to register.
 --- @return CompId The ID of the registered component.
 M.register = function(comp)
-	local id = require("witch-line.core.Component").setup(comp)
+	local id = Component.setup(comp)
 	ManagedComps[id] = comp
 	return id
 end

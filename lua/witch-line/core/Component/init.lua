@@ -247,8 +247,6 @@ end
 --- @return CompId id the id of the component
 --- @return Component|DefaultComponent|nil comp the component itself, or nil if it is a default component
 Component.setup = function(comp)
-	require("witch-line.core.Component.initial_state").save_initial_context(comp)
-
 	local id = comp.id
 	if comp._plug_provided then
 		---@cast id CompId
@@ -259,7 +257,7 @@ Component.setup = function(comp)
 		id = tostring(comp) .. tostring(math.random(1, 1000000))
 		rawset(comp, "id", id) -- Ensure the component has an ID field
 	end
-
+	require("witch-line.core.Component.initial_state").save_initial_context(comp)
 	---@cast id CompId
 	return id, comp
 end
