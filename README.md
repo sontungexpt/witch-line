@@ -294,6 +294,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `os_uname`         | `os_uname.lua`   | Displays the operating system name        |
 | `nvim_dap`         | `nvim_dap.lua`   | Shows nvim-dap status (if available)      |
 | `search.count`     | `search.lua`     | Shows number of searching value           |
+| `selection.count`  | `selection.lua`  | Shows number of selection zone            |
 
 ---
 

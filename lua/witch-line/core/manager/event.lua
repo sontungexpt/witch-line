@@ -116,7 +116,7 @@ M.register_events = function(comp)
 					if not found then
 						store[#store + 1] = {
 							name = ename,
-							patterns = patterns,
+							patterns = ps,
 							ids = { comp.id },
 						}
 					end

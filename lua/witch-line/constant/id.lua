@@ -45,6 +45,7 @@ local IdPathMap = {
 	["nvim_dap"] = "nvim_dap",
 
 	["search.count"] = "search\0count",
+	["selection.count"] = "selection\0count",
 }
 
 --- Metatable to access default component IDs with error handling.
@@ -76,6 +77,7 @@ local IdPathMap = {
 --- @field ["os_uname"] DefaultId
 --- @field ["nvim_dap"] DefaultId
 --- @field ["search.count"] DefaultId
+--- @field ["selection.count"] DefaultId
 local Id = setmetatable({}, {
 	__index = function(_, key)
 		if IdPathMap[key] then
