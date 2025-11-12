@@ -142,15 +142,9 @@ M.on_timer_trigger = function(work)
 				end
 
 				if qn > 0 then
-					--- Remove abandant queue part
-					local i = qn + 1
-					while queue[i] do
-						queue[i] = nil
-						i = i + 1
-					end
 					Session.with_session(function(sid)
 						work(sid, queue, base)
-						qn = 0 -- virtual clear queue
+						queue, qn = {}, 0
 					end)
 				end
 

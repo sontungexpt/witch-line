@@ -56,7 +56,25 @@ end
 --- Represents a single segment within the statusline layout.
 --- Each segment defines a visual or interactive element, such as text,
 --- icons, or clickable areas.
+---
+--- The layout uses a system of indexed "shifts" to manage relative positions.
+--- These indices determine where each visual property is stored and how
+--- it aligns with neighboring segments:
+---   • `VALUE_SHIFT` →  The main content area index.
+---   • `WIDTH_SHIFT` →  The computed width of main value index.
+---
+--- Using these shift constants, the positions of the **left** and **right**
+--- edges can be derived programmatically via:
+---   • `left_idx(VALUE_SHIFT)`   → left boundary index
+---   • `right_idx(VALUE_SHIFT)`  → right boundary index
+---   • or dynamically with `side_idx(VALUE_SHIFT, -1 | 1)`
+---
+--- This structure allows fast spatial computation and efficient redraws,
+--- since each segment’s positional indices can be updated arithmetically
+--- without rebuilding layout tables.
 --- @class Segment
+--- @field [VALUE_SHIFT] string|nil The main content area index.
+--- @field [WIDTH_SHIFT] integer|nil The computed width of main value index.
 --- @field frozen boolean|nil If true, the segment is persistent and will not be cleared on Vim exit.
 --- @field click_handler_form string|nil The name or ID of the click handler assigned to the segment (not cached).
 --- @field total_width integer|nil The total rendered width of the segment (not cached).

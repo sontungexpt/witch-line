@@ -69,8 +69,7 @@ local function update_comp_style(comp, sid, override_style)
 	local hl_name = comp._hl_name
 	if hl_name then
 		if force or override_style then
-			Highlight.highlight(hl_name, style)
-			return true, style
+			return Highlight.highlight(hl_name, style), style
 		end
 	else
 		if pcount > 0 then
@@ -85,8 +84,7 @@ local function update_comp_style(comp, sid, override_style)
 			end
 		end
 		rawset(comp, "_hl_name", hl_name)
-		Highlight.highlight(hl_name, style)
-		return true, style
+		return Highlight.highlight(hl_name, style), style
 	end
 	return false, style
 end

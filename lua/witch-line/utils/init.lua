@@ -1,3 +1,4 @@
+local unpack, type = unpack, type
 local M = {}
 
 --- Creates a debounced version of the given function.
