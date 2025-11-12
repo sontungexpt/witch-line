@@ -4,9 +4,11 @@ local M = {}
 
 local EventInfoStoreId = "EventInfo"
 
---- @class SpecialEvent
+--- @class SpecialEventOpts
 --- @field once? boolean
 --- @field pattern? string|string[]
+
+--- @class SpecialEvent : SpecialEventOpts
 --- @field name string|string[]
 --- @field ids CompId[]
 
@@ -112,13 +114,16 @@ local function same_string_or_array(a, b)
 	return false
 end
 
---- comment
---- @param a SpecialEvent
---- @param b SpecialEvent
-local same_special_event = function(a, b)
-	if not same_string_or_array(a.name, b.name) then
-		return false
-	elseif not same_string_or_array(a.pattern, b.pattern) then
+--- Compare two special event option objects to determine if they are equivalent.
+--- This function checks whether both events share the same `pattern` (string or array)
+--- and the same `once` flag. Used to detect duplicate or redundant special event
+--- definitions when registering autocmd-like events.
+---
+--- @param a SpecialEventOpts|SpecialEvent # The first special event or its options table.
+--- @param b SpecialEventOpts|SpecialEvent # The second special event options table to compare against.
+--- @return boolean                        # `true` if both have the same `pattern` and `once` values; otherwise `false`.
+local same_special_event_opts = function(a, b)
+	if not same_string_or_array(a.pattern, b.pattern) then
 		return false
 	end
 	if a.once ~= b.once then
@@ -152,10 +157,10 @@ end
 --- @param store table A list (array) of existing special events.
 --- @param e table The event to check for existence.
 --- @return integer The index of the existing event if found, otherwise `-1`.
-local find_existed_special_event = function(store, e)
+local find_existed_special_event_opts = function(store, e)
 	for k = 1, #store do
 		local existed = store[k]
-		if same_special_event(existed, e) then
+		if same_special_event_opts(existed, e) then
 			return k
 		end
 	end
@@ -198,18 +203,25 @@ M.register_events = function(comp)
 							n = n + 1
 							ps[n] = pat
 						end
-
-						local new = {
-							name = ename,
-							pattern = n > 1 and ps or ps[1], -- store string if only 1 value for reduce memory usage.
-							ids = { comp.id },
-						}
-						local idx = find_existed_special_event(store, new)
+						local pattern = n > 1 and ps or ps[1] -- store string if only 1 value for reduce memory usage.
+						local idx = find_existed_special_event_opts(store, {
+							pattern = pattern,
+						})
 						if idx > 0 then
 							local existed = store[idx]
 							existed.ids[#existed.ids + 1] = comp.id
+							local names = existed.name or {}
+							if type(names) == "string" then
+								names = { names }
+							end
+							names[#names + 1] = ename
+							existed.name = names
 						else
-							store[#store + 1] = new
+							store[#store + 1] = {
+								name = ename,
+								pattern = pattern,
+								ids = { comp.id },
+							}
 						end
 					else
 						-- BufEnter
@@ -219,19 +231,21 @@ M.register_events = function(comp)
 						store_e[#store_e + 1] = comp.id
 						store[e] = store_e
 					end
-				elseif etype == "table" then
-					local names, nnames, no_opts = {}, 0, true
-					for k, val in ipairs(e) do
-						if type(k) == "number" then
-							nnames = names + 1
-							names[nnames] = val
-						elseif k ~= "pattern" then
-							no_opts = false
-						end
+				end
+			elseif etype == "table" then
+				local names, n, no_opts = {}, 0, true
+				for k, val in pairs(e) do
+					if type(k) == "number" and val ~= "" then
+						n = n + 1
+						names[n] = val
+					elseif k ~= "pattern" then
+						no_opts = false
 					end
+				end
 
-					if nnames > 0 then
-						local pattern = e.pattern
+				if n > 0 then
+					local pattern = e.pattern
+					if pattern then
 						local pattern_type = type(pattern)
 						if pattern_type == "table" then
 							pattern = vim.tbl_filter(function(value)
@@ -241,40 +255,51 @@ M.register_events = function(comp)
 							if size == 0 then
 								pattern = nil
 							elseif size == 1 then
-								pattern = patterns[1]
+								pattern = pattern[1]
 							end
 						elseif pattern_type ~= "string" then
 							error("Invalid pattern in " .. vim.inspect(e))
 						elseif pattern == "" then
 							pattern = nil
 						end
+					end
 
-						--- Just contains event names
-						if no_opts and not pattern then
-							store = EventStore.events or {}
-							EventStore.events = store
-							for k = 1, nnames do
-								local store_e = store[names[k]] or {}
-								store_e[#store_e + 1] = comp.id
-								store[e] = store_e
+					--- Just contains event names
+					if no_opts and not pattern then
+						store = EventStore.events or {}
+						EventStore.events = store
+						for k = 1, n do
+							local name = names[k]
+							local store_e = store[name] or {}
+							store_e[#store_e + 1] = comp.id
+							store[name] = store_e
+						end
+					else
+						store = EventStore.special_events or {}
+						EventStore.special_events = store
+						local idx = find_existed_special_event_opts(store, {
+							pattern = pattern, -- store string if only 1 value for reduce memory usage.
+							once = e.once,
+						})
+						if idx > 0 then
+							local existed = store[idx]
+							existed.ids[#existed.ids + 1] = comp.id
+							local existed_names = existed.name or {}
+							if type(existed_names) == "string" then
+								existed_names = { existed_names }
 							end
+							for k = 1, n do
+								local name = names[k]
+								existed_names[#existed_names + 1] = name
+							end
+							existed.name = existed_names
 						else
-							store = EventStore.special_events or {}
-							EventStore.special_events = store
-							--- @type SpecialEvent
-							local new = {
-								name = ename,
+							store[#store + 1] = {
+								name = n > 1 and names or names[1],
 								pattern = pattern, -- store string if only 1 value for reduce memory usage.
 								once = e.once,
 								ids = { comp.id },
 							}
-							local idx = find_existed_special_event(store, new)
-							if idx > 0 then
-								local existed = store[idx]
-								existed.ids[#existed.ids + 1] = comp.id
-							else
-								store[#store + 1] = new
-							end
 						end
 					end
 				end
