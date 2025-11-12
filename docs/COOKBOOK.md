@@ -196,11 +196,11 @@ local component = {
 
   - Component.SpecialEvent
 
-| **Field**   | **Type**           | **Description**                                                                                |
-| ----------- | ------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `[integer]` | `string`           | Event name (e.g., `"BufEnter"`, `"InsertLeave"`). Each entry in the array represents an event. |
-| `once?`     | `boolean`          | _(Optional)_ If `true`, the event triggers only once.                                          |
-| `pattern?`  | `string\|stirng[]` | `string[]`                                                                                     | _(Optional)_ A pattern or list of patterns the event should match (e.g., `"*.lua"`). |
+| **Field**   | **Type**              | **Description**                                                                                |
+| ----------- | --------------------- | ---------------------------------------------------------------------------------------------- |
+| `[integer]` | `string`              | Event name (e.g., `"BufEnter"`, `"InsertLeave"`). Each entry in the array represents an event. |
+| `once?`     | `boolean`             | _(Optional)_ If `true`, the event triggers only once.                                          |
+| `pattern?`  | `string  \| string[]` | `string[]` (Optional) A pattern or list of patterns the event should match (e.g., `"*.lua"`).  |
 
 | **Type**                   | **Description**                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------- |
