@@ -71,7 +71,7 @@ local function read_plugin_stat(deep)
 	local root_dir = vim.api.nvim_get_runtime_file("**/witch-line", false)[1]
 	local stat = uv.fs_stat(root_dir)
 	if stat then
-		size = stat.size
+		size = size + stat.size
 		local mtime = stat.mtime
 		if mtime then
 			msec, mnsec = mtime.sec, mtime.nsec
@@ -82,11 +82,14 @@ local function read_plugin_stat(deep)
 		for i = 1, #paths do
 			local p = paths[i]
 			stat = uv.fs_stat(p)
-			local mtime = stat and stat.mtime
-			if mtime then
-				local sec, nsec = mtime.sec, mtime.nsec
-				if sec > msec or nsec > mnsec then
-					mnsec, mnsec = sec, nsec
+			if stat then
+				size = size + stat.size
+				local mtime = stat.mtime
+				if mtime then
+					local sec, nsec = mtime.sec, mtime.nsec
+					if sec > msec or nsec > mnsec then
+						msec, mnsec = sec, nsec
+					end
 				end
 			end
 		end

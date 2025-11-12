@@ -32,7 +32,13 @@ local Error = {
 
 		local id = vim.diagnostic.severity.ERROR
 		local signs = vim.diagnostic.config().signs
-		local icon = signs and signs.text[id]
+		local icon
+		if type(signs) == "table" then
+			local text = signs.text
+			if type(text) == "table" then
+				icon = text[id]
+			end
+		end
 		if not icon or icon == "" then
 			icon = hook.use_static(self).ERROR
 		end
@@ -53,7 +59,13 @@ local Warn = {
 		local hook = require("witch-line.core.manager.hook")
 		local id = vim.diagnostic.severity.WARN
 		local signs = vim.diagnostic.config().signs
-		local icon = signs and signs.text[id]
+		local icon
+		if type(signs) == "table" then
+			local text = signs.text
+			if type(text) == "table" then
+				icon = text[id]
+			end
+		end
 		if not icon or icon == "" then
 			icon = hook.use_static(self).ERROR
 		end
@@ -74,7 +86,13 @@ local Info = {
 		local hook = require("witch-line.core.manager.hook")
 		local id = vim.diagnostic.severity.INFO
 		local signs = vim.diagnostic.config().signs
-		local icon = signs and signs.text[id]
+		local icon
+		if type(signs) == "table" then
+			local text = signs.text
+			if type(text) == "table" then
+				icon = text[id]
+			end
+		end
 		if not icon or icon == "" then
 			icon = hook.use_static(self).INFO
 		end
@@ -95,7 +113,13 @@ local Hint = {
 		local hook = require("witch-line.core.manager.hook")
 		local id = vim.diagnostic.severity.HINT
 		local signs = vim.diagnostic.config().signs
-		local icon = signs and signs.text[id]
+		local icon
+		if type(signs) == "table" then
+			local text = signs.text
+			if type(text) == "table" then
+				icon = text[id]
+			end
+		end
 		if not icon or icon == "" then
 			icon = hook.use_static(self).HINT
 		end

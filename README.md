@@ -245,6 +245,8 @@ require("witch-line").setup({
       },
     },
   },
+  --- Enables deep scanning of the plugin directory for detecting cache expiration. (slower but more accurate)
+  cache_full_scan = false,
   disabled = {
     filetypes = { "help", "TelescopePrompt" },
     buftypes = { "nofile", "terminal" },
