@@ -77,20 +77,41 @@ end
 --- @class Segment
 --- @field [VALUE_SHIFT] string|nil The main content area index.
 --- @field [WIDTH_SHIFT] integer|nil The computed width of main value index.
---- @field frozen boolean|nil If true, the segment is persistent and will not be cleared on Vim exit.
 --- @field click_handler_form string|nil The name or ID of the click handler assigned to the segment (not cached).
 --- @field total_width integer|nil The total rendered width of the segment (not cached).
 
+--- Currrently support maximum 53 components in a statusline as bit mask operations
 --- @type Segment[] The list of statusline components.
 local Statusline = {}
 
 ---@type integer The size of the Values list.
-local ValuesSize = 0
+local StatuslineSize = 0
+local FrozenBitMask = 0ULL
+local IDX_BITS = 8 -- 8 bit for idx, about 255 components
+local IDX_MASK = 0xFF -- 255
+-- local PRIORITY_BITS = 56 -- 56 bit for priority
+-- local PRIORITY_MASK = 0x00FFFFFFFFFFFFFF -- 7.2e16 (72,057,594,037,927,935)
 
 --- Gets the current size of the statusline values.
 --- @return integer size The current size of the statusline values.
 M.get_size = function()
-	return ValuesSize
+	return StatuslineSize
+end
+
+--- Marks specific indices to be skipped during the merging process.
+--- @param bitmasks integer The current bitmask representing indices to skip.
+--- @param idx integer The index to mark for skipping.
+--- @return integer new_mask The updated bitmask with the specified index marked for skipping.
+local mark_bit = function(bitmasks, idx)
+	return bor(bitmasks, lshift(1, idx - 1))
+end
+
+--- Checks if a specific index is marked to be skipped in the bitmask.
+--- @param bitmasks integer The bitmask representing indices to skip.
+--- @param idx integer The index to check for skipping.
+--- @return boolean is_skipped True if the index is marked to be skipped, false otherwise.
+local is_marked = function(bitmasks, idx)
+	return band(bitmasks, lshift(1, idx - 1)) ~= 0
 end
 
 --- @type integer[] A sorted priority queue of flexible components.
@@ -99,10 +120,6 @@ end
 --- and will be retained longer when space is limited.
 local FlexiblePrioritySorted = {}
 
-local IDX_BITS = 8 -- 8 bit for idx, about 255 components
-local IDX_MASK = 0xFF -- 255
--- local PRIORITY_BITS = 56 -- 56 bit for priority
--- local PRIORITY_MASK = 0x00FFFFFFFFFFFFFF -- 7.2e16 (72,057,594,037,927,935)
 
 --- Encodes two integer values (`idx` and `priority`) into a single integer using bit manipulation.
 --- This function packs the `priority` value into the higher bits and `idx` into the lower bits.
@@ -192,24 +209,22 @@ end
 --- Resets all values
 --- @param cb function callback function to be called for each value during the reset process.
 M.iterate_values = function(cb)
-	for i = 1, ValuesSize do
+	for i = 1, StatuslineSize do
 		cb(i, Statusline[i])
 	end
 end
 
 --- Resets the value of a statusline component before caching.
 --- @param segment Segment The statusline component to reset.
-local format_state_before_cache = function(segment)
-	for k, v in pairs(segment) do
-		if k ~= "frozen" then
-			if k == VALUE_SHIFT then
-				if not segment.frozen then
-					segment[k] = "" -- Clear unfrozen main value
-				end
-			else
-				segment[k] = nil
-			end
-		end
+local format_state_before_cache = function(segment, frozen)
+	for k, _ in pairs(segment) do
+    if k == VALUE_SHIFT then
+      if not frozen then
+        segment[k] = "" -- Clear unfrozen main value
+      end
+    else
+      segment[k] = nil
+    end
 	end
 end
 
@@ -217,12 +232,12 @@ end
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
 M.on_vim_leave_pre = function(CacheDataAccessor)
 	-- Clear unfrozen values to reset statusline on next startup
-	M.iterate_values(function(_, segment)
-		format_state_before_cache(segment)
+	M.iterate_values(function(i, segment)
+		format_state_before_cache(segment, is_marked(FrozenBitMask, i))
 	end)
 
 	CacheDataAccessor.set("Statusline", Statusline)
-	CacheDataAccessor.set("StatuslineSize", ValuesSize)
+	CacheDataAccessor.set("StatuslineSize", StatuslineSize)
 	CacheDataAccessor.set("FlexiblePrioritySorted", FlexiblePrioritySorted)
 end
 
@@ -231,45 +246,30 @@ end
 --- @return function undo function to restore the previous state
 M.load_cache = function(CacheDataAccessor)
 	local before_values, before_values_size, before_flexible_priority_sorted =
-		Statusline, ValuesSize, FlexiblePrioritySorted
+		Statusline, StatuslineSize, FlexiblePrioritySorted
 
 	Statusline = CacheDataAccessor.get("Statusline") or Statusline
-	ValuesSize = CacheDataAccessor.get("StatuslineSize") or ValuesSize
+	StatuslineSize = CacheDataAccessor.get("StatuslineSize") or StatuslineSize
 	FlexiblePrioritySorted = CacheDataAccessor.get("FlexiblePrioritySorted") or FlexiblePrioritySorted
 
 	return function()
-		Statusline, ValuesSize, FlexiblePrioritySorted =
+		Statusline, StatuslineSize, FlexiblePrioritySorted =
 			before_values, before_values_size, before_flexible_priority_sorted
 	end
 end
 
---- Marks specific indices to be skipped during the merging process.
---- @param bitmasks integer The current bitmask representing indices to skip.
---- @param idx integer The index to mark for skipping.
---- @return integer new_mask The updated bitmask with the specified index marked for skipping.
-local skip = function(bitmasks, idx)
-	return bor(bitmasks, lshift(1, idx - 1))
-end
-
---- Checks if a specific index is marked to be skipped in the bitmask.
---- @param bitmasks integer The bitmask representing indices to skip.
---- @param idx integer The index to check for skipping.
---- @return boolean is_skipped True if the index is marked to be skipped, false otherwise.
-local is_skipped = function(bitmasks, idx)
-	return band(bitmasks, lshift(1, idx - 1)) ~= 0
-end
 
 --- Merges the highlight group names with the corresponding statusline values.
 --- @param skip_bitmasks integer|nil A bitmask representing indices to skip during the merging process (1-based index). If nil, no indices are skipped.
 --- @return string[] merged The merged list of statusline values with highlight group names applied.
 local function build_values(skip_bitmasks)
-	skip_bitmasks = skip_bitmasks or 0
+	skip_bitmasks = skip_bitmasks or 0ULL
 
 	--- Lazy load
 	local values, n = {}, 0
 
-	for i = 1, ValuesSize do
-		if not is_skipped(skip_bitmasks, i) then
+	for i = 1, StatuslineSize do
+		if not is_marked(skip_bitmasks, i) then
 			local seg = Statusline[i]
 
 			local val = seg[VALUE_SHIFT] or ""
@@ -330,7 +330,7 @@ M.compute_segment_width = compute_segment_width
 --- @return integer total_width The total display width of all statusline components.
 local compute_statusline_width = function()
 	local total_width = 0
-	for i = 1, ValuesSize do
+	for i = 1, StatuslineSize do
 		total_width = total_width + compute_segment_width(Statusline[i])
 	end
 	return total_width
@@ -362,14 +362,14 @@ M.render = function(limit_width)
 		return
 	end
 
-	local skip_mask = 0
+	local skip_mask = 0ULL
 	local remove_idx = 1
 	local curr_width = compute_statusline_width()
 	limit_width = limit_width or o.columns
 
 	while flexible and curr_width > limit_width do
 		local comp_idx = get_flexible_idx(flexible)
-		skip_mask = skip(skip_mask, comp_idx)
+		skip_mask = mark_bit(skip_mask, comp_idx)
 		curr_width = curr_width - compute_segment_width(Statusline[comp_idx])
 		remove_idx = remove_idx + 1
 		flexible = FlexiblePrioritySorted[remove_idx]
@@ -384,17 +384,20 @@ end
 --- @param frozen boolean|nil If true, the value is marked as frozen and will not be cleared on Vim exit.
 --- @return integer new_idx The index of the newly added value.
 M.push = function(value, frozen)
-	ValuesSize = ValuesSize + 1
+	StatuslineSize = StatuslineSize + 1
 
 	local width = nvim_strwidth(value)
 	--- @type Segment
-	Statusline[ValuesSize] = {
+	Statusline[StatuslineSize] = {
 		[VALUE_SHIFT] = value,
 		[WIDTH_SHIFT] = width,
 		total_width = width,
-		frozen = frozen,
 	}
-	return ValuesSize
+  if frozen then
+    FrozenBitMask = mark_bit(FrozenBitMask, StatuslineSize)
+  end
+
+	return StatuslineSize
 end
 
 --- Sets the value for a specific component.
@@ -429,6 +432,7 @@ end
 --- @param value string The value to set for the specified side.
 --- @param hl_name string|nil The highlight group name to set for the specified side.
 --- @param force boolean|nil If true, forces the update even if a value already exists for the specified side.
+--- @return boolean success If true the value is change otherwise does nothing.
 M.set_side_value = function(idxs, shift_side, value, hl_name, force)
 	local width = nvim_strwidth(value)
   local sidx = side_idx(VALUE_SHIFT, shift_side)
@@ -439,9 +443,11 @@ M.set_side_value = function(idxs, shift_side, value, hl_name, force)
 			seg[sidx] = assign_highlight_name(value, hl_name)
 			seg[widx], seg.total_width = width, nil
 		else
-			return -- Do not overwrite existing value
+      -- Do not overwrite existing value
+			return false
 		end
 	end
+  return true
 end
 
 --- Sets the left or right side value for a specific component.

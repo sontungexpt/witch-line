@@ -78,7 +78,7 @@ end
 --- 4. **Unsupported types:**
 ---    - Returns `false` by default.
 ---
---- ### 🧩 Example:
+--- ### Example:
 --- ```lua
 --- same_string_or_array("foo", "foo")            --> true
 --- same_string_or_array({"a", "b"}, {"b", "a"})  --> true
@@ -86,7 +86,7 @@ end
 --- same_string_or_array({"x"}, {"x", "y"})       --> false
 --- ```
 ---
---- ### 💡 Use case:
+--- ### Use case:
 --- Useful when comparing dynamic fields like `component.name` or `tags`
 --- that can store either a single string or an array of names.
 ---
@@ -99,9 +99,7 @@ local function same_string_or_array(a, b)
 	-- Different types (e.g., "string" vs "table") -> not equal
 	if ta ~= tb then
 		return false
-	end
-
-	if ta == "string" then
+  elseif ta == "string" then
 		-- Direct string comparison
 		return a == b
 	elseif ta == "table" then

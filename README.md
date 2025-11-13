@@ -46,11 +46,11 @@ What's is the reference concept.
 
 Reference is not a new topic. You meet it in many cases such example: in database a document, a table reference to another by id. In rust we has borrowing, or in C/C++ we has pointer. And now, I move this concept to witch-line component.
 
-See the magic: 
+See the magic:
 ```lua
-  -- We move from 
-  -- heirline 
-  local Comp = { 
+  -- We move from
+  -- heirline
+  local Comp = {
     style = {
       fg= ...
     },
@@ -63,8 +63,8 @@ See the magic:
   }
 
 
-  -- to witch-line 
-  -- You can see the difference and detail about red field and inherit field in [COOKBOOK](./docs/COOKBOOK.md) 
+  -- to witch-line
+  -- You can see the difference and detail about red field and inherit field in [COOKBOOK](./docs/COOKBOOK.md)
   local Parent = {
     id = "A"
     style = ...
@@ -75,13 +75,13 @@ See the magic:
       style = "A"
     }
   }
- 
+
   local Child2 = {
     id  = "C",
     inherit = "A"
   }
 
-  
+
 
 ```
 
