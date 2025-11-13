@@ -96,6 +96,7 @@ local Copilot = {
 
 	update = function(self, session_id)
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+    --- @cast ctx {status : string, progress_idx: integer, is_enabled: fun(): boolean}
 		local status = ctx.status
 		local icon = self.static.icon
 		local progress_idx = ctx.progress_idx

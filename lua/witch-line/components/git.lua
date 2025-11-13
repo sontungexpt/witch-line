@@ -68,6 +68,7 @@ local Branch = {
 		local static = self.static
 		--- @cast static { disabled: { filetypes: string[] }, icon: string }
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		--- @cast ctx {root_dir: string|nil, get_root_by_git: fun():string }
 		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 
 		local file_changed, sec_arg = nil, nil
@@ -148,6 +149,7 @@ local Branch = {
 	style = { fg = colors.green },
 	update = function(self, session_id)
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		--- @cast ctx {root_dir: string|nil, get_root_by_git: fun():string }
 		if not ctx.root_dir then
 			return ""
 		end
@@ -171,6 +173,7 @@ local Branch = {
 
 local Diff = {}
 
+--- @alias DiffResult { added: integer, modified: integer, removed: integer }
 --- @type DefaultComponent
 Diff.Interface = {
 	id = Id["git.diff.interface"],
@@ -196,8 +199,6 @@ Diff.Interface = {
 		local vim = vim
 		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 		local api, bo, tonumber, list_contains, gmatch = vim.api, vim.bo, tonumber, vim.list_contains, string.gmatch
-
-		--- @alias DiffResult { added: integer, modified: integer, removed: integer }
 
 		--- @type table<integer, vim.SystemObj>
 		local processes = {}
@@ -353,6 +354,7 @@ Diff.Added = {
 		--- @cast static { icon: string }
 
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
 		local diff = ctx.get_diff()
 		if diff then
 			local added = diff.added
@@ -383,6 +385,7 @@ Diff.Modified = {
 		local static = self.static
 		--- @cast static { icon: string }
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
 		local diff = ctx.get_diff()
 		if diff then
 			local modified = diff.modified
@@ -413,6 +416,7 @@ Diff.Removed = {
 		local static = self.static
 		--- @cast static { icon: string }
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
+		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
 		local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
 		if diff then
 			local removed = diff.removed

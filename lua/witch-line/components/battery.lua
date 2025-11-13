@@ -184,6 +184,8 @@ return {
 	update = function(self, session_id)
 		local hook = require("witch-line.core.manager.hook")
 		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
+    --- @cast static {icons: {charging: string[], discharging: string[]}, colors: {	battery_high: string, battery_medium: string, battery_weak : string}}
+    --- @cast ctx { get_status: nil|fun():string} | { get_capacity: nil|fun():number}| { current_charging_index: integer }
 		if not ctx.get_status or not ctx.get_capacity then
 			return ""
 		end

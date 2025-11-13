@@ -9,9 +9,8 @@ return {
 		format = "default",
 	},
 	update = function(self, session_id)
-		--- @type {format: string}
-		---@diagnostic disable-next-line: assign-type-mismatch
 		local static = self.static
+		--- @cast  static {format: string}
 		local fmt = static.format or "default"
 		--- @cast fmt string
 		if fmt == "default" then
