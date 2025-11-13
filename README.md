@@ -36,7 +36,60 @@ any idea to create a new component, please open an issue or pull request.
 
 - I like the reference concept in any database structure based on id. So I use the same concept in this plugin for component system. You can reference other component by id to share some field like events, style, static, context, hide, min_screen_width. This will help you to create a component based on other component without duplicate code.
 
-- This plugin also support inherit field from parent by recursively. So you can create a component based on other component and override some field like [heirline](https://github.com/rebelot/heirline.nvim). But I think the reference concept is better than inherit concept because you can share some field between components. And the statusline is a flat structure so you don't need to create a nested structure like heirline.
+- Spoiler this plugin also provide nested tables to inherit from parent by recursively for anyone enjoy with creating a component based on other component by nested table like [heirline](https://github.com/rebelot/heirline.nvim). But I think the reference concept is better. And the statusline is a flat structure and readable.
+
+#### Understand Concept
+
+What's is the reference concept.
+
+- I assume that almost people know about [heirline](https://github.com/rebelot/heirline.nvim). It's a well-being statusline framework based on recursion with many nested tables to inherit the value. It's good. But to be honestly, i think it's quite redundant, and some time make the component biggest and hard to maintain. We always retain the deepest nested level is less than 3 for avoiding aweful behavior and hard to control. And almost popular component isn't necessary to create more than 2 level inheritance. So why not make some changes with a flatten component list. That's why reference concept appears.
+
+Reference is not a new topic. You meet it in many cases such example: in database a document, a table reference to another by id. In rust we has borrowing, or in C/C++ we has pointer. And now, I move this concept to witch-line component.
+
+See the magic: 
+```lua
+  -- We move from 
+  -- heirline 
+  local Comp = { 
+    style = {
+      fg= ...
+    },
+    {
+      provider= ...
+    },
+    {
+      provider= ...
+    },
+  }
+
+
+  -- to witch-line 
+  -- You can see the difference and detail about red field and inherit field in [COOKBOOK](./docs/COOKBOOK.md) 
+  local Parent = {
+    id = "A"
+    style = ...
+  }
+  local Child1 = {
+    id = "B",
+    ref = { -- ref particular field only
+      style = "A"
+    }
+  }
+ 
+  local Child2 = {
+    id  = "C",
+    inherit = "A"
+  }
+
+  
+
+```
+
+
+
+
+
+
 
 ## Preview
 
