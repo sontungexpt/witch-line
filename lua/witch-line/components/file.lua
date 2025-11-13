@@ -72,9 +72,9 @@ local Name = {
 	style = {
 		fg = colors.orange,
 	},
-	padding = { left = 1, right = 0 },
 	update = function(self, sid)
 		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
+    ---@cast ctx {basename:string, icon:string, color:string}
 		return ctx.basename
 	end,
 }
@@ -89,10 +89,12 @@ local Icon = {
 	},
 	style = function(self, sid)
 		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
+    ---@cast ctx {basename:string, icon:string, color:string}
 		return { fg = ctx.color }
 	end,
 	update = function(self, sid)
 		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
+    ---@cast ctx {basename:string, icon:string, color:string}
 		return ctx.icon
 	end,
 }

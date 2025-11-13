@@ -426,6 +426,7 @@ local function overrides_component_value(to, from, skip_type_check)
 	for k, v in pairs(from) do
 		to[k] = overrides_component_value(to[k], v, skip_type_check)
 	end
+  return to
 end
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
 --- @param comp Component the component to create the statistic for
@@ -446,8 +447,7 @@ Component.overrides = function(comp, override)
 				or types_accepted == type_v -- single type
 			then
 				if type_v == "table" then
-					-- rawset(comp, k, vim.tbl_deep_extend("force", comp[k] or {}, v))
-					rawset(comp, overrides_component_value(comp[k], v, true))
+					rawset(comp, k, overrides_component_value(comp[k], v, true))
 				else
 					rawset(comp, k, v)
 				end
