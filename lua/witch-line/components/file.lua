@@ -5,7 +5,7 @@ local Id = require("witch-line.constant.id").Id
 local Interface = {
 	id = Id["file.interface"],
 	_plug_provided = true,
-	events = { "BufEnter" },
+	events = "BufEnter",
 	static = {
 		formatter = {
 			filetype = {
@@ -15,7 +15,7 @@ local Interface = {
 				["lazy"] = { "Lazy", "󰏔", colors.red },
 				["checkhealth"] = { "Health", "", colors.red },
 				["plantuml"] = { nil, "", colors.green },
-				["dashboard"] = { "", colors.red },
+				["dashboard"] = { nil, "", colors.red },
 				["toggleterm"] = {
 					function()
 						return "ToggleTerm " .. vim.b.toggle_number
