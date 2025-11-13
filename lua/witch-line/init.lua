@@ -24,6 +24,7 @@ local M = {}
 --- When `true`, Witch-Line will perform a full recursive scan (slower but more accurate).
 --- When `false` or `nil`, only the main plugin folder’s timestamp and size are checked (faster).
 ---@field cache_full_scan boolean|nil
+---@field cache_cleared_notification boolean|nil
 
 --- Use default configs if missing
 --- @param user_configs UserConfig|nil user_configs to check

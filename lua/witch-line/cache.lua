@@ -9,6 +9,7 @@ local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
 
 --- The witch-line plugin dir stat to check if should expire cacche when update plug
 local config_checksum, msec, mnsec, size = 0, 0, 0, 0
+local notification = true
 
 local loaded = false
 
@@ -129,9 +130,11 @@ M.clear = function()
 			require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
 		else
 			Data = {}
-			require("witch-line.utils.notifier").info(
-				"Cache deleted successfully. Please restart Neovim for changes to take effect."
-			)
+      if notification then
+        require("witch-line.utils.notifier").info(
+          "Cache deleted successfully. Please restart Neovim for changes to take effect."
+        )
+      end
 		end
 	end)
 end
@@ -166,8 +169,11 @@ M.read = function(user_configs)
 
 	local Persist = require("witch-line.utils.persist")
 
-	read_plugin_stat(user_configs and user_configs.cache_full_scan)
+  local is_tbl_configs = type(user_configs) == "table"
+  ---@cast user_configs table
+	read_plugin_stat(is_tbl_configs and user_configs.cache_full_scan)
 	create_config_checksum(user_configs)
+  notification = is_tbl_configs and user_configs.cache_cleared_notification or true
 	local bytecode = validate_expiration(content)
 	if not bytecode then
 		M.clear()
