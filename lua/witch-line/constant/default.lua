@@ -26,4 +26,5 @@ return {
 	"encoding",
 	"cursor.pos",
 	"cursor.progress",
+  "os_uname"
 }

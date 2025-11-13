@@ -509,12 +509,14 @@ do
 			return cached[1], cached[2]
 		end
 
-		local val, seen = nil, {}
+		local val, seen, r = self_val, {}, nil
 		local lookup_plain_value = M.lookup_plain_value
-		local r = self_val or lookup_plain_value(comp, key, seen)
-		if r then
-			val = r[1]
-		end
+    if val then
+      r = lookup_plain_value(comp, key, seen)
+      if r then
+        val = r[1]
+      end
+    end
 		local chain, n, pid = {}, 0, comp.inherit
 		while pid do
 			local c = ManagedComps[pid]
@@ -534,7 +536,7 @@ do
 		end
 
 		cached = { val, n }
-		if not self_val then
+		if not self_val then -- this is always change so never cache
 			if key_cache then
 				key_cache[cid] = cached
 			else
@@ -601,12 +603,14 @@ do
 		if cached then
 			return cached[1], false, cached[2]
 		end
-		local val, dynamic, seen = nil, nil, {}
+		local val, dynamic, seen, r = self_val, nil, {}, nil
 		local lookup_dynamic_value = M.lookup_dynamic_value
-		local r = self_val or lookup_dynamic_value(comp, key, sid, seen)
-		if r then
-			val, dynamic = r[1], r[4]
-		end
+    if not val then
+      r = lookup_dynamic_value(comp, key, sid, seen)
+      if r then
+        val, dynamic = r[1], r[4]
+      end
+    end
 
 		local chain, n, pid = {}, 0, comp.inherit
 		while pid do
@@ -635,7 +639,7 @@ do
 			else
 				new_session_store(sid, DYNAMIC_CAHCED_KEY, { [cid] = cached })
 			end
-		elseif not self_val then
+		elseif not self_val then -- this is always change so never cache
 			if key_cache then
 				key_cache[cid] = cached
 			else
