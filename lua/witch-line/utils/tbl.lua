@@ -27,13 +27,13 @@ end
 --- 2. Decreasing those counts based on elements in array `b`
 --- 3. If all counts cancel out (i.e., table `count` is empty) → arrays are equal
 ---
---- ⚙️ Complexity:
+--- Complexity:
 --- - Time: O(n)
 --- - Space: O(n)
 --- - Ignores element order
 --- - Suitable for primitive types (number, string, boolean)
 ---
---- 🧩 Example:
+--- Example:
 --- ```lua
 --- arrays_equal({1, 2, 3}, {3, 1, 2})   --> true
 --- arrays_equal({1, 2, 3}, {1, 2, 4})   --> false

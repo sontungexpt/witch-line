@@ -35,7 +35,7 @@ local function format_side_value(val, is_func)
 	if is_func then
 		return type(val) ~= "string" and "" or val
 	elseif type(val) ~= "string" then
-		return nil
+		return nil -- not a valid style so doesn’t render
 	end
 	return val
 end
@@ -115,18 +115,21 @@ end
 --- @param main_style_updated boolean Whether the main style was recently updated (forces re-render).
 --- @param main_style? CompStyle The component’s main style used as reference.
 --- @return boolean updated Whether the side highlight was changed.
+--- @return string|nil hl_name The dynamic highlight name as side.
 local function update_comp_side_style(comp, sid, side, main_style_updated, main_style)
 	local side_style = Component.side_style(comp, side)
+  ---@cast side_style CompStyle|nil|SideStyleFunc|SepStyle
 
 	local t = type(side_style)
 	local hl_name_field = Component.hl_name_field(side)
 	local hl_name = comp[hl_name_field]
+  local dynamic = t == "function"
 
 	-- Return early if no need to update
 	if
 		not (
 			hl_name == nil
-			or t == "function"
+			or dynamic
 			or (
 				main_style_updated
 				and t == "number"
@@ -139,7 +142,7 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 			)
 		)
 	then
-		return false
+		return false, nil
 	end
 
 	if t == "function" then
@@ -149,36 +152,37 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 
 	if t == "number" and main_style then
 		if side_style == SepStyle.SepFg then
-			---@diagnostic disable-next-line: cast-local-type
 			side_style = {
 				fg = main_style.foreground or main_style.fg,
 				bg = "NONE",
 			}
 		elseif side_style == SepStyle.SepBg then
-			---@diagnostic disable-next-line: cast-local-type
 			side_style = {
 				fg = main_style.background or main_style.bg,
 				bg = "NONE",
 			}
 		elseif side_style == SepStyle.Reverse then
-			---@diagnostic disable-next-line: cast-local-type
 			side_style = {
 				fg = main_style.background or main_style.bg,
 				bg = main_style.foreground or main_style.fg,
 			}
 		elseif side_style == SepStyle.Inherited then
-			rawset(comp, hl_name_field, comp._hl_name)
-			return true
+      if not dynamic then
+        rawset(comp, hl_name_field, comp._hl_name)
+        return true, nil
+      end
+      -- dynamic hl name it's change between comp._left_hl_name or comp._hl_name continually
+			return true, comp._hl_name
 		else
 			--- invalid styles
-			return false
+			return false, nil
 		end
 	end
 	-- Ensure highlight name exists and apply the new highlight
 	hl_name = hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
 	rawset(comp, hl_name_field, hl_name)
 	---@diagnostic disable-next-line: param-type-mismatch
-	return Highlight.highlight(hl_name, side_style)
+	return Highlight.highlight(hl_name, side_style), nil
 end
 
 --- Update a component and its value in the statusline.
@@ -216,12 +220,14 @@ local function update_comp(comp, sid)
 				local result = Manager.lookup_dynamic_value(comp, "left", sid)
 				if result then
 					local lval, force = result[1], result[4]
-					if lval then
-						update_comp_side_style(comp, sid, "left", style_updated, style)
-					end
 					lval = format_side_value(lval, force)
 					if lval then
-						Statusline.set_side_value(indices, -1, lval, comp._left_hl_name, force)
+            local updated, lhl_name  = update_comp_side_style(comp, sid, "left", style_updated, style)
+            if not lhl_name then -- never meet dynamic hl_name
+              Statusline.set_side_value(indices, -1, lval, comp._left_hl_name, force)
+            else
+              Statusline.set_side_value(indices, -1, lval, lhl_name or comp._left_hl_name, force or (updated and lhl_name ~= nil))
+            end
 					end
 				end
 
@@ -229,12 +235,14 @@ local function update_comp(comp, sid)
 				result = Manager.lookup_dynamic_value(comp, "right", sid, {})
 				if result then
 					local rval, force = result[1], result[4]
-					if rval then
-						update_comp_side_style(comp, sid, "right", style_updated, style)
-					end
 					rval = format_side_value(rval, force)
 					if rval then
-						Statusline.set_side_value(indices, 1, rval, comp._right_hl_name, force)
+            local updated, rhl_name  = update_comp_side_style(comp, sid, "right", style_updated, style)
+            if not rhl_name then -- never meet dynamic hl_name
+              Statusline.set_side_value(indices, 1, rval, comp._right_hl_name, force)
+            else
+              Statusline.set_side_value(indices, 1, rval, rhl_name or comp._right_hl_name, force or (updated and rhl_name ~= nil))
+            end
 					end
 				end
 
