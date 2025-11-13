@@ -86,6 +86,13 @@ M.assign_highlight_name = function(str, hl_name)
 	return hl_name and str ~= "" and "%#" .. hl_name .. "#" .. str .. "%*" or str
 end
 
+--- Replace a string contains highlight segment with new highlight name.
+--- @param str string The string that may contains highlight segment.
+--- @param new_hl_name string|nil The new string with the new replaced highlight name.
+M.replace_highlight_name = function(str, new_hl_name, first)
+  return string.gsub(str, "%%#.-#", "%#" .. new_hl_name .. "#", first and 1)
+end
+
 --- Retrieve highlight properties for a given highlight group.
 ---
 --- This function safely queries Neovim's highlight table to obtain

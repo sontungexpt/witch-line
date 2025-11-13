@@ -5,7 +5,6 @@ local Copilot = {
 	id = Id["copilot"],
 	name = "copilot",
 	_plug_provided = true,
-	user_events = { "WLCopilotLoad" },
 	static = {
 		icon = {
 			Normal = "",

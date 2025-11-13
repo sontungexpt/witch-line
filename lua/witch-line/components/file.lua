@@ -138,8 +138,12 @@ local Size = {
 			return ""
 		end
 
-		local file_size = (vim.uv or vim.loop).fs_stat(current_file).size
-		if file_size == 0 then
+		local stat = (vim.uv or vim.loop).fs_stat(current_file)
+    if type(stat) ~= "table"  then
+      return ""
+    end
+    local file_size = stat.size
+		if not file_size or file_size == 0 then
 			return ""
 		end
 

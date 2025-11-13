@@ -4,7 +4,9 @@ local bor, band, lshift = bit.bor, bit.band, bit.lshift
 local vim, concat, type, ipairs = vim, table.concat, type, ipairs
 local o, bo, api = vim.o, vim.bo, vim.api
 local nvim_strwidth = api.nvim_strwidth
-local assign_highlight_name = require("witch-line.core.highlight").assign_highlight_name
+local Highlight = require("witch-line.core.highlight")
+local assign_highlight_name = Highlight.assign_highlight_name
+local replace_highlight_name = Highlight.replace_highlight_name
 
 local M = {}
 -- Constants controlling the relative index positions for layout calculation.
@@ -398,13 +400,26 @@ end
 --- Sets the value for a specific component.
 --- @param idxs integer|integer[] The index of the component to set the side value for.
 --- @param value string The value to set for the specified side.
---- @param hl_name string|nil The highlight group name to set for the specified side.
+--- @param hl_name string|nil The highlight group name to set for segment.
 M.set_value = function(idxs, value, hl_name)
 	local width = nvim_strwidth(value)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
 		seg[VALUE_SHIFT] = assign_highlight_name(value, hl_name)
 		seg[WIDTH_SHIFT], seg.total_width = width, nil
+	end
+end
+
+--- Sets the highlight_name for a specific component.
+--- @param idxs integer|integer[] The index of the component to set the side value for.
+--- @param new_hl_name string|nil The new highlight group name to set for the segment.
+M.set_hl_name = function(idxs, new_hl_name)
+	for i = 1, #idxs do
+		local seg = Statusline[idxs[i]]
+    local curr_value = seg[VALUE_SHIFT]
+    if curr_value then
+      seg[VALUE_SHIFT] = replace_highlight_name(curr_value, new_hl_name, true)
+    end
 	end
 end
 
@@ -416,15 +431,31 @@ end
 --- @param force boolean|nil If true, forces the update even if a value already exists for the specified side.
 M.set_side_value = function(idxs, shift_side, value, hl_name, force)
 	local width = nvim_strwidth(value)
+  local sidx = side_idx(VALUE_SHIFT, shift_side)
+  local widx = side_idx(WIDTH_SHIFT, shift_side)
 	for i = 1, #idxs do
 		local seg = Statusline[idxs[i]]
-		local idx = side_idx(VALUE_SHIFT, shift_side)
-		if force or not seg[idx] then
-			seg[idx] = assign_highlight_name(value, hl_name)
-			seg[side_idx(WIDTH_SHIFT, shift_side)], seg.total_width = width, nil
+		if force or not seg[sidx] then
+			seg[sidx] = assign_highlight_name(value, hl_name)
+			seg[widx], seg.total_width = width, nil
 		else
 			return -- Do not overwrite existing value
 		end
+	end
+end
+
+--- Sets the left or right side value for a specific component.
+--- @param idxs integer|integer[] The index of the component to set the side value for.
+--- @param shift_side -1|1 The shift side value to get the side idx. 1 Right, -1 Left
+--- @param new_hl_name string|nil The new highlight group name to set for the specified side.
+M.set_side_hl_name = function(idxs, shift_side, new_hl_name)
+  local idx = side_idx(VALUE_SHIFT, shift_side)
+	for i = 1, #idxs do
+		local seg = Statusline[idxs[i]]
+    local curr_value = seg[idx]
+    if curr_value then
+      seg[idx] = replace_highlight_name(curr_value, new_hl_name, 1)
+    end
 	end
 end
 

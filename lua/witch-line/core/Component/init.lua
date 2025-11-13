@@ -84,7 +84,7 @@ Component.SepStyle = SepStyle
 ---
 --- A table of events that the component will listen to
 ---
---- @field events string|string[]|nil|Component.SpecialEvent[]
+--- @field events string|string[]|nil|Component.SpecialEvent[]|vim.api.keyset.events[]|vim.api.keyset.events
 ---
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
