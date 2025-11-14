@@ -1,30 +1,29 @@
 ---@type CombinedComponent
 return {
-	"mode",
+  "mode",
   {
     [0] = "file.name",
     padding = { left = 1, right = 0 },
   },
-	"file.icon",
-	"file.modifier",
+  "file.icon",
+  "file.modifier",
 
-	"git.branch",
-	"git.diff.added",
-	"git.diff.removed",
-	"git.diff.modified",
+  "git.branch",
+  "git.diff.added",
+  "git.diff.removed",
+  "git.diff.modified",
 
-	"%=",
+  "%=",
 
-	"lsp.clients",
-	"copilot",
+  "lsp.clients",
+  "copilot",
 
-	"diagnostic.error",
-	"diagnostic.warn",
-	"diagnostic.info",
+  "diagnostic.error",
+  "diagnostic.warn",
+  "diagnostic.info",
 
-	"indent",
-	"encoding",
-	"cursor.pos",
-	"cursor.progress",
-  "os_uname"
+  "indent",
+  "encoding",
+  "cursor.pos",
+  "cursor.progress",
 }
