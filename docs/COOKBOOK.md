@@ -1,4 +1,4 @@
-Thể cookbook is a collection of recipes that demonstrate how to use various features of the software. Each recipe provides step-by-step instructions, code examples, and explanations to help you understand and implement specific functionalities.
+Cookbook is a collection of recipes that demonstrate how to use various features of the software. Each recipe provides step-by-step instructions, code examples, and explanations to help you understand and implement specific functionalities.
 
 ## Navigation
 
@@ -211,7 +211,10 @@ local component = {
 | `Component.SpecialEvent[]` | A list of detailed special event definitions with extra options such as `pattern` or `once`. |
 | `nil`                      | The component will not listen to any events (default value).                                 |
 
-**Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
+**Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events. 
+
+**Combine with reference**: This field can be combine with ref.events. The component will be updated if events is triggered or the reference component's events triggered.
+
 
 **Syntax**: "EventName pattern1,pattern2" or {"EventName", ...}
 
@@ -230,7 +233,7 @@ local component = {
             pattern = { "VeryLazy", "LazyLoad"}
         },
         {
-            "CursorHold",
+            "CursorHold", "CursorHoldI"
             once = true,
         }
     }
@@ -254,6 +257,9 @@ local component = {
   | `nil`    | The component will not rely on timer-based updates (default value).            |
 
   **Description**: The time in milliseconds to debounce updates for the component. If set to `true`, it will use a default debounce time of 1000 milliseconds. If not provided, the component will not rely on timer-based updates.
+
+  **Combine with reference**: This field can be combine with ref.timing field. The component will be triggered update if on time or the reference component on time.
+
 
   **Example**:
 
@@ -528,6 +534,9 @@ local component = {
 
   **Description**: The minimum screen width required for the component to be displayed. If the screen width is less than this value, the component will not be rendered. This can be used to hide components on smaller screens or when there is not enough space to display them properly.
 
+ **Combine with reference**: This field can be combine with ref.min_screen_width. After combination, the component will be hide when screen zoom in below min_screen_width or the same behavior from reference component
+
+
   **Example**:
 
   - Type: `number`
@@ -557,6 +566,8 @@ local component = {
   | `nil`                            | The component will not be hidden (default behavior).                                   |
 
   **Description**: A flag that determines whether the component is hidden or not. If set to `true`, the component will not be rendered. This can be used to conditionally hide components based on certain criteria.
+
+  **Combine with reference**: This field can be combine with ref.hidden field. The component will be hide when the component.hidden return true or the reference component's hidden field return true
 
 - **Example**:
 
