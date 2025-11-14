@@ -26,4 +26,6 @@ return {
 	"encoding",
 	"cursor.pos",
 	"cursor.progress",
+
+  "battery",
 }
