@@ -1,4 +1,4 @@
----@type CombinedComponent
+---@type CombinedComponent|DefaultId
 return {
 	"mode",
   {
@@ -26,5 +26,4 @@ return {
 	"encoding",
 	"cursor.pos",
 	"cursor.progress",
-  "os_uname"
 }

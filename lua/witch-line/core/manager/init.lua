@@ -275,7 +275,10 @@ M.inspect = function(target)
 end
 
 do
+  local VIM_NIL = vim.NIL
+  --- @type table<string, table<CompId, vim.NIL|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil}>>
 	local raw_cache = {}
+
 	--- Internal recursive lookup for a raw (unevaluated) key value within a component.
 	---
 	--- This function performs a deep search across:
@@ -293,23 +296,20 @@ do
 	--- @param comp ManagedComponent                The component currently being inspected.
 	--- @param key string                           The key name to look up.
 	--- @param seen table<CompId, boolean>          Tracks visited components to prevent infinite recursion.
-	--- @return nil|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil} result
+	--- @return vim.NIL|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil} result
 	---   • `[1]` — The raw value found (static or unevaluated function).
 	---   • `[2]` — The origin component where the value is defined.
 	---   • `[3]` — The deepest referencecomponent, or nil if not found.
 	local function find_raw_value(comp, key, seen)
 		local cid = comp.id
 		if seen[cid] then
-			return nil
+			return VIM_NIL
 		end
 		seen[cid] = true
 		-- Cache raw values by origin to prevent duplicate recursion
 		local key_cache = raw_cache[key]
 		local result = key_cache and key_cache[cid]
 		if result then
-			if result == vim.NIL then
-				return nil
-			end
 			return result
 		end
 
@@ -365,12 +365,11 @@ do
 		end
 
 		if key_cache then
-			key_cache[cid] = vim.NIL
+			key_cache[cid] = VIM_NIL
 		else
-			raw_cache[key] = { [cid] = vim.NIL }
+			raw_cache[key] = { [cid] = VIM_NIL }
 		end
-
-		return nil
+		return VIM_NIL
 	end
 
 	--- Perform a plain lookup for a key within a component hierarchy.
@@ -384,13 +383,16 @@ do
 	---
 	--- @param comp ManagedComponent            Component to start the lookup from
 	--- @param key string                       The key name to look up
-	--- @param seen table<CompId, boolean>|nil  Optional recursion guard
-	--- @return nil|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil} result
-	---   • `[1]` — The raw value found (static or unevaluated function).
-	---   • `[2]` — The origin component where the value is defined.
-	---   • `[3]` — The deepest referencecomponent, or nil if not found.
+	--- @param seen table<CompId, boolean>|nil  Optional recursionl guard
+	--- @return nil|any raw_value The raw value found (static or unevaluated function).
+  --- @return nil|ManagedComponent origin The origin component where the value is defined.
+  --- @return nil|ManagedComponent drc The deepest reference component, or nil if not found.
 	M.lookup_plain_value = function(comp, key, seen)
-		return find_raw_value(comp, key, seen or {})
+		local result =  find_raw_value(comp, key, seen or {})
+    if result == VIM_NIL then
+      return nil,nil,nil
+    end
+    return result[1], result[2], result[3]
 	end
 
 	--- Retrieve only the context component for a given key.
@@ -404,7 +406,7 @@ do
 	--- @return ManagedComponent|nil context    The deepest referencecomponent, or nil if not found.
 	M.deepest_reference_component = function(comp, key, seen)
 		local r = find_raw_value(comp, key, seen or {})
-		return r and r[3]
+		return r ~= VIM_NIL and r[3] or nil
 	end
 
 	--- Resolve a key’s final value dynamically through inheritance and references.
@@ -416,54 +418,58 @@ do
 	--- @param sid SessionId          Session ID for caching evaluated results
 	--- @param seen table|nil         Optional set to prevent recursion
 	--- @param ... any                Additional arguments passed to function-type values
-	--- @return nil|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil} result
-	---   • `[1]` — The raw value found (static or unevaluated function).
-	---   • `[2]` — The origin component where the value is defined.
-	---   • `[3]` — The deepest referencecomponent, or nil if not found.
-	---   • `[4]` — True if raw_value is function.
+	--- @return nil|any raw_value The raw value found (static or unevaluated function).
+  --- @return nil|ManagedComponent origin The origin component where the value is defined.
+  --- @return nil|ManagedComponent drc The deepest reference component, or nil if not found.
+  --- @return boolean dynamic True if raw_value is function.
 	M.lookup_dynamic_value = function(comp, key, sid, seen, ...)
 		local cid = comp.id
 		if seen and seen[cid] then
-			return nil
+			return nil, nil, nil, false
 		end
 		-- Cache evaluated (resolved) value
 		local cache = get_session_store(sid, key)
+    ---@cast cache table<CompId, {[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil, [4]: boolean|nil}>
 		local result = cache and cache[cid]
 		if result then
-			return result
+			return result[1], result[2], result[3], result[4] or false
 		end
 
+    ---@diagnostic disable-next-line: cast-local-type
 		result = find_raw_value(comp, key, seen or {})
-		if result == nil then
-			return nil
+		if result == VIM_NIL then
+			return nil, nil, nil, false
 		end
 
-		local value = result[1]
-		if type(value) == "function" then
+		local value, origin, drc = result[1], result[2], result[3]
+    local dynamic = type(value) == "function"
+		if dynamic then
 			-- For inherited functions, use the origin component as context;
 			-- for reference/local ones, use the provider component.
-			local ctx_comp = result[3] or comp
+			local ctx_comp = drc or comp
 			if Component.should_pass_sid(key) then
 				value = value(ctx_comp, sid, ...)
 			else
 				value = value(ctx_comp, ...)
 			end
-			result = { value, result[2], result[3], true }
+			result = { value, origin, drc, dynamic }
 		end
 
 		-- Cache final evaluated value for this session
 		if cache then
+      ---@cast result {[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil, [4]: boolean|nil}>
 			cache[cid] = result
 		else
 			new_session_store(sid, key, { [cid] = result })
 		end
 
-		---@diagnostic disable-next-line: return-type-mismatch
-		return result
+		return value, origin, drc, dynamic
 	end
 end
 
 do
+
+  --- @type table<string, table<CompId, {[1]: any,[2]: integer}>>
 	local inherited_cache = {}
 
 	--- Resolve and merge inherited values for a given component key (static version).
@@ -509,25 +515,20 @@ do
 			return cached[1], cached[2]
 		end
 
-		local val, seen, r = self_val, {}, nil
 		local lookup_plain_value = M.lookup_plain_value
-    if val then
-      r = lookup_plain_value(comp, key, seen)
-      if r then
-        val = r[1]
-      end
-    end
-		local chain, n, pid = {}, 0, comp.inherit
+    local seen = {}
+		local val = self_val or lookup_plain_value(comp, key, seen)
+		local chain, n, pid, pval = {}, 0, comp.inherit, nil
 		while pid do
 			local c = ManagedComps[pid]
 			if not c then
 				break
 			end
-			r = lookup_plain_value(c, key, seen)
-			if r then
+			pval = lookup_plain_value(c, key, seen)
+      if pval then
 				n = n + 1
-				chain[n] = r[1]
-			end
+				chain[n] = pval
+      end
 			pid = c.inherit
 		end
 
@@ -599,30 +600,28 @@ do
 
 		local DYNAMIC_CAHCED_KEY = "inherited" .. key
 		local dynamic_key_cache = get_session_store(sid, DYNAMIC_CAHCED_KEY)
+    ---@cast dynamic_key_cache table<CompId, {[1]: any, [2]: integer}>
 		cached = dynamic_key_cache and dynamic_key_cache[cid]
 		if cached then
 			return cached[1], false, cached[2]
 		end
-		local val, dynamic, seen, r = self_val, nil, {}, nil
+		local val, dynamic, seen = self_val, false, {}
 		local lookup_dynamic_value = M.lookup_dynamic_value
     if not val then
-      r = lookup_dynamic_value(comp, key, sid, seen)
-      if r then
-        val, dynamic = r[1], r[4]
-      end
+      val, _, _, dynamic = lookup_dynamic_value(comp, key, sid, seen)
     end
 
-		local chain, n, pid = {}, 0, comp.inherit
+		local chain, n, pid, pval, pdynamic = {}, 0, comp.inherit, nil, false
 		while pid do
 			local c = ManagedComps[pid]
 			if not c then
 				break
 			end
-			r = lookup_dynamic_value(c, key, sid, seen)
-			if r then
+			pval, _, _, pdynamic = lookup_dynamic_value(c, key, sid, seen)
+			if pval then
 				n = n + 1
-				chain[n] = r[1]
-				dynamic = dynamic or r[4]
+				chain[n] = pval
+				dynamic = dynamic or pdynamic
 			end
 			pid = c.inherit
 		end

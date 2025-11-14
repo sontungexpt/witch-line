@@ -9,7 +9,6 @@ local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
 
 --- The witch-line plugin dir stat to check if should expire cacche when update plug
 local config_checksum, msec, mnsec, size = 0, 0, 0, 0
-local notification = true
 
 local loaded = false
 
@@ -124,7 +123,7 @@ M.save = function()
 end
 
 --- Clear the cache file and reset the Data table
-M.clear = function()
+M.clear = function(notification)
 	uv.fs_unlink(CACHED_FILE, function(err)
 		if err then
 			require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
@@ -173,16 +172,15 @@ M.read = function(user_configs)
   ---@cast user_configs table
 	read_plugin_stat(is_tbl_configs and user_configs.cache_full_scan)
 	create_config_checksum(user_configs)
-  notification = is_tbl_configs and user_configs.cache_cleared_notification or true
 	local bytecode = validate_expiration(content)
 	if not bytecode then
-		M.clear()
+		M.clear(is_tbl_configs and user_configs.cache_cleared_notification or true)
 		return nil
 	end
 
 	local data = Persist.deserialize_table_from_bytecode(bytecode)
 	if not data then
-		M.clear()
+		M.clear(is_tbl_configs and user_configs.cache_cleared_notification or true)
 		return
 	end
 

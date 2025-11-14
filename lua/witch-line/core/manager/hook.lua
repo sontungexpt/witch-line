@@ -11,14 +11,7 @@ local Hook = {}
 --- @param session_id SessionId The session id to get the context for
 --- @return table|nil context The context for the component
 Hook.use_context = function(comp, session_id)
-	local result = lookup_dynamic_value(comp, "context", session_id)
-	if not result then
-		return nil
-	end
-	local context = result[1]
-	if type(context) == "string" then
-		return require(context)
-	end
+	local context = lookup_dynamic_value(comp, "context", session_id)
 	return context
 end
 

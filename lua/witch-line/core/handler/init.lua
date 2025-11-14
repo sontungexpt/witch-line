@@ -65,7 +65,11 @@ end
 --- @return boolean updated        Whether the highlight was updated (`true`) or skipped (`false`).
 --- @return CompStyle style        The resolved and applied highlight style.
 local function update_comp_style(comp, sid, override_style)
-	local style, force, pcount = Manager.dynamic_inherit(comp, "style", sid, Highlight.merge_hl, override_style)
+  local override_style_t = type(override_style)
+	local style, force, pcount = Manager.dynamic_inherit(
+    comp, "style", sid, Highlight.merge_hl,
+    (override_style_t == "table" or override_style_t == "string") and override_style or nil
+  )
 	local hl_name = comp._hl_name
 	if hl_name then
 		if force or override_style then
@@ -217,31 +221,29 @@ local function update_comp(comp, sid)
 				Statusline.set_value(indices, value, comp._hl_name)
 
 				--- Left part
-				local result = Manager.lookup_dynamic_value(comp, "left", sid)
-				if result then
-					local lval, force = result[1], result[4]
-					lval = format_side_value(lval, force)
+				local lval, _, _, lforce = Manager.lookup_dynamic_value(comp, "left", sid)
+				if lval then
+					lval = format_side_value(lval, lforce)
 					if lval then
             local updated, lhl_name  = update_comp_side_style(comp, sid, "left", style_updated, style)
             if not lhl_name then -- never meet dynamic hl_name
-              Statusline.set_side_value(indices, -1, lval, comp._left_hl_name, force)
+              Statusline.set_side_value(indices, -1, lval, comp._left_hl_name, lforce)
             else
-              Statusline.set_side_value(indices, -1, lval, lhl_name or comp._left_hl_name, force or (updated and lhl_name ~= nil))
+              Statusline.set_side_value(indices, -1, lval, lhl_name or comp._left_hl_name, lforce or (updated and lhl_name ~= nil))
             end
 					end
 				end
 
 				--- Right part
-				result = Manager.lookup_dynamic_value(comp, "right", sid, {})
-				if result then
-					local rval, force = result[1], result[4]
-					rval = format_side_value(rval, force)
+				local rval, _, _, rforce = Manager.lookup_dynamic_value(comp, "right", sid, {})
+				if rval then
+					rval = format_side_value(rval, rforce)
 					if rval then
             local updated, rhl_name  = update_comp_side_style(comp, sid, "right", style_updated, style)
             if not rhl_name then -- never meet dynamic hl_name
-              Statusline.set_side_value(indices, 1, rval, comp._right_hl_name, force)
+              Statusline.set_side_value(indices, 1, rval, comp._right_hl_name, rforce)
             else
-              Statusline.set_side_value(indices, 1, rval, rhl_name or comp._right_hl_name, force or (updated and rhl_name ~= nil))
+              Statusline.set_side_value(indices, 1, rval, rhl_name or comp._right_hl_name, rforce or (updated and rhl_name ~= nil))
             end
 					end
 				end
