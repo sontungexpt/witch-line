@@ -44,7 +44,9 @@ local Error = {
     fg = "DiagnosticError",
   },
   ref = {
-    context = Id["diagnostic.interface"]
+    events = Id["diagnostic.interface"],
+    context = Id["diagnostic.interface"],
+    hidden = Id["diagnostic.interface"]
   },
   update = function(self, session_id)
     local hook = require("witch-line.core.manager.hook")
@@ -61,7 +63,9 @@ local Warn = {
   id = Id["diagnostic.warn"],
   _plug_provided = true,
   ref = {
-    context = Id["diagnostic.interface"]
+    events = Id["diagnostic.interface"],
+    context = Id["diagnostic.interface"],
+    hidden = Id["diagnostic.interface"]
   },
   style = {
     fg = "DiagnosticWarn",
@@ -81,7 +85,9 @@ local Info = {
   id = Id["diagnostic.info"],
   _plug_provided = true,
   ref = {
-    context = Id["diagnostic.interface"]
+    events = Id["diagnostic.interface"],
+    context = Id["diagnostic.interface"],
+    hidden = Id["diagnostic.interface"]
   },
   style = {
     fg = "DiagnosticInfo",
@@ -101,7 +107,9 @@ local Hint = {
   id = Id["diagnostic.hint"],
   _plug_provided = true,
   ref = {
-    context = Id["diagnostic.interface"]
+    events = Id["diagnostic.interface"],
+    context = Id["diagnostic.interface"],
+    hidden = Id["diagnostic.interface"]
   },
   style = {
     fg = "DiagnosticHint",
