@@ -139,7 +139,7 @@ end
 --- If a matching event is found, its index in the `store` array is returned.
 --- If no match is found, the function returns `-1`.
 ---
---- ### 🧩 Example:
+--- ### Example:
 --- ```lua
 --- local idx = find_existed_special_event(event_store, new_event)
 --- if idx ~= -1 then
@@ -147,7 +147,7 @@ end
 --- end
 --- ```
 ---
---- ### ⚙️ Implementation details:
+--- ### Implementation details:
 --- - Uses a **linear search** over `store`.
 --- - Equality between two events is determined by `same_special_event(existed, e)`.
 --- - Stops at the first match for efficiency.

@@ -471,6 +471,7 @@ end
 do
   --- @type table<string, table<CompId, {[1]: any,[2]: integer}>>
   local inherited_cache = {}
+  local lookup_plain_value, lookup_dynamic_value = M.lookup_plain_value, M.lookup_dynamic_value
 
   --- Resolve and merge inherited values for a given component key (static version).
   ---
@@ -509,13 +510,16 @@ do
   --- @return integer chain_size The total number of parents in the inheritance chain
   function M.plain_inherit(comp, key, merge, self_val)
     local cid = comp.id
-    local key_cache = inherited_cache[key]
-    local cached = key_cache and key_cache[cid]
-    if cached then
-      return cached[1], cached[2]
+
+    local key_cache
+    if not self_val then
+      key_cache = inherited_cache[key]
+      local cached = key_cache and key_cache[cid]
+      if cached then
+        return cached[1], cached[2]
+      end
     end
 
-    local lookup_plain_value = M.lookup_plain_value
     local seen = {}
     local val = self_val or lookup_plain_value(comp, key, seen)
     local chain, n, pid, pval = {}, 0, comp.inherit, nil
@@ -536,12 +540,11 @@ do
       val = merge(val, chain[i], n)
     end
 
-    cached = { val, n }
     if not self_val then -- this is always change so never cache
       if key_cache then
-        key_cache[cid] = cached
+        key_cache[cid] = { val, n }
       else
-        inherited_cache[key] = { [cid] = cached }
+        inherited_cache[key] = { [cid] = { val, n } }
       end
     end
 
@@ -591,22 +594,26 @@ do
   --- @return integer chain_size The total number of parents in the inheritance chain
   function M.dynamic_inherit(comp, key, sid, merge, self_val)
     local cid = comp.id
-    local key_cache = inherited_cache[key]
-    local cached = key_cache and key_cache[cid]
+    local key_cache
 
-    if cached then
-      return cached[1], false, cached[2]
+    --- We never cache in this case so no need to check cache
+    if not self_val then
+      key_cache = inherited_cache[key]
+      local cached = key_cache and key_cache[cid]
+
+      if cached then
+        return cached[1], false, cached[2]
+      end
     end
 
     local DYNAMIC_CAHCED_KEY = "inherited" .. key
     local dynamic_key_cache = get_session_store(sid, DYNAMIC_CAHCED_KEY)
     ---@cast dynamic_key_cache table<CompId, {[1]: any, [2]: integer}>
-    cached = dynamic_key_cache and dynamic_key_cache[cid]
+    local cached = dynamic_key_cache and dynamic_key_cache[cid]
     if cached then
       return cached[1], false, cached[2]
     end
     local val, dynamic, seen = self_val, false, {}
-    local lookup_dynamic_value = M.lookup_dynamic_value
     if not val then
       val, _, _, dynamic = lookup_dynamic_value(comp, key, sid, seen)
     end

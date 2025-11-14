@@ -494,40 +494,10 @@ M.set_click_handler = function(idxs, click_handler, force)
   end
 end
 
---- Determines if a buffer is disabled based on its filetype and buftype.
---- @param bufnr integer The buffer number to check.
---- @param disabled UserConfig.Disabled|nil The disabled configuration to check against. If nil, the buffer is not disabled.
---- @return boolean
-M.is_buf_disabled = function(bufnr, disabled)
-  if type(disabled) ~= "table" then
-    return false
-  end
-
-  local buf_o = bo[bufnr]
-  if type(disabled.filetypes) == "table" then
-    local filetype = buf_o.filetype
-    for _, ft in ipairs(disabled.filetypes) do
-      if filetype == ft then
-        return true
-      end
-    end
-  end
-
-  if type(disabled.buftypes) == "table" then
-    local buftype = buf_o.buftype
-    for _, bt in ipairs(disabled.buftypes) do
-      if buftype == bt then
-        return true
-      end
-    end
-  end
-
-  return false
-end
 
 --- Setup the necessary things for statusline rendering.
---- @param disabled_config UserConfig.Disabled|nil The disabled configuration to apply.
-M.setup = function(disabled_config)
+--- @param disabled_opts UserConfig.Disabled|nil The disabled configuration to apply.
+M.setup = function(disabled_opts)
   --- For automatically rerender statusline on Vim or window resize when there are flexible components.
   local render_debounce = require("witch-line.utils").debounce(M.render, 100)
   if next(FlexiblePrioritySorted) then
@@ -538,35 +508,68 @@ M.setup = function(disabled_config)
     })
   end
 
-  --- For automatically toggle `laststatus` based on buffer filetype and buftype.
-  local user_laststatus = o.laststatus or 3
+  if type(disabled_opts) == "table" then
+    local valid_buftypes = type(disabled_opts.buftypes) == "table"
+    local valid_filetypes = type(disabled_opts.filetypes) == "table"
 
-  api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
-    callback = function(e)
-      local bufnr = e.buf
-      vim.schedule(function()
-        if not api.nvim_buf_is_valid(bufnr) then
-          return
+    if valid_buftypes or valid_filetypes then
+      --- Determines if a buffer is disabled based on its filetype and buftype.
+      --- @param bufnr integer The buffer number to check.
+      --- @return boolean
+      local is_buf_disabled = function(bufnr)
+        local buf_o = bo[bufnr]
+        if valid_buftypes then
+          local filetype = buf_o.filetype
+          for _, ft in ipairs(disabled_opts.filetypes) do
+            if filetype == ft then
+              return true
+            end
+          end
         end
 
-        local disabled = M.is_buf_disabled(bufnr, disabled_config)
-
-        if not disabled and o.laststatus == 0 then
-          api.nvim_set_option_value("laststatus", user_laststatus, {})
-          render_debounce(o.columns) -- rerender statusline after enabling
-        elseif disabled and o.laststatus ~= 0 then
-          user_laststatus = o.laststatus
-          api.nvim_set_option_value("laststatus", 0, {})
-        else
-          return -- no change no need to redrawstatus
+        if valid_filetypes then
+          local buftype = buf_o.buftype
+          for _, bt in ipairs(disabled_opts.buftypes) do
+            if buftype == bt then
+              return true
+            end
+          end
         end
 
-        if api.nvim_get_mode().mode == "c" then
-          vim.cmd("redrawstatus")
-        end
-      end)
-    end,
-  })
+        return false
+      end
+
+      --- For automatically toggle `laststatus` based on buffer filetype and buftype.
+      local user_laststatus = o.laststatus or 3
+
+      api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+        callback = function(e)
+          local bufnr = e.buf
+          vim.schedule(function()
+            if not api.nvim_buf_is_valid(bufnr) then
+              return
+            end
+
+            local disabled = is_buf_disabled(bufnr)
+
+            if not disabled and o.laststatus == 0 then
+              api.nvim_set_option_value("laststatus", user_laststatus, {})
+              render_debounce(o.columns) -- rerender statusline after enabling
+            elseif disabled and o.laststatus ~= 0 then
+              user_laststatus = o.laststatus
+              api.nvim_set_option_value("laststatus", 0, {})
+            else
+              return -- no change no need to redrawstatus
+            end
+
+            if api.nvim_get_mode().mode == "c" then
+              vim.cmd("redrawstatus")
+            end
+          end)
+        end,
+      })
+    end
+  end
 end
 
 return M
