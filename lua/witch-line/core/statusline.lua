@@ -259,53 +259,6 @@ M.load_cache = function(CacheDataAccessor)
 end
 
 
---- Merges the highlight group names with the corresponding statusline values.
---- @param skip_bitmasks integer|nil A bitmask representing indices to skip during the merging process (1-based index). If nil, no indices are skipped.
---- @return string[] merged The merged list of statusline values with highlight group names applied.
-local function build_values(skip_bitmasks)
-  skip_bitmasks = skip_bitmasks or 0ULL
-
-  --- Lazy load
-  local values, n = {}, 0
-
-  for i = 1, StatuslineSize do
-    if not is_marked(skip_bitmasks, i) then
-      local seg = Statusline[i]
-
-      local val = seg[VALUE_SHIFT] or ""
-      -- If no main value, skip the whole segment including its left and right parts
-      if val ~= "" then
-        local click_handler_form = seg.click_handler_form
-        if click_handler_form then
-          n = n + 1
-          values[n] = click_handler_form
-        end
-
-        local left, right = seg[left_idx(VALUE_SHIFT)], seg[right_idx(VALUE_SHIFT)]
-        if left and left ~= "" then
-          n = n + 1
-          values[n] = left
-        end
-
-        --- Main part
-        n = n + 1
-        values[n] = val
-
-        --- Right part
-        if right and right ~= "" then
-          n = n + 1
-          values[n] = right
-        end
-
-        if click_handler_form then
-          n = n + 1
-          values[n] = "%X"
-        end
-      end
-    end
-  end
-  return values
-end
 
 --- Computes the total display width of a statusline component including its left and right parts.
 --- This function caches the computed width to optimize performance.
@@ -347,36 +300,97 @@ M.hide_segment = function(idxs)
   end
 end
 
---- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
---- If the statusline is disabled, it sets `o.statusline` to a single space.
---- @param limit_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
-M.render = function(limit_width)
-  if o.laststatus == 0 then
-    return
+do
+  local values, n = {}, 0
+  --- Builds the final statusline string by merging highlight segments and optional
+  --- click-handler wrappers, while skipping any indices marked in a bitmask.
+  ---
+  --- Each statusline segment consists of:
+  ---   • left part      (optional)
+  ---   • main value     (required to include the segment)
+  ---   • right part     (optional)
+  ---   • click handler  (optional: wraps the whole segment using "%X")
+  ---
+  --- Segments whose main value is an empty string are skipped entirely.
+  ---
+  --- @param skip_bitmasks integer|nil
+  ---     A bitmask (1-based indices) specifying which segments should be skipped.
+  ---     If nil, no skipping is applied.
+  ---
+  --- @return string value The fully concatenated statusline string.
+  local function build_value(skip_bitmasks)
+    skip_bitmasks = skip_bitmasks or 0ULL
+    n = 0 -- reset idx
+
+    for i = 1, StatuslineSize do
+      if not is_marked(skip_bitmasks, i) then
+        local seg = Statusline[i]
+
+        local val = seg[VALUE_SHIFT] or ""
+        -- If no main value, skip the whole segment including its left and right parts
+        if val ~= "" then
+          local click_handler_form = seg.click_handler_form
+          if click_handler_form then
+            n = n + 1
+            values[n] = click_handler_form
+          end
+
+          local left, right = seg[left_idx(VALUE_SHIFT)], seg[right_idx(VALUE_SHIFT)]
+          if left and left ~= "" then
+            n = n + 1
+            values[n] = left
+          end
+
+          --- Main part
+          n = n + 1
+          values[n] = val
+
+          --- Right part
+          if right and right ~= "" then
+            n = n + 1
+            values[n] = right
+          end
+
+          if click_handler_form then
+            n = n + 1
+            values[n] = "%X"
+          end
+        end
+      end
+    end
+    return concat(values, "", 1, n)
   end
 
-  local flexible = FlexiblePrioritySorted[1]
-  if not flexible then
-    local str = concat(build_values())
+  --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
+  --- If the statusline is disabled, it sets `o.statusline` to a single space.
+  --- @param limit_width integer|nil The maximum width for the statusline. Defaults to vim.o.columns if not provided.
+  M.render = function(limit_width)
+    if o.laststatus == 0 then
+      return
+    end
+
+    local flexible = FlexiblePrioritySorted[1]
+    if not flexible then
+      local str = build_value()
+      o.statusline = str ~= "" and str or " "
+      return
+    end
+
+    local skip_mask = 0ULL
+    local remove_idx = 1
+    local curr_width = compute_statusline_width()
+    limit_width = limit_width or o.columns
+    while flexible and curr_width > limit_width do
+      local comp_idx = get_flexible_idx(flexible)
+      skip_mask = mark_bit(skip_mask, comp_idx)
+      curr_width = curr_width - compute_segment_width(Statusline[comp_idx])
+      remove_idx = remove_idx + 1
+      flexible = FlexiblePrioritySorted[remove_idx]
+    end
+
+    local str = build_value(skip_mask)
     o.statusline = str ~= "" and str or " "
-    return
   end
-
-  local skip_mask = 0ULL
-  local remove_idx = 1
-  local curr_width = compute_statusline_width()
-  limit_width = limit_width or o.columns
-
-  while flexible and curr_width > limit_width do
-    local comp_idx = get_flexible_idx(flexible)
-    skip_mask = mark_bit(skip_mask, comp_idx)
-    curr_width = curr_width - compute_segment_width(Statusline[comp_idx])
-    remove_idx = remove_idx + 1
-    flexible = FlexiblePrioritySorted[remove_idx]
-  end
-
-  local str = concat(build_values(skip_mask))
-  o.statusline = str ~= "" and str or " "
 end
 
 --- Appends a new value to the statusline values list.
