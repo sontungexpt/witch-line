@@ -56,7 +56,8 @@ end
 --- @param user_configs UserConfig|nil The user configs to generate the checksum from
 local create_config_checksum = function(user_configs)
   local Hash = require("witch-line.utils.hash")
-  config_checksum = Hash.fnv1a32(user_configs, "version")
+  ---@diagnostic disable-next-line: param-type-mismatch
+  config_checksum = Hash.hash_tbl(user_configs, "version")
   -- local hashs = {}
   -- for i, hash in tbl_utils.fnv1a32_hash_gradually(user_configs) do
   -- 	hashs[i] = tostring(hash)

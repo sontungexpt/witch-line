@@ -301,7 +301,7 @@ M.hide_segment = function(idxs)
 end
 
 do
-  local values, n = {}, 0
+  local value_buffers, n = {}, 0
   --- Builds the final statusline string by merging highlight segments and optional
   --- click-handler wrappers, while skipping any indices marked in a bitmask.
   ---
@@ -332,33 +332,33 @@ do
           local click_handler_form = seg.click_handler_form
           if click_handler_form then
             n = n + 1
-            values[n] = click_handler_form
+            value_buffers[n] = click_handler_form
           end
 
           local left, right = seg[left_idx(VALUE_SHIFT)], seg[right_idx(VALUE_SHIFT)]
           if left and left ~= "" then
             n = n + 1
-            values[n] = left
+            value_buffers[n] = left
           end
 
           --- Main part
           n = n + 1
-          values[n] = val
+          value_buffers[n] = val
 
           --- Right part
           if right and right ~= "" then
             n = n + 1
-            values[n] = right
+            value_buffers[n] = right
           end
 
           if click_handler_form then
             n = n + 1
-            values[n] = "%X"
+            value_buffers[n] = "%X"
           end
         end
       end
     end
-    return concat(values, "", 1, n)
+    return concat(value_buffers, "", 1, n)
   end
 
   --- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
