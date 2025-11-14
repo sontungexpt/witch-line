@@ -1,5 +1,6 @@
 local M = {}
 
+
 --- The helper function to create a custom for default component
 --- @param path string The path to the component.
 --- @param override table The override table for the component.
