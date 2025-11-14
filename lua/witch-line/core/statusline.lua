@@ -509,27 +509,27 @@ M.setup = function(disabled_opts)
   end
 
   if type(disabled_opts) == "table" then
-    local valid_buftypes = type(disabled_opts.buftypes) == "table"
-    local valid_filetypes = type(disabled_opts.filetypes) == "table"
+    local disabled_filetypes = type(disabled_opts.filetypes) == "table" and disabled_opts.filetypes
+    local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
 
-    if valid_buftypes or valid_filetypes then
+    if disabled_buftypes or disabled_filetypes then
       --- Determines if a buffer is disabled based on its filetype and buftype.
       --- @param bufnr integer The buffer number to check.
       --- @return boolean
       local is_buf_disabled = function(bufnr)
         local buf_o = bo[bufnr]
-        if valid_buftypes then
+        if disabled_filetypes then
           local filetype = buf_o.filetype
-          for _, ft in ipairs(disabled_opts.filetypes) do
+          for _, ft in ipairs(disabled_filetypes) do
             if filetype == ft then
               return true
             end
           end
         end
 
-        if valid_filetypes then
+        if disabled_buftypes then
           local buftype = buf_o.buftype
-          for _, bt in ipairs(disabled_opts.buftypes) do
+          for _, bt in ipairs(disabled_buftypes) do
             if buftype == bt then
               return true
             end

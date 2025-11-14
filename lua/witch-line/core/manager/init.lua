@@ -512,6 +512,7 @@ do
     local cid = comp.id
 
     local key_cache
+    -- We nerver cache in this case so no need to check cache
     if not self_val then
       key_cache = inherited_cache[key]
       local cached = key_cache and key_cache[cid]
