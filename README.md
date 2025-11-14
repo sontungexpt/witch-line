@@ -298,9 +298,16 @@ require("witch-line").setup({
       },
     },
   },
+
   --- Enables deep scanning of the plugin directory for detecting cache expiration. (slower but more accurate)
   cache_full_scan = false,
+
+  -- Whether to show a notification when the cache is cleared automatically.
   cache_cleared_notification = true,
+
+  -- Whether to strip debug information when caching dumped functions. It's will help faster load
+  -- but hard to debug
+  cache_func_strip = false,
   disabled = {
     filetypes = { "help", "TelescopePrompt" },
     buftypes = { "nofile", "terminal" },

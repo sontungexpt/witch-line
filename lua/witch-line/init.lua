@@ -24,71 +24,69 @@ local M = {}
 --- When `true`, Witch-Line will perform a full recursive scan (slower but more accurate).
 --- When `false` or `nil`, only the main plugin folder’s timestamp and size are checked (faster).
 ---@field cache_full_scan boolean|nil
----@field cache_cleared_notification boolean|nil
+---@field cache_cleared_notification boolean|nil Whether to show a notification when the cache is cleared.
+---@field cache_func_strip boolean|nil Whether to strip debug information when caching dumped functions.
 
 --- Use default configs if missing
---- @param user_configs UserConfig|nil user_configs to check
+--- @param user_configs UserConfig user_configs to check
 --- @return UserConfig user_configs with defaults applied
 local use_default_config = function(user_configs)
-	if type(user_configs) ~= "table" then
-		user_configs = {}
-	end
-
-	if type(user_configs.components) ~= "table" or not next(user_configs.components) then
-		user_configs.components = require("witch-line.constant.default")
-	end
-	if type(user_configs.disabled) ~= "table" then
-		user_configs.disabled = {
-			buftypes = {
-				"terminal",
-			},
-		}
-	end
-	return user_configs
+  if type(user_configs.components) ~= "table" or not next(user_configs.components) then
+    user_configs.components = require("witch-line.constant.default")
+  end
+  if type(user_configs.disabled) ~= "table" then
+    user_configs.disabled = {
+      buftypes = {
+        "terminal",
+      },
+    }
+  end
+  return user_configs
 end
 
 --- @param user_configs UserConfig|nil user_configs
 M.setup = function(user_configs)
-	local Cache = require("witch-line.cache")
-	local DataAccessor = Cache.read(user_configs)
-	user_configs = use_default_config(user_configs)
+  user_configs = type(user_configs) == "table" and user_configs or {}
+  local Cache = require("witch-line.cache")
+  local DataAccessor = Cache.read(user_configs)
+  user_configs = use_default_config(user_configs)
 
-	local CACHE_MODS = {
-		"witch-line.core.manager.event",
-		"witch-line.core.manager.timer",
-		"witch-line.core.manager",
-		"witch-line.core.statusline",
-		"witch-line.core.highlight",
-	}
+  local CACHE_MODS = {
+    "witch-line.core.manager.event",
+    "witch-line.core.manager.timer",
+    "witch-line.core.manager",
+    "witch-line.core.statusline",
+    "witch-line.core.highlight",
+  }
 
-	if DataAccessor then
-		for i = 1, #CACHE_MODS do
-			require(CACHE_MODS[i]).load_cache(DataAccessor)
-		end
-	end
+  if DataAccessor then
+    for i = 1, #CACHE_MODS do
+      require(CACHE_MODS[i]).load_cache(DataAccessor)
+    end
+  end
 
-	require("witch-line.core.handler").setup(user_configs, DataAccessor)
-	require("witch-line.core.statusline").setup(user_configs.disabled)
+  require("witch-line.core.handler").setup(user_configs, DataAccessor)
+  require("witch-line.core.statusline").setup(user_configs.disabled)
 
-	vim.api.nvim_create_autocmd("VimLeavePre", {
-		once = true,
-		callback = function()
-			if not Cache.loaded() then
-				DataAccessor = Cache.DataAccessor
-				for i = 1, #CACHE_MODS do
-					require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
-				end
-				Cache.save()
-			end
-		end,
-	})
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    once = true,
+    callback = function()
+      if not Cache.loaded() then
+        DataAccessor = Cache.DataAccessor
+        for i = 1, #CACHE_MODS do
+          require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
+        end
+        Cache.save(user_configs.cache_func_strip)
+      end
+    end,
+  })
 
-	vim.api.nvim_create_autocmd("CmdlineEnter", {
-		once = true,
-		callback = function()
-			require("witch-line.command")
-		end,
-	})
+  vim.api.nvim_create_autocmd("CmdlineEnter", {
+    once = true,
+    callback = function()
+      require("witch-line.command")
+    end,
+  })
 end
 
 return M
