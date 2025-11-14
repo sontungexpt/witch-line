@@ -85,12 +85,6 @@ See the magic:
 
 ```
 
-
-
-
-
-
-
 ## Preview
 
 - Basic style (No separator, I aprreciate basic but you can create it or do many things else by yourself (like add separator) or you can create new PR for your feature you wantc)
@@ -112,7 +106,7 @@ See the magic:
 
 - 📁 **Context-Aware Disabling**: Automatically disable the statusline for specific `filetypes` or `buftypes` (e.g. terminal, help, etc).
 
-- 🧠 **Config Hashing**: Detect if user config has changed via FNV-1a hashing, ensuring minimal reinitialization.
+- 🧠 **Config Hashing**: Detect if user config has changed via xxh32 hashing, ensuring minimal reinitialization.
 
 - 💾 **Persistent Caching**: Cache user configurations and state across sessions using a simple key-value system.
 
@@ -137,7 +131,7 @@ This plugin is ideal for developers who want full control over the look and feel
 
   - [x] Implement caching mechanism (serialization + deserialization)
   - [x] Cache all needed data
-  - [x] Use checksum to detect config changes with FNV-1a
+  - [x] Use checksum to detect config changes with xxh32
   - [x] Lazy compile function of component
   - [x] Detect default component changed automatically when plugin was updated
   - [ ] Support up-value for component function caching
@@ -337,7 +331,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `mode`             | `mode.lua`       | Shows the current Neovim mode             |
 | `file.name`        | `file.lua`       | Displays the filename                     |
 | `file.icon`        | `file.lua`       | Displays an icon for the file             |
-| `file.modified`    | `file.lua`       | Indicates if the file has unsaved changes |
+| `file.modifier`    | `file.lua`       | Indicates if the file has unsaved changes |
 | `file.size`        | `file.lua`       | Shows the file size                       |
 | `%=`               | _(builtin)_      | Separator to align left/right components  |
 | `copilot`          | `copilot.lua`    | Shows Copilot status (if available)       |
@@ -349,9 +343,9 @@ Each component is referenced by name and can be composed to build a flexible and
 | `cursor.progress`  | `cursor.lua`     | Shows the cursor position as a % progress |
 | `lsp.clients`      | `lsp.lua`        | Lists active LSP clients                  |
 | `git.branch`       | `git.lua`        | Shows current Git branch                  |
-| `git.added`        | `git.lua`        | Number of added lines in Git diff         |
-| `git.removed`      | `git.lua`        | Number of removed lines in Git diff       |
-| `git.modified`     | `git.lua`        | Number of changed lines in Git diff       |
+| `git.diff.added`   | `git.lua`        | Number of added lines in Git diff         |
+| `git.diff.removed` | `git.lua`        | Number of removed lines in Git diff       |
+| `git.diff.modified`| `git.lua`        | Number of changed lines in Git diff       |
 | `datetime`         | `datetime.lua`   | Displays current date and time            |
 | `battery`          | `battery.lua`    | Shows battery status (if applicable)      |
 | `os_uname`         | `os_uname.lua`   | Displays the operating system name        |
