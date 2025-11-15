@@ -8,15 +8,15 @@ local M = {}
 --- Abstract components that are **not directly rendered**,
 --- but may be inherited or referenced by other components.
 --- Typically used to define shared layouts or reusable base definitions.
----@field abstracts CombinedComponent[]|nil
+---@field abstracts? CombinedComponent[]|DefaultId[]
 ---
 --- Components that are **actually rendered** in the statusline.
 --- These can inherit or reference abstract components to build complex layouts.
----@field components CombinedComponent[]
----@field disabled UserConfig.Disabled|nil Filetypes/buftypes where statusline is disabled.
----@field cache_full_scan boolean|nil Perform full plugin scan for cache expiration. Default false.
----@field cache_cleared_notification boolean|nil Show notification when cache is cleared. Default true.
----@field cache_func_strip boolean|nil Strip debug info when caching dumped functions. Default false.
+---@field components CombinedComponent[]|DefaultId[]
+---@field disabled? UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
+---@field cache_full_scan? boolean Perform full plugin scan for cache expiration. Default false.
+---@field cache_cleared_notification? boolean Show notification when cache is cleared. Default true.
+---@field cache_func_strip? boolean Strip debug info when caching dumped functions. Default false.
 
 --- Apply missing default configuration values to the user-provided config.
 --- Ensures required fields exist (such as `disabled` and `components`)

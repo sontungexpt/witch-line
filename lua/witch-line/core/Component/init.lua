@@ -7,10 +7,10 @@ local Component = {}
 
 --- @enum SepStyle
 local SepStyle = {
-	Inherited = 0, -- use the style of the component
-	SepFg = 1,
-	SepBg = 2,
-	Reverse = 3, -- use the reverse style of the component }
+  Inherited = 0, -- use the style of the component
+  SepFg = 1,
+  SepBg = 2,
+  Reverse = 3, -- use the reverse style of the component }
 }
 Component.SepStyle = SepStyle
 
@@ -245,7 +245,7 @@ Component.SepStyle = SepStyle
 --- Check if is default component
 --- @param comp Component the component to get the id from
 Component.is_default = function(comp)
-	return require("witch-line.constant.id").existed(comp.id)
+  return require("witch-line.constant.id").existed(comp.id)
 end
 
 --- Ensures that the component has a valid id, generating one if it does not.
@@ -253,63 +253,63 @@ end
 --- @return CompId id the id of the component
 --- @return Component|DefaultComponent|nil comp the component itself, or nil if it is a default component
 Component.setup = function(comp)
-	local id = comp.id
-	if comp._plug_provided then
-		---@cast id CompId
-		return id
-	elseif id then
-		id = require("witch-line.constant.id").validate(id)
-	else
-		id = tostring(comp) .. tostring(math.random(1, 1000000))
-		rawset(comp, "id", id) -- Ensure the component has an ID field
-	end
-	require("witch-line.core.Component.initial_state").save_initial_context(comp)
-	---@cast id CompId
-	return id, comp
+  local id = comp.id
+  if comp._plug_provided then
+    ---@cast id CompId
+    return id
+  elseif id then
+    id = require("witch-line.constant.id").validate(id)
+  else
+    id = tostring(comp) .. tostring(math.random(1, 1000000))
+    rawset(comp, "id", id) -- Ensure the component has an ID field
+  end
+  require("witch-line.core.Component.initial_state").save_initial_context(comp)
+  ---@cast id CompId
+  return id, comp
 end
 
 --- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
 Component.emit_pre_update = function(comp, sid)
-	local pre_update = comp.pre_update
-	if type(pre_update) == "function" then
-		pre_update(comp, sid)
-	end
+  local pre_update = comp.pre_update
+  if type(pre_update) == "function" then
+    pre_update(comp, sid)
+  end
 end
 
 --- Emits the `post_update` event for the component, calling the post_update function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy
 Component.emit_post_update = function(comp, sid)
-	local post_update = comp.post_update
-	if type(post_update) == "function" then
-		post_update(comp, sid)
-	end
+  local post_update = comp.post_update
+  if type(post_update) == "function" then
+    post_update(comp, sid)
+  end
 end
 
 --- Emits the `init` event for the component, calling the init function if it exists.
 --- @param comp Component the component to emit the event for
 --- @param sid SessionId the session id to use for the component, used for lazy loading components
 Component.emit_init = function(comp, sid)
-	local init = comp.init
-	if type(init) == "function" then
-		init(comp, sid)
-	end
+  local init = comp.init
+  if type(init) == "function" then
+    init(comp, sid)
+  end
 end
 
 --- Returns the field name for the highlight name of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
 --- @return string field_name the field name for the highlight name of the specified side
 Component.hl_name_field = function(side)
-	return side == "left" and "_left_hl_name" or "_right_hl_name"
+  return side == "left" and "_left_hl_name" or "_right_hl_name"
 end
 
 --- Returns the field name for the style of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
 --- @return CompStyle|nil|SideStyleFunc|SepStyle field_name the field name for the style of the specified side
 Component.side_style = function(comp, side)
-	return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
+  return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
 end
 
 --- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
@@ -318,76 +318,76 @@ end
 --- @return string value the new value of the component
 --- @return CompStyle|nil style the new style of the component
 Component.evaluate = function(comp, sid)
-	local result, style = resolve(comp.update, comp, sid)
+  local result, style = resolve(comp.update, comp, sid)
 
-	if type(result) ~= "string" then
-		result = ""
-	elseif result ~= "" then
-		local padding = resolve(comp.padding or 1, comp, sid)
-		local p_type = type(padding)
-		if p_type == "number" and padding > 0 then
-			local pad = str_rep(" ", padding)
-			result = pad .. result .. pad
-		elseif p_type == "table" then
-			local left, right = resolve(padding.left, comp, sid), resolve(padding.right, comp, sid)
+  if type(result) ~= "string" then
+    result = ""
+  elseif result ~= "" then
+    local padding = resolve(comp.padding or 1, comp, sid)
+    local p_type = type(padding)
+    if p_type == "number" and padding > 0 then
+      local pad = str_rep(" ", padding)
+      result = pad .. result .. pad
+    elseif p_type == "table" then
+      local left, right = resolve(padding.left, comp, sid), resolve(padding.right, comp, sid)
 
-			if type(left) == "number" and left > 0 then
-				result = str_rep(" ", left) .. result
-			end
-			if type(right) == "number" and right > 0 then
-				result = result .. str_rep(" ", right)
-			end
-		end
-	end
+      if type(left) == "number" and left > 0 then
+        result = str_rep(" ", left) .. result
+      end
+      if type(right) == "number" and right > 0 then
+        result = result .. str_rep(" ", right)
+      end
+    end
+  end
 
-	return result, style
+  return result, style
 end
 
 --- Requires a default component by its id.
 --- @param id CompId the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require_by_id = function(id)
-	local path = require("witch-line.constant.id").path(id)
-	if not path then
-		return nil
-	end
-	return Component.require(path)
+  local path = require("witch-line.constant.id").path(id)
+  if not path then
+    return nil
+  end
+  return Component.require(path)
 end
 
 --- Requires a default component by its path.
 --- @param path DefaultComponentPath the path to the component, e.g. "file.name" or "git.status"
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require = function(path)
-	local zero = path:find("\0", 2, true)
-	if not zero then
-		return require(COMP_MODULE_PATH .. path)
-	end
+  local zero = path:find("\0", 2, true)
+  if not zero then
+    return require(COMP_MODULE_PATH .. path)
+  end
 
-	local module_path, idx_path = path:sub(1, zero - 1), path:sub(zero + 1)
-	local component = require(COMP_MODULE_PATH .. module_path)
+  local module_path, idx_path = path:sub(1, zero - 1), path:sub(zero + 1)
+  local component = require(COMP_MODULE_PATH .. module_path)
 
-	for key in idx_path:gmatch("[^%.]+") do
-		component = component[key]
-		if not component then
-			return nil
-		end
-	end
-	return component
+  for key in idx_path:gmatch("[^%.]+") do
+    component = component[key]
+    if not component then
+      return nil
+    end
+  end
+  return component
 end
 
 --- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
 --- @param comp Component the component to remove the state from
 Component.format_state_before_cache = function(comp)
-	require("witch-line.core.Component.initial_state").restore_initial_context(comp)
-	rawset(comp, "_hidden", nil)
-	local temp = comp.temp
-	if type(temp) == "table" then
-		for key, _ in pairs(temp) do
-			rawset(temp, key, nil)
-		end
-	else
-		rawset(comp, "temp", nil)
-	end
+  require("witch-line.core.Component.initial_state").restore_initial_context(comp)
+  rawset(comp, "_hidden", nil)
+  local temp = comp.temp
+  if type(temp) == "table" then
+    for key, _ in pairs(temp) do
+      rawset(temp, key, nil)
+    end
+  else
+    rawset(comp, "temp", nil)
+  end
 end
 
 --- Recursively overrides the values of a component with the values from another component.
@@ -402,30 +402,30 @@ end
 --- @param skip_type_check boolean|nil if true, skips the type check and always overrides
 --- @return any value the overridden component value
 local function overrides_component_value(to, from, skip_type_check)
-	if to == nil then
-		return from
-	elseif from == nil then
-		return to
-	end
+  if to == nil then
+    return from
+  elseif from == nil then
+    return to
+  end
 
-	local to_type, from_type = type(to), type(from)
+  local to_type, from_type = type(to), type(from)
 
-	if not skip_type_check and to_type ~= from_type then
-		return to
-	elseif from_type ~= "table" then
-		return from
-		-- both are table from here
-	elseif next(to) == nil then
-		return from
-	elseif next(from) == nil then
-		return to
-	elseif vim.islist(to) and vim.islist(from) then
-		return from
-	end
+  if not skip_type_check and to_type ~= from_type then
+    return to
+  elseif from_type ~= "table" then
+    return from
+    -- both are table from here
+  elseif next(to) == nil then
+    return from
+  elseif next(from) == nil then
+    return to
+  elseif vim.islist(to) and vim.islist(from) then
+    return from
+  end
 
-	for k, v in pairs(from) do
-		to[k] = overrides_component_value(to[k], v, skip_type_check)
-	end
+  for k, v in pairs(from) do
+    to[k] = overrides_component_value(to[k], v, skip_type_check)
+  end
   return to
 end
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
@@ -433,29 +433,29 @@ end
 --- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
 --- @return Component stat_comp the statistic component with the necessary fields set
 Component.overrides = function(comp, override)
-	if type(override) ~= "table" then
-		return comp
-	end
+  if type(override) ~= "table" then
+    return comp
+  end
 
-	local accepted = require("witch-line.core.Component.overridable_types")
-	for k, v in pairs(override) do
-		local types_accepted = accepted[k]
-		if types_accepted then
-			local type_v = type(v)
-			if
-				type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
-				or types_accepted == type_v -- single type
-			then
-				if type_v == "table" then
-					rawset(comp, k, overrides_component_value(comp[k], v, true))
-				else
-					rawset(comp, k, v)
-				end
-			end
-		end
-	end
+  local accepted = require("witch-line.core.Component.overridable_types")
+  for k, v in pairs(override) do
+    local types_accepted = accepted[k]
+    if types_accepted then
+      local type_v = type(v)
+      if
+          type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
+          or types_accepted == type_v -- single type
+      then
+        if type_v == "table" then
+          rawset(comp, k, overrides_component_value(comp[k], v, true))
+        else
+          rawset(comp, k, v)
+        end
+      end
+    end
+  end
 
-	return comp
+  return comp
 end
 
 --- Gets the minimum screen width required to display the component.
@@ -463,8 +463,8 @@ end
 --- @param sid SessionId the session id to use for the component update
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
 Component.min_screen_width = function(comp, sid)
-	local min_screen_width = resolve(comp.min_screen_width, comp, sid)
-	return type(min_screen_width) == "number" and min_screen_width or nil
+  local min_screen_width = resolve(comp.min_screen_width, comp, sid)
+  return type(min_screen_width) == "number" and min_screen_width or nil
 end
 
 --- Checks if the component is hidden based on its `hidden` field.
@@ -472,8 +472,8 @@ end
 --- @param sid SessionId the session id to use for the component update
 --- @return boolean hidden whether the component is hidden
 Component.hidden = function(comp, sid)
-	local hidden = resolve(comp.hidden, comp, sid)
-	return hidden == true
+  local hidden = resolve(comp.hidden, comp, sid)
+  return hidden == true
 end
 
 --- Register a function to be called when a clickable component is clicked.
@@ -481,51 +481,51 @@ end
 --- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
 --- @throws if has an invalid field type
 Component.register_click_handler = function(comp)
-	local click_handler = comp._click_handler
-	if click_handler then
-		return click_handler
-	end
+  local click_handler = comp._click_handler
+  if click_handler then
+    return click_handler
+  end
 
-	local on_click = comp.on_click
+  local on_click = comp.on_click
 
-	local t = type(on_click)
-	if t == "table" then
-		-- {
-		--    name = "MyClickHandler", -- optional
-		--    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
-		--    -- If callback is a string, don't care about the name field
-		--    -- or callback = "MyClickHandler" -- the name of a global function
-		-- }
+  local t = type(on_click)
+  if t == "table" then
+    -- {
+    --    name = "MyClickHandler", -- optional
+    --    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
+    --    -- If callback is a string, don't care about the name field
+    --    -- or callback = "MyClickHandler" -- the name of a global function
+    -- }
 
-		local name = on_click.name
-		if name and type(name) ~= "string" or name == "" then
-			require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
-			return ""
-		end
-		click_handler = type(name) == "string" and name or nil
-		on_click = on_click.callback
-		t = type(on_click)
-	end
+    local name = on_click.name
+    if name and type(name) ~= "string" or name == "" then
+      require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
+      return ""
+    end
+    click_handler = type(name) == "string" and name or nil
+    on_click = on_click.callback
+    t = type(on_click)
+  end
 
-	if t == "string" and _G[on_click] then
-		click_handler = on_click
-	elseif t == "function" then
-		-- Fastest possible func_name derivation
-		if not click_handler then
-			click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
-		end
-		if not _G[click_handler] then
-			_G[click_handler] = function(...)
-				on_click(comp, ...)
-			end
-		end
-	else
-		require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
-		return ""
-	end
+  if t == "string" and _G[on_click] then
+    click_handler = on_click
+  elseif t == "function" then
+    -- Fastest possible func_name derivation
+    if not click_handler then
+      click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
+    end
+    if not _G[click_handler] then
+      _G[click_handler] = function(...)
+        on_click(comp, ...)
+      end
+    end
+  else
+    require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
+    return ""
+  end
 
-	comp._click_handler = click_handler
-	return click_handler
+  comp._click_handler = click_handler
+  return click_handler
 end
 
 --- Determine whether a function-type value should receive the `sid` argument
@@ -537,7 +537,7 @@ end
 --- @param key string  The key name to check
 --- @return boolean    True if the `sid` argument should be passed to the function
 Component.should_pass_sid = function(key)
-	return key ~= "context"
+  return key ~= "context"
 end
 
 return Component
