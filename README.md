@@ -152,8 +152,7 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support inherit field to inherit from other component
   - [x] Support static field to store static data
   - [x] Support context field to store context data
-  - [x] Support events field to listen to other component events
-  - [x] Support user_events field to listen to user-defined events
+  - [x] Support events field to trigger component update
   - [x] Support timing field to update component periodically
   - [x] Support lazy field to lazy load component
   - [x] Support padding field to add padding around component
@@ -256,7 +255,7 @@ You can setup the plugin by calling the `setup` function and passing in a table 
 
 require("witch-line").setup({
   --- @type CombinedComponent[]
-  abstract = {
+  abstracts = {
     "file.name",
     {
       id = "file", -- Abstract component for file-related info

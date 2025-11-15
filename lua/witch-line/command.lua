@@ -73,6 +73,7 @@ local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
       completions[#completions + 1] = key
     end
   end
+  table.sort(completions)
   return completions
 end
 

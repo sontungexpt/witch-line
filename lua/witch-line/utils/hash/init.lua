@@ -59,14 +59,15 @@ end
 ---   - `simple_serialize()` is used to convert keys/values to byte sequences.
 ---   - Tables already seen are skipped and replaced with the literal "vtable".
 ---
---- @param tbl table The table to hash.
+--- @param tbl table|nil The table to hash.
 --- @param hash_key string|nil Optional field key: if provided and present in a table, only that particular field is hashed instead of the full table contents.
 --- @return integer A 32-bit xxHash32 value.
 local hash_tbl = function(tbl, hash_key)
   -- invalid type then return an 32 bit constant number
-  if not next(tbl) then
+  if type(tbl) ~= "table" or not next(tbl) then
     return 0xFFFFFFFF
   end
+
   local st = xxh32.xxh32_init(0)
   local xxh32_update = xxh32.xxh32_update
 
