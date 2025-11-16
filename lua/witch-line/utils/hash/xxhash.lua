@@ -12,7 +12,7 @@ local rotl, rshift, bxor = bit.rol, bit.rshift, bit.bxor
 ---@field memsize   integer
 ---@field memory    integer[]  # uint8_t[16]
 
-ffi.cdef [[
+ffi.cdef([[
 typedef struct {
     uint32_t seed;
     uint32_t v1;
@@ -24,7 +24,7 @@ typedef struct {
     uint32_t memsize;
     uint8_t memory[16];  // temp buffer
 } xxh32_state_t;
-]]
+]])
 
 local uint32 = ffi.typeof("uint32_t")
 
@@ -33,7 +33,6 @@ local P2 = uint32(0x85EBCA77)
 local P3 = uint32(0xC2B2AE3D)
 local P4 = uint32(0x27D4EB2F)
 local P5 = uint32(0x165667B1)
-
 
 --- Initializes an xxHash32 state structure.
 ---
@@ -44,20 +43,18 @@ local P5 = uint32(0x165667B1)
 --- @param seed integer The user-provided 32-bit seed for hash initialization.
 --- @return xxh32_state_t st A freshly allocated and fully initialized xxHash32 state.
 local function xxh32_init(seed)
-  --- @type xxh32_state_t
-  ---@diagnostic disable-next-line: assign-type-mismatch
-  local st     = ffi.new("xxh32_state_t")
-  st.seed      = seed
-  st.v1        = seed + P1 + P2
-  st.v2        = seed + P2
-  st.v3        = seed + 0
-  st.v4        = seed - P1
-  st.total_len = 0
-  st.memsize   = 0
-  return st
+	--- @type xxh32_state_t
+	---@diagnostic disable-next-line: assign-type-mismatch
+	local st = ffi.new("xxh32_state_t")
+	st.seed = seed
+	st.v1 = seed + P1 + P2
+	st.v2 = seed + P2
+	st.v3 = seed + 0
+	st.v4 = seed - P1
+	st.total_len = 0
+	st.memsize = 0
+	return st
 end
-
-
 
 --- Feeds input bytes into the xxHash32 state.
 ---
@@ -74,52 +71,52 @@ end
 --- @param st xxh32_state_t The hash state being updated (return from `xxh32_init`).
 --- @param input string The input string.
 local function xxh32_update(st, input)
-  local len = #input
-  st.total_len = st.total_len + len
-  local p = ffi.cast("const uint8_t*", input)
-  local endp = p + len
+	local len = #input
+	st.total_len = st.total_len + len
+	local p = ffi.cast("const uint8_t*", input)
+	local endp = p + len
 
-  if st.memsize + len < 16 then
-    -- Chưa đủ 16 byte → nhét vào memory
-    ffi.copy(st.memory + st.memsize, input, len)
-    st.memsize = st.memsize + len
-    return
-  end
+	if st.memsize + len < 16 then
+		-- Chưa đủ 16 byte → nhét vào memory
+		ffi.copy(st.memory + st.memsize, p, len)
+		st.memsize = st.memsize + len
+		return
+	end
 
-  -- Nếu memory trước đó có dữ liệu → làm đầy đủ 16 byte
-  if st.memsize > 0 then
-    local needed = 16 - st.memsize
-    ffi.copy(st.memory + st.memsize, input, needed)
+	-- Nếu memory trước đó có dữ liệu → làm đầy đủ 16 byte
+	if st.memsize > 0 then
+		local needed = 16 - st.memsize
+		ffi.copy(st.memory + st.memsize, p, needed)
 
-    local mem = ffi.cast("uint32_t*", st.memory)
+		local mem = ffi.cast("uint32_t*", st.memory)
 
-    st.v1 = rotl(st.v1 + mem[0] * P2, 13) * P1
-    st.v2 = rotl(st.v2 + mem[1] * P2, 13) * P1
-    st.v3 = rotl(st.v3 + mem[2] * P2, 13) * P1
-    st.v4 = rotl(st.v4 + mem[3] * P2, 13) * P1
+		st.v1 = rotl(st.v1 + mem[0] * P2, 13) * P1
+		st.v2 = rotl(st.v2 + mem[1] * P2, 13) * P1
+		st.v3 = rotl(st.v3 + mem[2] * P2, 13) * P1
+		st.v4 = rotl(st.v4 + mem[3] * P2, 13) * P1
 
-    p = p + needed
-    st.memsize = 0
-  end
+		p = p + needed
+		st.memsize = 0
+	end
 
-  -- Main loop
-  while p + 16 <= endp do
-    local blk = ffi.cast("uint32_t*", p)
+	-- Main loop
+	while p + 16 <= endp do
+		local blk = ffi.cast("uint32_t*", p)
 
-    st.v1 = rotl(st.v1 + blk[0] * P2, 13) * P1
-    st.v2 = rotl(st.v2 + blk[1] * P2, 13) * P1
-    st.v3 = rotl(st.v3 + blk[2] * P2, 13) * P1
-    st.v4 = rotl(st.v4 + blk[3] * P2, 13) * P1
+		st.v1 = rotl(st.v1 + blk[0] * P2, 13) * P1
+		st.v2 = rotl(st.v2 + blk[1] * P2, 13) * P1
+		st.v3 = rotl(st.v3 + blk[2] * P2, 13) * P1
+		st.v4 = rotl(st.v4 + blk[3] * P2, 13) * P1
 
-    p = p + 16
-  end
+		p = p + 16
+	end
 
-  -- Copy phần dư (<16 bytes)
-  if p < endp then
-    local leftover = endp - p
-    ffi.copy(st.memory, p, leftover)
-    st.memsize = leftover
-  end
+	-- Copy phần dư (<16 bytes)
+	if p < endp then
+		local leftover = endp - p
+		ffi.copy(st.memory, p, leftover)
+		st.memsize = leftover
+	end
 end
 
 --- Finalize the XXH32 hash computation.
@@ -129,46 +126,43 @@ end
 --- @param st xxh32_state_t State object return from `xxh32_init`
 --- @return integer h32 The finalized 32-bit hash value.
 local function xxh32_finalize(st)
-  local h32
+	local h32
 
-  if st.total_len >= 16 then
-    h32 = rotl(st.v1, 1) +
-        rotl(st.v2, 7) +
-        rotl(st.v3, 12) +
-        rotl(st.v4, 18)
-  else
-    h32 = st.seed + P5
-  end
+	if st.total_len >= 16 then
+		h32 = rotl(st.v1, 1) + rotl(st.v2, 7) + rotl(st.v3, 12) + rotl(st.v4, 18)
+	else
+		h32 = st.seed + P5
+	end
 
-  h32 = h32 + st.total_len
+	h32 = h32 + st.total_len
 
-  -- Process remaining bytes
-  local mem = ffi.cast("uint8_t*", st.memory)
-  local i = 0
+	-- Process remaining bytes
+	local mem = ffi.cast("uint8_t*", st.memory)
+	local i = 0
 
-  -- 4 bytes
-  while i + 4 <= st.memsize do
-    local k1 = ffi.cast("uint32_t*", mem + i)[0]
-    h32 = rotl(h32 + k1 * P3, 17) * P4
-    i = i + 4
-  end
+	-- 4 bytes
+	while i + 4 <= st.memsize do
+		local k1 = ffi.cast("uint32_t*", mem + i)[0]
+		h32 = rotl(h32 + k1 * P3, 17) * P4
+		i = i + 4
+	end
 
-  -- Single bytes
-  while i < st.memsize do
-    h32 = rotl(h32 + mem[i] * P5, 11) * P1
-    i = i + 1
-  end
+	-- Single bytes
+	while i < st.memsize do
+		h32 = rotl(h32 + mem[i] * P5, 11) * P1
+		i = i + 1
+	end
 
-  -- Avalanche
-  h32 = bxor(h32, rshift(h32, 15)) * P2
-  h32 = bxor(h32, rshift(h32, 13)) * P3
-  h32 = bxor(h32, rshift(h32, 16))
+	-- Avalanche
+	h32 = bxor(h32, rshift(h32, 15)) * P2
+	h32 = bxor(h32, rshift(h32, 13)) * P3
+	h32 = bxor(h32, rshift(h32, 16))
 
-  return h32
+	return h32
 end
 
 return {
-  xxh32_init = xxh32_init,
-  xxh32_update = xxh32_update,
-  xxh32_finalize = xxh32_finalize
+	xxh32_init = xxh32_init,
+	xxh32_update = xxh32_update,
+	xxh32_finalize = xxh32_finalize,
 }

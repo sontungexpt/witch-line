@@ -2,24 +2,25 @@ local require, vim, type = require, vim, type
 
 local M = {}
 
----@class UserConfig.Cache
----@field full_scan boolean|nil Perform full plugin scan for cache expiration. Default false.
----@field notification boolean|nil Show notification when cache is cleared. Default true.
----@field func_strip boolean|nil Strip debug info when caching dumped functions. Default false.
+--- @class UserConfig.Cache
+--- @field full_scan? boolean Perform full plugin scan for cache expiration. Default false.
+--- @field notification? boolean Show notification when cache is cleared. Default true.
+--- @field func_strip? boolean Strip debug info when caching dumped functions. Default false.
 
----@alias UserConfig.Disabled {filetypes: string[], buftypes: string[]}
+--- @alias UserConfig.Disabled {filetypes: string[], buftypes: string[]}
 --- The full user configuration for Witch-Line.
----@class UserConfig : table
+--- @class UserConfig : table
+---
 --- Abstract components that are **not directly rendered**,
 --- but may be inherited or referenced by other components.
 --- Typically used to define shared layouts or reusable base definitions.
----@field abstracts CombinedComponent[]|nil
+--- @field abstracts? CombinedComponent[]
 ---
 --- Components that are **actually rendered** in the statusline.
 --- These can inherit or reference abstract components to build complex layouts.
----@field components CombinedComponent[]
----@field disabled UserConfig.Disabled|nil Filetypes/buftypes where statusline is disabled.
----@field cache UserConfig.Cache
+--- @field components CombinedComponent[]
+--- @field disabled? UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
+--- @field cache? UserConfig.Cache
 
 --- Apply missing default configuration values to the user-provided config.
 --- Ensures required fields exist (such as `disabled` and `components`)

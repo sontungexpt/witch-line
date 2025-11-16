@@ -20,7 +20,7 @@ Component.SepStyle = SepStyle
 --- @field events? CompId|CompId[] A table of ids of components that this component references
 --- @field timing? CompId|CompId[] A table of ids of components that this component references
 --- @field hidden? CompId|CompId[] A table of ids of components that this component references for its hide function
---- @field min_screen_width CompId|CompId[] A table of ids of components that this component references for its minimum screen width
+--- @field min_screen_width? CompId|CompId[] A table of ids of components that this component references for its minimum screen width
 ---
 --- @field static? CompId A id of a component that this component references for its static values
 --- @field context? CompId A id of a component that this component references for its context
