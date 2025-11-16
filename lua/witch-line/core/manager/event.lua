@@ -4,112 +4,133 @@ local M = {}
 
 local EventInfoStoreId = "EventInfo"
 
+--- Options used for configuring a special event.
+--- These fields control event behavior but do not include identifiers.
 --- @class SpecialEventOpts
---- @field once? boolean
---- @field pattern? string|string[]
+--- @field once? boolean  Optional flag. If true, the event is triggered only once.
+--- @field remove_when? function The event will be remove when `remove_when` return true
+---
+--- Optional file/buffer pattern(s).
+--- Can be:
+---   - string: a single pattern
+---   - string[]: list of patterns
+---   - nil: no pattern filtering
+--- Empty strings or "*" are treated as no pattern.
+--- @field pattern? string|string[]|nil
 
+--- Represents a fully registered special event entry stored in the event registry.
+--- This type includes resolved event names and the list of component IDs bound to it.
 --- @class SpecialEvent : SpecialEventOpts
+---
+--- One or more event names.
+--- After normalization, this is **always** a list-of-strings.
 --- @field name string|string[]
---- @field ids CompId[]
+--- @field ids CompId[] Array of component IDs associated with this event.
+
+--- Input shape for incoming special events before being stored.
+--- This type is used when registering new events.
+--- It omits `ids` because the store is responsible for managing and appending them.
+--- @class SpecialEventInput : SpecialEvent
+--- @field ids nil `ids` must be nil. The system will create and populate this field.
 
 ---@class EventStore
----@field events nil|table<string, CompId[]> Stores component dependencies for nvim events
----@field user_events nil|table<string, CompId[]> Stores component dependencies for user-defined events
----@field special_events nil|SpecialEvent[] Stores component dependencies for user-defined events
+---@field events? table<string, CompId[]> Stores component dependencies for nvim events
+---@field user_events? table<string, CompId[]> Stores component dependencies for user-defined events
+---@field special_events? SpecialEvent[] Stores component dependencies for user-defined events
 local EventStore = {
-  -- Stores component dependencies for events
-  -- Only init if needed
-  -- events = {
-  -- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for nvim events
-  -- },
+	-- Stores component dependencies for events
+	-- Only init if needed
+	-- events = {
+	-- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for nvim events
+	-- },
 
-  -- -- -- Stores component dependencies for user events
-  -- Only init if needed
-  -- user_events = {
-  -- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for user-defined events
-  -- },
+	-- -- -- Stores component dependencies for user events
+	-- Only init if needed
+	-- user_events = {
+	-- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for user-defined events
+	-- },
 
-  -- special_events = {
-  --   {
-  --     name = "BufEnter",
-  --     pattern = "*lua"
-  --     ids = { comp1, comp2 }
-  --   }
-  -- }
+	-- special_events = {
+	--   {
+	--     name = "BufEnter",
+	--     pattern = "*lua"
+	--     ids = { comp1, comp2 }
+	--   }
+	-- }
 }
 
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
 M.on_vim_leave_pre = function(CacheDataAccessor)
-  CacheDataAccessor.set("EventStore", EventStore)
+	local special_events = EventStore.special_events
+	if special_events then
+		local Persist = require("witch-line.utils.persist")
+		for _, entry in ipairs(special_events) do
+			Persist.serialize_function(entry)
+		end
+	end
+	CacheDataAccessor.set("EventStore", EventStore)
 end
 
 --- Load the event and timer stores from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 --- @return function undo function to restore the previous state of the stores
 M.load_cache = function(CacheDataAccessor)
-  local before_event_store = EventStore
+	local before_event_store = EventStore
 
-  EventStore = CacheDataAccessor.get("EventStore") or EventStore
+	EventStore = CacheDataAccessor.get("EventStore") or EventStore
 
-  return function()
-    EventStore = before_event_store
-  end
+	return function()
+		EventStore = before_event_store
+	end
 end
 
 M.inspect = function()
-  require("witch-line.utils.notifier").info(vim.inspect(EventStore))
+	require("witch-line.utils.notifier").info(vim.inspect(EventStore))
 end
 
---- Check whether two values are the same when they can each be either a string or an array of strings.
+--- Compare two values that may each be either:
+--- - a string, or
+--- - an array (list) of strings.
 ---
---- This function provides flexible equality for cases where a field can hold:
---- - a single string value, or
---- - a list (array) of string values.
+--- Extended behavior:
+--- - If one side is a string and the other is a list with **exactly one element**,
+---   the two are considered equal **if that single element equals the string**.
 ---
---- Comparison behavior:
---- 1. **Different types:**
----    - If one is a string and the other is a table → returns `false`.
---- 2. **Both strings:**
----    - Compares them directly using `==`.
---- 3. **Both tables (arrays):**
----    - Compares them by content, ignoring element order,
----      using `array_equal()` (which performs multiset comparison).
---- 4. **Unsupported types:**
----    - Returns `false` by default.
----
---- ### Example:
---- ```lua
---- same_string_or_array("foo", "foo")            --> true
---- same_string_or_array({"a", "b"}, {"b", "a"})  --> true
---- same_string_or_array("foo", {"foo"})          --> false
---- same_string_or_array({"x"}, {"x", "y"})       --> false
---- ```
----
---- ### Use case:
---- Useful when comparing dynamic fields like `component.name` or `tags`
---- that can store either a single string or an array of names.
----
---- @param a string|table The first value to compare.
---- @param b string|table The second value to compare.
---- @return boolean `true` if both are equal (order-insensitive for arrays), otherwise `false`.
-local function same_string_or_array(a, b)
-  local ta, tb = type(a), type(b)
+--- @param a string|table
+--- @param b string|table
+--- @return boolean
+local function string_list_equal(a, b)
+	local ta, tb = type(a), type(b)
 
-  -- Different types (e.g., "string" vs "table") -> not equal
-  if ta ~= tb then
-    return false
-  elseif ta == "string" then
-    -- Direct string comparison
-    return a == b
-  elseif ta == "table" then
-    -- Compare arrays (order-insensitive, content-based)
-    --- @cast b table
-    return require("witch-line.utils.tbl").array_equal(a, b)
-  end
+	-- Case 1: Same type
+	if ta == tb then
+		if ta == "string" then
+			return a == b
+		elseif ta == "table" then
+			--- @cast b table
+			return require("witch-line.utils.tbl").array_equal(a, b)
+		end
+		return false
+	end
 
-  -- Fallback: unsupported types
-  return false
+	-- Case 2: Compare string vs single-element list
+	-- Normalize: ensure "list" is always first variable
+	local str, list
+	if ta == "string" and tb == "table" then
+		str, list = a, b
+	elseif ta == "table" and tb == "string" then
+		str, list = b, a
+	else
+		return false -- unsupported types
+	end
+
+	-- Only equal if list is exactly one element AND matches string
+	if #list == 1 then
+		return list[1] == str
+	end
+
+	return false
 end
 
 --- Compare two special event option objects to determine if they are equivalent.
@@ -121,13 +142,14 @@ end
 --- @param b SpecialEventOpts|SpecialEvent # The second special event options table to compare against.
 --- @return boolean                        # `true` if both have the same `pattern` and `once` values; otherwise `false`.
 local same_special_event_opts = function(a, b)
-  if not same_string_or_array(a.pattern, b.pattern) then
-    return false
-  end
-  if a.once ~= b.once then
-    return false
-  end
-  return true
+	if a.once ~= b.once then
+		return false
+	elseif a.remove_when ~= b.remove_when then
+		return false
+	elseif not string_list_equal(a.pattern, b.pattern) then
+		return false
+	end
+	return true
 end
 
 --- Find the index of an existing special event in the given store.
@@ -155,165 +177,295 @@ end
 --- @param store table A list (array) of existing special events.
 --- @param e table The event to check for existence.
 --- @return integer The index of the existing event if found, otherwise `-1`.
-local find_existed_special_event_opts = function(store, e)
-  for k = 1, #store do
-    local existed = store[k]
-    if same_special_event_opts(existed, e) then
-      return k
-    end
-  end
-  return -1
+local find_matching_special_event = function(store, e)
+	for k = 1, #store do
+		local existed = store[k]
+		if same_special_event_opts(existed, e) then
+			return k
+		end
+	end
+	return -1
 end
 
---- Register events for components.
----@param comp Component
+--- Ensure that `EventStore[key]` exists.
+--- If it does not exist, create an empty table for that key.
+--- @param key string The key to ensure inside EventStore.
+--- @return table store The table associated with the given key.
+local function ensure_store(key)
+	local s = EventStore[key] or {}
+	EventStore[key] = s
+	return s
+end
+
+--- Push a component ID into `store[name]`.
+--- If the list does not exist, create it before appending.
+--- @param store table<string, table> The store table containing event lists.
+--- @param event string The name of the list inside the store.
+--- @param comp_id CompId The value to append into the list.
+local function register_normal_event(store, event, comp_id)
+	local list = store[event]
+	if not list then
+		store[event] = { comp_id }
+	else
+		list[#list + 1] = comp_id
+	end
+	return list
+end
+
+--- Register or update an entry in the special-event store.
+--- If a matching event entry exists, append the component ID and merge event names.
+--- Otherwise, insert a new entry.
+---
+--- @param store SpecialEventInput[] The list storing SpecialEvent items.
+--- @param event SpecialEventInput The incoming event definition.
+--- @param comp_id CompId The component ID to register.
+--- @return nil
+local function register_special_event_entry(store, event, comp_id)
+	-- Normalize incoming_names into either string or list-of-strings
+	local event_name = event.name
+	if type(event_name) == "table" then
+		local names = event.name
+		if type(names) == "table" then
+			event_name = vim.tbl_filter(function(v)
+				return v ~= ""
+			end, event_name)
+			local n = #event_name
+			if n == 0 then
+				return
+			end
+			if n == 1 then
+				event_name = event_name[1]
+			end
+		end
+	end
+
+	-- Find existing entry index (-1 if not found)
+	local entry_index = find_matching_special_event(store, event)
+	if entry_index > 0 then
+		local entry = store[entry_index]
+
+		-- Append component ID
+		entry.ids[#entry.ids + 1] = comp_id
+
+		-- Normalize "name" to list
+		local name_list, name_list_size = entry.name or {}, nil
+		if type(name_list) == "string" then
+			name_list = { name_list }
+			name_list_size = 1
+		else
+			name_list_size = #name_list
+		end
+
+		-- Merge event.name into existing list
+		if type(event_name) == "table" then
+			for i, name in ipairs(event_name) do
+				name_list[name_list_size + i] = name
+			end
+		else
+			name_list[name_list_size + 1] = event_name
+		end
+		entry.name = name_list
+	else
+		event.name = event_name
+		event.ids = { comp_id }
+		-- Insert a brand new event entry
+		store[#store + 1] = event
+	end
+end
+
+--- Register an autocommand event represented as a plain string.
+---
+--- Supported formats include:
+---   "BufEnter *.lua"
+---   "BufEnter *.lua",*.js,...
+---   "User MyEvent"
+---   "CursorHold"
+---
+--- This function performs the following steps:
+--- 1. Parses the raw declaration into:
+---       - `ename`: the event identifier (e.g. "BufEnter", "User", "CursorHold")
+---       - `patterns`: zero or more trailing patterns (e.g. "*.lua", "MyEvent")
+---
+--- 2. Classifies the parsed event into one of three internal buckets:
+---       - User-defined events:
+---           "User <Pattern>"  → stored in `user_events`
+---
+---       - Special events with patterns:
+---           "<Event> <Pattern>"  → stored in `special_events`
+---           (e.g.: "BufEnter *.lua")
+---
+---       - Normal events without patterns:
+---           "<Event>" → stored in `normal_events`
+---
+--- Parsing behavior:
+---   "BufEnter *.lua" → ename = "BufEnter", patterns = "*.lua"
+---   "User MyEvent"   → ename = "User",    patterns = "MyEvent"
+---   "CursorHold"     → ename = "CursorHold", patterns = ""
+---
+--- @param e string  A raw event declaration from the component. Must follow one of the
+---                  supported formats and must not include nested tables or callback keys.
+--- @param comp_id CompId component id
+local function register_string_event(e, comp_id)
+	-- Extract the event name and trailing pattern section.
+	local event_name, patterns = e:match("^(%S+)%s*(.*)$")
+	if event_name and event_name ~= "" then
+		if event_name == "User" then
+			-- User LazyLoad
+			if patterns and patterns ~= "" then
+				local store = ensure_store("user_events")
+				for p in patterns:gmatch("[^,%s]+") do
+					if patterns ~= "*" then
+						register_normal_event(store, p, comp_id)
+					end
+				end
+			end
+		elseif patterns and patterns ~= "" then
+			local ps, n = {}, 0
+			for p in patterns:gmatch("[^,%s]+") do
+				if p ~= "*" then
+					n = n + 1
+					ps[n] = p
+				end
+			end
+			local store = ensure_store("special_events")
+			register_special_event_entry(store, {
+				name = event_name,
+				pattern = n > 1 and ps or ps[1], -- store string if only 1 value for reduce memory usage.,
+			}, comp_id)
+		else
+			-- BufEnter
+			register_normal_event(ensure_store("events"), event_name, comp_id)
+		end
+	end
+end
+
+--- Process a table-based event definition.
+--- This function extracts numeric-index event names, normalizes the pattern,
+--- and decides whether to register a normal event or a special event.
+---
+--- Example accepted input:
+--- {
+---   [1] = "BufEnter",
+---   [2] = "BufLeave",
+---   pattern = "*.lua",
+---   once = true,
+--- }
+---
+--- @param e Component.SpecialEvent The raw event definition supplied by user. May contain:
+---   - numeric keys → event names
+---   - "pattern" (string|string[]|nil)
+---   - "once" (boolean|nil)
+--- @param comp_id CompId Component object that contains `id`
+local function register_tbl_event(e, comp_id)
+	local event_names, event_count, opts, outs_count = {}, 0, {}, 0
+	for k, v in pairs(e) do
+		if type(k) == "number" and v ~= "" then
+			event_count = event_count + 1
+			event_names[event_count] = v
+		elseif k ~= "pattern" then
+			outs_count = outs_count + 1
+			opts[outs_count] = k
+		end
+	end
+	if event_count == 0 then
+		return
+	end
+
+	-- Normalize pattern
+	local pattern = e.pattern
+	if pattern then
+		-- Format pattern
+		local pattern_type = type(pattern)
+		if pattern_type == "table" then
+			-- Faster manual filtering (avoid vim.tbl_filter)
+			local new = {}
+			local n = 0
+			for i = 1, #pattern do
+				local v = pattern[i]
+				if v ~= "" and v ~= "*" then
+					n = n + 1
+					new[n] = v
+				end
+			end
+			if n == 0 then
+				pattern = nil
+			elseif n == 1 then
+				pattern = new[1]
+			else
+				pattern = new
+			end
+		elseif pattern_type ~= "string" then
+			error("Invalid pattern in " .. vim.inspect(e))
+		elseif pattern == "" or pattern == "*" then
+			pattern = nil
+		end
+	end
+
+	-- No options, no pattern → register as normal event
+	if outs_count == 0 and not pattern then
+		local store = ensure_store("events")
+		for k = 1, event_count do
+			register_normal_event(store, event_names[k], comp_id)
+		end
+		return
+	end
+
+	local new = {
+		name = event_names,
+		pattern = pattern,
+	}
+	for i = 1, outs_count do
+		local opt = opts[i]
+		new[opt] = e[opt]
+	end
+
+	-- Otherwise → special event
+	register_special_event_entry(ensure_store("special_events"), new, comp_id)
+end
+
+--- Register events declared by a component.
+--- This function accepts three event declaration formats:
+---   1. A single string event → "BufEnter *.lua"
+---   2. A list of string events → { "BufEnter *.lua", "CursorHold" }
+---   3. A list of table-based special events → { { "BufEnter", pattern = "*.lua" }, ... }
+---
+--- The function detects the type of each event entry and delegates to:
+---   - register_string_event()  for string-based event definitions
+---   - register_tbl_event()     for table-based (special) events
+---
+--- @param comp Component  The component to register events
 M.register_events = function(comp)
-  local events = comp.events
-  local t = type(events)
-  if t == "string" then
-    events, t = { events }, "table"
-  end
+	local cid = comp.id
+	if not cid then
+		error("Component id must not be nil")
+	end
 
-  if t == "table" then
-    local store
-    for i = 1, #events do
-      local e = events[i]
-      local etype = type(e)
-      if etype == "string" then
-        local ename, patterns = e:match("^(%S+)%s*(.*)$")
-        if ename then
-          if ename == "User" then
-            -- User LazyLoad
-            if patterns and patterns ~= "" then
-              store = EventStore.user_events or {}
-              EventStore.user_events = store
-              for pat in patterns:gmatch("[^,%s]+") do
-                local store_e = store[pat] or {}
-                store_e[#store_e + 1] = comp.id
-                store[pat] = store_e
-              end
-            end
-          elseif patterns and patterns ~= "" then
-            store = EventStore.special_events or {}
-            EventStore.special_events = store
-            local ps, n = {}, 0
-            for pat in patterns:gmatch("[^,%s]+") do
-              n = n + 1
-              ps[n] = pat
-            end
-            local pattern = n > 1 and ps or ps[1] -- store string if only 1 value for reduce memory usage.
-            local idx = find_existed_special_event_opts(store, {
-              pattern = pattern,
-            })
-            if idx > 0 then
-              local existed = store[idx]
-              existed.ids[#existed.ids + 1] = comp.id
-              local names = existed.name or {}
-              if type(names) == "string" then
-                names = { names }
-              end
-              names[#names + 1] = ename
-              existed.name = names
-            else
-              store[#store + 1] = {
-                name = ename,
-                pattern = pattern,
-                ids = { comp.id },
-              }
-            end
-          else
-            -- BufEnter
-            store = EventStore.events or {}
-            EventStore.events = store
-            local store_e = store[e] or {}
-            store_e[#store_e + 1] = comp.id
-            store[e] = store_e
-          end
-        end
-      elseif etype == "table" then
-        local names, n, no_opts = {}, 0, true
-        for k, val in pairs(e) do
-          if type(k) == "number" and val ~= "" then
-            n = n + 1
-            names[n] = val
-          elseif k ~= "pattern" then
-            no_opts = false
-          end
-        end
-
-        if n > 0 then
-          local pattern = e.pattern
-          if pattern then
-            local pattern_type = type(pattern)
-            if pattern_type == "table" then
-              pattern = vim.tbl_filter(function(value)
-                return value ~= ""
-              end, pattern)
-              local size = #pattern
-              if size == 0 then
-                pattern = nil
-              elseif size == 1 then
-                pattern = pattern[1]
-              end
-            elseif pattern_type ~= "string" then
-              error("Invalid pattern in " .. vim.inspect(e))
-            elseif pattern == "" then
-              pattern = nil
-            end
-          end
-
-          --- Just contains event names
-          if no_opts and not pattern then
-            store = EventStore.events or {}
-            EventStore.events = store
-            for k = 1, n do
-              local name = names[k]
-              local store_e = store[name] or {}
-              store_e[#store_e + 1] = comp.id
-              store[name] = store_e
-            end
-          else
-            store = EventStore.special_events or {}
-            EventStore.special_events = store
-            local idx = find_existed_special_event_opts(store, {
-              pattern = pattern, -- store string if only 1 value for reduce memory usage.
-              once = e.once,
-            })
-            if idx > 0 then
-              local existed = store[idx]
-              existed.ids[#existed.ids + 1] = comp.id
-              local existed_names = existed.name or {}
-              if type(existed_names) == "string" then
-                existed_names = { existed_names }
-              end
-              for k = 1, n do
-                local name = names[k]
-                existed_names[#existed_names + 1] = name
-              end
-              existed.name = existed_names
-            else
-              store[#store + 1] = {
-                name = n > 1 and names or names[1],
-                pattern = pattern, -- store string if only 1 value for reduce memory usage.
-                once = e.once,
-                ids = { comp.id },
-              }
-            end
-          end
-        end
-      end
-    end
-  end
+	local events = comp.events
+	local t = type(events)
+	if t == "string" then
+		register_string_event(events, cid)
+	elseif t == "table" then
+		for i = 1, #events do
+			local e = events[i]
+			local etype = type(e)
+			if etype == "string" then
+				register_string_event(e, cid)
+			elseif etype == "table" then
+				--- @cast e Component.SpecialEvent
+				register_tbl_event(e, cid)
+			end
+		end
+	end
 end
 
 --- Register the component for VimResized event if it has a minimum screen width.
 --- @param comp Component The component to register for VimResized event.
 M.register_vim_resized = function(comp)
-  local store = EventStore.events or {}
-  EventStore.events = store
-  local es = store["VimResized"] or {}
-  es[#es + 1] = comp.id
-  store["VimResized"] = es
+	local store = EventStore.events or {}
+	EventStore.events = store
+	local es = store["VimResized"] or {}
+	es[#es + 1] = comp.id
+	store["VimResized"] = es
 end
 
 --- Get the event information for a component in a session.
@@ -322,68 +474,73 @@ end
 --- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event information for the component, or nil if not found.
 --- @see Hook.use_event_info
 M.get_event_info = function(comp, sid)
-  local store = Session.get_store(sid, EventInfoStoreId)
-  return store and store[comp.id] or nil
+	local store = Session.get_store(sid, EventInfoStoreId)
+	return store and store[comp.id] or nil
 end
 
 --- Initialize the autocmd for events and user events.
 --- @param work fun(sid: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the sid, component IDs, and event information as arguments.
 M.on_event = function(work)
-  local events, user_events, spectial_events = EventStore.events, EventStore.user_events, EventStore.special_events
+	local events, user_events, spectial_events = EventStore.events, EventStore.user_events, EventStore.special_events
 
-  --- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
-  local id_event_info_map = {}
+	--- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
+	local id_event_info_map = {}
 
-  local emit = require("witch-line.utils").debounce(function()
-    Session.with_session(function(sid)
-      Session.new_store(sid, EventInfoStoreId, id_event_info_map)
-      work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
-      id_event_info_map = {}
-    end)
-  end, 120)
+	local emit = require("witch-line.utils").debounce(function()
+		Session.with_session(function(sid)
+			Session.new_store(sid, EventInfoStoreId, id_event_info_map)
+			work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
+			id_event_info_map = {}
+		end)
+	end, 120)
 
-  local api = vim.api
-  local group = api.nvim_create_augroup("WitchLineEvents", { clear = true })
-  if events and next(events) then
-    api.nvim_create_autocmd(vim.tbl_keys(events), {
-      group = group,
-      callback = function(e)
-        for _, id in ipairs(events[e.event]) do
-          id_event_info_map[id] = e
-        end
-        emit()
-      end,
-    })
-  end
+	local api = vim.api
+	local group = api.nvim_create_augroup("WitchLineEvents", { clear = true })
+	if events and next(events) then
+		api.nvim_create_autocmd(vim.tbl_keys(events), {
+			group = group,
+			callback = function(e)
+				for _, id in ipairs(events[e.event]) do
+					id_event_info_map[id] = e
+				end
+				emit()
+			end,
+		})
+	end
 
-  if user_events and next(user_events) then
-    api.nvim_create_autocmd("User", {
-      pattern = vim.tbl_keys(user_events),
-      group = group,
-      callback = function(e)
-        for _, id in ipairs(user_events[e.match]) do
-          id_event_info_map[id] = e
-        end
-        emit()
-      end,
-    })
-  end
+	if user_events and next(user_events) then
+		api.nvim_create_autocmd("User", {
+			pattern = vim.tbl_keys(user_events),
+			group = group,
+			callback = function(e)
+				for _, id in ipairs(user_events[e.match]) do
+					id_event_info_map[id] = e
+				end
+				emit()
+			end,
+		})
+	end
 
-  if spectial_events and next(spectial_events) then
-    for i = 1, #spectial_events do
-      local entry = spectial_events[i]
-      api.nvim_create_autocmd(entry.name, {
-        pattern = entry.pattern,
-        once = entry.once,
-        group = group,
-        callback = function(e)
-          for _, id in ipairs(entry.ids) do
-            id_event_info_map[id] = e
-          end
-          emit()
-        end,
-      })
-    end
-  end
+	if spectial_events and next(spectial_events) then
+		for i = 1, #spectial_events do
+			local entry = spectial_events[i]
+			api.nvim_create_autocmd(entry.name, {
+				pattern = entry.pattern,
+				once = entry.once,
+				group = group,
+				callback = function(e)
+					for _, id in ipairs(entry.ids) do
+						id_event_info_map[id] = e
+					end
+					emit()
+
+					local remove_when = require("witch-line.utils.persist").lazy_decode(entry, "remove_when")
+					if type(remove_when) == "function" then
+						return remove_when()
+					end
+				end,
+			})
+		end
+	end
 end
 return M

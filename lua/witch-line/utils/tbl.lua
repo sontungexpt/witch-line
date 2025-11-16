@@ -44,6 +44,10 @@ end
 --- @param b table The second array
 --- @return boolean True if both arrays contain the same elements (regardless of order)
 M.array_equal = function(a, b)
+	if a == b then
+		return true
+	end
+
 	local len = #a
 	if len ~= #b then
 		return false
