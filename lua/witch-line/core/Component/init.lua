@@ -78,11 +78,14 @@ Component.SepStyle = SepStyle
 --- @field timing? boolean|integer
 ---
 ---
---- A fllag indicating whether the component should be lazy loaded or not.
+--- A flag indicating whether the component should be lazy loaded or not.
 --- @field lazy? boolean
 ---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated
 --- @field flexible? number
+---
+--- A flag indicating whether the component should show individual value for each window.
+--- @field win_individual? boolean
 ---
 --- A table of events that the component will listen to
 ---
@@ -224,12 +227,13 @@ Component.SepStyle = SepStyle
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded? boolean If true, the component is loaded
+--- @field _abstract? boolean If true, the component is abstract and should not be displayed directly (all component are abstract)
+--- @field _renderable? boolean If true, the component is renderable
 --- @field _indices? integer[] The render index of the component in the statusline
 --- @field _hl_name? string The highlight group name for the component
 --- @field _left_hl_name? string The highlight group name for the left part of the component
 --- @field _right_hl_name? string The highlight group name for the right part of the component
 --- @field _hidden? boolean If true, the component is hidden and should not be displayed
---- @field _abstract? boolean If true, the component is abstract and should not be displayed directly (all component are abstract)
 --- @field _click_handler? string The name of the click handler function for the component
 
 --- @class DefaultComponent : Component The default components provided by witch-line
@@ -251,12 +255,12 @@ end
 --- Ensures that the component has a valid id, generating one if it does not.
 --- @param comp Component|DefaultComponent the component to get the id from
 --- @return CompId id the id of the component
---- @return Component|DefaultComponent|nil comp the component itself, or nil if it is a default component
+--- @return Component comp the component itself, or nil if it is a default component
 Component.setup = function(comp)
 	local id = comp.id
 	if comp._plug_provided then
 		---@cast id CompId
-		return id
+		return id, comp
 	elseif id then
 		id = require("witch-line.constant.id").validate(id)
 	else

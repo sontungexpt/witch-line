@@ -7,7 +7,16 @@ local M = {}
 --- @field notification? boolean Show notification when cache is cleared. Default true.
 --- @field func_strip? boolean Strip debug info when caching dumped functions. Default false.
 
---- @alias UserConfig.Disabled {filetypes: string[], buftypes: string[]}
+--- @class UserConfig.Disabled
+--- @field filetypes? string[] The filetypes where statusline is disabled.
+--- @field buftypes? string[] The buftypes where statusline is disabled.
+---
+--- @class UserConfig.Statusline
+--- Components that are **actually rendered** in the statusline.
+--- These can inherit or reference abstract components to build complex layouts.
+--- @field components CombinedComponent[]
+--- @field win_components? fun(winid: integer): CombinedComponent[]|nil The window-specific components
+---
 --- The full user configuration for Witch-Line.
 --- @class UserConfig : table
 ---
@@ -15,10 +24,9 @@ local M = {}
 --- but may be inherited or referenced by other components.
 --- Typically used to define shared layouts or reusable base definitions.
 --- @field abstracts? CombinedComponent[]
+--- @field statusline UserConfig.Statusline
 ---
---- Components that are **actually rendered** in the statusline.
---- These can inherit or reference abstract components to build complex layouts.
---- @field components CombinedComponent[]
+---
 --- @field disabled UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
 --- @field cache UserConfig.Cache
 
@@ -41,19 +49,22 @@ local use_default_config = function(user_configs)
 	if type(user_configs.cache) ~= "table" then
 		user_configs.cache = {}
 	end
+	if type(user_configs.statusline) ~= "table" then
+		---@diagnostic disable-next-line: missing-fields
+		user_configs.statusline = {}
+	end
 
 	return user_configs
 end
 
---- Apply default components if cache was not loaded.
---- @param user_configs UserConfig The config table to modify.
---- @return UserConfig user_configs The config table with components applied if missing.
-local apply_default_components = function(user_configs)
-	local components = user_configs.components
-	user_configs.components = (type(components) ~= "table" or next(components) == nil)
-			and require("witch-line.constant.default")
-		or components
-	return user_configs
+--- Apply default components to the statusline if it doesn't exist.
+--- @param statusline UserConfig.Statusline
+local apply_statusline_default_components = function(statusline)
+	local components = statusline.components
+	if type(components) ~= "table" then
+		statusline.components = require("witch-line.constant.default")
+	end
+	return statusline
 end
 
 --- @param user_configs UserConfig|nil user_configs
@@ -80,11 +91,19 @@ M.setup = function(user_configs)
 			require(CACHE_MODS[i]).load_cache(DataAccessor)
 		end
 	else
-		apply_default_components(user_configs)
+		apply_statusline_default_components(user_configs.statusline)
 	end
+	-- user_configs.statusline.win_components = function(winid)
+	-- 	local filetype = vim.bo[vim.api.nvim_win_get_buf(winid)].filetype
+	-- 	if filetype == "NvimTree" then
+	-- 		return {
+	-- 			"battery",
+	-- 		}
+	-- 	end
+	-- end
 
-	require("witch-line.core.handler").setup(user_configs, DataAccessor)
 	require("witch-line.core.statusline").setup(user_configs.disabled)
+	require("witch-line.core.handler").setup(user_configs, DataAccessor)
 
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		once = true,

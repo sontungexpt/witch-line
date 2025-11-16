@@ -54,7 +54,7 @@ M.load_cache = function(CacheDataAccessor)
 	end
 end
 --- Register a timer for a component.
---- @param comp Component The component to register the timer for.
+--- @param comp ManagedComponent The component to register the timer for.
 M.register_timer = function(comp)
 	local interval = comp.timing == true and ONE_SECOND or comp.timing
 

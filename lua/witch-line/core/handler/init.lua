@@ -1,5 +1,5 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
-local o = vim.o
+local o, api = vim.o, vim.api
 
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
@@ -14,15 +14,12 @@ local SepStyle = Component.SepStyle
 local M = {}
 
 --- Clear the value of a component in the statusline.
---- @param comp Component The component to clear.
+--- @param comp ManagedComponent The component to clear.
 local hide_component = function(comp)
-	local indices = comp._indices
-	-- A abstract component may be not have _indices key
-	if not indices then
+	if not comp._renderable then
 		return
 	end
-
-	Statusline.hide_segment(indices)
+	Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
 	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
@@ -59,7 +56,7 @@ end
 ---      (if any), caching it for future lookups.
 --- 4. Applies the resolved highlight style and updates the `_hl_name` cache.
 ---
---- @param comp Component          The component whose highlight style should be updated.
+--- @param comp ManagedComponent          The component whose highlight style should be updated.
 --- @param sid SessionId           The session ID used for dynamic style resolution and caching.
 --- @param override_style CompStyle|nil Optional override style, applied before inheritance.
 --- @return boolean updated        Whether the highlight was updated (`true`) or skipped (`false`).
@@ -116,7 +113,7 @@ end
 --- - `true`:  Style was updated and applied.
 --- - `false`: No change was necessary or style was invalid.
 ---
---- @param comp Component The component whose side style should be updated.
+--- @param comp ManagedComponent The component whose side style should be updated.
 --- @param sid SessionId The session identifier used for dynamic style evaluation.
 --- @param side "left"|"right" The side to update.
 --- @param main_style_updated boolean Whether the main style was recently updated (forces re-render).
@@ -193,10 +190,11 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 end
 
 --- Update a component and its value in the statusline.
---- @param comp Component The component to update.
+--- @param comp ManagedComponent The component to update.
 --- @param sid SessionId The ID of the process to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 local function update_comp(comp, sid)
+	local cid = comp.id
 	Component.emit_pre_update(comp, sid)
 
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
@@ -209,19 +207,19 @@ local function update_comp(comp, sid)
 	else
 		local value, override_style = Component.evaluate(comp, sid)
 
-		local indices = comp._indices
 		-- A abstract component will not have indices
 		-- It's just call the update function for other purpose and we not affect to the statusline
 		-- So we just ignore it even the value is empty string
-		if indices then
+		if comp._renderable then
 			if value == "" then
 				hide_component(comp)
 				hidden = true
 			else
+				local winid = comp.win_individual and api.nvim_get_current_win() or nil
 				-- Main part
 				-- Update style first to make sure comp._hl_name is not nil
 				local style_updated, style = update_comp_style(comp, sid, override_style)
-				Statusline.set_value(indices, value, comp._hl_name)
+				Statusline.set_value(cid, value, comp._hl_name, winid)
 
 				--- Left part
 				local lval, _, _, lforce = Manager.lookup_dynamic_value(comp, "left", sid)
@@ -230,14 +228,15 @@ local function update_comp(comp, sid)
 					if lval then
 						local updated, lhl_name = update_comp_side_style(comp, sid, "left", style_updated, style)
 						if not lhl_name then -- never meet dynamic hl_name
-							Statusline.set_side_value(indices, -1, lval, comp._left_hl_name, lforce)
+							Statusline.set_side_value(cid, -1, lval, comp._left_hl_name, lforce, winid)
 						else
 							Statusline.set_side_value(
-								indices,
+								cid,
 								-1,
 								lval,
 								lhl_name or comp._left_hl_name,
-								lforce or (updated and lhl_name ~= nil)
+								lforce or (updated and lhl_name ~= nil),
+								winid
 							)
 						end
 					end
@@ -250,21 +249,22 @@ local function update_comp(comp, sid)
 					if rval then
 						local updated, rhl_name = update_comp_side_style(comp, sid, "right", style_updated, style)
 						if not rhl_name then -- never meet dynamic hl_name
-							Statusline.set_side_value(indices, 1, rval, comp._right_hl_name, rforce)
+							Statusline.set_side_value(cid, 1, rval, comp._right_hl_name, rforce, winid)
 						else
 							Statusline.set_side_value(
-								indices,
+								cid,
 								1,
 								rval,
 								rhl_name or comp._right_hl_name,
-								rforce or (updated and rhl_name ~= nil)
+								rforce or (updated and rhl_name ~= nil),
+								winid
 							)
 						end
 					end
 				end
 
 				if comp.on_click then
-					Statusline.set_click_handler(indices, Component.register_click_handler(comp))
+					Statusline.set_click_handler(cid, Component.register_click_handler(comp), nil, winid)
 				end
 
 				rawset(comp, "_hidden", false) -- Reset hidden state
@@ -278,7 +278,7 @@ end
 M.update_comp = update_comp
 
 --- Update a component and its dependencies.
---- @param comp Component The component to update.
+--- @param comp ManagedComponent The component to update.
 --- @param sid SessionId The ID of the process to use for this update.
 --- @param dep_graph_kind DepGraphKind|DepGraphKind[] The store to use for dependencies. Defaults to { EventStore.Timer, EventStore.Event}
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
@@ -323,7 +323,7 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 end
 
 --- Refresh a component and its dependencies in the next session.
---- @param comp Component The component to refresh.
+--- @param comp ManagedComponent The component to refresh.
 --- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
 M.refresh_component_graph = function(comp, dep_graph_kind, seen)
@@ -343,6 +343,7 @@ end
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion.
 M.update_comp_graph_by_ids = function(ids, sid, dep_graph_kind, seen)
 	seen = seen or {}
+
 	for _, id in ipairs(ids) do
 		if not seen[id] then
 			local comp = Manager.get_comp(id)
@@ -354,7 +355,7 @@ M.update_comp_graph_by_ids = function(ids, sid, dep_graph_kind, seen)
 end
 
 --- Link dependencies for a component based on its ref and inherit fields.
---- @param comp Component The component to link dependencies for.
+--- @param comp ManagedComponent The component to link dependencies for.
 local function bind_dependencies(comp)
 	local link_dependency = Manager.link_dependency
 	local ref = comp.ref
@@ -386,7 +387,7 @@ local function bind_dependencies(comp)
 end
 
 --- Register conditions for a component.
---- @param comp Component The component to register conditions for.
+--- @param comp ManagedComponent The component to register conditions for.
 local function bind_update_conditions(comp)
 	if comp.timing then
 		Timer.register_timer(comp)
@@ -399,10 +400,14 @@ local function bind_update_conditions(comp)
 	if comp.min_screen_width then
 		Event.register_vim_resized(comp)
 	end
+
+	if comp.win_individual then
+		Event.register_win_enter(comp)
+	end
 end
 
 --- Pull missing dependencies for a component based on its ref and inherit fields.
---- @param comp Component The component to pull dependencies for.
+--- @param comp ManagedComponent The component to pull dependencies for.
 local function pull_missing_dependencies(comp)
 	-- Pull missing dependencies from the component's ref field
 	for dep_id in Manager.iterate_all_dependency_ids(comp.id) do
@@ -448,14 +453,19 @@ end
 
 --- Register an abstract component that is not directly rendered in the statusline.
 --- These components can be used as dependencies for other components.
---- @param comp Component The abstract component to register.
---- @return CompId The ID of the registered component.
-function M.register_abstract_component(comp)
+--- @param comp ManagedComponent The abstract component to register.
+--- @param winid? integer The window ID to register the component for.
+--- @return ManagedComponent comp The registered component.
+function M.register_abstract_component(comp, winid)
 	if not comp._abstract then
-		local id = Manager.register(comp)
+		comp = Manager.register(comp)
 
 		if comp.init then
-			Manager.queue_initialization(id)
+			Manager.queue_initialization(comp.id)
+		end
+
+		if winid then
+			rawset(comp, "win_individual", true)
 		end
 
 		bind_update_conditions(comp)
@@ -463,14 +473,15 @@ function M.register_abstract_component(comp)
 		pull_missing_dependencies(comp)
 
 		rawset(comp, "_abstract", true)
-		return id
+		return comp
 	end
-	return comp.id
+	return comp
 end
 
 --- Build statusline indices for a component.
---- @param comp Component The component to build indices for.
-local function build_indices(comp)
+--- @param comp ManagedComponent The component to build indices for.
+--- @param winid? integer The window ID to build indices for.
+local function build_indices(comp, winid)
 	-- Why not support left and right indpendently?
 	-- Because the update id the main part   --
 	-- The left and right are just the decoration of the main part
@@ -480,29 +491,25 @@ local function build_indices(comp)
 	if not update then
 		return
 	end
+	local cid = comp.id
 
-	local idx = Statusline.push("")
-
-	local indices = comp._indices
-	if not indices then
-		rawset(comp, "_indices", { idx })
-	else
-		indices[#indices + 1] = idx
-	end
+	Statusline.push(cid, "", winid)
 
 	local flexible = comp.flexible
 	if flexible then
-		Statusline.track_flexible(idx, flexible)
+		Statusline.track_flexible(cid, flexible)
 	end
+	rawset(comp, "_renderable", true)
 end
 --- Register a component node, which may include nested components.
 --- @param comp Component The component to register.
 --- @param parent_id CompId|nil The ID of the parent component, if any.
---- @return Component The registered component. Nil if registration failed.
-local function register_component(comp, parent_id)
+--- @param winid? integer The window ID to register the component for.
+--- @return ManagedComponent comp The registered component. Nil if registration failed.
+local function register_component(comp, parent_id, winid)
 	-- Avoid recursion for already loaded components
 	if comp._loaded then
-		build_indices(comp)
+		build_indices(comp, winid)
 		return comp
 	end
 
@@ -517,8 +524,7 @@ local function register_component(comp, parent_id)
 	-- 	...}
 	-- So the final component will be {
 	--   id = "mode",
-	--   events = { "VimLeavePre" },
-	--   update = function() ... end,
+	--   events = { "VimLeavePre" }, update = function() ... end,
 	--   ...
 	-- }
 	-- If a component is made base on other component with some overrided fields
@@ -539,11 +545,6 @@ local function register_component(comp, parent_id)
 	-- Example: { { child1, child2, ... } }
 	-- Example: { child1, child2, ... }
 	if not vim.islist(comp) then
-		-- Set parent inheritance if applicable
-		if parent_id and not comp.inherit then
-			rawset(comp, "inherit", parent_id)
-		end
-
 		-- Every component is treat as an abstract component
 		-- The difference is that abstract components are not rendered directly
 		-- but they can be dependencies of other components
@@ -552,12 +553,17 @@ local function register_component(comp, parent_id)
 		-- but can be used as dependencies for other components
 
 		-- Abstract registration
-		local id = M.register_abstract_component(comp)
+		comp = M.register_abstract_component(comp, winid)
+
+		-- Set parent inheritance if applicable
+		if parent_id and not comp.inherit then
+			rawset(comp, "inherit", parent_id)
+		end
 
 		if comp.lazy == false then
-			Manager.mark_emergency(id)
+			Manager.mark_emergency(comp.id)
 		end
-		build_indices(comp)
+		build_indices(comp, winid)
 		rawset(comp, "_loaded", true) -- Mark the component as loaded
 	end
 
@@ -566,29 +572,33 @@ end
 
 --- Register a literal string component in the statusline.
 --- @param comp LiteralComponent The string component to register.
-local function register_literal_comp(comp)
+--- @param win_id? integer The window ID to register the component for.
+--- @return LiteralComponent The registered component
+local function register_literal_comp(comp, win_id)
 	if comp ~= "" then
-		Statusline.push(comp, true)
+		Statusline.push(nil, comp, win_id)
 	end
 	return comp
 end
 
 --- Register a component by its type.
---- @param comp Component|LiteralComponent The component to register.
+--- @param comp CombinedComponent The component to register.
 --- @param parent_id CompId|nil The ID of the parent component, if any.
---- @return Component|LiteralComponent|nil comp The registered component. Nil if registration failed.
-function M.register_combined_component(comp, parent_id)
+--- @param winid? integer The window ID to register the component for.
+--- @return CombinedComponent|nil comp The registered component. Nil if registration failed.
+function M.register_combined_component(comp, parent_id, winid)
 	local kind = type(comp)
 	if kind == "string" then
 		--- @cast comp DefaultId
 		local c = Component.require_by_id(comp)
 		if not c then
-			return register_literal_comp(comp)
+			---@diagnostic disable-next-line: return-type-mismatch
+			return register_literal_comp(comp, winid)
 		end
-		comp = register_component(c, parent_id)
+		comp = register_component(c, parent_id, winid)
 	elseif kind == "table" and next(comp) then
-		--- @cast comp Component
-		comp = register_component(comp, parent_id)
+		---@cast comp Component
+		comp = register_component(comp, parent_id, winid)
 	else
 		-- Invalid component type
 		return nil
@@ -596,7 +606,8 @@ function M.register_combined_component(comp, parent_id)
 
 	-- If the component is not a literal component then it will drop by here
 	for i, child in ipairs(comp) do
-		M.register_combined_component(child, comp.id)
+		--- @cast child CombinedComponent
+		M.register_combined_component(child, comp.id, winid)
 		rawset(comp, i, nil) -- Remove child to avoid duplication
 	end
 	return comp
@@ -604,8 +615,9 @@ end
 
 --- Setup the statusline with the given configurations.
 --- @param user_configs UserConfig  The configurations for the statusline.
---- @param DataAccessor Cache.DataAccessor|nil The accessor to cache data if had cache ortherwise nil
+--- @param DataAccessor? Cache.DataAccessor The accessor to cache data if had cache ortherwise nil
 M.setup = function(user_configs, DataAccessor)
+	local statusline = user_configs.statusline
 	if not DataAccessor then
 		local abstracts = user_configs.abstracts
 		if type(abstracts) == "table" then
@@ -625,7 +637,33 @@ M.setup = function(user_configs, DataAccessor)
 			end
 		end
 
-		M.register_combined_component(user_configs.components)
+		M.register_combined_component(statusline.components)
+	end
+
+	local win_components = statusline.win_components
+	if win_components then
+		local seen = {}
+		api.nvim_create_autocmd({ "WinEnter", "WinClosed" }, {
+			callback = function(e)
+				if e.event == "WinEnter" then
+					vim.schedule(function()
+						local winid = api.nvim_get_current_win()
+						if api.nvim_win_is_valid(winid) then
+							if not seen[winid] then
+								seen[winid] = true
+								local components = win_components(winid)
+								if type(components) == "table" then
+									M.register_combined_component(components, nil, winid)
+								end
+							end
+							Statusline.render(winid)
+						end
+					end)
+				else
+					seen[tonumber(e.match)] = nil
+				end
+			end,
+		})
 	end
 
 	Event.on_event(function(sid, ids)
