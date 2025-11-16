@@ -607,15 +607,7 @@ end
 --- @param DataAccessor Cache.DataAccessor|nil The accessor to cache data if had cache ortherwise nil
 M.setup = function(user_configs, DataAccessor)
 	if not DataAccessor then
-		if user_configs.abstract then
-			vim.deprecate(
-				"`abstract` field in user_configs is deprecated. " .. "Use `abstracts` instead",
-				"v.1.1.0",
-				"witch-line"
-			)
-		end
-
-		local abstracts = user_configs.abstracts or user_configs.abstract
+		local abstracts = user_configs.abstracts
 		if type(abstracts) == "table" then
 			for i = 1, #abstracts do
 				local c = abstracts[i]

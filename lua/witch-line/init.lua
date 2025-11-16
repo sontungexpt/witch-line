@@ -19,8 +19,8 @@ local M = {}
 --- Components that are **actually rendered** in the statusline.
 --- These can inherit or reference abstract components to build complex layouts.
 --- @field components CombinedComponent[]
---- @field disabled? UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
---- @field cache? UserConfig.Cache
+--- @field disabled UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
+--- @field cache UserConfig.Cache
 
 --- Apply missing default configuration values to the user-provided config.
 --- Ensures required fields exist (such as `disabled` and `components`)
@@ -38,13 +38,8 @@ local use_default_config = function(user_configs)
 		}
 	end
 
-	local cache_opts = user_configs.cache
-	if type(cache_opts) ~= table then
-		user_configs.cache = {
-			notification = true,
-		}
-	elseif cache_opts.notification == nil then
-		cache_opts.notification = true
+	if type(user_configs.cache) ~= "table" then
+		user_configs.cache = {}
 	end
 
 	return user_configs

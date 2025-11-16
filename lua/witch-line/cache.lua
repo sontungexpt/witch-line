@@ -71,7 +71,7 @@ end
 
 --- Read modification info of the `witch-line` plugin directory.
 --- Used to detect if the plugin was updated (mtime/size changed).
---- @param deep boolean|nil If true, also scans all subfiles recursively
+--- @param deep? boolean If true, also scans all subfiles recursively
 local function read_plugin_stat(deep)
 	local root_dir = nvim_get_runtime_file("**/witch-line", false)[1]
 	local stat = uv.fs_stat(root_dir)
@@ -128,14 +128,14 @@ M.save = function(config_checksum, dumped_func_strip)
 end
 
 --- Clear the cache file and reset the Data table.
---- @param notification boolean|nil Whether to show a user notification after clearing the cache.
+--- @param notification? boolean Whether to show a user notification after clearing the cache.
 M.clear = function(notification)
 	uv.fs_unlink(CACHED_FILE, function(err)
 		if err then
 			require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
 		else
 			Data = {}
-			if notification then
+			if notification ~= false then
 				require("witch-line.utils.notifier").info(
 					"Cache deleted successfully. Please restart Neovim for changes to take effect."
 				)
@@ -235,14 +235,14 @@ M.read = function(config_checksum, full_scan, notification)
 	read_plugin_stat(full_scan)
 	local bytecode = validate_expiration(config_checksum, content)
 	if not bytecode then
-		M.clear(notification or true)
+		M.clear(notification)
 		return nil
 	end
 
 	local Persist = require("witch-line.utils.persist")
 	local data = Persist.deserialize_table_from_bytecode(bytecode)
 	if not data then
-		M.clear(notification or true)
+		M.clear(notification)
 		return nil
 	end
 

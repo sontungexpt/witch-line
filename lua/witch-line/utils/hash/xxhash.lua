@@ -76,24 +76,32 @@ local function xxh32_update(st, input)
 	local p = ffi.cast("const uint8_t*", input)
 	local endp = p + len
 
-	if st.memsize + len < 16 then
+	-- cache some local vars for speed
+	local memsize, mem = st.memsize, st.memory
+	-- Work with local accumulators to reduce table access
+
+	if memsize + len < 16 then
 		-- Chưa đủ 16 byte → nhét vào memory
-		ffi.copy(st.memory + st.memsize, p, len)
-		st.memsize = st.memsize + len
+		ffi.copy(mem + memsize, p, len)
+		st.memsize = memsize + len
 		return
 	end
 
+	local v1, v2, v3, v4 = st.v1, st.v2, st.v3, st.v4
+
 	-- Nếu memory trước đó có dữ liệu → làm đầy đủ 16 byte
-	if st.memsize > 0 then
-		local needed = 16 - st.memsize
-		ffi.copy(st.memory + st.memsize, p, needed)
+	if memsize > 0 then
+		local needed = 16 - memsize
+		ffi.copy(mem + memsize, p, needed) -- copy from input pointer
 
-		local mem = ffi.cast("uint32_t*", st.memory)
+		local m32 = ffi.cast("uint32_t*", st.memory)
 
-		st.v1 = rotl(st.v1 + mem[0] * P2, 13) * P1
-		st.v2 = rotl(st.v2 + mem[1] * P2, 13) * P1
-		st.v3 = rotl(st.v3 + mem[2] * P2, 13) * P1
-		st.v4 = rotl(st.v4 + mem[3] * P2, 13) * P1
+		---@diagnostic disable: cast-local-type
+		v1 = uint32(rotl(v1 + m32[0] * P2, 13) * P1)
+		v2 = uint32(rotl(v2 + m32[1] * P2, 13) * P1)
+		v3 = uint32(rotl(v3 + m32[2] * P2, 13) * P1)
+		v4 = uint32(rotl(v4 + m32[3] * P2, 13) * P1)
+		---@diagnostic enable: cast-local-type
 
 		p = p + needed
 		st.memsize = 0
@@ -103,10 +111,12 @@ local function xxh32_update(st, input)
 	while p + 16 <= endp do
 		local blk = ffi.cast("uint32_t*", p)
 
-		st.v1 = rotl(st.v1 + blk[0] * P2, 13) * P1
-		st.v2 = rotl(st.v2 + blk[1] * P2, 13) * P1
-		st.v3 = rotl(st.v3 + blk[2] * P2, 13) * P1
-		st.v4 = rotl(st.v4 + blk[3] * P2, 13) * P1
+		---@diagnostic disable: cast-local-type
+		v1 = uint32(rotl(v1 + blk[0] * P2, 13) * P1)
+		v2 = uint32(rotl(v2 + blk[1] * P2, 13) * P1)
+		v3 = uint32(rotl(v3 + blk[2] * P2, 13) * P1)
+		v4 = uint32(rotl(v4 + blk[3] * P2, 13) * P1)
+		---@diagnostic enable: cast-local-type
 
 		p = p + 16
 	end
@@ -114,9 +124,13 @@ local function xxh32_update(st, input)
 	-- Copy phần dư (<16 bytes)
 	if p < endp then
 		local leftover = endp - p
-		ffi.copy(st.memory, p, leftover)
+		ffi.copy(mem, p, leftover)
 		st.memsize = leftover
 	end
+
+	-- write back local accumulators and memsize
+	---@diagnostic disable-next-line: assign-type-mismatch
+	st.v1, st.v2, st.v3, st.v4 = v1, v2, v3, v4
 end
 
 --- Finalize the XXH32 hash computation.
