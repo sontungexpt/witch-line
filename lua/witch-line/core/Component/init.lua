@@ -17,29 +17,23 @@ Component.SepStyle = SepStyle
 --- @class CompId : string
 
 --- @class Reference : table
---- @field events CompId|CompId[]|nil A table of ids of components that this component references
---- @field timing CompId|CompId[]|nil A table of ids of components that this component references
---- @field hidden CompId|CompId[]|nil A table of ids of components that this component references for its hide function
---- @field min_screen_width CompId|CompId[]|nil A table of ids of components that this component references for its minimum screen width
+--- @field events? CompId|CompId[] A table of ids of components that this component references
+--- @field timing? CompId|CompId[] A table of ids of components that this component references
+--- @field hidden? CompId|CompId[] A table of ids of components that this component references for its hide function
+--- @field min_screen_width CompId|CompId[] A table of ids of components that this component references for its minimum screen width
 ---
---- @field static CompId|nil A id of a component that this component references for its static values
---- @field context CompId|nil A id of a component that this component references for its context
---- @field style CompId|nil A id of a component that this component references for its style
---- @field left CompId|nil A id of a component that this components references for left separator
---- @field left_style CompId|nil A id of a component that this component references for its left_style
---- @field right CompId|nil A id of a component that this components references for right separator
---- @field right_style CompId|nil A id of a component that this component references for its right_style
+--- @field static? CompId A id of a component that this component references for its static values
+--- @field context? CompId A id of a component that this component references for its context
+--- @field style? CompId A id of a component that this component references for its style
+--- @field left? CompId A id of a component that this components references for left separator
+--- @field left_style? CompId A id of a component that this component references for its left_style
+--- @field right? CompId A id of a component that this components references for right separator
+--- @field right_style? CompId A id of a component that this component references for its right_style
 
 --- @class LiteralComponent : string
 
 --- @class CombinedComponent : Component, LiteralComponent
 --- @field [integer] CombinedComponent a table of childs, can be used to create a list of components
-
---- @class Neighbor
---- @field [1] CompId The id of the neighbor component if you want to use numbered fields
---- @field id CompId The id of the neighbor component if you want to use named fields
---- @field space integer The space between the component and its neighbor
---- @field priority integer The priority of the neighbor component when the status line is too long, higher numbers are more likely to be truncated
 
 --- @alias PaddingFunc fun(self: ManagedComponent, sid: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
@@ -56,46 +50,52 @@ Component.SepStyle = SepStyle
 ---
 --- @class Component.SpecialEvent
 --- @field [integer] string event name
---- @field once? boolean
+--- @field once? boolean Optional flag. If true, the event is triggered only once.
+---
+--- Optional file/buffer pattern(s).
+--- Can be:
+---   - string: a single pattern
+---   - string[]: list of patterns
+---   - nil: no pattern filtering
+--- Empty strings or "*" are treated as no pattern.
 --- @field pattern? string|string[]
+--- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
 ---
 --- @class Component : table
---- @field id CompId|nil The unique identifier for the component, can be a string or a number
+--- @field id? CompId The unique identifier for the component, can be a string or a number
 ---
 --- The version of the component, can be used to force reload the component when it changes
 --- - If provided, the component will be reloaded on start if the version changes manually when update component configurations by user. It's help the cache system work faster if speed is more important because the user manage the version manually.
 --- - If nil, the component will automatically reload when the component changes by search for the changes by Cache system.
---- @field version integer|string|nil
+--- @field version? integer|string
 ---
 --- The id of the component to inherit from, can be used to extend a component
---- @field inherit CompId|nil
+--- @field inherit? CompId
 ---
 --- A timing configuration that determines how often the component is updated.
 --- - If true, the component will be updated on every 1 second.
 --- - If a number, the component will be updated every n ticks.
---- @field timing boolean|integer|nil
+--- @field timing? boolean|integer
 ---
 ---
 --- A fllag indicating whether the component should be lazy loaded or not.
---- @field lazy boolean|nil
+--- @field lazy? boolean
 ---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated
---- @field flexible number|nil
+--- @field flexible? number
 ---
 --- A table of events that the component will listen to
 ---
---- @field events string|string[]|nil|Component.SpecialEvent[]|vim.api.keyset.events[]|vim.api.keyset.events
+--- @field events? string|string[]|Component.SpecialEvent[]
 ---
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
 --- - If nil: always visible.
 --- - If function: called and its return value is used as above.
 --- - Example of min_screen_width function: `function(self: ManagedComponent, sid: SessionId) return 80 end`
---- @field min_screen_width integer|nil|fun(self: ManagedComponent, sid: SessionId):number|nil
+--- @field min_screen_width? integer|fun(self: ManagedComponent, sid: SessionId):number|nil
 ---
---- @field ref Reference|nil A table of references to other components that this component depends on
----
---- @field neighbors Neighbor[]|nil A table of neighbor components that this component is related to ( Not implemented yet )
+--- @field ref? Reference A table of references to other components that this component depends on
 ---
 --- A table of styles that will be applied to the left separator of the component
 --- - If string: used as a highlight group name.
@@ -108,14 +108,14 @@ Component.SepStyle = SepStyle
 --- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
 --- - Example of left_style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field left_style CompStyle|nil|SideStyleFunc|SepStyle
+--- @field left_style? CompStyle|SideStyleFunc|SepStyle
 ---
 --- The left separator of the component
 --- - If string: used as is.
 --- - If nil: no left part.
 --- - If function: called and its return value is used as the left part.
 --- - Example of left function: `function(self, sid) return "<" end`
---- @field left string|nil|UpdateFunc
+--- @field left? string|UpdateFunc
 ---
 --- A table of styles that will be applied to the right part of the component
 --- - If string: used as a highlight group name.
@@ -128,14 +128,14 @@ Component.SepStyle = SepStyle
 --- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
 --- - Example of right_style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field right_style CompStyle|nil|SideStyleFunc|SepStyle
+--- @field right_style? CompStyle|SideStyleFunc|SepStyle
 ---
 --- The right separator of the component
 --- - If string: used as is.
 --- - If nil: no right part.
 --- - If function: called and its return value is used as the right part.
 --- - Example of right function: `function(self, sid) return ">" end`
---- @field right string|nil|UpdateFunc
+--- @field right? string|UpdateFunc
 ---
 --- The padding of the component
 --- - If integer: number of spaces to add to both sides of the component.
@@ -153,13 +153,13 @@ Component.SepStyle = SepStyle
 ---	- If function: called and its return value is used as above.
 --- - Example of padding function: `function(self, sid) return {left = 2, right = 1} end`
 --- - Example of padding function: `function(self, sid) return 2 end` (adds 2 spaces to both sides)
---- @field padding integer|nil|PaddingTable|PaddingFunc
+--- @field padding? integer|PaddingTable|PaddingFunc
 ---
 --- An initialization function that will be called when the component is first loaded
 --- - If nil: no initialization function will be called.
 --- - If string: required the string as a module and called it with the component and sid as arguments.
 --- - If function: called with the component and sid as arguments.
---- @field init nil|fun(self: ManagedComponent, sid: SessionId)
+--- @field init? fun(self: ManagedComponent, sid: SessionId)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
@@ -168,24 +168,24 @@ Component.SepStyle = SepStyle
 --- - If function: called and its return value is used as above.
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
 --- - Example of style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field style CompStyle|nil|StyleFunc
+--- @field style? CompStyle|StyleFunc
 ---
 --- @field temp any A temporary field that can be used to store temporary values, will not be cached
 ---
 --- A static field that can be accessed by the`use_static` hook
 --- - If nil: no static will be passed.
 --- - If table: used as is.
---- @field static nil|table
+--- @field static? table
 ---
 --- A context field that can be accessed by the `use_context` hook
 --- - If nil: no context will be passed.
 --- - If function: called and its return value is used as above.
 --- - If string: required the string as a module and used as is.
 --- - Example of context function: `function(self, sid) return {buffer = vim.api.nvim_get_current_buf()} end`
---- @field context nil|table|fun(self: ManagedComponent): table
+--- @field context? table|fun(self: ManagedComponent): table
 ---
 --- A function that will be called before the component is updated
---- @field pre_update nil|fun(self: ManagedComponent, sid: SessionId)
+--- @field pre_update? fun(self: ManagedComponent, sid: SessionId)
 ---
 --- The update function that will be called to get the value of the component
 --- - If string: used as is.
@@ -193,15 +193,15 @@ Component.SepStyle = SepStyle
 --- - If function: called and its return value and style are used as the new value and style of the component
 --- - Example of update function: `function(self, sid) return "Hello World" end`
 --- - Example of update function with style: `function(self, sid) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
---- @field update nil|string|UpdateFunc
+--- @field update? string|UpdateFunc
 ---
 --- A function that will be called after the component is updated
---- @field post_update nil|fun(self: ManagedComponent, sid: SessionId)
+--- @field post_update? fun(self: ManagedComponent, sid: SessionId)
 ---
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be
---- @field hidden nil|fun(self: ManagedComponent, sid: SessionId): boolean|nil
+--- @field hidden? fun(self: ManagedComponent, sid: SessionId): boolean|nil
 ---
 ---
 --- A function or the name of a global function to call when the component is clicked
@@ -220,17 +220,17 @@ Component.SepStyle = SepStyle
 ---    -- or callback = "MyClickHandler" -- the name of a global function
 ---  }
 ---  ```
---- @field on_click nil|string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
+--- @field on_click? string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
---- @field _loaded boolean|nil If true, the component is loaded
---- @field _indices integer[]|nil The render index of the component in the statusline
---- @field _hl_name string|nil The highlight group name for the component
---- @field _left_hl_name string|nil The highlight group name for the left part of the component
---- @field _right_hl_name string|nil The highlight group name for the right part of the component
---- @field _hidden boolean|nil If true, the component is hidden and should not be displayed
---- @field _abstract boolean|nil If true, the component is abstract and should not be displayed directly (all component are abstract)
---- @field _click_handler string|nil The name of the click handler function for the component
+--- @field _loaded? boolean If true, the component is loaded
+--- @field _indices? integer[] The render index of the component in the statusline
+--- @field _hl_name? string The highlight group name for the component
+--- @field _left_hl_name? string The highlight group name for the left part of the component
+--- @field _right_hl_name? string The highlight group name for the right part of the component
+--- @field _hidden? boolean If true, the component is hidden and should not be displayed
+--- @field _abstract? boolean If true, the component is abstract and should not be displayed directly (all component are abstract)
+--- @field _click_handler? string The name of the click handler function for the component
 
 --- @class DefaultComponent : Component The default components provided by witch-line
 --- @field id DefaultId the id of default component
@@ -426,7 +426,7 @@ local function overrides_component_value(to, from, skip_type_check)
 	for k, v in pairs(from) do
 		to[k] = overrides_component_value(to[k], v, skip_type_check)
 	end
-  return to
+	return to
 end
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
 --- @param comp Component the component to create the statistic for

@@ -15,32 +15,18 @@ local xxh32 = require("witch-line.utils.hash.xxhash")
 --- @param v any value
 --- @return string serialized Serialized value as string
 local function simple_serialize(v)
-  local t = type(v)
-  if t == "string" then
-    return v
-  elseif t == "number" then
-    return tostring(v)
-  elseif t == "boolean" then
-    return v and "1" or "0"
-  elseif t == "function" then
-    return dump(v, true)
-  end
-  return t
+	local t = type(v)
+	if t == "string" then
+		return v
+	elseif t == "number" then
+		return tostring(v)
+	elseif t == "boolean" then
+		return v and "1" or "0"
+	elseif t == "function" then
+		return dump(v, true)
+	end
+	return t
 end
-
---- Comparator used to deterministically sort table keys.
----
---- Ordering rules:
----   - If types match and both are numbers or strings → normal `<` comparison.
----   - If types differ → compare by type name (string order).
---- @param a any
---- @param b any
---- @return boolean
-local function less(a, b)
-  local ta, tb = type(a), type(b)
-  return ta == tb and a < b or ta < tb
-end
-
 
 --- Computes a deterministic xxHash32 hash for a Lua table.
 ---
@@ -59,64 +45,101 @@ end
 ---   - `simple_serialize()` is used to convert keys/values to byte sequences.
 ---   - Tables already seen are skipped and replaced with the literal "vtable".
 ---
---- @param tbl table|nil The table to hash.
---- @param hash_key string|nil Optional field key: if provided and present in a table, only that particular field is hashed instead of the full table contents.
+--- @param tbl? table The table to hash.
+--- @param hash_key? string Optional field key: if provided and present in a table, only that particular field is hashed instead of the full table contents.
+--- @param key_priority_map? table<string, integer> Optional ranking table used for deterministic key ordering.
+--- If provided:
+---    - Keys with lower rank values are ordered first.
+---    - Keys without rank fall back to type/value comparison.
+--- If nil:
+---    - All keys fall back entirely to type/value comparison.
 --- @return integer A 32-bit xxHash32 value.
-local hash_tbl = function(tbl, hash_key)
-  -- invalid type then return an 32 bit constant number
-  if type(tbl) ~= "table" or not next(tbl) then
-    return 0xFFFFFFFF
-  end
+local hash_tbl = function(tbl, hash_key, key_priority_map)
+	-- invalid type then return an 32 bit constant number
+	if type(tbl) ~= "table" or not next(tbl) then
+		return 0xFFFFFFFF
+	end
 
-  local st = xxh32.xxh32_init(0)
-  local xxh32_update = xxh32.xxh32_update
+	local st = xxh32.xxh32_init(0)
+	local xxh32_update = xxh32.xxh32_update
 
-  local stack, stack_size = { tbl }, 1
-  local seen = { [tbl] = true }
-  local current, keys, keys_size = nil, {}, 0
+	local stack, stack_size = { tbl }, 1
+	local seen = { [tbl] = true }
+	local current, keys, keys_size = nil, {}, 0
+	key_priority_map = key_priority_map or {}
 
-  while stack_size > 0 do
-    current = stack[stack_size]
-    stack_size = stack_size - 1
+	while stack_size > 0 do
+		current = stack[stack_size]
+		stack_size = stack_size - 1
 
-    if hash_key and current[hash_key] then
-      xxh32_update(st, simple_serialize(current[hash_key]))
-    else
-      keys_size = 0 --- reset key buffer
-      for k in pairs(current) do
-        keys_size = keys_size + 1
-        local i = keys_size
-        while i > 1 and less(k, keys[i - 1]) do
-          keys[i] = keys[i - 1]
-          i = i - 1
-        end
-        keys[i] = k
-      end
+		if hash_key and current[hash_key] then
+			xxh32_update(st, simple_serialize(current[hash_key]))
+		else
+			keys_size = 0 --- reset key buffer
+			for k in pairs(current) do
+				keys_size = keys_size + 1
+				local i, rk = keys_size, key_priority_map[k]
+				-- custom compare using pre-cached rank
+				while i > 1 do
+					local prev = keys[i - 1]
+					local rprev = key_priority_map[prev]
 
-      for i = 1, keys_size do
-        local k = keys[i]
-        local v = current[k]
+					if rk then
+						-- current key has rank
+						-- CASE 1: Both keys have a rank → compare by rank (fastest path)
+						if rprev then
+							-- both ranked → compare by rank
+							if rk >= rprev then
+								break
+							end
+							-- else CASE 2: Current key has rank, previous does not → current < previous → continue shifting
+						end
 
-        xxh32_update(st, simple_serialize(k))
+					-- CASE 3: Previous key has rank, current does not → current > previous → stop shifting
+					elseif rprev then
+						-- prev has rank, k does not -> k is bigger
+						break
 
-        -- Add value
-        if type(v) == "table" then
-          if not seen[v] then
-            seen[v] = true
-            stack_size = stack_size + 1
-            stack[stack_size] = v
-          end
-          xxh32_update(st, "tbl")
-        else
-          xxh32_update(st, simple_serialize(v))
-        end
-      end
-    end
-  end
-  return xxh32.xxh32_finalize(st)
+					-- CASE 4: Neither key has a rank → fallback to type-based + value-based comparison
+					else
+						-- fallback: type/value compare
+						local ta, tb = type(k), type(prev)
+						if not (ta == tb and k < prev or ta < tb) then
+							break
+						end
+					end
+
+					-- Shift the previous key forward to make room for `k`
+					keys[i] = prev
+					i = i - 1
+				end
+
+				keys[i] = k
+			end
+
+			for i = 1, keys_size do
+				local k = keys[i]
+				local v = current[k]
+
+				xxh32_update(st, simple_serialize(k))
+
+				-- Add value
+				if type(v) == "table" then
+					if not seen[v] then
+						seen[v] = true
+						stack_size = stack_size + 1
+						stack[stack_size] = v
+					end
+					xxh32_update(st, "tbl")
+				else
+					xxh32_update(st, simple_serialize(v))
+				end
+			end
+		end
+	end
+	return xxh32.xxh32_finalize(st)
 end
 
-
 return {
-  hash_tbl = hash_tbl
+	hash_tbl = hash_tbl,
 }

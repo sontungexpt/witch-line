@@ -8,7 +8,7 @@ local EventInfoStoreId = "EventInfo"
 --- These fields control event behavior but do not include identifiers.
 --- @class SpecialEventOpts
 --- @field once? boolean  Optional flag. If true, the event is triggered only once.
---- @field remove_when? function The event will be remove when `remove_when` return true
+--- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
 ---
 --- Optional file/buffer pattern(s).
 --- Can be:
@@ -33,31 +33,30 @@ local EventInfoStoreId = "EventInfo"
 --- @class SpecialEventInput : SpecialEvent
 --- @field ids nil `ids` must be nil. The system will create and populate this field.
 
----@class EventStore
----@field events? table<string, CompId[]> Stores component dependencies for nvim events
----@field user_events? table<string, CompId[]> Stores component dependencies for user-defined events
----@field special_events? SpecialEvent[] Stores component dependencies for user-defined events
-local EventStore = {
-	-- Stores component dependencies for events
-	-- Only init if needed
-	-- events = {
-	-- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for nvim events
-	-- },
-
-	-- -- -- Stores component dependencies for user events
-	-- Only init if needed
-	-- user_events = {
-	-- 	-- [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for user-defined events
-	-- },
-
-	-- special_events = {
-	--   {
-	--     name = "BufEnter",
-	--     pattern = "*lua"
-	--     ids = { comp1, comp2 }
-	--   }
-	-- }
-}
+--- @class EventStore
+--- Stores component dependencies for nvim events
+--- ### Example
+---   events = {
+---     [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for nvim events
+---   },
+--- @field events? table<string, CompId[]>
+--- Stores component dependencies for user-defined events
+--- ### Example
+--    user_events = {
+-- 	    [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for user-defined events
+--    },
+--- @field user_events? table<string, CompId[]>
+--- Stores component dependencies for user-defined events
+--- ### Example
+---   special_events = {
+---     {
+---       name = "BufEnter",
+---       pattern = "*lua"
+---       ids = { comp1, comp2 }
+---     }
+---   }
+--- @field special_events? SpecialEvent[]
+local EventStore = {}
 
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
