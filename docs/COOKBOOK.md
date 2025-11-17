@@ -414,23 +414,26 @@ local component = {
   | `fun(self, session_id): nil` | A function that initializes the component. It is called once when the component is created. |
 
   **Description**: A function that initializes the component. It is called once when the component is created right after the component is managed by WitchLine.
+  This is usually use for create custom update logic for the component when `events` or `timing` is not enough.
 
   **Example**:
 
   - Type: `fun(self, session_id): nil`
 
   ```lua
-  local component = {
+  local parent = {
+      id = "parent",
       init = function(self, session_id)
-          -- Initialization code here
       end
   }
+
   ```
 
   - Some tricks:
 
   ```lua
     local component = {
+        id = "parent",
         init = function(self, session_id)
             local hook = require("witch-line.core.manager.hook")
             local static = hook.use_static(self) -- Use hook to access static
@@ -456,6 +459,20 @@ local component = {
             local static = hook.use_static(self) -- Use hook to access static
             return static.icon .. " updated text"
           end
+
+    }
+
+    -- Then when you want to create a child component and update at the same time with parent then you
+    -- can use ref like this.
+    -- Just ensure that the parent is call `require("witch-line.core.handler").refresh_component_graph`
+    local child = {
+        id = "child",
+        ref = {
+            events = "parent"
+        },
+        update = function()
+            return "child"
+        end
     }
   ```
 
