@@ -16,11 +16,10 @@ local M = {}
 --- Clear the value of a component in the statusline.
 --- @param comp ManagedComponent The component to clear.
 local hide_component = function(comp)
-	if not comp._renderable then
-		return
+	if comp._renderable then
+		Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
+		rawset(comp, "_hidden", true) -- Mark as hidden
 	end
-	Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
-	rawset(comp, "_hidden", true) -- Mark as hidden
 end
 
 --- Format the side value

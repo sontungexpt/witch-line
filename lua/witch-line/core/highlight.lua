@@ -89,8 +89,9 @@ end
 --- Replace a string contains highlight segment with new highlight name.
 --- @param str string The string that may contains highlight segment.
 --- @param new_hl_name string|nil The new string with the new replaced highlight name.
-M.replace_highlight_name = function(str, new_hl_name, first)
-	return string.gsub(str, "%%#.-#", "%#" .. new_hl_name .. "#", first and 1)
+--- @param n? integer Whether to replace the first occurrence only.
+M.replace_highlight_name = function(str, new_hl_name, n)
+	return string.gsub(str, "%%#.-#", "%#" .. new_hl_name .. "#", n)
 end
 
 --- Retrieve highlight properties for a given highlight group.
