@@ -648,20 +648,20 @@ M.setup = function(user_configs, DataAccessor)
 					seen[tonumber(e.match)] = nil
 					return
 				end
-
 				local winid = api.nvim_get_current_win()
-				if not seen[winid] then
-					seen[winid] = true
-
-					--- Schedule for ensure that filetype and buftype are available
-					vim.schedule(function()
-						local components = statusline.win(winid)
-						if type(components) == "table" then
-							M.register_combined_component(components, nil, winid)
-						end
-					end)
+				if seen[winid] then
+					Statusline.render(winid)
+					return
 				end
-				Statusline.render(winid)
+				seen[winid] = true
+				--- Schedule for ensure that filetype and buftype are available
+				vim.schedule(function()
+					local components = statusline.win(winid)
+					if type(components) == "table" then
+						M.register_combined_component(components, nil, winid)
+					end
+					Statusline.render(winid)
+				end)
 			end,
 		})
 	end
