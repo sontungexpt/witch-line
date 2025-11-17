@@ -12,10 +12,8 @@ local M = {}
 --- @field buftypes? string[] The buftypes where statusline is disabled.
 ---
 --- @class UserConfig.Statusline
---- Components that are **actually rendered** in the statusline.
---- These can inherit or reference abstract components to build complex layouts.
---- @field components CombinedComponent[]
---- @field win_components? fun(winid: integer): CombinedComponent[]|nil The window-specific components
+--- @field global CombinedComponent The global statusline components.
+--- @field win? fun(winid: integer): CombinedComponent|nil The per-window statusline components.
 ---
 --- The full user configuration for Witch-Line.
 --- @class UserConfig : table
@@ -24,6 +22,8 @@ local M = {}
 --- but may be inherited or referenced by other components.
 --- Typically used to define shared layouts or reusable base definitions.
 --- @field abstracts? CombinedComponent[]
+---
+--- The final statusline configuration.
 --- @field statusline UserConfig.Statusline
 ---
 ---
@@ -60,9 +60,9 @@ end
 --- Apply default components to the statusline if it doesn't exist.
 --- @param statusline UserConfig.Statusline
 local apply_statusline_default_components = function(statusline)
-	local components = statusline.components
-	if type(components) ~= "table" then
-		statusline.components = require("witch-line.constant.default")
+	local global = statusline.global
+	if type(global) ~= "table" then
+		statusline.global = require("witch-line.constant.default")
 	end
 	return statusline
 end
@@ -93,14 +93,6 @@ M.setup = function(user_configs)
 	else
 		apply_statusline_default_components(user_configs.statusline)
 	end
-	-- user_configs.statusline.win_components = function(winid)
-	-- 	local filetype = vim.bo[vim.api.nvim_win_get_buf(winid)].filetype
-	-- 	if filetype == "NvimTree" then
-	-- 		return {
-	-- 			"battery",
-	-- 		}
-	-- 	end
-	-- end
 
 	require("witch-line.core.statusline").setup(user_configs.disabled)
 	require("witch-line.core.handler").setup(user_configs, DataAccessor)

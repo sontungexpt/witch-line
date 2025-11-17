@@ -267,7 +267,7 @@ require("witch-line").setup({
     },
   },
   --- @type CombinedComponent[]
-  components = {
+  statusline = {
     "mode",
     "file.name",
     "file.icon",

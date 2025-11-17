@@ -439,7 +439,8 @@ end
 --- @param winid? integer The window ID to set the value for.
 --- @return integer new_idx The index of the newly added value.
 M.push = function(comp_id, value, winid)
-	local statusline = get_statusline(winid)
+	local statusline = winid and Statusline[winid] or GlobalStatusline
+	-- local statusline = get_statusline(winid)
 	local slots = ensure_window_slots(statusline)
 
 	local new_slots_size = #slots + 1

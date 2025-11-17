@@ -600,6 +600,7 @@ function M.register_combined_component(comp, parent_id, winid)
 		comp = register_component(comp, parent_id, winid)
 	else
 		-- Invalid component type
+		error("Invalid component type: " .. kind)
 		return nil
 	end
 
@@ -636,31 +637,31 @@ M.setup = function(user_configs, DataAccessor)
 			end
 		end
 
-		M.register_combined_component(statusline.components)
+		M.register_combined_component(statusline.global)
 	end
 
-	local win_components = statusline.win_components
-	if win_components then
+	if statusline.win then
 		local seen = {}
 		api.nvim_create_autocmd({ "WinEnter", "WinClosed" }, {
 			callback = function(e)
-				if e.event == "WinEnter" then
+				if e.event == "WinClosed" then
+					seen[tonumber(e.match)] = nil
+					return
+				end
+
+				local winid = api.nvim_get_current_win()
+				if not seen[winid] then
+					seen[winid] = true
+
+					--- Schedule for ensure that filetype and buftype are available
 					vim.schedule(function()
-						local winid = api.nvim_get_current_win()
-						if api.nvim_win_is_valid(winid) then
-							if not seen[winid] then
-								seen[winid] = true
-								local components = win_components(winid)
-								if type(components) == "table" then
-									M.register_combined_component(components, nil, winid)
-								end
-							end
-							Statusline.render(winid)
+						local components = statusline.win(winid)
+						if type(components) == "table" then
+							M.register_combined_component(components, nil, winid)
 						end
 					end)
-				else
-					seen[tonumber(e.match)] = nil
 				end
+				Statusline.render(winid)
 			end,
 		})
 	end
