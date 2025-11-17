@@ -36,7 +36,7 @@ M.queue_initialization = function(id)
 end
 
 --- Iterate over the queue of components pending initialization (FIFO).
---- @return fun(): CompId|nil, Component iterator A function that returns the next component ID in the queue
+--- @return fun(): CompId|nil, ManagedComponent iterator A function that returns the next component ID in the queue
 M.iter_pending_init_components = function()
 	local index = 0
 	return function()
@@ -65,7 +65,7 @@ M.mark_emergency = function(id)
 end
 
 --- Iterate over the queue of urgent components (FIFO).
---- @return fun(): CompId|, Component iterator A function that returns the next component ID in the queue
+--- @return fun(): CompId|, ManagedComponent iterator A function that returns the next component ID in the queue
 M.iter_emergency_components = function()
 	local index = 0
 	return function()
@@ -102,7 +102,11 @@ M.load_cache = function(CacheDataAccessor)
 	if CachedComps then
 		setmetatable(ManagedComps, {
 			__index = function(t, k)
-				local comp = Persist.deserialize_function(CachedComps[k])
+				local comp = CachedComps[k]
+				if not comp then
+					return nil
+				end
+				comp = Persist.deserialize_function(comp)
 				t[k] = comp
 				return comp
 			end,
@@ -134,12 +138,16 @@ M.get_list_comps = function()
 end
 
 --- Register a component with the component manager.
---- @param comp Component The component to register.
---- @return CompId The ID of the registered component.
+--- @param comp ManagedComponent The component to register.
+--- @return ManagedComponent comp The registered component.
 M.register = function(comp)
 	local id = Component.setup(comp)
+	local managed = ManagedComps[id]
+	if managed then
+		return managed
+	end
 	ManagedComps[id] = comp
-	return id
+	return comp
 end
 
 --- Check if a component with the given ID exists.
@@ -190,7 +198,7 @@ end
 --- Must sure that all components are registered before call this function including dependencies components.
 --- @param dep_graph_kind DepGraphKind The ID of the dependency store to search in.
 --- @param comp_id CompId The ID of the component to find dependencies for.
---- @return fun()|fun(): CompId, Component An iterator function that returns the next dependent ID and its component.
+--- @return fun()|fun(): CompId, ManagedComponent An iterator function that returns the next dependent ID and its component.
 --- @return DepSet|nil The dependencies map for the given ID, or nil if none exist.
 M.iterate_dependents = function(dep_graph_kind, comp_id)
 	assert(dep_graph_kind and comp_id, "Both dep_graph_id and ref_id must be provided")
@@ -232,7 +240,7 @@ M.iterate_all_dependency_ids = function(comp_id)
 end
 
 --- Add a dependency for a component.
---- @param comp Component The component to add the dependency for.
+--- @param comp ManagedComponent The component to add the dependency for.
 --- @param ref CompId|CompId[] The ID or IDs that this component depends on.
 --- @param dep_graph_kind DepGraphKind The ID of the dependency store to use.
 M.link_dependency = function(comp, ref, dep_graph_kind)
@@ -254,7 +262,7 @@ end
 
 --- Get a component by its ID.
 --- @param id CompId The ID of the component to retrieve.
---- @return Component|nil comp The component with the given ID, or nil if not found.
+--- @return ManagedComponent|nil comp The component with the given ID, or nil if not found.
 M.get_comp = function(id)
 	return id and ManagedComps[id]
 end

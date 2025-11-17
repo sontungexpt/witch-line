@@ -202,6 +202,10 @@ end
 --- @param event string The name of the list inside the store.
 --- @param comp_id CompId The value to append into the list.
 local function register_normal_event(store, event, comp_id)
+	if not comp_id then
+		error("Component id must not be nil")
+	end
+
 	local list = store[event]
 	if not list then
 		store[event] = { comp_id }
@@ -432,7 +436,7 @@ end
 ---   - register_string_event()  for string-based event definitions
 ---   - register_tbl_event()     for table-based (special) events
 ---
---- @param comp Component  The component to register events
+--- @param comp ManagedComponent  The component to register events
 M.register_events = function(comp)
 	local cid = comp.id
 	if not cid then
@@ -457,18 +461,20 @@ M.register_events = function(comp)
 	end
 end
 
---- Register the component for VimResized event if it has a minimum screen width.
---- @param comp Component The component to register for VimResized event.
+--- Register the component for VimResized event.
+--- @param comp ManagedComponent The component to register for VimResized event.
 M.register_vim_resized = function(comp)
-	local store = EventStore.events or {}
-	EventStore.events = store
-	local es = store["VimResized"] or {}
-	es[#es + 1] = comp.id
-	store["VimResized"] = es
+	register_normal_event(ensure_store("events"), "VimResized", comp.id)
+end
+
+--- Register the component for WinEnter event.
+--- @param comp ManagedComponent The component to register for WinEnter event.
+M.register_win_enter = function(comp)
+	register_normal_event(ensure_store("events"), "WinEnter", comp.id)
 end
 
 --- Get the event information for a component in a session.
---- @param comp Component The component to get the event information for.
+--- @param comp ManagedComponent The component to get the event information for.
 --- @param sid SessionId The session id to get the event information for.
 --- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event information for the component, or nil if not found.
 --- @see Hook.use_event_info

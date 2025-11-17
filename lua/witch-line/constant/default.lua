@@ -21,6 +21,7 @@ return {
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",
+	"diagnostic.hint",
 
 	"indent",
 	"encoding",

@@ -203,7 +203,7 @@ local component = {
 | `pattern?`     | `string  \| string[]` | (Optional) A pattern or list of patterns the event should match (e.g., `"*.lua"`).             |
 | `remove_when?` | `function `           | (Optional) Remove this special event if `remmove_when` return true.                            |
 
-- events tyoe
+- events type
 
 | **Type**                   | **Description**                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------- |
@@ -276,6 +276,32 @@ local component = {
   local component = {
       timing = 500 -- Debounce time of 500ms
   }
+  ```
+
+- **win_individual**:
+
+  **Type**: `boolean`
+
+  **Description**: If set to `true`, the component will be updated for each window individually. If not provided, the component will not be updated for each window individually.
+
+  **Example**:
+
+  ```lua
+  local component = {
+  	id = "test",
+  	win_individual = true,
+  	lazy = false,
+  	update = function(self, sid)
+        -- When the component in the window with filetype NvimTree
+        -- The result will be "nvim_tree"
+        -- Else the result will be "test"
+        -- Each window has individual value
+  		local filetype = vim.bo.filetype
+  		if filetype == "NvimTree" then
+  			return "nvim_tree"
+  		end
+  		return "test"
+  	end,
   ```
 
 - **temp**:

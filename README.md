@@ -91,6 +91,14 @@ See the magic:
 - Basic style (No separator, I aprreciate basic but you can create it or do many things else by yourself (like add separator) or you can create new PR for your feature you wantc)
   <img width="1899" height="128" alt="image" src="https://github.com/user-attachments/assets/6bfcc79b-5db6-4419-aced-34deef1fd8c5" />
 
+- Individual statusline for each window.
+
+<img width="1916" height="69" alt="image" src="https://github.com/user-attachments/assets/794ae173-1b53-4e8c-aa67-9f7678824967" />
+
+- Individual component value for each window.
+
+<img width="1914" height="86" alt="image" src="https://github.com/user-attachments/assets/879896c8-1f50-4ef9-b506-dc1fbc032b44" />
+
 ## ✨ Features
 
 `witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
@@ -123,8 +131,8 @@ This plugin is ideal for developers who want full control over the look and feel
 
 - Laststatus
 
-  - [ ] Support for laststatus = 1
-  - [ ] Support for laststatus = 2
+  - [x] Support for laststatus = 1
+  - [x] Support for laststatus = 2
   - [x] Support for laststatus = 3
   - [x] Support for laststatus = 0
 
@@ -253,7 +261,6 @@ vim.o.laststatus = 3
 You can setup the plugin by calling the `setup` function and passing in a table of options.
 
 ```lua
-
 require("witch-line").setup({
   --- @type CombinedComponent[]
   abstracts = {
@@ -266,31 +273,37 @@ require("witch-line").setup({
       min_screen_width = 80,          -- Hide if screen width < 80
     },
   },
+
   --- @type CombinedComponent[]
-  components = {
-    "mode",
-    "file.name",
-    "file.icon",
-    {
-      id = "component_id",               -- Unique identifier
-      padding = { left = 1, right = 1 }, -- Padding around the component
-      static = { some_key = "some_value" }, -- Static metadata
-      timing = false,                 -- No timing updates
-      style = { fg = "#ffffff", bg = "#000000", bold = true }, -- Style override
-      min_screen_width = 80,          -- Hide if screen width < 80
-      hidden = function()               -- Hide condition
-        return vim.bo.buftype == "nofile"
-      end,
-      left_style = { fg = "#ff0000" }, -- Left style override
-      update = function(self, ctx, static, session_id) -- Main content generator
-        return vim.fn.expand("%:t")
-      end,
-      ref = {                       -- References to other components
-        events = { "file.name" },
-        style = "file.name",
-        static = "file.name",
-      },
+  statusline = {
+    --- The global statusline components
+    global = {
+        "mode",
+        "file.name",
+        "git.branch",
+        {
+          id = "component_id",               -- Unique identifier
+          padding = { left = 1, right = 1 }, -- Padding around the component
+          static = { some_key = "some_value" }, -- Static metadata
+          win_individual = false,
+          timing = false,                 -- No timing updates
+          style = { fg = "#ffffff", bg = "#000000", bold = true }, -- Style override
+          min_screen_width = 80,          -- Hide if screen width < 80
+          hidden = function()               -- Hide condition
+            return vim.bo.buftype == "nofile"
+          end,
+          left_style = { fg = "#ff0000" }, -- Left style override
+          update = function(self, ctx, static, session_id) -- Main content generator
+            return vim.fn.expand("%:t")
+          end,
+          ref = {                       -- References to other components
+            events = { "file.name" },
+            style = "file.name",
+            static = "file.name",
+          },
+        },
     },
+    win = function(winid) return {} end
   },
 
   cache = {
@@ -309,6 +322,67 @@ require("witch-line").setup({
 })
 
 ```
+
+#### Top level options
+
+| Field        | Type                                                                     | Description                                                                                                               |
+| ------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `abstracts`  | `CombinedComponent[]`                                                    | A list of abstract components registered before everything else. Used for component references and dependency resolution. |
+| `statusline` | `{ global: CombinedComponent[], win?: fun(winid): CombinedComponent[] }` | Defines the global statusline and optional per-window statusline overrides.                                               |
+| `cache`      | `{ full_scan: boolean, notification: boolean, func_strip: boolean }`     | Cache behavior and optimizations.                                                                                         |
+| `disabled`   | `{ filetypes: string[], buftypes: string[] }`                            | Filetypes/buftypes where the plugin should be disabled.                                                                   |
+
+#### statusline
+
+| Key      | Type                              | Description                                                                                                                                                                            |
+| -------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `global` | `CombinedComponent[]`             | Global statusline components.                                                                                                                                                          |
+| `win`    | `fun(winid): CombinedComponent[]` | Per-window statusline components. When using this field, you must set `laststatus` to `2` or `1`, and you must add all neccesary components to the `abstracts` field to let it's work. |
+
+Example config using `win` option
+
+```lua
+require("witch-line").setup({
+    abstracts = {
+        "battery",
+        -- require("your custom component")
+    }
+    statusline = {
+        global = {
+            "file.name",
+            "git.branch",
+            --- require("your custom component")
+            --- Other components
+        }
+        win = function(winid
+          --- Only show battery in NvimTree window
+          local filetype = vim.bo[vim.api.nvim_win_get_buf(winid)].filetype
+          if filetype == "NvimTree" then
+            return {
+                "battery",
+                -- require("your custom component")
+            }
+          end
+        end
+    }
+
+})
+```
+
+#### cache
+
+| Key            | Type      | Default | Description                                                                         |
+| -------------- | --------- | ------- | ----------------------------------------------------------------------------------- |
+| `full_scan`    | `boolean` | `false` | Performs a full plugin scan to detect cache expiration. Heavier, but more reliable. |
+| `notification` | `boolean` | `true`  | Shows a notification when the cache is cleared.                                     |
+| `func_strip`   | `boolean` | `false` | Strips debug info from dumped functions to reduce cache size.                       |
+
+#### disabled
+
+| Key         | Type       | Description                                    |
+| ----------- | ---------- | ---------------------------------------------- |
+| `filetypes` | `string[]` | Filetypes where the plugin should be disabled. |
+| `buftypes`  | `string[]` | Buftypes where the plugin should be disabled.  |
 
 ### Commands
 
