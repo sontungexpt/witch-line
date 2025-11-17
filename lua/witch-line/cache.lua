@@ -177,19 +177,22 @@ M.config_checksum = function(user_configs)
 		post_update = 23,
 		hidden = 24,
 		on_click = 25,
+		win_individual = 26,
 
 		--- For UserConfig field
-		cache = 26,
-		full_scan = 27,
-		notification = 28,
-		func_strip = 29,
+		cache = 27,
+		full_scan = 28,
+		notification = 29,
+		func_strip = 30,
 
-		disabled = 30,
-		filetypes = 31,
-		buftypes = 32,
+		disabled = 31,
+		filetypes = 32,
+		buftypes = 33,
 
-		abstracts = 33,
-		components = 34,
+		abstracts = 34,
+		statusline = 35,
+		global = 36,
+		win = 37,
 	})
 end
 
