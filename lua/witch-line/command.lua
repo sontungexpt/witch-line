@@ -33,17 +33,9 @@ local commands = {
 				require("witch-line.core.highlight").inspect("styles")
 			end,
 		},
-		statusline = {
-			flexible_priority_sorted = function()
-				require("witch-line.core.statusline").inspect("flexible_priority_sorted")
-			end,
-			values = function()
-				require("witch-line.core.statusline").inspect("statusline")
-			end,
-			[FALLBACK_KEY] = function()
-				require("witch-line.core.statusline").inspect("statusline")
-			end,
-		},
+		statusline = function()
+			require("witch-line.core.statusline").inspect()
+		end,
 	},
 }
 

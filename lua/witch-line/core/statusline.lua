@@ -1,12 +1,12 @@
 local bit = require("bit")
 local bor, band, lshift = bit.bor, bit.band, bit.lshift
 
-local vim, concat, type, ipairs = vim, table.concat, type, ipairs
-local o, bo, api = vim.o, vim.bo, vim.api
-local nvim_strwidth = api.nvim_strwidth
+local vim, concat, type = vim, table.concat, type
+local o, api = vim.o, vim.api
+local nvim_strwidth, nvim_get_current_win = api.nvim_strwidth, api.nvim_get_current_win
+
 local Highlight = require("witch-line.core.highlight")
 local assign_highlight_name = Highlight.assign_highlight_name
-local replace_highlight_name = Highlight.replace_highlight_name
 
 local M = {}
 -- Constants controlling the relative index positions for layout calculation.
@@ -101,36 +101,30 @@ local GlobalStatusline
 --- @type integer # integer = literal component id
 local LiteralCount = 0
 
---- Lazy-initializes the global and per-window statusline state tables.
+--- Lazy-initialize global & per-window statusline state.
 ---
---- Behavior summary:
----   - `StatuslineState` is a map: winid → window-state table.
----   - Window 0 stores the **global default state**.
----   - Each window inherits all fields from the global state, except
----     `comp_state`, which is a component-state map (comp_id → state).
----   - Component state is lazily created per window, and each component
----     inherits from its global default state (`global_comp_state`).
----   - When a window closes, its state entry is removed.
+--- Summary:
+---   - `Statusline[0]` = global default state.
+---   - `Statusline[winid]` = per-window state that falls back to global.
+---   - `state_map` (component states) is created per window; each entry
+---       inherits from the global component defaults via metatable.
+---   - Window state is created only when accessed.
+---   - When a window closes, its state table is removed.
 ---
 --- Structure:
 ---   Statusline = {
----       [0] = {
----           state_map = { [comp_id] = CompState },
----           slots = {},
----           ... other global keys ...
----       },
----       [winid] = {
----           state_map = { [comp_id] = deepcopy(global_comp_state[comp_id]) },
----           slots = (fallback to global),
----           ... window-specific overrides ...
----       }
+---     [0] = { state_map = {...}, slots = {...}, ... },
+---     [win] = {
+---       state_map = setmetatable({}, { __index = Statusline[0].state_map }),
+---       slots = (fallback to global),
+---       ...
+---     },
 ---   }
 ---
 --- Notes:
----   - All state is created on demand through metatables, so nothing is
----     allocated until a window or component is actually accessed.
----   - Inheritance is shallow per window, but component-state inheritance
----     is deep (via deepcopy).
+---   - Only global tables exist initially; per-window tables appear on demand.
+---   - Component state uses shallow inheritance per window, but each component
+---     merges from global defaults automatically.
 local lazy_setup = function()
 	GlobalStatusline = Statusline[0]
 	if not GlobalStatusline then
@@ -141,17 +135,16 @@ local lazy_setup = function()
 		Statusline[0] = GlobalStatusline
 	end
 
-	local auid = nil
-
-	-- Shared metatable for component state
-	local state_map_mt = {
-		__index = GlobalStatusline.state_map,
-	}
-
+	local auid, state_map_mt = nil, nil
 	setmetatable(Statusline, {
 		__index = function(t, winid)
 			local win_state = setmetatable({}, {
 				__index = function(t1, key)
+					--- Lazily create shared metatable for component state
+					state_map_mt = state_map_mt or {
+						__index = GlobalStatusline.state_map,
+					}
+
 					--- Each window has its own state map
 					if key == "state_map" then
 						local new = setmetatable({}, state_map_mt)
@@ -175,15 +168,15 @@ local lazy_setup = function()
 	})
 end
 
---- Returns the state table associated with a window.
----
---- If `winid` is nil, the current window ID is used.
---- Window states are lazily created via WinStateMap's metatable.
----
+--- Returns the window-level statusline state.
+--- If `vim.o.laststatus` is 3, returns the global statusline state.
+--- If `winid` is nil, returns the global statusline state.
+--- If `winid` is 0, returns the global statusline state.
+--- Otherwise, returns the per-window statusline state.
 --- @param winid? integer Window ID to fetch. Defaults to current window.
 --- @return Statusline state Window-level state table.
 local get_statusline = function(winid)
-	return winid and Statusline[winid] or GlobalStatusline
+	return (o.laststatus == 3 or winid == nil) and GlobalStatusline or Statusline[winid]
 end
 
 --- Ensure `statusline.slots` exists (lazy-create if missing).
@@ -263,26 +256,25 @@ M.track_flexible = function(comp_id, priority, winid)
 end
 
 --- Inspects the current statusline values.
---- @param kind? "statusline" The type of values to inspect. If nil or "values", inspects the statusline values.
-M.inspect = function(kind)
-	local notifier = require("witch-line.utils.notifier")
-	notifier.info(vim.inspect(Statusline))
+M.inspect = function()
+	require("witch-line.utils.notifier").info(vim.inspect(Statusline))
 end
 
 --- Resets the value of a statusline component before caching.
---- @param segment CompState The statusline component to reset.
-local format_state_before_cache = function(segment, frozen)
+--- @param state CompState The statusline component to reset.
+local format_state_before_cache = function(state, frozen)
 	local frozen_fields = {
 		"flex",
 		"idxs",
 	}
-	for k, _ in pairs(segment) do
+
+	for k, _ in pairs(state) do
 		if k == VALUE_SHIFT then
 			if not frozen then
-				segment[k] = "" -- Clear unfrozen main value
+				state[k] = "" -- Clear unfrozen main value
 			end
 		elseif not vim.tbl_contains(frozen_fields, k) then
-			segment[k] = nil
+			state[k] = nil
 		end
 	end
 end
@@ -329,59 +321,56 @@ end
 --- @param win_state Statusline The window state to compute the width for.
 --- @return integer total_width The total display width of all statusline components.
 local compute_statusline_width = function(win_state)
-	local total_width = 0
-	local slots, comps = win_state.slots, win_state.state_map
+	local total, slots, comps = 0, win_state.slots, win_state.state_map
 	for i = 1, #slots do
-		total_width = total_width + compute_slot_width(comps[slots[i]])
+		total = total + compute_slot_width(comps[slots[i]])
 	end
-	return total_width
+	return total
 end
 
 --- Builds the final statusline string by merging highlight segments and optional
 --- click-handler wrappers, while skipping any indices marked in a bitmask.
 ---
---- @param slots Statusline.CompId[] The indices of the statusline components to build the value for.
---- @param comps CompStateMap The statusline component to build the value for.
+--- @param slots Slots The indices of the statusline components to build the value for.
+--- @param state_map CompStateMap The statusline component to build the value for.
 --- @param skip_mask? integer A bitmask (1-based indices) specifying which segments should be skipped. If nil, no skipping is applied.
 --- @return string value Final concatenated statusline string.
-local function build_value(slots, comps, skip_mask)
+local build_value = function(slots, state_map, skip_mask)
 	skip_mask = skip_mask or 0ULL
 
-	local out, count = {}, 0
-	local total_slots = #slots
-
-	for i = 1, total_slots do
+	local out, n = {}, 0
+	for i = 1, #slots do
 		if not is_marked(skip_mask, i) then
-			local state = comps[slots[i]]
+			local state = state_map[slots[i]]
 			local val = state[VALUE_SHIFT] or ""
 
 			-- If no main value, skip the whole segment including its left and right parts
 			if val ~= "" then
 				local click_handler_form = state.click_handler_form
 				if click_handler_form then
-					count = count + 1
-					out[count] = click_handler_form
+					n = n + 1
+					out[n] = click_handler_form
 				end
 
 				local left, right = state[left_idx(VALUE_SHIFT)], state[right_idx(VALUE_SHIFT)]
 				if left and left ~= "" then
-					count = count + 1
-					out[count] = left
+					n = n + 1
+					out[n] = left
 				end
 
 				--- Main part
-				count = count + 1
-				out[count] = val
+				n = n + 1
+				out[n] = val
 
 				--- Right part
 				if right and right ~= "" then
-					count = count + 1
-					out[count] = right
+					n = n + 1
+					out[n] = right
 				end
 
 				if click_handler_form then
-					count = count + 1
-					out[count] = "%X"
+					n = n + 1
+					out[n] = "%X"
 				end
 			end
 		end
@@ -404,10 +393,10 @@ M.render = function(winid)
 		return
 	end
 
-	local statusline, win_o = GlobalStatusline, vim.o
+	local statusline, opt = GlobalStatusline, vim.o
 	if laststatus ~= 3 then
-		winid = winid or api.nvim_get_current_win()
-		statusline, win_o = get_statusline(winid), vim.wo[winid]
+		winid = winid or nvim_get_current_win()
+		statusline, opt = get_statusline(winid), vim.wo[winid]
 	end
 
 	local comp_state = statusline.state_map
@@ -416,7 +405,7 @@ M.render = function(winid)
 	local current_flex = flex_list[1]
 
 	if not current_flex then
-		win_o.statusline = build_value(statusline.slots, comp_state)
+		opt.statusline = build_value(statusline.slots, comp_state)
 		return
 	end
 
@@ -441,8 +430,7 @@ M.render = function(winid)
 		current_flex = flex_list[flex_idx]
 	end
 
-	local str = build_value(statusline.slots, comp_state, hidden_slots)
-	win_o.statusline = str ~= "" and str or " "
+	opt.statusline = build_value(statusline.slots, comp_state, hidden_slots)
 end
 
 --- Appends a new value to the statusline values list.
@@ -465,16 +453,13 @@ M.push = function(comp_id, value, winid)
 	--- Rawget to avoid automatically creating the table
 	local state_map = statusline.state_map
 	local state = rawget(state_map, comp_id)
-	if state then
-		state.idxs[#state.idxs + 1] = new_slots_size
-	else
-		local width = nvim_strwidth(value)
+	if not state then
+		local width = value == "" and 0 or nvim_strwidth(value)
 		--- @type CompState
 		state_map[comp_id] = {
 			[VALUE_SHIFT] = value,
 			[WIDTH_SHIFT] = width,
 			total_width = width,
-			idxs = { new_slots_size },
 		}
 	end
 	slots[new_slots_size] = comp_id
@@ -482,42 +467,23 @@ M.push = function(comp_id, value, winid)
 end
 
 --- Ensures that a specific component state exists.
---- @param statusline Statusline Window or global statusline state.
+--- @param winid? integer The window ID to set the value for.
 --- @param comp_id CompId The component ID to ensure.
 --- @return CompState state The existing or newly created component state.
-local ensure_comp_state = function(statusline, comp_id)
-	local state_map = statusline.state_map
-	local state = rawget(state_map, comp_id)
-	if state then
-		return state
-	end
-
-	-- lookup in global state by metatable
-	local gstate = state_map[comp_id]
-	state = gstate and require("witch-line.utils.tbl").shallow_copy(gstate) or {}
+local ensure_comp_state = function(winid, comp_id)
+	local state_map = get_statusline(winid).state_map
+	local state = rawget(state_map, comp_id) or {}
 	state_map[comp_id] = state
 	return state
-end
-
---- Updates the state of a specific component.
---- @param comp_id CompId The index of the component to update.
---- @param winid? integer The window ID to set the value for.
-local update_state = function(comp_id, winid, fn)
-	fn(ensure_comp_state(get_statusline(winid), comp_id))
-	local global_state = o.laststatus == 3 and GlobalStatusline.state_map[comp_id] or nil
-	if global_state then
-		fn(global_state)
-	end
 end
 
 --- Hides a specific component by setting its value to an empty string.
 --- @param comp_id CompId The index of the component to hide.
 --- @param winid? integer The window ID to set the value for.
 M.hide_segment = function(comp_id, winid)
-	update_state(comp_id, winid, function(state)
-		state[VALUE_SHIFT] = ""
-		state[WIDTH_SHIFT], state.total_width = 0, nil
-	end)
+	local state = ensure_comp_state(winid, comp_id)
+	state[VALUE_SHIFT] = ""
+	state[WIDTH_SHIFT], state.total_width = 0, nil
 end
 
 --- Sets the value for a specific component.
@@ -526,10 +492,9 @@ end
 --- @param hl_name? string The highlight group name to set for segment.
 --- @param winid? integer The window ID to set the value for.
 M.set_value = function(comp_id, value, hl_name, winid)
-	update_state(comp_id, winid, function(state)
-		state[WIDTH_SHIFT], state.total_width = nvim_strwidth(value), nil
-		state[VALUE_SHIFT] = assign_highlight_name(value, hl_name)
-	end)
+	local state = ensure_comp_state(winid, comp_id)
+	state[WIDTH_SHIFT], state.total_width = nvim_strwidth(value), nil
+	state[VALUE_SHIFT] = assign_highlight_name(value, hl_name)
 end
 
 --- Sets the highlight_name for a specific component.
@@ -537,10 +502,9 @@ end
 --- @param new_hl_name string|nil The new highlight group name to set for the segment.
 --- @param winid? integer The window ID to set the value for.
 M.set_hl_name = function(comp_id, new_hl_name, winid)
-	update_state(comp_id, winid, function(state)
-		local curr_value = state[VALUE_SHIFT]
-		state[VALUE_SHIFT] = curr_value and replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
-	end)
+	local state = ensure_comp_state(winid, comp_id)
+	local curr_value = state[VALUE_SHIFT]
+	state[VALUE_SHIFT] = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
 end
 
 --- Sets the left or right side value for a specific component.
@@ -551,13 +515,12 @@ end
 --- @param force? boolean If true, forces the update even if a value already exists for the specified side.
 --- @param winid? integer The window ID to set the value for.
 M.set_side_value = function(comp_id, shift_side, value, hl_name, force, winid)
-	update_state(comp_id, winid, function(state)
-		local vidx = side_idx(VALUE_SHIFT, shift_side)
-		if force or not state[vidx] then
-			state[side_idx(WIDTH_SHIFT, shift_side)], state.total_width = nvim_strwidth(value), nil
-			state[vidx] = assign_highlight_name(value, hl_name)
-		end
-	end)
+	local state = ensure_comp_state(winid, comp_id)
+	local vidx = side_idx(VALUE_SHIFT, shift_side)
+	if force or not state[vidx] then
+		state[side_idx(WIDTH_SHIFT, shift_side)], state.total_width = nvim_strwidth(value), nil
+		state[vidx] = assign_highlight_name(value, hl_name)
+	end
 end
 
 --- Sets the left or right side value for a specific component.
@@ -566,11 +529,10 @@ end
 --- @param new_hl_name? string The new highlight group name to set for the specified side.
 --- @param winid? integer The window ID to set the value for.
 M.set_side_hl_name = function(comp_id, shift_side, new_hl_name, winid)
-	update_state(comp_id, winid, function(state)
-		local idx = side_idx(VALUE_SHIFT, shift_side)
-		local curr_value = state[idx]
-		state[idx] = curr_value and replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
-	end)
+	local state = ensure_comp_state(winid, comp_id)
+	local idx = side_idx(VALUE_SHIFT, shift_side)
+	local curr_value = state[idx]
+	state[idx] = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
 end
 
 --- Updates the click handler for a specific component.
@@ -579,11 +541,10 @@ end
 --- @param force? boolean If true, forces the update even if a click handler already exists.
 --- @param winid? integer The window ID to set the value for.
 M.set_click_handler = function(comp_id, click_handler, force, winid)
-	update_state(comp_id, winid, function(state)
-		if force or not state.click_handler_form then
-			state.click_handler_form = "%@v:lua." .. click_handler .. "@"
-		end
-	end)
+	local state = ensure_comp_state(winid, comp_id)
+	if force or not state.click_handler_form then
+		state.click_handler_form = "%@v:lua." .. click_handler .. "@"
+	end
 end
 
 --- Setup the necessary things for statusline rendering.
@@ -594,8 +555,11 @@ M.setup = function(disabled_opts)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
 	local render_debounce = require("witch-line.utils").debounce(M.render, 100)
 	api.nvim_create_autocmd("VimResized", {
-		callback = function(e)
-			render_debounce()
+		callback = function()
+			local flexs = get_statusline(nvim_get_current_win()).flexs
+			if flexs and #flexs > 0 then
+				render_debounce()
+			end
 		end,
 	})
 
@@ -604,30 +568,15 @@ M.setup = function(disabled_opts)
 		local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
 
 		if disabled_buftypes or disabled_filetypes then
+			local bo = vim.bo
 			--- Determines if a buffer is disabled based on its filetype and buftype.
 			--- @param bufnr integer The buffer number to check.
-			--- @return boolean
+			--- @return boolean disabled True if the buffer is disabled, false otherwise.
 			local is_buf_disabled = function(bufnr)
 				local buf_o = bo[bufnr]
-				if disabled_filetypes then
-					local filetype = buf_o.filetype
-					for _, ft in ipairs(disabled_filetypes) do
-						if filetype == ft then
-							return true
-						end
-					end
-				end
-
-				if disabled_buftypes then
-					local buftype = buf_o.buftype
-					for _, bt in ipairs(disabled_buftypes) do
-						if buftype == bt then
-							return true
-						end
-					end
-				end
-
-				return false
+				return (disabled_filetypes and vim.list_contains(disabled_filetypes, buf_o.filetype))
+					or (disabled_buftypes and vim.list_contains(disabled_buftypes, buf_o.buftype))
+					or false
 			end
 
 			--- For automatically toggle `laststatus` based on buffer filetype and buftype.
