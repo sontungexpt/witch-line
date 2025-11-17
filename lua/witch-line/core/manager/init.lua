@@ -93,35 +93,23 @@ end
 
 --- Load the cache for components and dependency stores.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
---- @return function undo Function to restore the previous state of Comps and DepGraph.
 M.load_cache = function(CacheDataAccessor)
-	local before_dep_store, before_pending_inits, before_urgents = DepGraphRegistry, InitializePendingIds, EmergencyIds
 	local CachedComps = CacheDataAccessor.get("CachedComps")
-
 	local Persist = require("witch-line.utils.persist")
-	if CachedComps then
-		setmetatable(ManagedComps, {
-			__index = function(t, k)
-				local comp = CachedComps[k]
-				if not comp then
-					return nil
-				end
-				comp = Persist.deserialize_function(comp)
-				t[k] = comp
-				return comp
-			end,
-		})
-	end
-
-	DepGraphRegistry = CacheDataAccessor.get("DepGraph") or DepGraphRegistry
-	InitializePendingIds = CacheDataAccessor.get("PendingInit") or InitializePendingIds
-	EmergencyIds = CacheDataAccessor.get("Urgents") or EmergencyIds
-	return function()
-		ManagedComps = {}
-		DepGraphRegistry = before_dep_store
-		InitializePendingIds = before_pending_inits
-		EmergencyIds = before_urgents
-	end
+	setmetatable(ManagedComps, {
+		__index = function(t, k)
+			local comp = CachedComps[k]
+			if not comp then
+				return nil
+			end
+			comp = Persist.deserialize_function(comp)
+			t[k] = comp
+			return comp
+		end,
+	})
+	DepGraphRegistry = CacheDataAccessor.get("DepGraph")
+	InitializePendingIds = CacheDataAccessor.get("PendingInit")
+	EmergencyIds = CacheDataAccessor.get("Urgents")
 end
 
 --- Iterate over all registered components.

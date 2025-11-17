@@ -42,16 +42,8 @@ end
 
 --- Load the event and timer stores from the persistent storage.
 --- @param 	CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
---- @return function undo function to restore the previous state of the stores
 M.load_cache = function(CacheDataAccessor)
-	local before_timer_store = TimerStore
-
 	TimerStore = CacheDataAccessor.get("TimerStore") or TimerStore
-
-	return function()
-		M.stop_all_timers()
-		TimerStore = before_timer_store
-	end
 end
 --- Register a timer for a component.
 --- @param comp ManagedComponent The component to register the timer for.

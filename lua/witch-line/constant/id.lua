@@ -109,8 +109,8 @@ return {
 	--- @param id CompId|nil id to validate
 	--- @return CompId? id the id of the component
 	validate = function(id)
-		if not id then
-			require("witch-line.utils.notifier").error("Id must not be null")
+		if type(id) ~= "string" then
+			require("witch-line.utils.notifier").error("Id must be a string")
 		elseif IdPathMap[id] then
 			require("witch-line.utils.notifier").error("Id must be different from default id: " .. tostring(id))
 		end

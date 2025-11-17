@@ -73,15 +73,8 @@ end
 
 --- Load the event and timer stores from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
---- @return function undo function to restore the previous state of the stores
 M.load_cache = function(CacheDataAccessor)
-	local before_event_store = EventStore
-
 	EventStore = CacheDataAccessor.get("EventStore") or EventStore
-
-	return function()
-		EventStore = before_event_store
-	end
 end
 
 M.inspect = function()

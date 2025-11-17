@@ -90,6 +90,7 @@ end
 --- @field state_map CompStateMap The window-specific component state map.
 --- @field slots Slots The list of components in the statusline.
 --- @field flexs? FlexSorted The sorted list of flexible components.
+--- @field literal_n integer The number of literal components.
 
 --- Map: window_id -> (component_id -> CompState)
 --- @type table<integer, Statusline>
@@ -97,9 +98,6 @@ local Statusline = {}
 
 --- @type Statusline
 local GlobalStatusline
-
---- @type integer # integer = literal component id
-local LiteralCount = 0
 
 --- Lazy-initialize global & per-window statusline state.
 ---
@@ -131,6 +129,7 @@ local lazy_setup = function()
 		GlobalStatusline = {
 			state_map = {},
 			slots = {},
+			literal_n = 0,
 		}
 		Statusline[0] = GlobalStatusline
 	end
@@ -138,23 +137,12 @@ local lazy_setup = function()
 	local auid, state_map_mt = nil, nil
 	setmetatable(Statusline, {
 		__index = function(t, winid)
-			local win_state = setmetatable({}, {
-				__index = function(t1, key)
-					--- Lazily create shared metatable for component state
-					state_map_mt = state_map_mt or {
-						__index = GlobalStatusline.state_map,
-					}
+			--- Lazily create shared state map metatable
+			state_map_mt = state_map_mt or {
+				__index = GlobalStatusline.state_map,
+			}
 
-					--- Each window has its own state map
-					if key == "state_map" then
-						local new = setmetatable({}, state_map_mt)
-						t1[key] = new
-						return new
-					end
-					return GlobalStatusline[key]
-				end,
-			})
-
+			--- Lazily create autocmd for window close
 			auid = auid
 				or api.nvim_create_autocmd("WinClosed", {
 					callback = function(e)
@@ -162,6 +150,12 @@ local lazy_setup = function()
 					end,
 				})
 
+			local win_state = setmetatable({
+				literal_n = 0, -- each window has its own literal count
+				state_map = setmetatable({}, state_map_mt),
+			}, {
+				__index = GlobalStatusline,
+			})
 			t[winid] = win_state
 			return win_state
 		end,
@@ -177,18 +171,6 @@ end
 --- @return Statusline state Window-level state table.
 local get_statusline = function(winid)
 	return (o.laststatus == 3 or winid == nil) and GlobalStatusline or Statusline[winid]
-end
-
---- Ensure `statusline.slots` exists (lazy-create if missing).
---- @param statusline Statusline Window or global statusline state.
---- @return Slots slots The existing or newly created slots table.
-local ensure_window_slots = function(statusline)
-	local slots = rawget(statusline, "slots")
-	if not slots then
-		slots = {}
-		statusline.slots = slots
-	end
-	return slots
 end
 
 --- Returns the sorted list of flexible components.
@@ -291,12 +273,8 @@ end
 
 --- Loads the statusline cache.
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
---- @return function undo function to restore the previous state
 M.load_cache = function(CacheDataAccessor)
 	Statusline[0] = CacheDataAccessor.get("GlobalStatusline")
-	return function()
-		Statusline[0] = nil
-	end
 end
 
 --- Computes the total display width of a statusline component including its left and right parts.
@@ -441,14 +419,17 @@ end
 M.push = function(comp_id, value, winid)
 	local statusline = winid and Statusline[winid] or GlobalStatusline
 	-- local statusline = get_statusline(winid)
-	local slots = ensure_window_slots(statusline)
+	local slots = rawget(statusline, "slots")
+	if not slots then
+		slots = {}
+		statusline.slots = slots
+	end
 
 	local new_slots_size = #slots + 1
 
 	if not comp_id then
-		LiteralCount = LiteralCount + 1
-		---@diagnostic disable-next-line: cast-local-type
-		comp_id = LiteralCount
+		comp_id = statusline.literal_n + 1
+		statusline.literal_n = comp_id
 	end
 
 	--- Rawget to avoid automatically creating the table

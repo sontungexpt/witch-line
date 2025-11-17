@@ -57,19 +57,10 @@ end
 
 --- Loads the data from cache  from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the highlight cache.
---- @return function undo function to restore the previous state
 M.load_cache = function(CacheDataAccessor)
-	local color_rgb_24bit_before, styles_before = ColorRgb24Bit, Styles
-
-	ColorRgb24Bit = CacheDataAccessor.get("ColorRgb24Bit") or {}
+	ColorRgb24Bit = CacheDataAccessor.get("ColorRgb24Bit")
 	Styles = CacheDataAccessor.get("HighlightStyles")
-
 	restore_highlight_styles()
-
-	return function()
-		ColorRgb24Bit = color_rgb_24bit_before
-		Styles = styles_before
-	end
 end
 
 --- Generates a valid highlight group name from an ID.
