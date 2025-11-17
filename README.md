@@ -91,6 +91,15 @@ See the magic:
 - Basic style (No separator, I aprreciate basic but you can create it or do many things else by yourself (like add separator) or you can create new PR for your feature you wantc)
   <img width="1899" height="128" alt="image" src="https://github.com/user-attachments/assets/6bfcc79b-5db6-4419-aced-34deef1fd8c5" />
 
+- Individual statusline for each window.
+
+<img width="1916" height="69" alt="image" src="https://github.com/user-attachments/assets/794ae173-1b53-4e8c-aa67-9f7678824967" />
+
+- Individual component value for each window.
+
+<img width="1914" height="86" alt="image" src="https://github.com/user-attachments/assets/879896c8-1f50-4ef9-b506-dc1fbc032b44" />
+
+
 ## ✨ Features
 
 `witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
