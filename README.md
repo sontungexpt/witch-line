@@ -303,7 +303,9 @@ require("witch-line").setup({
           },
         },
     },
-    win = function(winid) return {} end
+
+    -- @type fun(winid): CombinedComponent[]|nil
+    win = nil
   },
 
   cache = {
