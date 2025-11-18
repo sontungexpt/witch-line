@@ -89,15 +89,19 @@ See the magic:
 ## Preview
 
 - Basic style (No separator, I aprreciate basic but you can create it or do many things else by yourself (like add separator) or you can create new PR for your feature you wantc)
-  <img width="1899" height="128" alt="image" src="https://github.com/user-attachments/assets/6bfcc79b-5db6-4419-aced-34deef1fd8c5" />
+
+<img width="1920" height="1047" alt="image" src="https://github.com/user-attachments/assets/87b8f955-34e6-4410-a2a0-83359f249cfc" />
+
 
 - Individual statusline for each window.
 
-<img width="1916" height="69" alt="image" src="https://github.com/user-attachments/assets/794ae173-1b53-4e8c-aa67-9f7678824967" />
+<img width="1918" height="1013" alt="image" src="https://github.com/user-attachments/assets/3ef62280-500c-4266-91d4-2f03d9c08dfb" />
+
 
 - Individual component value for each window.
 
-<img width="1914" height="86" alt="image" src="https://github.com/user-attachments/assets/879896c8-1f50-4ef9-b506-dc1fbc032b44" />
+<img width="1917" height="1041" alt="image" src="https://github.com/user-attachments/assets/6a588a6b-df7b-4749-87c2-fb625133760a" />
+
 
 ## ✨ Features
 
