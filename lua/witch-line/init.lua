@@ -1,4 +1,4 @@
-local require, vim, type = require, vim, type
+local require, type = require, type
 
 local M = {}
 
@@ -97,7 +97,9 @@ M.setup = function(user_configs)
 	require("witch-line.core.statusline").setup(user_configs.disabled)
 	require("witch-line.core.handler").setup(user_configs, DataAccessor)
 
-	vim.api.nvim_create_autocmd("VimLeavePre", {
+	local nvim_create_autocmd = vim.api.nvim_create_autocmd
+
+	nvim_create_autocmd("VimLeavePre", {
 		once = true,
 		callback = function()
 			if not Cache.loaded() then
@@ -105,12 +107,13 @@ M.setup = function(user_configs)
 				for i = 1, #CACHE_MODS do
 					require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
 				end
+
 				Cache.save(conf_checksum, cache_opts.func_strip)
 			end
 		end,
 	})
 
-	vim.api.nvim_create_autocmd("CmdlineEnter", {
+	nvim_create_autocmd("CmdlineEnter", {
 		once = true,
 		callback = function()
 			require("witch-line.command")

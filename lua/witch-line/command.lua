@@ -1,41 +1,33 @@
-local api = vim.api
 local M = {}
+
+--- Module
+local Manager = require("witch-line.core.manager")
+local Cache = require("witch-line.cache")
+local Statusline = require("witch-line.core.statusline")
+local Event = require("witch-line.core.manager.event")
+local Timer = require("witch-line.core.manager.timer")
+local Highlight = require("witch-line.core.highlight")
+
 local FALLBACK_KEY = "\0fallback\0"
 
-local commands = {
+local COMMANDS = {
 	clear_cache = function()
-		require("witch-line.cache").clear(true)
+		Cache.clear(true)
 	end,
 
 	inspect = {
-		cache_data = function()
-			require("witch-line.cache").inspect()
-		end,
-		event_store = function()
-			require("witch-line.core.manager.event").inspect()
-		end,
-		timer_store = function()
-			require("witch-line.core.manager.timer").inspect()
-		end,
+		cache_data = Cache.inspect,
+		event_store = Event.inspect,
+		timer_store = Timer.inspect,
 		comp_manager = {
-			comps = function()
-				require("witch-line.core.manager").inspect("comps")
-			end,
-			dep_store = function()
-				require("witch-line.core.manager").inspect("dep_store")
-			end,
+			comps = Manager.inspect,
+			dep_store = Manager.inspect,
 		},
 		highlight = {
-			rgb24bit = function()
-				require("witch-line.core.highlight").inspect("rgb24bit")
-			end,
-			styles = function()
-				require("witch-line.core.highlight").inspect("styles")
-			end,
+			rgb24bit = Highlight.inspect,
+			styles = Highlight.inspect,
 		},
-		statusline = function()
-			require("witch-line.core.statusline").inspect()
-		end,
+		statusline = Statusline.inspect,
 	},
 }
 
@@ -47,7 +39,7 @@ local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
 	table.remove(args, 1) -- Remove the command name
 
 	---@type table|function
-	local node = commands
+	local node = COMMANDS
 	for i = 1, #args - 1 do
 		node = node[args[i]]
 		if not node then
@@ -69,14 +61,14 @@ local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
 	return completions
 end
 
-api.nvim_create_user_command("WitchLine", function(a)
+vim.api.nvim_create_user_command("WitchLine", function(a)
 	local args = a.fargs
 	if #args < 1 then
 		return
 	end
 
 	local arg = args[1]
-	local work = commands[arg]
+	local work = COMMANDS[arg]
 	for i = 2, #args do
 		arg = args[i]
 		work = work[arg]
@@ -94,8 +86,9 @@ api.nvim_create_user_command("WitchLine", function(a)
 	end
 end, {
 	nargs = "*",
-	complete = function(ArgLead, CmdLine, CursorPos)
-		return get_trie_completions(ArgLead, CmdLine, CursorPos)
-	end,
+	complete = get_trie_completions,
+	-- complete = function(ArgLead, CmdLine, CursorPos)
+	-- 	return get_trie_completions(ArgLead, CmdLine, CursorPos)
+	-- end,
 })
 return M

@@ -34,7 +34,7 @@ any idea to create a new component, please open an issue or pull request.
 
 ### Concept ideas
 
-- I like the reference concept in any database structure based on id. So I use the same concept in this plugin for component system. You can reference other component by id to share some field like events, style, static, context, hide, min_screen_width. This will help you to create a component based on other component without duplicate code.
+- I like the reference concept in any database structure based on id. So I use the same concept in this plugin for component system. You can reference other component by id to share some field like events, style, static, context, hidden, min_screen_width. This will help you to create a component based on other component without duplicate code.
 
 - Spoiler this plugin also provide nested tables to inherit from parent by recursively for anyone enjoy with creating a component based on other component by nested table like [heirline](https://github.com/rebelot/heirline.nvim). But I think the reference concept is better. And the statusline is a flat structure and readable.
 
@@ -171,15 +171,16 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support left field to add left content
   - [x] Support right field to add right content
   - [x] Support min_screen_width field to hide component if screen width is less than this value
-  - [x] Support hide field to hide component based on condition
+  - [x] Support hidden field to hide component based on condition
   - [x] Support init function to initialize component
   - [x] Support pre_update function to run before update function
   - [x] Support post_update function to run after update function
   - [x] Support update function to generate component content
-  - [x] Support ref field to reference other component fields (events, style, static, context, hide, min_screen_width)
+  - [x] Support ref field to reference other component fields (events, style, static, context, hidden, min_screen_width)
   - [x] Support version field to manage component cache
   - [x] Support flexible field to hide component based on priority when space is limited
   - [x] Support on_click function to handle click events
+  - [x] Support win_individual field to enable individual value for each window
   - [ ] Support coroutine for update function
 
 - Hide Automatically
@@ -309,11 +310,11 @@ require("witch-line").setup({
   },
 
   cache = {
-      -- Perform full plugin scan for cache expiration. Default false.
+      -- Perform full plugin scan for cache expiration. Default false. Faster but less accurate.
       full_scan = false,
       -- Show notification when cache is cleared. Default true.
       notification = true,
-      -- Strip debug info when caching dumped functions. Default false.
+      -- Strip debug info when caching dumped functions. Default false. Faster but harder to debug.
       func_strip = false,
   },
 
@@ -461,7 +462,7 @@ You can use the `require("witch-line.builtin").comp` builtin function to create 
 local my_component = require("witch-line.builtin").comp("file.name", {
   padding = { left = 2 },
   min_screen_width = 60,
-  hide = function()
+  hidden = function()
     return vim.bo.buftype == "nofile"
   end,
   style = { fg = "#ffffff", bg = "#222222", bold = true },
@@ -475,7 +476,7 @@ local my_component = {
   [0] = "file.name",  -- Inherit from the default file.name component
   padding = { left = 2 },
   min_screen_width = 60,
-  hide = function()
+  hidden = function()
     return vim.bo.buftype == "nofile"
   end,
   style = { fg = "#ffffff", bg = "#222222", bold = true },

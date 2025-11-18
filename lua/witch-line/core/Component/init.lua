@@ -229,7 +229,6 @@ Component.SepStyle = SepStyle
 --- @field _loaded? boolean If true, the component is loaded
 --- @field _abstract? boolean If true, the component is abstract and should not be displayed directly (all component are abstract)
 --- @field _renderable? boolean If true, the component is renderable
---- @field _indices? integer[] The render index of the component in the statusline
 --- @field _hl_name? string The highlight group name for the component
 --- @field _left_hl_name? string The highlight group name for the left part of the component
 --- @field _right_hl_name? string The highlight group name for the right part of the component
@@ -244,7 +243,6 @@ Component.SepStyle = SepStyle
 --- @field id CompId the id of component
 --- @field [integer] CompId -- Child components by their IDs
 --- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
---- @field _loaded true Always true, indicates that the component has been loaded
 
 --- Check if is default component
 --- @param comp Component the component to get the id from
