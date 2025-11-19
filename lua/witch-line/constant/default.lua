@@ -15,13 +15,14 @@ return {
 
 	"%=",
 
-	"lsp.clients",
-	"windsurf",
-
 	"diagnostic.error",
 	"diagnostic.warn",
 	"diagnostic.info",
 	"diagnostic.hint",
+
+	"lsp.clients",
+
+	"windsurf",
 
 	"indent",
 	"encoding",

@@ -5,25 +5,13 @@ local WindSurf = {
 	id = Id["windsurf"],
 	_plug_provided = true,
 	static = {
-		-- local server_status_symbols = {
-		--       [0] = "󰣺 ", -- Connected
-		--       [1] = "󰣻 ", -- Connection Error
-		--       [2] = "󰣽 ", -- Disconnected
-		--     }
-
-		--     local status_symbols = {
-		--       [0] = "󰚩 ", -- Enabled
-		--       [1] = "󱚧 ", -- Disabled Globally
-		--       [3] = "󱚢 ", -- Disabled for Buffer filetype
-		--       [5] = "󱚠 ", -- Disabled for Buffer encoding
-		--       [2] = "󱙻 ", -- Disabled for Buffer (catch-all)
-		--     }
 		icon = {
 			idle = "󰚩",
-			erorr = "󱚧",
-			warning = "",
-			waiting = { "", "󰪞", "󰪟", "󰪠", "󰪢", "󰪣", "󰪤", "󰪥" },
-			unauthorized = "󱙻",
+			error = "󱚡",
+			completions = "󱜙",
+			waiting = { "󱇷    ", "󱇷   ", "󱇷  ", "󱇷 ", "󱇷" },
+			-- waiting = { "󰚩", "󱇷", "󰚩", "󱇷",  },
+			unauthorized = "󱚟",
 			disabled = "󱚧",
 		},
 		fps = 3, -- should be 3 - 5
@@ -40,6 +28,7 @@ local WindSurf = {
 					return true
 				end
 				local timer
+				local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 				virtual_text.set_statusbar_refresh(function()
 					if vim.bo.buftype ~= "prompt" and require("codeium.virtual_text").status().state == "waiting" then
 						timer = timer or (vim.uv or vim.loop).new_timer()
@@ -50,7 +39,7 @@ local WindSurf = {
 								0,
 								math.floor(1000 / static.fps),
 								vim.schedule_wrap(function()
-									require("witch-line.core.handler").refresh_component_graph(self)
+									refresh_component_graph(self)
 								end)
 							)
 						end
@@ -58,8 +47,11 @@ local WindSurf = {
 					elseif timer then
 						timer:stop()
 					end
-					require("witch-line.core.handler").refresh_component_graph(self)
+					refresh_component_graph(self)
 				end)
+
+				-- Update the component immediately
+				refresh_component_graph(self)
 			end,
 		})
 	end,
@@ -68,6 +60,15 @@ local WindSurf = {
 		local icon = self.static.icon
 		local ctx = self.context
 		--- @cast ctx {status : string, progress_idx: integer, is_enabled: fun(): boolean}
+
+		local server_status = require("codeium.api").check_status()
+		local api_key_error = server_status.api_key_error
+		if api_key_error ~= nil then
+			if api_key_error:find("Auth") then
+				return icon.unauthorized
+			end
+			return icon.error
+		end
 
 		local status = require("codeium.virtual_text").status()
 		if status.state == "waiting" then
@@ -81,7 +82,7 @@ local WindSurf = {
 			return icon.idle
 		elseif status.state == "completions" and status.total > 0 then
 			ctx.progress_idx = 0
-			return string.format("%d/%d", status.current, status.total)
+			return icon.completions .. " " .. string.format("%d/%d", status.current, status.total)
 		end
 		return icon.disabled
 	end,
