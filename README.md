@@ -100,6 +100,11 @@ See the magic:
 
 <img width="1917" height="1041" alt="image" src="https://github.com/user-attachments/assets/6a588a6b-df7b-4749-87c2-fb625133760a" />
 
+- Video:
+
+https://github.com/user-attachments/assets/241d091f-bfdb-4935-b33d-8c8a2626c2a4
+
+
 ## ✨ Features
 
 `witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
