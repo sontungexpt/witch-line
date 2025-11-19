@@ -1,13 +1,14 @@
-local colors = {
-	yellow = "#ffc021",
-	cyan = "#56b6c2",
-	green = "#47d864",
-	orange = "#FF8800",
-	magenta = "#c678dd",
-	blue = "#51afef",
-	red = "#ee2c4a",
-	gray = "#5c6370",
-	purple = "#c688eb",
-	pink = "#eb7fdc",
+local palette = {
+	yellow = 0xffc021,
+	cyan = 0x56b6c2,
+	green = 0x47d864,
+	orange = 0xFF8800,
+	magenta = 0xc678dd,
+	blue = 0x51afef,
+	red = 0xee2c4a,
+	gray = 0x5c6370,
+	purple = 0xc688eb,
+	pink = 0xeb7fdc,
 }
-return colors
+
+return palette
