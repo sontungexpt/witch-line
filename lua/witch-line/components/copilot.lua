@@ -3,7 +3,6 @@ local Id = require("witch-line.constant.id").Id
 ---@type DefaultComponent
 local Copilot = {
 	id = Id["copilot"],
-	name = "copilot",
 	_plug_provided = true,
 	static = {
 		icon = {
@@ -72,13 +71,15 @@ local Copilot = {
 					if status == "InProgress" then
 						ctx.status = "InProgress"
 						timer = timer or (vim.uv or vim.loop).new_timer()
-						timer:start(
-							0,
-							math.floor(1000 / static.fps),
-							vim.schedule_wrap(function()
-								refresh_component_graph(self)
-							end)
-						)
+						if timer then
+							timer:start(
+								0,
+								math.floor(1000 / static.fps),
+								vim.schedule_wrap(function()
+									refresh_component_graph(self)
+								end)
+							)
+						end
 						return
 					elseif status == "" then
 						status = "Error"
@@ -102,13 +103,14 @@ local Copilot = {
 		local progress_idx = ctx.progress_idx
 
 		if not ctx.is_enabled() then
-			progress_idx = 0
+			ctx.progress_idx = 0
 			return icon.Disabled
 		elseif status == "InProgress" then
 			progress_idx = progress_idx < #icon.InProgress and progress_idx + 1 or 1
+			ctx.progress_idx = progress_idx
 			return icon.InProgress[progress_idx]
 		else
-			progress_idx = 0
+			ctx.progress_idx = 0
 			return icon[status] or status or ""
 		end
 	end,

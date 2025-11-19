@@ -21,7 +21,10 @@ local IdPathMap = {
 	["file.icon"] = "file\0icon",
 	["file.modifier"] = "file\0modifier",
 	["file.size"] = "file\0size",
+
 	["copilot"] = "copilot",
+	["windsurf"] = "windsurf",
+
 	["diagnostic.interface"] = "diagnostic\0interface",
 	["diagnostic.error"] = "diagnostic\0error",
 	["diagnostic.warn"] = "diagnostic\0warn",
@@ -78,6 +81,7 @@ local IdPathMap = {
 --- @field ["nvim_dap"] DefaultId
 --- @field ["search.count"] DefaultId
 --- @field ["selection.count"] DefaultId
+--- @field ["windsurf"] DefaultId
 local Id = setmetatable({}, {
 	__index = function(_, key)
 		if IdPathMap[key] then

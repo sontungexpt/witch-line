@@ -115,7 +115,7 @@ local Clients = {
 			end
 		end
 
-		return #server_names > 0 and table.concat(server_names, ", ") or "NO LSP, FORMATTER  "
+		return #server_names > 0 and table.concat(server_names, ", ") or "No Lsp, Formatters  "
 	end,
 }
 

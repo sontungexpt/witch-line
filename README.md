@@ -92,16 +92,13 @@ See the magic:
 
 <img width="1920" height="1047" alt="image" src="https://github.com/user-attachments/assets/87b8f955-34e6-4410-a2a0-83359f249cfc" />
 
-
 - Individual statusline for each window.
 
 <img width="1918" height="1013" alt="image" src="https://github.com/user-attachments/assets/3ef62280-500c-4266-91d4-2f03d9c08dfb" />
 
-
 - Individual component value for each window.
 
 <img width="1917" height="1041" alt="image" src="https://github.com/user-attachments/assets/6a588a6b-df7b-4749-87c2-fb625133760a" />
-
 
 ## ✨ Features
 
@@ -416,6 +413,7 @@ Each component is referenced by name and can be composed to build a flexible and
 | `file.size`         | `file.lua`       | Shows the file size                       |
 | `%=`                | _(builtin)_      | Separator to align left/right components  |
 | `copilot`           | `copilot.lua`    | Shows Copilot status (if available)       |
+| `windsurf`          | `windsurf.lua`   | Shows Codeium status (if available)       |
 | `diagnostic.error`  | `diagnostic.lua` | Shows number of error diagnostics         |
 | `diagnostic.warn`   | `diagnostic.lua` | Shows number of warning diagnostics       |
 | `diagnostic.info`   | `diagnostic.lua` | Shows number of info diagnostics          |

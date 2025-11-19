@@ -16,7 +16,7 @@ return {
 	"%=",
 
 	"lsp.clients",
-	"copilot",
+	"windsurf",
 
 	"diagnostic.error",
 	"diagnostic.warn",
