@@ -300,7 +300,7 @@ local function resolve_color(c, field, auto_adjust)
 	end
 
 	--- num is number here
-	if auto_adjust then
+	if auto_theme_enabled and auto_adjust then
 		local stbg = nvim_get_hl(0, statusline_opts).bg
 		return stbg and adjust(num, stbg) or num
 	end
