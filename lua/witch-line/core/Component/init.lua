@@ -450,7 +450,7 @@ Component.overrides = function(comp, override)
 		comp.auto_theme = false
 	end
 
-	local accepted = require("witch-line.core.Component.overridable_types")
+	local accepted = require("witch-line.core.Component.overrideable_fields")
 	for k, v in pairs(override) do
 		local types_accepted = accepted[k]
 		if types_accepted then
