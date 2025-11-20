@@ -242,31 +242,26 @@ M.inspect = function()
 	require("witch-line.utils.notifier").info(vim.inspect(Statusline))
 end
 
---- Resets the value of a statusline component before caching.
---- @param state CompState The statusline component to reset.
-local format_state_before_cache = function(state, frozen)
+--- Handles necessary operations before Vim exits.
+--- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
+M.on_vim_leave_pre = function(CacheDataAccessor)
 	local frozen_fields = {
 		"flex",
 		"idxs",
 	}
-
-	for k, _ in pairs(state) do
-		if k == VALUE_SHIFT then
-			if not frozen then
-				state[k] = "" -- Clear unfrozen main value
+	--- Format the state before cache
+	for key, state in pairs(GlobalStatusline.state_map) do
+		-- Clear unfrozen values to reset statusline on next startup
+		local frozen = type(key) == "number"
+		for k, _ in pairs(state) do
+			if k == VALUE_SHIFT then
+				if not frozen then
+					state[k] = "" -- Clear unfrozen main value
+				end
+			elseif not vim.tbl_contains(frozen_fields, k) then
+				state[k] = nil
 			end
-		elseif not vim.tbl_contains(frozen_fields, k) then
-			state[k] = nil
 		end
-	end
-end
-
---- Handles necessary operations before Vim exits.
---- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
-M.on_vim_leave_pre = function(CacheDataAccessor)
-	-- Clear unfrozen values to reset statusline on next startup
-	for key, value in pairs(GlobalStatusline.state_map) do
-		format_state_before_cache(value, type(key) == "number")
 	end
 	CacheDataAccessor.set("GlobalStatusline", GlobalStatusline)
 end
