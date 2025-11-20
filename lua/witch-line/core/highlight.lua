@@ -1,8 +1,11 @@
 local bit = require("bit")
 local band, rshift, lshift, bor = bit.band, bit.rshift, bit.lshift, bit.bor
 
-local api, type, next, pcall, pairs = vim.api, type, next, pcall, pairs
-local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name = api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
+local api = vim.api
+local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
+	api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
+local type, next, pcall, pairs = type, next, pcall, pairs
+local string_gsub = string.gsub
 
 local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
@@ -40,10 +43,10 @@ M.inspect = function(target)
 	elseif target == "styles" then
 		notifier.info(vim.inspect(Styles))
 	else
-		notifier.info(vim.inspect({
+		notifier.info(vim.inspect {
 			ColorRgb24Bit = ColorRgb24Bit,
 			Styles = Styles,
-		}))
+		})
 	end
 end
 
@@ -58,7 +61,9 @@ end
 M.toggle_auto_theme = function()
 	auto_theme_enabled = not auto_theme_enabled
 	restore_highlight_styles()
-	require("witch-line.utils.notifier").info("Auto theme is " .. (auto_theme_enabled and "enabled" or "disabled"))
+	require("witch-line.utils.notifier").info(
+		"Auto theme is " .. (auto_theme_enabled and "enabled" or "disabled")
+	)
 end
 
 api.nvim_create_autocmd("Colorscheme", {
@@ -84,7 +89,7 @@ end
 --- @param id CompId The ID to generate the highlight name for.
 --- @return string hl_name The generated highlight name.
 M.make_hl_name_from_id = function(id)
-	return "WL" .. string.gsub(tostring(id), "[^%w_]", "")
+	return "WL" .. string_gsub(tostring(id), "[^%w_]", "")
 end
 
 --- Adds a highlight name to a string.hi
@@ -99,7 +104,7 @@ end
 --- @param new_hl_name string|nil The new string with the new replaced highlight name.
 --- @param n? integer Whether to replace the first occurrence only.
 M.replace_highlight_name = function(str, new_hl_name, n)
-	return string.gsub(str, "%%#.-#", "%#" .. new_hl_name .. "#", n)
+	return string_gsub(str, "%%#.-#", "%#" .. new_hl_name .. "#", n)
 end
 
 --- Retrieve highlight properties for a given highlight group.
