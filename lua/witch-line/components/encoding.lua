@@ -4,7 +4,6 @@ local Id = require("witch-line.constant.id").Id
 ---@type DefaultComponent
 local Encoding = {
 	id = Id["encoding"],
-	auto_theme = true,
 	events = { "InsertEnter" },
 	_plug_provided = true,
 	static = {

@@ -5,7 +5,6 @@ local Id = require("witch-line.constant.id").Id
 local Position = {
 	id = Id["cursor.pos"],
 	_plug_provided = true,
-	auto_theme = true,
 	style = { fg = colors.fg },
 	events = { "CursorMoved", "CursorMovedI" },
 	update = function(self)
@@ -18,7 +17,6 @@ local Position = {
 local Progress = {
 	id = Id["cursor.progress"],
 	_plug_provided = true,
-	auto_theme = true,
 	ref = {
 		events = Id["cursor.pos"],
 	},

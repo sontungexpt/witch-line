@@ -4,7 +4,6 @@ local Id = require("witch-line.constant.id").Id
 --- @type DefaultComponent
 local Interface = {
 	id = Id["file.interface"],
-	auto_theme = true,
 	_plug_provided = true,
 	events = "BufEnter",
 	static = {
@@ -65,7 +64,6 @@ local Interface = {
 ---@type DefaultComponent
 local Name = {
 	id = Id["file.name"],
-	auto_theme = true,
 	_plug_provided = true,
 	ref = {
 		events = Id["file.interface"],
@@ -85,7 +83,6 @@ local Name = {
 local Icon = {
 	id = Id["file.icon"],
 	_plug_provided = true,
-	auto_theme = true,
 	ref = {
 		events = Id["file.interface"],
 		context = Id["file.interface"],
@@ -105,7 +102,6 @@ local Icon = {
 --- @type DefaultComponent
 local Modifier = {
 	id = Id["file.modifier"],
-	auto_theme = true,
 	_plug_provided = true,
 	events = { "BufEnter", "BufWritePost", "TextChangedI", "TextChanged" },
 	style = {
@@ -129,7 +125,6 @@ local Modifier = {
 local Size = {
 	id = Id["file.size"],
 	_plug_provided = true,
-	auto_theme = true,
 	ref = {
 		events = Id["file.interface"],
 	},

@@ -4,7 +4,6 @@ local colors = require("witch-line.constant.color")
 ---@type DefaultComponent
 return {
 	events = { "BufEnter", "WinEnter" },
-	auto_theme = true,
 	_plug_provided = true,
 	id = Id["indent"],
 	style = { fg = colors.cyan },

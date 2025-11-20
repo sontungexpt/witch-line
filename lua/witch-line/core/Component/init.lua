@@ -244,7 +244,6 @@ Component.SepStyle = SepStyle
 --- @class DefaultComponent : Component The default components provided by witch-line
 --- @field id DefaultId the id of default component
 --- @field _plug_provided true Mark as created by witch-line
---- @field auto_theme true Mark as created by witch-line
 
 --- @class ManagedComponent : Component, DefaultComponent
 --- @field id CompId the id of component
@@ -437,8 +436,9 @@ local function overrides_component_value(to, from, skip_type_check)
 	end
 	return to
 end
+
 --- Creates a custom statistic component, which can be used to display custom statistics in the status line.
---- @param comp Component the component to create the statistic for
+--- @param comp DefaultComponent the component to create the statistic for
 --- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
 --- @return Component stat_comp the statistic component with the necessary fields set
 Component.overrides = function(comp, override)
@@ -472,7 +472,7 @@ Component.overrides = function(comp, override)
 end
 
 --- Gets the minimum screen width required to display the component.
---- @param comp Component the component to get the minimum screen width from
+--- @param comp Component|DefaultComponent the component to get the minimum screen width from
 --- @param sid SessionId the session id to use for the component update
 --- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
 Component.min_screen_width = function(comp, sid)
@@ -481,16 +481,21 @@ Component.min_screen_width = function(comp, sid)
 end
 
 --- Gets the auto theme of the component.
---- @param comp Component the component to get auto theme from
+--- @param comp Component|DefaultComponent the component to get auto theme from
 --- @param sid SessionId the session id to use for the component update
 --- @return boolean auto_theme the auto theme of the component, or nil if it is not defined
 Component.auto_theme = function(comp, sid)
 	local auto_theme = resolve(comp.auto_theme, comp, sid)
-	return auto_theme and true or false
+	if auto_theme ~= nil then
+		-- auto_theme true or false
+		return auto_theme
+	end
+	-- fallback to plug provided
+	return comp._plug_provided or false
 end
 
 --- Checks if the component is hidden based on its `hidden` field.
---- @param comp Component the component to checks
+--- @param comp Component|DefaultComponent the component to checks
 --- @param sid SessionId the session id to use for the component update
 --- @return boolean hidden whether the component is hidden
 Component.hidden = function(comp, sid)
@@ -499,7 +504,7 @@ Component.hidden = function(comp, sid)
 end
 
 --- Register a function to be called when a clickable component is clicked.
---- @param comp Component The component to register the click event for.
+--- @param comp Component|DefaultComponent The component to register the click event for.
 --- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
 --- @throws if has an invalid field type
 Component.register_click_handler = function(comp)
@@ -556,8 +561,8 @@ end
 --- Some keys (like "context") should not receive a session ID, since
 --- their logic is independent of the session state.
 ---
---- @param key string  The key name to check
---- @return boolean    True if the `sid` argument should be passed to the function
+--- @param key string The key name to check
+--- @return boolean should_pass True if the `sid` argument should be passed to the function
 Component.should_pass_sid = function(key)
 	return key ~= "context"
 end

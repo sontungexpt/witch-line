@@ -17,7 +17,6 @@ local Mode = {
 ---@type DefaultComponent
 return {
 	id = Id["mode"],
-	auto_theme = true,
 	_plug_provided = true,
 	events = { "VimResized", "ModeChanged" },
 	static = {

@@ -5,7 +5,6 @@ local DiagnosticSevrity = vim.diagnostic.severity
 local Interface = {
 	id = Id["diagnostic.interface"],
 	_plug_provided = true,
-	auto_theme = true,
 	events = "DiagnosticChanged",
 	static = {
 		[DiagnosticSevrity.ERROR] = "",

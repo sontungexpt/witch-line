@@ -3,7 +3,6 @@ local Id = require("witch-line.constant.id").Id
 --- @type DefaultComponent
 local SearchCount = {
 	id = Id["search.count"],
-	auto_theme = true,
 	_plug_provided = true,
 	events = { "CmdlineLeave /" },
 	hidden = function(self, sid)

@@ -4,7 +4,6 @@ local colors = require("witch-line.constant.color")
 --- @type DefaultComponent
 return {
 	id = Id["os_uname"],
-	auto_theme = true,
 	_plug_provided = true,
 	events = { "BufEnter" },
 	static = {

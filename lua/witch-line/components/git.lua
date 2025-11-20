@@ -4,7 +4,6 @@ local colors = require("witch-line.constant.color")
 ---@type DefaultComponent
 local Branch = {
 	id = Id["git.branch"],
-	auto_theme = true,
 	_plug_provided = true,
 	static = {
 		icon = "",
@@ -178,7 +177,6 @@ local Diff = {}
 --- @type DefaultComponent
 Diff.Interface = {
 	id = Id["git.diff.interface"],
-	auto_theme = true,
 	_plug_provided = true,
 	static = {
 		disabled = {
@@ -339,7 +337,6 @@ Diff.Interface = {
 --- @type DefaultComponent
 Diff.Added = {
 	id = Id["git.diff.added"],
-	auto_theme = true,
 	_plug_provided = true,
 	static = {
 		icon = "",
@@ -372,7 +369,6 @@ Diff.Added = {
 ---@type DefaultComponent
 Diff.Modified = {
 	id = Id["git.diff.modified"],
-	auto_theme = true,
 	_plug_provided = true,
 	static = {
 		icon = "",
@@ -404,7 +400,6 @@ Diff.Modified = {
 ---@type DefaultComponent
 Diff.Removed = {
 	id = Id["git.diff.removed"],
-	auto_theme = true,
 	_plug_provided = true,
 	static = {
 		icon = "-",

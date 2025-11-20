@@ -4,7 +4,6 @@ local colors = require("witch-line.constant.color")
 --- @type DefaultComponent
 return {
 	id = Id["battery"],
-	auto_theme = true,
 	_plug_provided = true,
 	timing = 10000, -- 10 seconds
 	static = {

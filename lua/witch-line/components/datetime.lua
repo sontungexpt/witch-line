@@ -4,7 +4,6 @@ local Id = require("witch-line.constant.id").Id
 return {
 	id = Id["datetime"],
 	_plug_provided = true,
-	auto_theme = true,
 	timing = true,
 	static = {
 		format = "default",
