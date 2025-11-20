@@ -219,7 +219,7 @@ This plugin is ideal for developers who want full control over the look and feel
 
 ### Benchmarks
 
-The benchmarks of 11 runs:
+The benchmarks of 30 runs:
 
 This is just an example because I don't have much time to make each statusline with the same ui.
 And i'm not sure is it the best config for each statusline.
@@ -232,8 +232,9 @@ The benchmarks is run with `nvim -u` with only the statusline plugin loaded.
 
 | Plugin     | Load Time (ms) | Avg Update Time (ms) |
 | ---------- | -------------- | -------------------- |
-| witch-line | 21.7409090909  |                      |
-| lualine    | 86.0590909     |                      |
+| witch-line | 3.4137         |
+| lualine    | 4.4964         |                      |
+| heirline   | 6.3693         |                      |
 
 ---
 
