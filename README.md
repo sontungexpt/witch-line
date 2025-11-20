@@ -329,6 +329,8 @@ require("witch-line").setup({
 
   --- Whether to automatically adjust the theme.
   --- If it is set to false the `auto_theme` field of the component will be ignored.
+  --- Default: true.
+  --- You can toggle it by `:Witchline toggle_auto_theme`
   auto_theme = true
 
 })
@@ -402,6 +404,7 @@ The plugin provides the following commands:
 
 - `:Witchline clear_cache` - Clear the plugin's cache.
 - `:Witchline inspect` - Use for debugging and inspecting internal state.
+- `:Witchline toggle_auto_theme` - Toggle automatic theme adjustment.
 
 ## 🧾 Default Components Reference
 
