@@ -314,6 +314,12 @@ require("witch-line").setup({
   },
 
   cache = {
+      -- You can enabled cache.
+      -- If you use default configuration. It's may not need to be enabled because it's really fast
+      -- and won't affect performance.
+      -- If your components configuration is so complex such as with many nested childs. You can try
+      -- cache.
+      enabled = false,
       -- Perform full plugin scan for cache expiration. Default false. Faster but less accurate.
       full_scan = false,
       -- Show notification when cache is cleared. Default true.

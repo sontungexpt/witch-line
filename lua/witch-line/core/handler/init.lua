@@ -416,6 +416,15 @@ local function bind_update_conditions(comp)
 	end
 end
 
+local ref_keys = {
+	"context",
+	"static",
+	"style",
+	"left",
+	"left_style",
+	"right",
+	"right_style",
+}
 --- Pull missing dependencies for a component based on its ref and inherit fields.
 --- @param comp ManagedComponent The component to pull dependencies for.
 local function pull_missing_dependencies(comp)
@@ -431,16 +440,6 @@ local function pull_missing_dependencies(comp)
 	if type(ref) ~= "table" then
 		return
 	end
-
-	local ref_keys = {
-		"context",
-		"static",
-		"style",
-		"left",
-		"left_style",
-		"right",
-		"right_style",
-	}
 
 	for i = 1, #ref_keys do
 		local dep_id = ref[ref_keys[i]]
@@ -624,10 +623,10 @@ end
 
 --- Setup the statusline with the given configurations.
 --- @param user_configs UserConfig  The configurations for the statusline.
---- @param DataAccessor? Cache.DataAccessor The accessor to cache data if had cache ortherwise nil
-M.setup = function(user_configs, DataAccessor)
+--- @param CacheDataAccessor? Cache.DataAccessor The accessor to cache data if had cache ortherwise nil
+M.setup = function(user_configs, CacheDataAccessor)
 	local statusline = user_configs.statusline
-	if not DataAccessor then
+	if not CacheDataAccessor then
 		local abstracts = user_configs.abstracts
 		if type(abstracts) == "table" then
 			for i = 1, #abstracts do
