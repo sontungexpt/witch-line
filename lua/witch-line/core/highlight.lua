@@ -58,6 +58,7 @@ end
 M.toggle_auto_theme = function()
 	auto_theme_enabled = not auto_theme_enabled
 	restore_highlight_styles()
+	require("witch-line.utils.notifier").info("Auto theme is " .. (auto_theme_enabled and "enabled" or "disabled"))
 end
 
 api.nvim_create_autocmd("Colorscheme", {
