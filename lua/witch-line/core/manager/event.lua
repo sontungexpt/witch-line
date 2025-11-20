@@ -1,8 +1,12 @@
+local next = next
+local nvim_create_autocmd = vim.api.nvim_create_autocmd
+
 local Session = require("witch-line.core.Session")
 
 local M = {}
 
-local EventInfoStoreId = "EventInfo"
+local AUGROUP = vim.api.nvim_create_augroup("WitchLineEvent", { clear = true })
+local EVENT_INFO_STORE_ID = "EventInfo"
 
 --- Options used for configuring a special event.
 --- These fields control event behavior but do not include identifiers.
@@ -89,9 +93,9 @@ end
 --- - If one side is a string and the other is a list with **exactly one element**,
 ---   the two are considered equal **if that single element equals the string**.
 ---
---- @param a string|table
---- @param b string|table
---- @return boolean
+--- @param a string|table The first value to compare
+--- @param b string|table The second value to compare
+--- @return boolean equal True if the two values are equal, false otherwise
 local function string_list_equal(a, b)
 	local ta, tb = type(a), type(b)
 
@@ -472,7 +476,7 @@ end
 --- @return vim.api.keyset.create_autocmd.callback_args|nil event_info The event information for the component, or nil if not found.
 --- @see Hook.use_event_info
 M.get_event_info = function(comp, sid)
-	local store = Session.get_store(sid, EventInfoStoreId)
+	local store = Session.get_store(sid, EVENT_INFO_STORE_ID)
 	return store and store[comp.id] or nil
 end
 
@@ -484,37 +488,35 @@ M.on_event = function(work)
 	--- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
 	local id_event_info_map = {}
 
-	local emit = require("witch-line.utils").debounce(function()
+	local work_debounce = require("witch-line.utils").debounce(function()
 		Session.with_session(function(sid)
-			Session.new_store(sid, EventInfoStoreId, id_event_info_map)
+			Session.new_store(sid, EVENT_INFO_STORE_ID, id_event_info_map)
 			work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
 			id_event_info_map = {}
 		end)
 	end, 120)
 
-	local api = vim.api
-	local group = api.nvim_create_augroup("WitchLineEvents", { clear = true })
 	if events and next(events) then
-		api.nvim_create_autocmd(vim.tbl_keys(events), {
-			group = group,
+		nvim_create_autocmd(vim.tbl_keys(events), {
+			group = AUGROUP,
 			callback = function(e)
 				for _, id in ipairs(events[e.event]) do
 					id_event_info_map[id] = e
 				end
-				emit()
+				work_debounce()
 			end,
 		})
 	end
 
 	if user_events and next(user_events) then
-		api.nvim_create_autocmd("User", {
+		nvim_create_autocmd("User", {
 			pattern = vim.tbl_keys(user_events),
-			group = group,
+			group = AUGROUP,
 			callback = function(e)
 				for _, id in ipairs(user_events[e.match]) do
 					id_event_info_map[id] = e
 				end
-				emit()
+				work_debounce()
 			end,
 		})
 	end
@@ -522,15 +524,15 @@ M.on_event = function(work)
 	if spectial_events and next(spectial_events) then
 		for i = 1, #spectial_events do
 			local entry = spectial_events[i]
-			api.nvim_create_autocmd(entry.name, {
+			nvim_create_autocmd(entry.name, {
 				pattern = entry.pattern,
 				once = entry.once,
-				group = group,
+				group = AUGROUP,
 				callback = function(e)
 					for _, id in ipairs(entry.ids) do
 						id_event_info_map[id] = e
 					end
-					emit()
+					work_debounce()
 
 					local remove_when = require("witch-line.utils.persist").lazy_decode(entry, "remove_when")
 					if type(remove_when) == "function" then

@@ -67,17 +67,20 @@ M.benchmark = function(cb, name, file_path)
 	local uv = vim.uv or vim.loop
 	local start = uv.hrtime()
 	cb()
-	local elapsed = (uv.hrtime() - start) / 1e6 -- Convert to milliseconds
-	local text = string.format("%s took %.2f ms\n", name, elapsed)
+	local elapsed_ns = uv.hrtime() - start -- nanoseconds
+
+	local text = string.format("%s took %d ns\n", name, elapsed_ns)
+
 	if file_path then
 		local file = io.open(file_path, "a")
 		if file then
-			--- get ms from elapsed
 			file:write(text)
 			file:close()
 		end
 	else
-		require("witch-line.utils.notifier").info(text)
+		vim.defer_fn(function()
+			require("witch-line.utils.notifier").info(text)
+		end, 1000)
 	end
 end
 
