@@ -14,6 +14,9 @@ local SepStyle = {
 }
 Component.SepStyle = SepStyle
 
+--- @class ThemeAwareStyle : vim.api.keyset.highlight
+--- @field auto_theme? boolean  If true, the style automatically adapts to the current theme
+
 --- @class CompId : string
 
 --- @class Reference : table
@@ -40,7 +43,7 @@ Component.SepStyle = SepStyle
 ---
 --- @alias UpdateFunc fun(self:ManagedComponent,  sid: SessionId): string|nil , CompStyle|nil|
 ---
---- @alias CompStyle vim.api.keyset.highlight|string
+--- @alias CompStyle ThemeAwareStyle|string
 --- @alias StyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle|SepStyle
 ---
@@ -83,6 +86,9 @@ Component.SepStyle = SepStyle
 ---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated
 --- @field flexible? number
+---
+--- A function to determine whether the component should be automatically adjusted to suit the theme
+--- @field auto_theme? boolean | fun(self: ManagedComponent, sid: SessionId): boolean
 ---
 --- A flag indicating whether the component should show individual value for each window.
 --- @field win_individual? boolean
@@ -238,6 +244,7 @@ Component.SepStyle = SepStyle
 --- @class DefaultComponent : Component The default components provided by witch-line
 --- @field id DefaultId the id of default component
 --- @field _plug_provided true Mark as created by witch-line
+--- @field auto_theme true Mark as created by witch-line
 
 --- @class ManagedComponent : Component, DefaultComponent
 --- @field id CompId the id of component
@@ -439,6 +446,10 @@ Component.overrides = function(comp, override)
 		return comp
 	end
 
+	if override.style or override.left_style or override.right_style then
+		comp.auto_theme = false
+	end
+
 	local accepted = require("witch-line.core.Component.overridable_types")
 	for k, v in pairs(override) do
 		local types_accepted = accepted[k]
@@ -467,6 +478,15 @@ end
 Component.min_screen_width = function(comp, sid)
 	local min_screen_width = resolve(comp.min_screen_width, comp, sid)
 	return type(min_screen_width) == "number" and min_screen_width or nil
+end
+
+--- Gets the auto theme of the component.
+--- @param comp Component the component to get auto theme from
+--- @param sid SessionId the session id to use for the component update
+--- @return boolean auto_theme the auto theme of the component, or nil if it is not defined
+Component.auto_theme = function(comp, sid)
+	local auto_theme = resolve(comp.auto_theme, comp, sid)
+	return auto_theme and true or false
 end
 
 --- Checks if the component is hidden based on its `hidden` field.

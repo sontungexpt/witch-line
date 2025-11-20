@@ -4,6 +4,7 @@ local colors = require("witch-line.constant.color")
 --- @type DefaultComponent
 local SelectionCount = {
 	id = Id["selection.count"],
+	auto_theme = true,
 	_plug_provided = true,
 	style = {
 		fg = colors.cyan,

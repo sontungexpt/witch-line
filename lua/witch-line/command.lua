@@ -14,7 +14,7 @@ local COMMANDS = {
 	clear_cache = function()
 		Cache.clear(true)
 	end,
-
+	toggle_auto_theme = Highlight.toggle_auto_theme,
 	inspect = {
 		cache_data = Cache.inspect,
 		event_store = Event.inspect,

@@ -104,7 +104,6 @@ See the magic:
 
 https://github.com/user-attachments/assets/241d091f-bfdb-4935-b33d-8c8a2626c2a4
 
-
 ## ✨ Features
 
 `witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
@@ -208,8 +207,7 @@ This plugin is ideal for developers who want full control over the look and feel
 
 - Themes
 
-  - [ ] Create a theme systems
-  - [ ] Auto adjust color of components based on theme
+  - [x] Auto adjust color of components based on theme
 
 - Bug fixs (Will fix soon this important)
 
@@ -328,6 +326,11 @@ require("witch-line").setup({
     filetypes = { "help", "TelescopePrompt" },
     buftypes = { "nofile", "terminal" },
   },
+
+  --- Whether to automatically adjust the theme.
+  --- If it is set to false the `auto_theme` field of the component will be ignored.
+  auto_theme = true
+
 })
 
 ```

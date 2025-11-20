@@ -36,31 +36,37 @@ local function format_side_value(val, is_func)
 	return val
 end
 
---- Update or apply the highlight style of a component.
+--- Apply auto-theme flag to a style table
+--- @param style table|string  Style table or style name
+--- @param enable_auto_theme boolean  Whether to enable auto-theme
+--- @return table|string  Updated style table or original string
+local function apply_auto_theme(style, enable_auto_theme)
+	if type(style) == "table" then
+		style.auto_theme = style.auto_theme or enable_auto_theme
+	end
+	return style
+end
+
+--- Update or apply a component's highlight style.
 ---
---- This function resolves a component’s `style` field (including inherited and
---- referenced styles), generates or reuses its highlight group name (`_hl_name`),
---- and applies the highlight definition through `Highlight.highlight()`.
+--- Resolves the final `style` (including overrides, inheritance, and references),
+--- generates or reuses `_hl_name`, and applies it via `Highlight.highlight()`.
 ---
---- Behavior:
---- 1. Uses `Manager.dynamic_inherit()` to compute the final merged `style` value,
----    combining local, inherited, and referenced styles with `Highlight.merge_hl()`.
---- 2. If the component already has a `_hl_name`:
----    - Reapplies the highlight if the style is dynamic (`force == true`)
----      or has been externally overridden (`style_overided` provided).
---- 3. If `_hl_name` is not set:
----    - Generates a new one via `Highlight.make_hl_name_from_id()`.
----    - If the component has parents (`pcount > 0`), assigns its own name.
----    - Otherwise, tries to reuse the deepest referenced component’s `_hl_name`
----      (if any), caching it for future lookups.
---- 4. Applies the resolved highlight style and updates the `_hl_name` cache.
+--- Logic:
+--- 1. Merge local, inherited, and referenced styles using `Manager.dynamic_inherit()` and `Highlight.merge_hl()`.
+--- 2. If `_hl_name` exists, reapply highlight if dynamic (`force`) or overridden (`override_style`).
+--- 3. If `_hl_name` is missing, generate via `Highlight.make_hl_name_from_id()`:
+---    - Assign own name if component has parents.
+---    - Otherwise, reuse deepest referenced `_hl_name` if available.
+--- 4. Apply highlight and update `_hl_name` cache.
 ---
---- @param comp ManagedComponent          The component whose highlight style should be updated.
---- @param sid SessionId           The session ID used for dynamic style resolution and caching.
---- @param override_style CompStyle|nil Optional override style, applied before inheritance.
---- @return boolean updated        Whether the highlight was updated (`true`) or skipped (`false`).
---- @return CompStyle style        The resolved and applied highlight style.
-local function update_comp_style(comp, sid, override_style)
+--- @param comp ManagedComponent  Component to update.
+--- @param sid SessionId          Session for dynamic style resolution.
+--- @param auto_theme boolean Optional auto-theme flag.
+--- @param override_style? CompStyle  Optional style override.
+--- @return boolean updated  True if highlight changed, false if skipped.
+--- @return CompStyle style  The resolved style.
+local function update_comp_style(comp, sid, auto_theme, override_style)
 	local override_style_t = type(override_style)
 	local style, force, pcount = Manager.dynamic_inherit(
 		comp,
@@ -69,6 +75,7 @@ local function update_comp_style(comp, sid, override_style)
 		Highlight.merge_hl,
 		(override_style_t == "table" or override_style_t == "string") and override_style or nil
 	)
+	style = apply_auto_theme(style, auto_theme)
 	local hl_name = comp._hl_name
 	if hl_name then
 		if force or override_style then
@@ -117,9 +124,10 @@ end
 --- @param side "left"|"right" The side to update.
 --- @param main_style_updated boolean Whether the main style was recently updated (forces re-render).
 --- @param main_style? CompStyle The component’s main style used as reference.
+--- @param auto_theme boolean Flag to enable auto theme.
 --- @return boolean updated Whether the side highlight was changed.
 --- @return string|nil hl_name The dynamic highlight name as side.
-local function update_comp_side_style(comp, sid, side, main_style_updated, main_style)
+local function update_comp_side_style(comp, sid, side, main_style_updated, main_style, auto_theme)
 	local side_style = Component.side_style(comp, side)
 	---@cast side_style CompStyle|nil|SideStyleFunc|SepStyle
 
@@ -185,7 +193,7 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 	hl_name = hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
 	rawset(comp, hl_name_field, hl_name)
 	---@diagnostic disable-next-line: param-type-mismatch
-	return Highlight.highlight(hl_name, side_style), nil
+	return Highlight.highlight(hl_name, apply_auto_theme(side_style, auto_theme)), nil
 end
 
 --- Update a component and its value in the statusline.
@@ -215,9 +223,10 @@ local function update_comp(comp, sid)
 				hidden = true
 			else
 				local winid = comp.win_individual and api.nvim_get_current_win() or nil
+				local auto_theme = Component.auto_theme(comp, sid)
 				-- Main part
 				-- Update style first to make sure comp._hl_name is not nil
-				local style_updated, style = update_comp_style(comp, sid, override_style)
+				local style_updated, style = update_comp_style(comp, sid, auto_theme, override_style)
 				Statusline.set_value(cid, value, comp._hl_name, winid)
 
 				--- Left part
@@ -225,7 +234,8 @@ local function update_comp(comp, sid)
 				if lval then
 					lval = format_side_value(lval, lforce)
 					if lval then
-						local updated, lhl_name = update_comp_side_style(comp, sid, "left", style_updated, style)
+						local updated, lhl_name =
+							update_comp_side_style(comp, sid, "left", style_updated, style, auto_theme)
 						if not lhl_name then -- never meet dynamic hl_name
 							Statusline.set_side_value(cid, -1, lval, comp._left_hl_name, lforce, winid)
 						else
@@ -246,7 +256,8 @@ local function update_comp(comp, sid)
 				if rval then
 					rval = format_side_value(rval, rforce)
 					if rval then
-						local updated, rhl_name = update_comp_side_style(comp, sid, "right", style_updated, style)
+						local updated, rhl_name =
+							update_comp_side_style(comp, sid, "right", style_updated, style, auto_theme)
 						if not rhl_name then -- never meet dynamic hl_name
 							Statusline.set_side_value(cid, 1, rval, comp._right_hl_name, rforce, winid)
 						else

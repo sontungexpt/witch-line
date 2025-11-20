@@ -4,6 +4,7 @@ local Id = require("witch-line.constant.id").Id
 local WindSurf = {
 	id = Id["windsurf"],
 	_plug_provided = true,
+	auto_theme = true,
 	static = {
 		icon = {
 			idle = "󰚩",

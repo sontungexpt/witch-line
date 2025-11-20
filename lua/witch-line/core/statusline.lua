@@ -374,7 +374,7 @@ M.render = function(winid)
 	local statusline, opt = GlobalStatusline, vim.o
 	if laststatus ~= 3 then
 		winid = winid or nvim_get_current_win()
-		statusline, opt = get_statusline(winid), vim.wo[winid]
+		statusline, opt = Statusline(winid), vim.wo[winid]
 	end
 
 	local comp_state = statusline.state_map
@@ -411,6 +411,10 @@ M.render = function(winid)
 	opt.statusline = build_value(statusline.slots, comp_state, hidden_slots)
 end
 
+--- Renders the statusline with a debounce.
+--- @see render
+M.render_debounce = require("witch-line.utils").debounce(M.render, 100)
+
 --- Appends a new value to the statusline values list.
 --- @param comp_id? CompId The component ID. Nil means it is a literal component
 --- @param value string The value to append.
@@ -428,6 +432,7 @@ M.push = function(comp_id, value, winid)
 	local new_slots_size = #slots + 1
 
 	if not comp_id then
+		---@diagnostic disable-next-line: cast-local-type
 		comp_id = statusline.literal_n + 1
 		statusline.literal_n = comp_id
 	end
@@ -535,12 +540,11 @@ M.setup = function(disabled_opts)
 	lazy_setup()
 
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
-	local render_debounce = require("witch-line.utils").debounce(M.render, 100)
 	api.nvim_create_autocmd("VimResized", {
 		callback = function()
 			local flexs = get_statusline(nvim_get_current_win()).flexs
 			if flexs and #flexs > 0 then
-				render_debounce()
+				M.render_debounce()
 			end
 		end,
 	})
@@ -576,7 +580,7 @@ M.setup = function(disabled_opts)
 
 						if not disabled and o.laststatus == 0 then
 							api.nvim_set_option_value("laststatus", user_laststatus, {})
-							render_debounce() -- rerender statusline after enabling
+							M.render_debounce() -- rerender statusline after enabling
 						elseif disabled and o.laststatus ~= 0 then
 							user_laststatus = o.laststatus
 							api.nvim_set_option_value("laststatus", 0, {})

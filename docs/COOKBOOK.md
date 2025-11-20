@@ -332,6 +332,21 @@ local component = {
       end}
   ```
 
+- **auto_theme**:
+
+  **Type**: `boolean | fun(self, session_id): boolean`
+
+  **Description**: If set to `true`, the style of the component will be automatically updated based on the current theme.
+  This will not work if user set `auto_theme` to false in `setup` function.
+
+  **Example**:
+
+  ```lua
+  local component = {
+      auto_theme = true -- The style of the component will be automatically updated based on the current theme
+  }
+  ```
+
 - **flexible**:
 
   **Type**: `number | nil`
@@ -478,29 +493,33 @@ local component = {
 
 - **style**:
 
-  | **Type**                                                    | **Description**                                                                                                                   |
+  **Alias**: `ThemeAwareStyle`: This is inherited from `vim.api.keyset.highlight` with new field:
+
+  **Type**:
+  | **Type** | **Description** |
   | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-  | `string`                                                    | A highlight group name to be applied to the component.                                                                            |
-  | `vim.api.keyset.highlight`                                  | A static highlight group to be applied to the component.                                                                          |
-  | `nil`                                                       | No specific highlight group will be applied (default behavior).                                                                   |
-  | `fun(self, session_id): string \| vim.api.keyset.highlight` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
+  | `string` | A highlight group name to be applied to the component. |
+  | `ThemeAwareStyle` | A static highlight group to be applied to the component. |
+  | `nil` | No specific highlight group will be applied (default behavior). |
+  | `fun(self, session_id): string \| ThemeAwareStyle` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
 
   **Description**: The highlight style to be applied to the component.
 
   **Example**:
 
-  - Type: `vim.api.keyset.highlight`
+  - Type: `ThemeAwareStyle`
 
   ```lua
   local component = {
       style = {
           fg = "#ffffff",
           bg = "#000000",
+          auto_theme = false -- disabled auto theme only for style
       }
   }
   ```
 
-  - Type: `fun(self, session_id) -> vim.api.keyset.highlight`
+  - Type: `fun(self, session_id) -> ThemeAwareStyle`
 
   ```lua
   local component = {
@@ -695,7 +714,9 @@ local component = {
 
 - **left_style**:
 
-  **Alias**: `SepStyle` : `0 | 1 | 2 | 3`
+  **Alias**:
+
+  - `SepStyle` : `0 | 1 | 2 | 3`
 
   | **Values**: | **Description**                                                                                                                                                     |
   | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -704,13 +725,17 @@ local component = {
   | 2           | The foreground color of the separator is the background color of the component, and the background color of the separator is `NONE`.                                |
   | 3           | The foreground color of the separator is the background color of the component, and the background color of the separator is the foreground color of the component. |
 
-  | **Type**                                                                       | **Description**                                                                                                                   |
-  | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-  | `SepStyle`                                                                     | A predefined style based on the component's style.                                                                                |
-  | `vim.api.keyset.highlight`                                                     | A static highlight group to be applied to the left part of the component.                                                         |
-  | `nil`                                                                          | No specific highlight group will be applied to the left part (default behavior).                                                  |
-  | `fun(self, session_id): vim.api.keyset.highlight \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
-  | `string`                                                                       | A highlight group name to be applied to the left part of the component.                                                           |
+  - `ThemeAwareStyle`: This is inherited from `vim.api.keyset.highlight` with new field:
+
+  **Type**:
+
+  | **Type**                                                              | **Description**                                                                                                                   |
+  | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+  | `SepStyle`                                                            | A predefined style based on the component's style.                                                                                |
+  | `ThemeAwareStyle`                                                     | A static highlight group to be applied to the left part of the component.                                                         |
+  | `nil`                                                                 | No specific highlight group will be applied to the left part (default behavior).                                                  |
+  | `fun(self, session_id): ThemeAwareStyle \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
+  | `string`                                                              | A highlight group name to be applied to the left part of the component.                                                           |
 
   **Description**: The highlight style to be applied to the left part of the component.
 
@@ -724,18 +749,19 @@ local component = {
   }
   ```
 
-  - Type: `vim.api.keyset.highlight`
+  - Type: `ThemeAwareStyle`
 
   ```lua
   local component = {
       left_style = {
           fg = "#ffffff",
           bg = "#000000",
+          auto_theme = false -- disabled auto theme only for left_style
       }
   }
   ```
 
-  - Type: `fun(self, ctx, static, session_id) -> vim.api.keyset.highlight`
+  - Type: `fun(self, ctx, static, session_id) -> ThemeAwareStyle`
 
   ```lua
   local component = {
@@ -773,7 +799,9 @@ local component = {
 
 - **right_style**:
 
-  **Alias**: `SepStyle` : `0 | 1 | 2 | 3`
+  **Alias**:
+
+  - `SepStyle` : `0 | 1 | 2 | 3`
 
   | **Values**: | **Description**                                                                                                                                                     |
   | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -782,13 +810,17 @@ local component = {
   | 2           | The foreground color of the separator is the background color of the component, and the background color of the separator is `NONE`.                                |
   | 3           | The foreground color of the separator is the background color of the component, and the background color of the separator is the foreground color of the component. |
 
-  | **Type**                                                                       | **Description**                                                                                                                   |
-  | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-  | `SepStyle`                                                                     | A predefined style based on the component's style.                                                                                |
-  | `vim.api.keyset.highlight`                                                     | A static highlight group to be applied to the right part of the component.                                                        |
-  | `nil`                                                                          | No specific highlight group will be applied to the right part (default behavior).                                                 |
-  | `fun(self, session_id): vim.api.keyset.highlight \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
-  | `string`                                                                       | A highlight group name to be applied to the right part of the component.                                                          |
+  - `ThemeAwareStyle`: This is inherited from `vim.api.keyset.highlight` with new field:
+
+  **Type**:
+
+  | **Type**                                                              | **Description**                                                                                                                   |
+  | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+  | `SepStyle`                                                            | A predefined style based on the component's style.                                                                                |
+  | `ThemeAwareStyle`                                                     | A static highlight group to be applied to the right part of the component.                                                        |
+  | `nil`                                                                 | No specific highlight group will be applied to the right part (default behavior).                                                 |
+  | `fun(self, session_id): ThemeAwareStyle \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
+  | `string`                                                              | A highlight group name to be applied to the right part of the component.                                                          |
 
   **Description**: The highlight style to be applied to the right part of the component. It can be a static highlight group or a function that returns a highlight group. If not provided, the default highlight group will be used. The function can be used to create dynamic styles based on the current state of the component, this accepts the `context` field as the second argument, and `static` as the third argument, so you can use those values to determine the style dynamically.
 
@@ -802,18 +834,19 @@ local component = {
   }
   ```
 
-  - Type: `vim.api.keyset.highlight`
+  - Type: `ThemeAwareStyle`
 
   ```lua
   local component = {
       right_style = {
           fg = "#ffffff",
           bg = "#000000",
+          auto_theme = false -- disabled auto theme only for right_style
       }
   }
   ```
 
-  - Type: `fun(self, ctx, static, session_id) -> vim.api.keyset.highlight`
+  - Type: `fun(self, ctx, static, session_id) -> ThemeAwareStyle`
 
   ```lua
   local component = {

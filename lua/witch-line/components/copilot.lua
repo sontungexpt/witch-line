@@ -3,6 +3,7 @@ local Id = require("witch-line.constant.id").Id
 ---@type DefaultComponent
 local Copilot = {
 	id = Id["copilot"],
+	auto_theme = true,
 	_plug_provided = true,
 	static = {
 		icon = {

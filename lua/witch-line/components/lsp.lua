@@ -4,6 +4,7 @@ local colors = require("witch-line.constant.color")
 ---@type DefaultComponent
 local Clients = {
 	id = Id["lsp.clients"],
+	auto_theme = true,
 	_plug_provided = true,
 	events = { "LspAttach", "LspDetach", "BufWritePost" },
 	flexible = 100,

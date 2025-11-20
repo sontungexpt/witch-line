@@ -22,13 +22,10 @@ local M = {}
 --- but may be inherited or referenced by other components.
 --- Typically used to define shared layouts or reusable base definitions.
 --- @field abstracts? CombinedComponent[]
----
---- The final statusline configuration.
---- @field statusline UserConfig.Statusline
----
----
+--- @field statusline UserConfig.Statusline The final statusline configuration.
 --- @field disabled UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
---- @field cache UserConfig.Cache
+--- @field cache UserConfig.Cache Configuration for the cache.
+--- @field auto_theme? boolean Whether to automatically adjust the theme. If it is set to false the `auto_theme` field of the component will be ignored.
 
 --- Apply missing default configuration values to the user-provided config.
 --- Ensures required fields exist (such as `disabled` and `components`)
@@ -94,6 +91,12 @@ M.setup = function(user_configs)
 		apply_statusline_default_components(user_configs.statusline)
 	end
 
+	-- Set auto theme
+	if user_configs.auto_theme == false then
+		require("witch-line.core.highlight").set_auto_theme(false)
+	end
+
+	-- Set up statusline
 	require("witch-line.core.statusline").setup(user_configs.disabled)
 	require("witch-line.core.handler").setup(user_configs, DataAccessor)
 

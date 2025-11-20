@@ -1,9 +1,14 @@
+local bit = require("bit")
+local band, rshift, lshift, bor = bit.band, bit.rshift, bit.lshift, bit.bor
+
 local api, type, next, pcall, pairs = vim.api, type, next, pcall, pairs
 local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name = api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
 
 local shallow_copy = require("witch-line.utils.tbl").shallow_copy
 
 local M = {}
+
+local auto_theme_enabled = true
 
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
@@ -19,6 +24,11 @@ M.get_style = function(comp)
 		return Styles[comp._hl_name]
 	end
 	return nil
+end
+
+--- Sets the auto theme value.
+M.set_auto_theme = function(value)
+	auto_theme_enabled = value
 end
 
 --- Inspects the current highlight cache.
@@ -42,6 +52,12 @@ local function restore_highlight_styles()
 	for hl_name, style in pairs(Styles) do
 		M.highlight(hl_name, style)
 	end
+end
+
+--- Toggles the auto-theme feature.
+M.toggle_auto_theme = function()
+	auto_theme_enabled = not auto_theme_enabled
+	restore_highlight_styles()
 end
 
 api.nvim_create_autocmd("Colorscheme", {
@@ -100,8 +116,7 @@ end
 --- ```
 ---
 --- @param opts table      Options passed to `nvim_get_hl`, typically including `{ name = hl_name }`.
---- @return vim.api.keyset.get_hl_info|nil props  A table containing highlight properties
----                                               (e.g., `fg`, `bg`, `bold`, `italic`), or `nil` if not found.
+--- @return vim.api.keyset.get_hl_info|nil props  A table containing highlight properties (e.g., `fg`, `bg`, `bold`, `italic`), or `nil` if not found.
 M.safe_nvim_get_hl = function(opts)
 	local ok, style = pcall(nvim_get_hl, 0, opts)
 	return ok and style or nil
@@ -164,52 +179,132 @@ M.merge_hl = function(child, parent, n)
 	return child
 end
 
---- Resolve a color definition into a concrete 24-bit RGB value or an inherited highlight property.
+--- Adjust a 24-bit RGB color for better contrast against a background.
+--- Steps:
+--- 1) Lighten or darken the color depending on background luminance.
+--- 2) Apply soft desaturation to avoid harsh colors.
+--- 3) Push color components away from background values if too similar.
+--- 4) Restore some saturation while preserving hue.
+--- The goal is to improve visibility without blowing the color to white.
+local adjust = function(c, bg)
+	-- Unpack background RGB
+	local bg_r = rshift(bg, 16)
+	local bg_g = band(rshift(bg, 8), 0xFF)
+	local bg_b = band(bg, 0xFF)
+
+	-- Unpack color RGB
+	local r = rshift(c, 16)
+	local g = band(rshift(c, 8), 0xFF)
+	local b = band(c, 0xFF)
+
+	-- Background luminance ×1000 to avoid floats
+	local Lbg = bg_r * 299 + bg_g * 587 + bg_b * 114
+	local is_dark = Lbg < 140000
+
+	-- Balanced lighten/darken (safer on bright backgrounds)
+	local gain = is_dark and 1080 or 860
+	r = rshift(r * gain, 10)
+	g = rshift(g * gain, 10)
+	b = rshift(b * gain, 10)
+
+	-- Soft desaturation (push toward a soft gray)
+	local gray = rshift(r + g + b, 2)
+	-- Light background → reduce saturation stronger to reduce glare
+	local desat = is_dark and 0.75 or 0.5
+	r = gray + (r - gray) * desat
+	g = gray + (g - gray) * desat
+	b = gray + (b - gray) * desat
+
+	-- Push components away if too close to background
+	local threshold = is_dark and 58 or 68
+	local base_push = is_dark and 26 or 34
+
+	-- Weighted push: channels with higher difference get stronger push
+	local d = r - bg_r
+	if d < threshold and d > -threshold then
+		r = d > 0 and r + base_push or r - base_push
+	end
+
+	local d2 = g - bg_g
+	if d2 < threshold and d2 > -threshold then
+		g = d2 > 0 and g + base_push or g - base_push
+	end
+
+	local d3 = b - bg_b
+	if d3 < threshold and d3 > -threshold then
+		b = d3 > 0 and b + base_push or b - base_push
+	end
+
+	-- Adaptive saturation: depends on color-background brightness contrast
+	local gray2 = (r + g + b) * 0.333
+	local sat2 = is_dark and 1.15 or 1.30
+	r = gray2 + (r - gray2) * sat2
+	g = gray2 + (g - gray2) * sat2
+	b = gray2 + (b - gray2) * sat2
+
+	-- Clamp to valid range
+	r = r < 0 and 0 or r > 255 and 255 or r
+	g = g < 0 and 0 or g > 255 and 255 or g
+	b = b < 0 and 0 or b > 255 and 255 or b
+
+	-- Pack RGB back into 24-bit
+	return bor(lshift(r, 16), lshift(g, 8), b)
+end
+
+local statusline_opts = {
+	name = "StatusLine",
+}
+
+--- Resolve a color into a 24-bit RGB value, a highlight group property, or "NONE".
 ---
---- This function converts a given color specification into an actual numeric RGB value.
---- The input may be:
---- - A numeric RGB value (e.g. `0xFFAA00`)
---- - A named color string (e.g. `"red"`, `"LightGrey"`)
---- - A highlight group name (e.g. `"Normal"`, `"StatusLine"`)
---- - The literal string `"NONE"`
+--- Supports:
+--- 1. Numeric RGB (e.g., 0xFFAA00) → returned directly (optionally adjusted).
+--- 2. Named colors (e.g., "red") → resolved via Neovim API and cached.
+--- 3. Highlight groups (e.g., "Normal") → fetch `fg` or `bg` field.
+--- 4. "NONE" → returned as-is.
 ---
---- ### Lookup Order
---- 1. **Numeric check:** If `c` is already a number, return it directly.
---- 2. **Cached lookup:** Try to resolve from the cached table `ColorRgb24Bit`.
---- 3. **Neovim API:** Use `nvim_get_color_by_name(c)` to resolve standard color names or hex strings.
---- 4. **Highlight group:** If still unresolved, call `get_hlprop(c)` to fetch another group's color field (`"fg"` or `"bg"`).
----
---- ### Notes
---- - `"NONE"` is returned unchanged to indicate transparent/no color.
---- - Successfully resolved colors are cached in `ColorRgb24Bit` for reuse.
---- - Returns `nil` if the color cannot be resolved.
----
---- @param c string|integer  Color name, numeric RGB value, or highlight group name.
---- @param field "fg"|"bg"   The field to extract when resolving from another highlight group.
---- @return integer|string|nil color  The resolved 24-bit RGB color, `"NONE"`, or `nil` if not found.
-local function resolve_color(c, field)
+--- @param c string|integer|nil  Color name, RGB value, or highlight group.
+--- @param field "fg"|"bg"   Field to fetch from highlight group.
+--- @param auto_adjust? boolean  Adjust color based on statusline background if true.
+--- @return integer|string|nil  Resolved 24-bit RGB, "NONE", or nil if not found.
+local function resolve_color(c, field, auto_adjust)
 	local t = type(c)
-	if t == "number" then
-		return c
-	elseif t ~= "string" or c == "" then
+	local num = c
+	if t == "string" then
+		if c == "NONE" then
+			return "NONE"
+		elseif c == "" then
+			return nil
+		end
+		-- Read cache
+		num = ColorRgb24Bit[c]
+		if not num then
+			num = nvim_get_color_by_name(c)
+			if num ~= -1 then
+				-- cache color
+				ColorRgb24Bit[c] = num
+			else
+				local ok, style = pcall(nvim_get_hl, 0, {
+					name = c,
+					create = false,
+				})
+				if not ok then
+					return nil
+				end
+				-- Not cache here because c can be changed by user
+				num = style[field]
+			end
+		end
+	elseif t ~= "number" then
 		return nil
-	elseif c == "NONE" then
-		return "NONE"
 	end
-	local num = ColorRgb24Bit[c]
-	if num then
-		return num
+
+	--- num is number here
+	if auto_adjust then
+		local stbg = nvim_get_hl(0, statusline_opts).bg
+		return stbg and adjust(num, stbg) or num
 	end
-	num = nvim_get_color_by_name(c)
-	if num ~= -1 then
-		ColorRgb24Bit[c] = num
-		return num
-	end
-	local ok, style = pcall(nvim_get_hl, 0, {
-		name = c,
-		create = false,
-	})
-	return ok and style[field] or nil
+	return num
 end
 
 --- Defines or updates a Neovim highlight group with the given style.
@@ -224,7 +319,7 @@ end
 --- - If empty or invalid, the function does nothing and returns false.
 ---
 --- @param group_name string The name of the highlight group to define or update.
---- @param hl_style string|table The style definition — either a link target or a style table.
+--- @param hl_style CompStyle The style definition — either a link target or a style table.
 --- @return boolean success True if the highlight was applied successfully, false otherwise.
 M.highlight = function(group_name, hl_style)
 	if group_name == "" then
@@ -241,9 +336,14 @@ M.highlight = function(group_name, hl_style)
 	Styles[group_name] = hl_style
 
 	local style = shallow_copy(hl_style)
-	style.foreground = resolve_color(style.foreground or style.fg, "fg")
-	style.background = resolve_color(style.background or style.bg, "bg") or "NONE"
-	style.fg, style.bg = nil, nil
+	local auto_theme = style.auto_theme
+
+	style.fg = resolve_color(style.fg or style.foreground, "fg", auto_theme)
+	style.bg = resolve_color(style.bg or style.background, "bg", auto_theme) or "NONE"
+
+	--- Removed this before highlight because this is the custom value and not valid in nvim_set_hl
+	style.auto_theme = nil
+
 	nvim_set_hl(0, group_name, style)
 	return true
 end
