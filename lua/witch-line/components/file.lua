@@ -125,6 +125,7 @@ local Modifier = {
 local Size = {
 	id = Id["file.size"],
 	_plug_provided = true,
+	events = "BufWritePost",
 	ref = {
 		events = Id["file.interface"],
 	},
