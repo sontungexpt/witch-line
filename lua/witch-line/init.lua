@@ -1,8 +1,10 @@
 local require, type = require, type
+local nvim_create_autocmd = vim.api.nvim_create_autocmd
 
 local M = {}
 
 --- @class UserConfig.Cache
+--- @field enabled? boolean Enable cache. Default false.
 --- @field full_scan? boolean Perform full plugin scan for cache expiration. Default false.
 --- @field notification? boolean Show notification when cache is cleared. Default true.
 --- @field func_strip? boolean Strip debug info when caching dumped functions. Default false.
@@ -43,9 +45,6 @@ local use_default_config = function(user_configs)
 		}
 	end
 
-	if type(user_configs.cache) ~= "table" then
-		user_configs.cache = {}
-	end
 	if type(user_configs.statusline) ~= "table" then
 		---@diagnostic disable-next-line: missing-fields
 		user_configs.statusline = {}
@@ -64,30 +63,48 @@ local apply_statusline_default_components = function(statusline)
 	return statusline
 end
 
---- @param user_configs UserConfig|nil user_configs
+--- @param user_configs? UserConfig user_configs
 M.setup = function(user_configs)
-	local Cache = require("witch-line.cache")
-	local conf_checksum = Cache.config_checksum(user_configs)
+	local cache_opts = type(user_configs) == "table" and user_configs.cache
+	local CacheDataAccessor
+	if type(cache_opts) == "table" and cache_opts.enabled then
+		local Cache = require("witch-line.cache")
+		local conf_checksum = Cache.config_checksum(user_configs)
+
+		-- -- Read cache
+		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.full_scan, cache_opts.notification)
+		local CACHE_MODS = {
+			"witch-line.core.manager.event",
+			"witch-line.core.manager.timer",
+			"witch-line.core.manager",
+			"witch-line.core.statusline",
+			"witch-line.core.highlight",
+		}
+
+		nvim_create_autocmd("VimLeavePre", {
+			once = true,
+			callback = function()
+				if not Cache.loaded() then
+					CacheDataAccessor = Cache.DataAccessor
+					for i = 1, #CACHE_MODS do
+						require(CACHE_MODS[i]).on_vim_leave_pre(CacheDataAccessor)
+					end
+
+					Cache.save(conf_checksum, cache_opts.func_strip)
+				end
+			end,
+		})
+
+		if CacheDataAccessor then
+			for i = 1, #CACHE_MODS do
+				require(CACHE_MODS[i]).load_cache(CacheDataAccessor)
+			end
+		end
+	end
 	user_configs = use_default_config(user_configs)
 
-	local cache_opts = user_configs.cache
-
-	-- Read cache
-	local DataAccessor = Cache.read(conf_checksum, cache_opts.full_scan, cache_opts.notification)
-
-	local CACHE_MODS = {
-		"witch-line.core.manager.event",
-		"witch-line.core.manager.timer",
-		"witch-line.core.manager",
-		"witch-line.core.statusline",
-		"witch-line.core.highlight",
-	}
-
-	if DataAccessor then
-		for i = 1, #CACHE_MODS do
-			require(CACHE_MODS[i]).load_cache(DataAccessor)
-		end
-	else
+	-- Cached is disabled or no cached data
+	if not CacheDataAccessor then
 		apply_statusline_default_components(user_configs.statusline)
 	end
 
@@ -98,23 +115,7 @@ M.setup = function(user_configs)
 
 	-- Set up statusline
 	require("witch-line.core.statusline").setup(user_configs.disabled)
-	require("witch-line.core.handler").setup(user_configs, DataAccessor)
-
-	local nvim_create_autocmd = vim.api.nvim_create_autocmd
-
-	nvim_create_autocmd("VimLeavePre", {
-		once = true,
-		callback = function()
-			if not Cache.loaded() then
-				DataAccessor = Cache.DataAccessor
-				for i = 1, #CACHE_MODS do
-					require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
-				end
-
-				Cache.save(conf_checksum, cache_opts.func_strip)
-			end
-		end,
-	})
+	require("witch-line.core.handler").setup(user_configs, CacheDataAccessor)
 
 	nvim_create_autocmd("CmdlineEnter", {
 		once = true,

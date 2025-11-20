@@ -1,4 +1,4 @@
-local next = next
+local next, vim = next, vim
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
 
 local Session = require("witch-line.core.Session")
@@ -483,7 +483,8 @@ end
 --- Initialize the autocmd for events and user events.
 --- @param work fun(sid: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the sid, component IDs, and event information as arguments.
 M.on_event = function(work)
-	local events, user_events, spectial_events = EventStore.events, EventStore.user_events, EventStore.special_events
+	local events, user_events, spectial_events =
+		EventStore.events, EventStore.user_events, EventStore.special_events
 
 	--- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
 	local id_event_info_map = {}

@@ -1,4 +1,4 @@
-local type = type
+local type, pairs, next = type, pairs, next
 local Component = require("witch-line.core.Component")
 local Session = require("witch-line.core.Session")
 local get_session_store, new_session_store = Session.get_store, Session.new_store
@@ -42,10 +42,7 @@ M.iter_pending_init_components = function()
 	return function()
 		index = index + 1
 		local id = InitializePendingIds[index]
-		if not id then
-			return nil
-		end
-		return id, ManagedComps[id]
+		return id, id and ManagedComps[id]
 	end
 end
 
@@ -62,20 +59,6 @@ end
 --- @param id CompId The ID of the component to mark as urgent.
 M.mark_emergency = function(id)
 	EmergencyIds[#EmergencyIds + 1] = id
-end
-
---- Iterate over the queue of urgent components (FIFO).
---- @return fun(): CompId|, ManagedComponent iterator A function that returns the next component ID in the queue
-M.iter_emergency_components = function()
-	local index = 0
-	return function()
-		index = index + 1
-		local id = EmergencyIds[index]
-		if not id then
-			return nil
-		end
-		return id, ManagedComps[id]
-	end
 end
 
 --- The function to be called before Vim exits.
@@ -187,45 +170,60 @@ end
 --- @param dep_graph_kind DepGraphKind The ID of the dependency store to search in.
 --- @param comp_id CompId The ID of the component to find dependencies for.
 --- @return fun()|fun(): CompId, ManagedComponent An iterator function that returns the next dependent ID and its component.
---- @return DepSet|nil The dependencies map for the given ID, or nil if none exist.
 M.iterate_dependents = function(dep_graph_kind, comp_id)
 	assert(dep_graph_kind and comp_id, "Both dep_graph_id and ref_id must be provided")
 	local store = DepGraphRegistry[dep_graph_kind]
 	local id_map = store and store[comp_id]
 	if not id_map then
-		return function() end, nil
+		return function() end
 	end
 	local curr_id = nil
 	return function()
 		curr_id = next(id_map, curr_id)
-		if curr_id then
-			return curr_id, ManagedComps[curr_id]
-		end
-	end,
-		id_map
+		return curr_id, curr_id and ManagedComps[curr_id]
+	end
 end
 
---- Iterate over all dependency IDs that a given component ID depends on in a specific dependency store
+--- Iterate all missing dependency IDs that a given component ID depends on
 --- @param comp_id CompId The ID of the component to find dependencies for
---- @return fun()|fun(): CompId|nil An iterator function that returns the next dependent ID
-M.iterate_all_dependency_ids = function(comp_id)
-	assert(comp_id, "comp id must be provided")
-
-	local deps = {}
+--- @return fun(): CompId|nil iter An iterator function that returns the next dependent ID
+M.iterate_missing_dependency_ids = function(comp_id)
+	local missings = {}
 	for _, graph in pairs(DepGraphRegistry) do
 		for dep_id, map in pairs(graph) do
-			if map[comp_id] then
-				deps[dep_id] = true
+			if map[comp_id] and not ManagedComps[dep_id] then
+				missings[dep_id] = true
 			end
 		end
 	end
-
 	local id = nil
 	return function()
-		id = next(deps, id)
+		id = next(missings, id)
 		return id
 	end
 end
+
+-- --- Iterate over all dependency IDs that a given component ID depends on in a specific dependency store
+-- --- @param comp_id CompId The ID of the component to find dependencies for
+-- --- @return fun()|fun(): CompId|nil An iterator function that returns the next dependent ID
+-- M.iterate_all_dependency_ids = function(comp_id)
+-- 	assert(comp_id, "comp id must be provided")
+
+-- 	local deps = {}
+-- 	for _, graph in pairs(DepGraphRegistry) do
+-- 		for dep_id, map in pairs(graph) do
+-- 			if map[comp_id] then
+-- 				deps[dep_id] = true
+-- 			end
+-- 		end
+-- 	end
+
+-- 	local id = nil
+-- 	return function()
+-- 		id = next(deps, id)
+-- 		return id
+-- 	end
+-- end
 
 --- Add a dependency for a component.
 --- @param comp ManagedComponent The component to add the dependency for.
@@ -234,17 +232,19 @@ end
 M.link_dependency = function(comp, ref, dep_graph_kind)
 	local store = get_dependency_graph(dep_graph_kind)
 	local id = comp.id
+
 	--- @cast id CompId Id never nil
-
 	if type(ref) ~= "table" then
-		ref = { ref }
-	end
-
-	for i = 1, #ref do
-		local r = ref[i]
-		local dependents = store[r] or {}
+		local dependents = store[ref] or {}
 		dependents[id] = true
-		store[r] = dependents
+		store[ref] = dependents
+	else
+		for i = 1, #ref do
+			local r = ref[i]
+			local dependents = store[r] or {}
+			dependents[id] = true
+			store[r] = dependents
+		end
 	end
 end
 
@@ -264,10 +264,10 @@ M.inspect = function(target)
 	elseif target == "comps" then
 		notifier.info("Inspecting Comps\n" .. vim.inspect(ManagedComps or {}))
 	else
-		notifier.info("Inspecting dep_store and comps: \n" .. vim.inspect({
+		notifier.info("Inspecting dep_store and comps: \n" .. vim.inspect {
 			DepGraph = DepGraphRegistry or {},
 			Comps = ManagedComps or {},
-		}))
+		})
 	end
 end
 

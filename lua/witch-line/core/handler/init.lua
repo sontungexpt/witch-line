@@ -26,7 +26,7 @@ end
 --- @param val any the value of the side
 --- @param is_func boolean|nil Flag indicate that is the side is a function or not
 --- @return nil|string result String if valid, otherwise nil
-local function format_side_value(val, is_func)
+local format_side_value = function(val, is_func)
 	-- Avoid non-string values if function-type
 	if is_func then
 		return type(val) ~= "string" and "" or val
@@ -40,7 +40,7 @@ end
 --- @param style table|string  Style table or style name
 --- @param enable_auto_theme boolean  Whether to enable auto-theme
 --- @return table|string  Updated style table or original string
-local function apply_auto_theme(style, enable_auto_theme)
+local apply_auto_theme = function(style, enable_auto_theme)
 	if type(style) == "table" then
 		style.auto_theme = style.auto_theme or enable_auto_theme
 	end
@@ -164,18 +164,18 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 	if t == "number" and main_style then
 		if side_style == SepStyle.SepFg then
 			side_style = {
-				fg = main_style.foreground or main_style.fg,
+				fg = main_style.fg or main_style.foreground,
 				bg = "NONE",
 			}
 		elseif side_style == SepStyle.SepBg then
 			side_style = {
-				fg = main_style.background or main_style.bg,
+				fg = main_style.bg or main_style.background,
 				bg = "NONE",
 			}
 		elseif side_style == SepStyle.Reverse then
 			side_style = {
-				fg = main_style.background or main_style.bg,
-				bg = main_style.foreground or main_style.fg,
+				fg = main_style.bg or main_style.background,
+				bg = main_style.fg or main_style.foreground,
 			}
 		elseif side_style == SepStyle.Inherited then
 			if not dynamic then
@@ -337,7 +337,7 @@ end
 --- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
 --- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
 M.refresh_component_graph = function(comp, dep_graph_kind, seen)
-	require("witch-line.core.Session").with_session(function(sid)
+	Session.with_session(function(sid)
 		M.update_comp_graph(comp, sid, dep_graph_kind or {
 			DepGraphKind.Event,
 			DepGraphKind.Timer,
@@ -420,12 +420,10 @@ end
 --- @param comp ManagedComponent The component to pull dependencies for.
 local function pull_missing_dependencies(comp)
 	-- Pull missing dependencies from the component's ref field
-	for dep_id in Manager.iterate_all_dependency_ids(comp.id) do
-		if not Manager.is_existed(dep_id) then
-			local c = Component.require_by_id(dep_id)
-			if c then
-				M.register_abstract_component(c)
-			end
+	for dep_id in Manager.iterate_missing_dependency_ids(comp.id) do
+		local c = Component.require_by_id(dep_id)
+		if c then
+			M.register_abstract_component(c)
 		end
 	end
 
@@ -541,11 +539,11 @@ local function register_component(comp, parent_id, winid)
 	local comp_path = comp[0]
 	--- @cast comp_path DefaultId
 	if type(comp_path) == "string" then
-		local c = require("witch-line.core.Component").require_by_id(comp_path)
+		local c = Component.require_by_id(comp_path)
 		-- If c is nil, assume that the user is trying to add the [0] field for other purpose
 		-- so we just ignore it
 		if c then
-			comp = require("witch-line.core.Component").overrides(c, comp)
+			comp = Component.overrides(c, comp)
 		end
 	end
 
@@ -667,11 +665,13 @@ M.setup = function(user_configs, DataAccessor)
 				seen[winid] = true
 				--- Schedule for ensure that filetype and buftype are available
 				vim.schedule(function()
-					local components = statusline.win(winid)
-					if type(components) == "table" then
-						M.register_combined_component(components, nil, winid)
+					if api.nvim_win_is_valid(winid) then
+						local components = statusline.win(winid)
+						if type(components) == "table" then
+							M.register_combined_component(components, nil, winid)
+						end
+						Statusline.render(winid)
 					end
-					Statusline.render(winid)
 				end)
 			end,
 		})
