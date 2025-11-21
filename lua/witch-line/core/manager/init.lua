@@ -128,20 +128,6 @@ M.is_existed = function(id)
 	return ManagedComps[id] ~= nil
 end
 
---- Get the dependency store for a given ID, creating it if it does not exist.
---- @param kind DepGraphKind The ID to get the dependency store for.
---- @param raw? boolean If true, return the raw store without creating it if it doesn't exist.
---- @return DepGraphMap depstore The dependency store for the given ID.
-local get_dependency_graph = function(kind, raw)
-	local dep_store = DepGraphRegistry[kind]
-	if not dep_store and not raw then
-		dep_store = {}
-		DepGraphRegistry[kind] = dep_store
-	end
-	return dep_store
-end
-M.get_dependency_graph = get_dependency_graph
-
 --- A iterator to loop all key, value in the depstore has id
 --- @param id DepGraphKind The ID of the dependency store to iterate over.
 --- @return fun()|fun(): CompId, DepSet An iterator function that returns the next ID and its dependencies.
@@ -183,7 +169,7 @@ M.iterate_missing_dependency_ids = function(comp_id)
 	local missings = {}
 	for _, graph in pairs(DepGraphRegistry) do
 		for dep_id, map in pairs(graph) do
-			if map[comp_id] and not ManagedComps[dep_id] then
+			if not ManagedComps[dep_id] and map[comp_id] then
 				missings[dep_id] = true
 			end
 		end
@@ -222,13 +208,14 @@ end
 --- @param ref CompId|CompId[] The ID or IDs that this component depends on.
 --- @param dep_graph_kind DepGraphKind The ID of the dependency store to use.
 M.link_dependency = function(comp, ref, dep_graph_kind)
-	local store = get_dependency_graph(dep_graph_kind)
-	local id = comp.id
+	local store = DepGraphRegistry[dep_graph_kind] or {}
+	DepGraphRegistry[dep_graph_kind] = store
 
-	--- @cast id CompId Id never nil
+	local cid = comp.id
+
 	if type(ref) ~= "table" then
 		local dependents = store[ref] or {}
-		dependents[id] = true
+		dependents[cid] = true
 		store[ref] = dependents
 		return
 	end
@@ -236,7 +223,7 @@ M.link_dependency = function(comp, ref, dep_graph_kind)
 	for i = 1, #ref do
 		local r = ref[i]
 		local dependents = store[r] or {}
-		dependents[id] = true
+		dependents[cid] = true
 		store[r] = dependents
 	end
 end

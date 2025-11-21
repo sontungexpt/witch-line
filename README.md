@@ -65,7 +65,7 @@ See the magic:
 
 
   -- to witch-line
-  -- You can see the difference and detail about red field and inherit field in [COOKBOOK](./docs/COOKBOOK.md)
+  -- You can see the difference and detail about ref field and inherit field in [COOKBOOK](./docs/COOKBOOK.md)
   local Parent = {
     id = "A"
     style = ...
