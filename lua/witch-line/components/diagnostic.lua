@@ -1,9 +1,11 @@
 local Id = require("witch-line.constant.id").Id
 local DiagnosticSevrity = vim.diagnostic.severity
 
+local INTERFACE_ID = Id["diagnostic.interface"]
+
 --- @type DefaultComponent
 local Interface = {
-	id = Id["diagnostic.interface"],
+	id = INTERFACE_ID,
 	_plug_provided = true,
 	events = "DiagnosticChanged",
 	static = {
@@ -44,9 +46,9 @@ local Error = {
 		fg = "DiagnosticError",
 	},
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = INTERFACE_ID,
+		context = INTERFACE_ID,
+		hidden = INTERFACE_ID,
 	},
 	update = function(self, session_id)
 		local hook = require("witch-line.core.manager.hook")
@@ -63,9 +65,9 @@ local Warn = {
 	id = Id["diagnostic.warn"],
 	_plug_provided = true,
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = INTERFACE_ID,
+		context = INTERFACE_ID,
+		hidden = INTERFACE_ID,
 	},
 	style = {
 		fg = "DiagnosticWarn",
@@ -85,9 +87,9 @@ local Info = {
 	id = Id["diagnostic.info"],
 	_plug_provided = true,
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = INTERFACE_ID,
+		context = INTERFACE_ID,
+		hidden = INTERFACE_ID,
 	},
 	style = {
 		fg = "DiagnosticInfo",
@@ -107,9 +109,9 @@ local Hint = {
 	id = Id["diagnostic.hint"],
 	_plug_provided = true,
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = INTERFACE_ID,
+		context = INTERFACE_ID,
+		hidden = INTERFACE_ID,
 	},
 	style = {
 		fg = "DiagnosticHint",

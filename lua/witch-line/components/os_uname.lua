@@ -5,7 +5,7 @@ local colors = require("witch-line.constant.color")
 return {
 	id = Id["os_uname"],
 	_plug_provided = true,
-	events = { "BufEnter" },
+	events = "UIEnter",
 	static = {
 		icon = {
 			mac = "",
@@ -37,6 +37,6 @@ return {
 			return static_icon.windows, { fg = static_colors.windows }
 		end
 
-		return uname or "󱚟 Unknown OS", { fg = "#ffffff" }
+		return uname or "󱚟  Unknown OS", { fg = "#ffffff" }
 	end,
 }

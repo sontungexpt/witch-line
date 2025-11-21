@@ -13,6 +13,11 @@ local M = {}
 
 local auto_theme_enabled = true
 
+--- Because this is builtin so we can pre compute the id of StatusLine hl group
+local STATUSLINE_HL = {
+	id = api.nvim_get_hl_id_by_name("StatusLine"),
+}
+
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
 
@@ -259,10 +264,6 @@ local adjust = function(c, bg)
 	return bor(lshift(r, 16), lshift(g, 8), b)
 end
 
-local statusline_opts = {
-	name = "StatusLine",
-}
-
 --- Resolve a color into a 24-bit RGB value, a highlight group property, or "NONE".
 ---
 --- Supports:
@@ -306,7 +307,7 @@ local function resolve_color(c, field, auto_adjust)
 
 	--- num is number here
 	if auto_theme_enabled and auto_adjust then
-		local stbg = nvim_get_hl(0, statusline_opts).bg
+		local stbg = nvim_get_hl(0, STATUSLINE_HL).bg
 		return stbg and adjust(num, stbg) or num
 	end
 	return num

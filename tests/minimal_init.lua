@@ -6,67 +6,90 @@ vim.opt.rtp:append(vim.fn.stdpath("data") .. "/lazy/heirline-components.nvim")
 vim.opt.rtp:append(vim.fn.stdpath("data") .. "/lazy/heirline.nvim")
 
 local base_dir = "/home/stilux/Data/Workspace/neovim-plugins/witch-line/tests/benchmark/"
+local bench_file = base_dir .. "benchmarks.txt"
+
 local uv = vim.uv or vim.loop
+local function ensure_file(p)
+	if uv.fs_stat(p) == nil then
+		local fd = uv.fs_open(p, "w", 438)
+		uv.fs_close(fd)
+	end
+end
 
--- Benchmark file path
+ensure_file(bench_file)
 
--- Read numbers from file
-local function read_stats(bench_file)
-	local fd = uv.fs_open(bench_file, "r", 438) -- 438 = 0o666
+-- Read all benchmarks from file: <name> <count> <total> <avg>
+local function read_all_stats()
+	local fd = uv.fs_open(bench_file, "r", 438)
 	if not fd then
-		return 0, 0.0, 0.0 -- count, total, avg
+		return {}
 	end
 
-	local data = uv.fs_read(fd, 1024)
+	local content = uv.fs_read(fd, 4096)
 	uv.fs_close(fd)
 
-	if not data or data == "" then
-		return 0, 0.0, 0.0
+	local stats = {}
+	if not content or content == "" then
+		return stats
 	end
 
-	local count, total, avg = data:match("^(%d+)%s+(%d+%.?%d*)%s+(%d+%.?%d*)$")
-	return tonumber(count), tonumber(total), tonumber(avg)
-end
-
--- Write numbers to file
-local function write_stats(count, total, avg, bench_file)
-	local out = string.format("%d %.4f %.4f", count, total, avg)
-	uv.fs_write(uv.fs_open(bench_file, "w", 438), out)
-end
-
---- Measure a function and record benchmark
---- @param callback fun(): any
-local measure = function(callback, name)
-	local bench_file = base_dir .. "witch-line-bench.txt"
-	if name == "lualine" then
-		bench_file = base_dir .. "lualine-bench.txt"
-	elseif name == "heirline" then
-		bench_file = base_dir .. "heirline-bench.txt"
+	for name, count, total, avg in content:gmatch("(%S+)%s+(%d+)%s+([%d%.]+)%s+([%d%.]+)") do
+		stats[name] = {
+			count = tonumber(count),
+			total = tonumber(total),
+			avg = tonumber(avg),
+		}
 	end
+
+	return stats
+end
+
+-- Write all stats back to file
+local function write_all_stats(stats)
+	local out = {}
+	for name, s in pairs(stats) do
+		out[#out + 1] = string.format("%s %d %.4f %.4f", name, s.count, s.total, s.avg)
+	end
+
+	local fd = uv.fs_open(bench_file, "w", 438)
+	uv.fs_write(fd, table.concat(out, "\n"))
+	uv.fs_close(fd)
+end
+
+--- Measure a function and update benchmark
+local function measure(callback, name)
+	local stats = read_all_stats()
+	local entry = stats[name] or { count = 0, total = 0.0, avg = 0.0 }
 
 	local start = uv.hrtime()
-
-	callback() -- run your setup()
-
+	callback()
 	local elapsed = (uv.hrtime() - start) / 1e6 -- ms
 
-	-- Read previous stats
-	local count, total = read_stats(bench_file)
+	-- Update stats
+	entry.count = entry.count + 1
+	entry.total = entry.total + elapsed
+	entry.avg = entry.total / entry.count
 
-	count = count + 1
-	total = total + elapsed
-	local avg = total / count
-
-	-- Save new stats
-	write_stats(count, total, avg, bench_file)
+	stats[name] = entry
+	write_all_stats(stats)
 
 	-- Print for debugging
 	vim.defer_fn(function()
-		print(string.format(name .. " loaded in %.2f ms | avg %.2f ms (%d runs)", elapsed, avg, count))
+		print(
+			string.format(
+				"%s loaded in %.2f ms | avg %.2f ms (%d runs)",
+				name,
+				elapsed,
+				entry.avg,
+				entry.count
+			)
+		)
 	end, 300)
 
 	return elapsed
 end
+
+-- BENCHMARKS -------------------------------------------------------
 
 measure(function()
 	vim.o.statusline = " "
@@ -86,7 +109,7 @@ measure(function()
 	heirline_components.init.subscribe_to_events()
 	heirline.load_colors(heirline_components.hl.get_colors())
 	heirline.setup {
-		statusline = { -- UI statusbar
+		statusline = {
 			hl = { fg = "fg", bg = "bg" },
 			heirline_components.component.mode(),
 			heirline_components.component.git_branch(),

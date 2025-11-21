@@ -1,9 +1,10 @@
 local colors = require("witch-line.constant.color")
 local Id = require("witch-line.constant.id").Id
 
+local INTERFACE_ID = Id["file.interface"]
 --- @type DefaultComponent
 local Interface = {
-	id = Id["file.interface"],
+	id = INTERFACE_ID,
 	_plug_provided = true,
 	events = "BufEnter",
 	static = {
@@ -66,8 +67,8 @@ local Name = {
 	id = Id["file.name"],
 	_plug_provided = true,
 	ref = {
-		events = Id["file.interface"],
-		context = Id["file.interface"],
+		events = INTERFACE_ID,
+		context = INTERFACE_ID,
 	},
 	style = {
 		fg = colors.orange,
@@ -84,18 +85,13 @@ local Icon = {
 	id = Id["file.icon"],
 	_plug_provided = true,
 	ref = {
-		events = Id["file.interface"],
-		context = Id["file.interface"],
+		events = INTERFACE_ID,
+		context = INTERFACE_ID,
 	},
-	style = function(self, sid)
-		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
-		---@cast ctx {basename:string, icon:string, color:string}
-		return { fg = ctx.color }
-	end,
 	update = function(self, sid)
 		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
 		---@cast ctx {basename:string, icon:string, color:string}
-		return ctx.icon
+		return ctx.icon, { fg = ctx.color }
 	end,
 }
 
@@ -127,7 +123,7 @@ local Size = {
 	_plug_provided = true,
 	events = "BufWritePost",
 	ref = {
-		events = Id["file.interface"],
+		events = INTERFACE_ID,
 	},
 	style = {
 		fg = colors.green,

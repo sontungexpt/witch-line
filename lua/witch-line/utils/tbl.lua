@@ -22,17 +22,6 @@ M.unique_list = function(list)
 end
 
 --- Check if two arrays contain the same elements (order does not matter)
---- The function works by:
---- 1. Counting occurrences of each element in array `a`
---- 2. Decreasing those counts based on elements in array `b`
---- 3. If all counts cancel out (i.e., table `count` is empty) → arrays are equal
----
---- Complexity:
---- - Time: O(n)
---- - Space: O(n)
---- - Ignores element order
---- - Suitable for primitive types (number, string, boolean)
----
 --- Example:
 --- ```lua
 --- arrays_equal({1, 2, 3}, {3, 1, 2})   --> true
@@ -42,7 +31,7 @@ end
 ---
 --- @param a table The first array
 --- @param b table The second array
---- @return boolean True if both arrays contain the same elements (regardless of order)
+--- @return boolean equal True if both arrays contain the same elements (regardless of order)
 M.array_equal = function(a, b)
 	if a == b then
 		return true

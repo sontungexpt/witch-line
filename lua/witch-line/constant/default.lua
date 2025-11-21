@@ -3,7 +3,7 @@ return {
 	"mode",
 	{
 		[0] = "file.name",
-		padding = { left = 1, right = 0 },
+		padding = { left = 1 },
 	},
 	"file.icon",
 	"file.modifier",

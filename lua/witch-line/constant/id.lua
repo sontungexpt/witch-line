@@ -49,6 +49,8 @@ local IdPathMap = {
 
 	["search.count"] = "search\0count",
 	["selection.count"] = "selection\0count",
+
+	["weather"] = "weather",
 }
 
 --- Metatable to access default component IDs with error handling.
@@ -82,6 +84,7 @@ local IdPathMap = {
 --- @field ["search.count"] DefaultId
 --- @field ["selection.count"] DefaultId
 --- @field ["windsurf"] DefaultId
+--- @field ["weather"] DefaultId
 local Id = setmetatable({}, {
 	__index = function(_, key)
 		if IdPathMap[key] then
@@ -116,7 +119,9 @@ return {
 		if type(id) ~= "string" then
 			require("witch-line.utils.notifier").error("Id must be a string")
 		elseif IdPathMap[id] then
-			require("witch-line.utils.notifier").error("Id must be different from default id: " .. tostring(id))
+			require("witch-line.utils.notifier").error(
+				"Id must be different from default id: " .. tostring(id)
+			)
 		end
 		return id
 	end,
