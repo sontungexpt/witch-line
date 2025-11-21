@@ -30,7 +30,6 @@ local Copilot = {
 		local static = self.static
 		--- @cast static {icon: table, fps: number}
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-
 		local timer
 
 		ctx.is_enabled = function()
@@ -76,7 +75,7 @@ local Copilot = {
 								0,
 								math.floor(1000 / static.fps),
 								vim.schedule_wrap(function()
-									refresh_component_graph(self)
+									refresh_component_graph(self, true)
 								end)
 							)
 						end

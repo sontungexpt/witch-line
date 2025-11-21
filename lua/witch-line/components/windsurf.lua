@@ -30,7 +30,9 @@ local WindSurf = {
 				local timer
 				local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 				virtual_text.set_statusbar_refresh(function()
-					if vim.bo.buftype ~= "prompt" and require("codeium.virtual_text").status().state == "waiting" then
+					if
+						vim.bo.buftype ~= "prompt" and require("codeium.virtual_text").status().state == "waiting"
+					then
 						timer = timer or (vim.uv or vim.loop).new_timer()
 						local static = self.static
 						--- @cast static {icon: table, fps: number}
@@ -39,7 +41,8 @@ local WindSurf = {
 								0,
 								math.floor(1000 / static.fps),
 								vim.schedule_wrap(function()
-									refresh_component_graph(self)
+									-- need to render immediately for animation
+									refresh_component_graph(self, true)
 								end)
 							)
 						end

@@ -489,13 +489,15 @@ M.on_event = function(work)
 	--- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
 	local id_event_info_map = {}
 
+	local dispatch_events = function(sid)
+		Session.new_store(sid, EVENT_INFO_STORE_ID, id_event_info_map)
+		work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
+		id_event_info_map = {}
+	end
+
 	local work_debounce = require("witch-line.utils").debounce(function()
-		Session.with_session(function(sid)
-			Session.new_store(sid, EVENT_INFO_STORE_ID, id_event_info_map)
-			work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
-			id_event_info_map = {}
-		end)
-	end, 120)
+		Session.with_session(dispatch_events)
+	end, 100)
 
 	if events and next(events) then
 		nvim_create_autocmd(vim.tbl_keys(events), {

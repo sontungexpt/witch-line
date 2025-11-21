@@ -1,3 +1,3 @@
-lualine 1 4.3824 4.3824
-heirline 1 6.5554 6.5554
-witch-line 1 3.3452 3.3452
+lualine 8 55.3338 6.9167
+heirline 8 55.8404 6.9800
+witch-line 8 27.3934 3.4242

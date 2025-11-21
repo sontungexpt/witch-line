@@ -334,15 +334,21 @@ end
 
 --- Refresh a component and its dependencies in the next session.
 --- @param comp ManagedComponent The component to refresh.
---- @param dep_graph_kind DepGraphKind|DepGraphKind[]|nil Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
---- @param seen table<CompId, true>|nil Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
-M.refresh_component_graph = function(comp, dep_graph_kind, seen)
+--- @param eager? boolean Optional. Whether to update the statusline immediately. Defaults to false.
+--- @param dep_graph_kind? DepGraphKind|DepGraphKind[] Optional. The store to use for dependencies. Defaults to { EventStore.Event, EventStore.Timer }
+--- @param seen? table<CompId, true> Optional. A table to keep track of already seen components to avoid infinite recursion. Defaults to an empty table.
+M.refresh_component_graph = function(comp, eager, dep_graph_kind, seen)
 	Session.with_session(function(sid)
 		M.update_comp_graph(comp, sid, dep_graph_kind or {
 			DepGraphKind.Event,
 			DepGraphKind.Timer,
 		}, seen)
-		Statusline.render()
+
+		if eager then
+			Statusline.render()
+		else
+			Statusline.render_debounce()
+		end
 	end)
 end
 
@@ -669,7 +675,7 @@ M.setup = function(user_configs, CacheDataAccessor)
 						if type(components) == "table" then
 							M.register_combined_component(components, nil, winid)
 						end
-						Statusline.render(winid)
+						Statusline.render_debounce(winid)
 					end
 				end)
 			end,
@@ -678,12 +684,12 @@ M.setup = function(user_configs, CacheDataAccessor)
 
 	Event.on_event(function(sid, ids)
 		M.update_comp_graph_by_ids(ids, sid, DepGraphKind.Event, {})
-		Statusline.render()
+		Statusline.render_debounce()
 	end)
 
 	Timer.on_timer_trigger(function(sid, ids)
 		M.update_comp_graph_by_ids(ids, sid, DepGraphKind.Timer, {})
-		Statusline.render()
+		Statusline.render_debounce()
 	end)
 
 	Session.with_session(function(sid)
@@ -694,7 +700,7 @@ M.setup = function(user_configs, CacheDataAccessor)
 			DepGraphKind.Event,
 			DepGraphKind.Timer,
 		}, {})
-		Statusline.render()
+		Statusline.render_debounce()
 	end)
 end
 

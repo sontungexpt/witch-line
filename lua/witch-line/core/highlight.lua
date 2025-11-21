@@ -7,8 +7,6 @@ local hlID, nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
 local type, next, pcall, pairs = type, next, pcall, pairs
 local string_gsub = string.gsub
 
-local shallow_copy = require("witch-line.utils.tbl").shallow_copy
-
 local M = {}
 
 local auto_theme_enabled = true
@@ -341,7 +339,11 @@ M.highlight = function(group_name, hl_style)
 
 	Styles[group_name] = hl_style
 
-	local style = shallow_copy(hl_style)
+	local style = {} --- Shallow copy
+	for k, v in pairs(hl_style) do
+		style[k] = v
+	end
+
 	local auto_theme = style.auto_theme
 
 	style.fg = resolve_color(style.fg or style.foreground, "fg", auto_theme)

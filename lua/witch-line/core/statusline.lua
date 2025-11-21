@@ -9,6 +9,7 @@ local Highlight = require("witch-line.core.highlight")
 local assign_highlight_name = Highlight.assign_highlight_name
 
 local M = {}
+
 -- Constants controlling the relative index positions for layout calculation.
 -- These are typically used to determine horizontal shifts (e.g., for padding, borders, etc.)
 ---@type integer  Offset index for the left side.
@@ -407,8 +408,7 @@ M.render = function(winid)
 end
 
 --- Renders the statusline with a debounce.
---- @see render
-M.render_debounce = require("witch-line.utils").debounce(M.render, 100)
+M.render_debounce = require("witch-line.utils").debounce(M.render, 80)
 
 --- Appends a new value to the statusline values list.
 --- @param comp_id? CompId The component ID. Nil means it is a literal component
@@ -551,16 +551,6 @@ M.setup = function(disabled_opts)
 
 		if disabled_buftypes or disabled_filetypes then
 			local bo = vim.bo
-			--- Determines if a buffer is disabled based on its filetype and buftype.
-			--- @param bufnr integer The buffer number to check.
-			--- @return boolean disabled True if the buffer is disabled, false otherwise.
-			local is_buf_disabled = function(bufnr)
-				local buf_o = bo[bufnr]
-				return (disabled_filetypes and vim.list_contains(disabled_filetypes, buf_o.filetype))
-					or (disabled_buftypes and vim.list_contains(disabled_buftypes, buf_o.buftype))
-					or false
-			end
-
 			--- For automatically toggle `laststatus` based on buffer filetype and buftype.
 			local user_laststatus = o.laststatus or 3
 
@@ -572,7 +562,12 @@ M.setup = function(disabled_opts)
 							return
 						end
 
-						local disabled = is_buf_disabled(bufnr)
+						local buf_o = bo[bufnr]
+						local disabled = (
+							disabled_filetypes and vim.list_contains(disabled_filetypes, buf_o.filetype)
+						)
+							or (disabled_buftypes and vim.list_contains(disabled_buftypes, buf_o.buftype))
+							or false
 
 						if not disabled and o.laststatus == 0 then
 							api.nvim_set_option_value("laststatus", user_laststatus, {})

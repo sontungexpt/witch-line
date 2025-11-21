@@ -2,15 +2,17 @@ local unpack, type = unpack, type
 local M = {}
 
 --- Creates a debounced version of the given function.
---- The debounced function will only execute after the specified delay has passed since the last invocation.
---- If the debounced function is called again before the delay has passed, the timer resets.
---- @usage
---- @example
---- local debounced_func = M.debounce(function() print("Hello, World!") end, 200)
---- debounced_func() -- Will print "Hello, World!" after 200ms if not called again within that time.
---- @param func function The function to debounce.
---- @param delay number The delay in milliseconds.
---- @return function debounced_func A debounced version of the input function.
+---
+--- The returned function forwards **all arguments** to the original `func`
+--- after the specified delay has passed without further calls.
+---
+--- If the debounced function is invoked again before the delay elapses,
+--- the timer is reset and only the latest arguments are used.
+---
+--- @generic A...  -- generic varargs for LSP
+--- @param func fun(...: A...) The function to debounce. All arguments will be passed through.
+--- @param delay number Delay in milliseconds before invoking `func`.
+--- @return fun(...: A...) debounced_func A debounced version of `func`.
 M.debounce = function(func, delay)
 	local timer, running = nil, false
 	return function(...)

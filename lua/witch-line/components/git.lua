@@ -105,7 +105,7 @@ local Branch = {
 			refresh_component_graph(self)
 		end
 
-		api.nvim_create_autocmd({ "BufEnter" }, {
+		api.nvim_create_autocmd("BufEnter", {
 			callback = function(e)
 				if vim.list_contains(static.disabled.filetypes, vim.bo[e.buf].filetype) then
 					return
@@ -198,7 +198,8 @@ Diff.Interface = {
 	init = function(self, session_id)
 		local vim = vim
 		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
-		local api, bo, tonumber, list_contains, gmatch = vim.api, vim.bo, tonumber, vim.list_contains, string.gmatch
+		local api, bo, tonumber, list_contains, gmatch =
+			vim.api, vim.bo, tonumber, vim.list_contains, string.gmatch
 
 		--- @type table<integer, vim.SystemObj>
 		local processes = {}
