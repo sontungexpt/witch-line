@@ -1,4 +1,4 @@
-local pairs = pairs
+local pairs, type = pairs, type
 local M = {}
 
 local ONE_SECOND = 1000 -- 1 second

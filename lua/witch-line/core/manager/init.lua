@@ -97,7 +97,7 @@ end
 
 --- Iterate over all registered components.
 --- @return fun(): CompId, ManagedComponent iterator Iterator over all components.
---- @return ManagedComponent[] comps The list of all components.
+--- @return table<CompId, ManagedComponent>
 M.iterate_comps = function()
 	return pairs(ManagedComps)
 end
@@ -130,18 +130,11 @@ end
 
 --- Get the dependency store for a given ID, creating it if it does not exist.
 --- @param kind DepGraphKind The ID to get the dependency store for.
---- @param raw boolean|nil If true, return the raw store without creating it if it doesn't exist.
+--- @param raw? boolean If true, return the raw store without creating it if it doesn't exist.
 --- @return DepGraphMap depstore The dependency store for the given ID.
 local get_dependency_graph = function(kind, raw)
-	local id_type = type(kind)
-	assert(id_type == "number" or id_type == "string", "id must be a number or string, got: " .. id_type)
-
 	local dep_store = DepGraphRegistry[kind]
-	if raw then
-		return dep_store
-	end
-
-	if not dep_store then
+	if not dep_store and not raw then
 		dep_store = {}
 		DepGraphRegistry[kind] = dep_store
 	end
@@ -238,13 +231,14 @@ M.link_dependency = function(comp, ref, dep_graph_kind)
 		local dependents = store[ref] or {}
 		dependents[id] = true
 		store[ref] = dependents
-	else
-		for i = 1, #ref do
-			local r = ref[i]
-			local dependents = store[r] or {}
-			dependents[id] = true
-			store[r] = dependents
-		end
+		return
+	end
+
+	for i = 1, #ref do
+		local r = ref[i]
+		local dependents = store[r] or {}
+		dependents[id] = true
+		store[r] = dependents
 	end
 end
 
@@ -328,7 +322,7 @@ do
 			local parent = ManagedComps[inherit_id]
 			if parent then
 				result = find_raw_value(parent, key, seen)
-				if result ~= nil then
+				if result ~= VIM_NIL then
 					if key_cache then
 						key_cache[cid] = result
 					else
@@ -347,7 +341,7 @@ do
 				local ref_comp = ManagedComps[ref_id]
 				if ref_comp then
 					result = find_raw_value(ref_comp, key, seen)
-					if result ~= nil then
+					if result ~= VIM_NIL then
 						-- Keep the lastest ref
 						result[3] = result[3] or ref_comp
 						if key_cache then

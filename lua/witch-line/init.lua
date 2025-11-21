@@ -54,7 +54,8 @@ local use_default_config = function(user_configs)
 end
 
 --- Apply default components to the statusline if it doesn't exist.
---- @param statusline UserConfig.Statusline
+--- @param statusline UserConfig.Statusline the statusline
+--- @return UserConfig.Statusline statusline the changed statusline
 local apply_statusline_default_components = function(statusline)
 	local global = statusline.global
 	if type(global) ~= "table" then
@@ -70,8 +71,7 @@ M.setup = function(user_configs)
 	if type(cache_opts) == "table" and cache_opts.enabled then
 		local Cache = require("witch-line.cache")
 		local conf_checksum = Cache.config_checksum(user_configs)
-
-		-- -- Read cache
+		-- Read cache
 		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.full_scan, cache_opts.notification)
 		local CACHE_MODS = {
 			"witch-line.core.manager.event",

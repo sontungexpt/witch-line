@@ -1,7 +1,7 @@
 local bit = require("bit")
 local bor, band, lshift = bit.bor, bit.band, bit.lshift
 
-local vim, concat, type = vim, table.concat, type
+local vim, concat, type, rawget = vim, table.concat, type, rawget
 local o, api = vim.o, vim.api
 local nvim_strwidth, nvim_get_current_win = api.nvim_strwidth, api.nvim_get_current_win
 
@@ -486,7 +486,8 @@ end
 M.set_hl_name = function(comp_id, new_hl_name, winid)
 	local state = ensure_comp_state(winid, comp_id)
 	local curr_value = state[VALUE_SHIFT]
-	state[VALUE_SHIFT] = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
+	state[VALUE_SHIFT] = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1)
+		or curr_value
 end
 
 --- Sets the left or right side value for a specific component.

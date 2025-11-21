@@ -1,4 +1,4 @@
-local next, vim = next, vim
+local next, type, pairs, vim = next, type, pairs, vim
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
 
 local Session = require("witch-line.core.Session")

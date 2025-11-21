@@ -283,6 +283,7 @@ require("witch-line").setup({
   --- @type CombinedComponent[]
   statusline = {
     --- The global statusline components
+    --- Set it to new if you want to use default components in example
     global = {
         "mode",
         "file.name",
@@ -357,7 +358,7 @@ require("witch-line").setup({
 
 | Key      | Type                              | Description                                                                                                                                                                            |
 | -------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `global` | `CombinedComponent[]`             | Global statusline components.                                                                                                                                                          |
+| `global` | `CombinedComponent[]\|nil`        | Global statusline components. Set to nil if you want to use default components in example.                                                                                             |
 | `win`    | `fun(winid): CombinedComponent[]` | Per-window statusline components. When using this field, you must set `laststatus` to `2` or `1`, and you must add all neccesary components to the `abstracts` field to let it's work. |
 
 Example config using `win` option
@@ -365,7 +366,7 @@ Example config using `win` option
 ```lua
 require("witch-line").setup({
     abstracts = {
-        "battery",
+        "battery", -- pre register battery to use in win option
         -- require("your custom component")
     }
     statusline = {

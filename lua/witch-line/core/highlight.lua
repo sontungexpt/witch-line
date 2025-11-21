@@ -89,7 +89,7 @@ end
 --- @param id CompId The ID to generate the highlight name for.
 --- @return string hl_name The generated highlight name.
 M.make_hl_name_from_id = function(id)
-	return "WL" .. string_gsub(tostring(id), "[^%w_]", "")
+	return "WL" .. string_gsub(id, "[^%w_]", "")
 end
 
 --- Adds a highlight name to a string.hi
