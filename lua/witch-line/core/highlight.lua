@@ -2,8 +2,8 @@ local bit = require("bit")
 local band, rshift, lshift, bor = bit.band, bit.rshift, bit.lshift, bit.bor
 
 local api = vim.api
-local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
-	api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
+local hlID, nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
+	vim.fn.hlID, api.nvim_set_hl, api.nvim_get_hl, api.nvim_get_color_by_name
 local type, next, pcall, pairs = type, next, pcall, pairs
 local string_gsub = string.gsub
 
@@ -124,6 +124,7 @@ end
 --- @param opts table      Options passed to `nvim_get_hl`, typically including `{ name = hl_name }`.
 --- @return vim.api.keyset.get_hl_info|nil props  A table containing highlight properties (e.g., `fg`, `bg`, `bold`, `italic`), or `nil` if not found.
 M.safe_nvim_get_hl = function(opts)
+	-- Not cache here because c can be changed by user
 	local ok, style = pcall(nvim_get_hl, 0, opts)
 	return ok and style or nil
 end
@@ -155,12 +156,12 @@ end
 --- @return CompStyle merged The merged highlight table (or the child table if no merge occurred).
 M.merge_hl = function(child, parent, n)
 	if type(child) == "string" then
-		local ok, s = pcall(nvim_get_hl, 0, {
-			name = child,
-			create = false,
-		})
+		local hlid = hlID(child)
 		---@diagnostic disable-next-line: cast-local-type
-		child = ok and s or nil
+		child = hlid ~= 0 and nvim_get_hl(0, {
+			id = hlid,
+			create = false,
+		}) or nil
 	end
 	local pt = type(parent)
 	if pt == "table" then
@@ -174,12 +175,13 @@ M.merge_hl = function(child, parent, n)
 	end
 
 	if pt == "string" then
-		local ok, pstyle = pcall(nvim_get_hl, 0, {
-			name = parent,
+		local hlid = hlID(parent)
+		local pstyle = hlid ~= 0 and nvim_get_hl(0, {
+			id = hlid,
 			create = false,
-		})
+		}) or nil
 		---@diagnostic disable-next-line: param-type-mismatch, return-type-mismatch
-		return ok and vim.tbl_deep_extend("keep", child or {}, pstyle) or child
+		return pstyle and vim.tbl_deep_extend("keep", child or {}, pstyle) or child
 	end
 	---@cast child CompStyle
 	return child
@@ -290,15 +292,12 @@ local function resolve_color(c, field, auto_adjust)
 				-- cache color
 				ColorRgb24Bit[c] = num
 			else
-				local ok, style = pcall(nvim_get_hl, 0, {
-					name = c,
-					create = false,
-				})
-				if not ok then
+				local hlid = hlID(c)
+				if hlid == 0 then
 					return nil
 				end
 				-- Not cache here because c can be changed by user
-				num = style[field]
+				num = nvim_get_hl(0, { id = hlid, create = false })[field]
 			end
 		end
 	elseif t ~= "number" then

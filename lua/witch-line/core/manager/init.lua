@@ -102,12 +102,6 @@ M.iterate_comps = function()
 	return pairs(ManagedComps)
 end
 
---- Get a list of all registered components.
---- @return ManagedComponent[] The list of all components.
-M.get_list_comps = function()
-	return vim.tbl_values(ManagedComps)
-end
-
 --- Register a component with the component manager.
 --- @param comp ManagedComponent The component to register.
 --- @return ManagedComponent comp The registered component.
