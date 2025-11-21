@@ -258,9 +258,10 @@ end
 
 --- Ensures that the component has a valid id, generating one if it does not.
 --- @param comp Component|DefaultComponent the component to get the id from
+--- @param context_capture boolean whether to capture the context of the component
 --- @return CompId id the id of the component
 --- @return Component comp the component itself, or nil if it is a default component
-Component.setup = function(comp)
+Component.setup = function(comp, context_capture)
 	local id = comp.id
 	if comp._plug_provided then
 		---@cast id CompId
@@ -271,7 +272,9 @@ Component.setup = function(comp)
 		id = tostring(comp) .. tostring(math.random(1, 1000000))
 		rawset(comp, "id", id) -- Ensure the component has an ID field
 	end
-	require("witch-line.core.Component.initial_state").save_initial_context(comp)
+	if context_capture then
+		require("witch-line.core.Component.initial_state").save_initial_context(comp)
+	end
 	---@cast id CompId
 	return id, comp
 end
@@ -547,7 +550,9 @@ Component.register_click_handler = function(comp)
 			end
 		end
 	else
-		require("witch-line.utils.notifier").error("on_click must be a function or the name of a global function")
+		require("witch-line.utils.notifier").error(
+			"on_click must be a function or the name of a global function"
+		)
 		return ""
 	end
 

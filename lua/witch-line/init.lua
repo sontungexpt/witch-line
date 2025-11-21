@@ -71,8 +71,13 @@ M.setup = function(user_configs)
 	if type(cache_opts) == "table" and cache_opts.enabled then
 		local Cache = require("witch-line.cache")
 		local conf_checksum = Cache.config_checksum(user_configs)
+
 		-- Read cache
 		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.full_scan, cache_opts.notification)
+
+		-- Capture initial context of component so that when it is cached, the context can be restored
+		require("witch-line.core.manager").set_captured_initial_context(true)
+
 		local CACHE_MODS = {
 			"witch-line.core.manager.event",
 			"witch-line.core.manager.timer",

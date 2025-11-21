@@ -3,14 +3,22 @@ local Component = require("witch-line.core.Component")
 local Session = require("witch-line.core.Session")
 local get_session_store, new_session_store = Session.get_store, Session.new_store
 
-local M = {}
-
---- @enum DepGraphKind
-M.DepGraphKind = {
-	Visible = 1,
-	Event = 2,
-	Timer = 3,
+local M = {
+	--- @enum DepGraphKind
+	DepGraphKind = {
+		Visible = 1,
+		Event = 2,
+		Timer = 3,
+	},
 }
+
+--- Should the initial context be captured?
+local captured_initial_context = false
+
+--- Set whether the initial context should be captured.
+M.set_captured_initial_context = function(value)
+	captured_initial_context = value
+end
 
 ---@alias DepSet table<CompId, true>
 ---@alias DepGraphMap table<CompId, DepSet>
@@ -106,7 +114,7 @@ end
 --- @param comp ManagedComponent The component to register.
 --- @return ManagedComponent comp The registered component.
 M.register = function(comp)
-	local id = Component.setup(comp)
+	local id = Component.setup(comp, captured_initial_context)
 	local managed = ManagedComps[id]
 	if managed then
 		return managed
