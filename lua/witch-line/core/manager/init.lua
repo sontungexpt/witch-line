@@ -17,8 +17,8 @@ M.DepGraphKind = {
 ---@type table<DepGraphKind, DepGraphMap>
 local DepGraphRegistry = {
 	-- [GraphKind.Display] = {
-	--   [comp_id] = {
-	--     [dep_comp_id] = true, -- comp_id depends on dep_comp_id
+	--   [dependency] = {
+	--     [dependent] = true, -- dependent depends on dependency
 	--   }
 	-- }
 }
@@ -164,7 +164,6 @@ end
 --- @param comp_id CompId The ID of the component to find dependencies for.
 --- @return fun()|fun(): CompId, ManagedComponent An iterator function that returns the next dependent ID and its component.
 M.iterate_dependents = function(dep_graph_kind, comp_id)
-	assert(dep_graph_kind and comp_id, "Both dep_graph_id and ref_id must be provided")
 	local store = DepGraphRegistry[dep_graph_kind]
 	local id_map = store and store[comp_id]
 	if not id_map then
