@@ -487,15 +487,15 @@ M.on_event = function(work)
 		EventStore.events, EventStore.user_events, EventStore.special_events
 
 	--- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
-	local id_event_info_map = {}
+	local event_queue = {}
 
 	local dispatch_events = function(sid)
-		Session.new_store(sid, EVENT_INFO_STORE_ID, id_event_info_map)
-		work(sid, vim.tbl_keys(id_event_info_map), id_event_info_map)
-		id_event_info_map = {}
+		Session.new_store(sid, EVENT_INFO_STORE_ID, event_queue)
+		work(sid, vim.tbl_keys(event_queue), event_queue)
+		event_queue = {}
 	end
 
-	local work_debounce = require("witch-line.utils").debounce(function()
+	local dispatch_debounce = require("witch-line.utils").debounce(function()
 		Session.with_session(dispatch_events)
 	end, 100)
 
@@ -504,9 +504,9 @@ M.on_event = function(work)
 			group = AUGROUP,
 			callback = function(e)
 				for _, id in ipairs(events[e.event]) do
-					id_event_info_map[id] = e
+					event_queue[id] = e
 				end
-				work_debounce()
+				dispatch_debounce()
 			end,
 		})
 	end
@@ -517,9 +517,9 @@ M.on_event = function(work)
 			group = AUGROUP,
 			callback = function(e)
 				for _, id in ipairs(user_events[e.match]) do
-					id_event_info_map[id] = e
+					event_queue[id] = e
 				end
-				work_debounce()
+				dispatch_debounce()
 			end,
 		})
 	end
@@ -533,9 +533,9 @@ M.on_event = function(work)
 				group = AUGROUP,
 				callback = function(e)
 					for _, id in ipairs(entry.ids) do
-						id_event_info_map[id] = e
+						event_queue[id] = e
 					end
-					work_debounce()
+					dispatch_debounce()
 
 					local remove_when = require("witch-line.utils.persist").lazy_decode(entry, "remove_when")
 					if type(remove_when) == "function" then

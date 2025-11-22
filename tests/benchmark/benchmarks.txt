@@ -1,3 +1,3 @@
-heirline 1 6.4605 6.4605
-witch-line 1 3.2801 3.2801
-lualine 1 4.3303 4.3303
+witch-line 7 22.7818 3.2545
+lualine 7 68.9450 9.8493
+heirline 7 50.9467 7.2781

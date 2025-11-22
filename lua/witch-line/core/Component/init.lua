@@ -258,7 +258,7 @@ end
 
 --- Ensures that the component has a valid id, generating one if it does not.
 --- @param comp Component|DefaultComponent the component to get the id from
---- @param context_capture boolean whether to capture the context of the component
+--- @param context_capture? boolean whether to capture the context of the component
 --- @return CompId id the id of the component
 --- @return Component comp the component itself, or nil if it is a default component
 Component.setup = function(comp, context_capture)
