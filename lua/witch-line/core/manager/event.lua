@@ -43,13 +43,13 @@ local EVENT_INFO_STORE_ID = "EventInfo"
 ---   events = {
 ---     [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for nvim events
 ---   },
---- @field events? table<string, CompId[]>
+--- @field events table<string, CompId[]>
 --- Stores component dependencies for user-defined events
 --- ### Example
 --    user_events = {
 -- 	    [event] = { comp_id1, comp_id2, ... } -- Stores component dependencies for user-defined events
 --    },
---- @field user_events? table<string, CompId[]>
+--- @field user_events table<string, CompId[]>
 --- Stores component dependencies for user-defined events
 --- ### Example
 ---   special_events = {
@@ -59,8 +59,12 @@ local EVENT_INFO_STORE_ID = "EventInfo"
 ---       ids = { comp1, comp2 }
 ---     }
 ---   }
---- @field special_events? SpecialEvent[]
-local EventStore = {}
+--- @field special_events SpecialEvent[]
+local EventStore = {
+	events = {},
+	user_events = {},
+	special_events = {},
+}
 
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
@@ -78,7 +82,7 @@ end
 --- Load the event and timer stores from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 M.load_cache = function(CacheDataAccessor)
-	EventStore = CacheDataAccessor["EventStore"]
+	EventStore = CacheDataAccessor["EventStore"] or EventStore
 end
 
 M.inspect = function()
@@ -181,16 +185,6 @@ local find_matching_special_event = function(store, e)
 		end
 	end
 	return -1
-end
-
---- Ensure that `EventStore[key]` exists.
---- If it does not exist, create an empty table for that key.
---- @param key string The key to ensure inside EventStore.
---- @return table store The table associated with the given key.
-local function ensure_store(key)
-	local s = EventStore[key] or {}
-	EventStore[key] = s
-	return s
 end
 
 --- Push a component ID into `store[name]`.
@@ -312,7 +306,7 @@ local function register_string_event(e, comp_id)
 		if event_name == "User" then
 			-- User LazyLoad
 			if patterns and patterns ~= "" then
-				local store = ensure_store("user_events")
+				local store = EventStore.user_events
 				for p in patterns:gmatch("[^,%s]+") do
 					if patterns ~= "*" then
 						register_normal_event(store, p, comp_id)
@@ -327,14 +321,14 @@ local function register_string_event(e, comp_id)
 					ps[n] = p
 				end
 			end
-			local store = ensure_store("special_events")
+			local store = EventStore.special_events
 			register_special_event_entry(store, {
 				name = event_name,
 				pattern = n > 1 and ps or ps[1], -- store string if only 1 value for reduce memory usage.,
 			}, comp_id)
 		else
 			-- BufEnter
-			register_normal_event(ensure_store("events"), event_name, comp_id)
+			register_normal_event(EventStore.events, event_name, comp_id)
 		end
 	end
 end
@@ -403,7 +397,7 @@ local function register_tbl_event(e, comp_id)
 
 	-- No options, no pattern → register as normal event
 	if outs_count == 0 and not pattern then
-		local store = ensure_store("events")
+		local store = EventStore.events
 		for k = 1, event_count do
 			register_normal_event(store, event_names[k], comp_id)
 		end
@@ -420,7 +414,7 @@ local function register_tbl_event(e, comp_id)
 	end
 
 	-- Otherwise → special event
-	register_special_event_entry(ensure_store("special_events"), new, comp_id)
+	register_special_event_entry(EventStore.special_events, new, comp_id)
 end
 
 --- Register events declared by a component.
@@ -435,12 +429,7 @@ end
 ---
 --- @param comp ManagedComponent  The component to register events
 M.register_events = function(comp)
-	local cid = comp.id
-	if not cid then
-		error("Component id must not be nil")
-	end
-
-	local events = comp.events
+	local cid, events = comp.id, comp.events
 	local t = type(events)
 	if t == "string" then
 		register_string_event(events, cid)
@@ -461,13 +450,13 @@ end
 --- Register the component for VimResized event.
 --- @param comp ManagedComponent The component to register for VimResized event.
 M.register_vim_resized = function(comp)
-	register_normal_event(ensure_store("events"), "VimResized", comp.id)
+	register_normal_event(EventStore.events, "VimResized", comp.id)
 end
 
 --- Register the component for WinEnter event.
 --- @param comp ManagedComponent The component to register for WinEnter event.
 M.register_win_enter = function(comp)
-	register_normal_event(ensure_store("events"), "WinEnter", comp.id)
+	register_normal_event(EventStore.events, "WinEnter", comp.id)
 end
 
 --- Get the event information for a component in a session.
@@ -499,7 +488,7 @@ M.on_event = function(work)
 		Session.with_session(dispatch_events)
 	end, 100)
 
-	if events and next(events) then
+	if next(events) then
 		nvim_create_autocmd(vim.tbl_keys(events), {
 			group = AUGROUP,
 			callback = function(e)
@@ -511,7 +500,7 @@ M.on_event = function(work)
 		})
 	end
 
-	if user_events and next(user_events) then
+	if next(user_events) then
 		nvim_create_autocmd("User", {
 			pattern = vim.tbl_keys(user_events),
 			group = AUGROUP,
@@ -524,7 +513,7 @@ M.on_event = function(work)
 		})
 	end
 
-	if spectial_events and next(spectial_events) then
+	if next(spectial_events) then
 		for i = 1, #spectial_events do
 			local entry = spectial_events[i]
 			nvim_create_autocmd(entry.name, {

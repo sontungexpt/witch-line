@@ -316,11 +316,13 @@ require("witch-line").setup({
   },
 
   cache = {
-      -- You can enable cache.
-      -- If you use default configuration or simple configuration. It's may not need to be enabled because it's really fast
-      -- and won't affect performance.
-      -- If your components configuration is so complex such as with many nested childs. You can try
-      -- cache
+      -- You can enable cache here.
+      -- If you use default configuration or simple configuration. You don't need to enable it, it's
+      -- not affect performance.
+      -- If your components configuration is so complex such as with many nested child levels. You can try
+      -- cache it.
+      -- Please consider the performance because reading file from disk is not free. If
+      -- configuration is so simple it will make your loading time longer instead of faster.
       enabled = false,
       -- Perform full plugin scan for cache expiration. Default false. Faster but less accurate.
       full_scan = false,

@@ -24,9 +24,9 @@ local M = {}
 --- but may be inherited or referenced by other components.
 --- Typically used to define shared layouts or reusable base definitions.
 --- @field abstracts? CombinedComponent[]
---- @field statusline UserConfig.Statusline The final statusline configuration.
---- @field disabled UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
---- @field cache UserConfig.Cache Configuration for the cache.
+--- @field statusline? UserConfig.Statusline The final statusline configuration.
+--- @field disabled? UserConfig.Disabled Filetypes/buftypes where statusline is disabled.
+--- @field cache? UserConfig.Cache Configuration for the cache.
 --- @field auto_theme? boolean Whether to automatically adjust the theme. If it is set to false the `auto_theme` field of the component will be ignored.
 
 --- Apply missing default configuration values to the user-provided config.

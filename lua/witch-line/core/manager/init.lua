@@ -99,9 +99,9 @@ M.load_cache = function(CacheDataAccessor)
 		end,
 	})
 
-	DepGraphRegistry = CacheDataAccessor["DepGraph"]
-	InitializePendingIds = CacheDataAccessor["PendingInit"]
-	EmergencyIds = CacheDataAccessor["Urgents"]
+	DepGraphRegistry = CacheDataAccessor["DepGraph"] or DepGraphRegistry
+	InitializePendingIds = CacheDataAccessor["PendingInit"] or InitializePendingIds
+	EmergencyIds = CacheDataAccessor["Urgents"] or EmergencyIds
 end
 
 --- Iterate over all registered components.

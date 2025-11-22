@@ -43,7 +43,7 @@ end
 --- Load the event and timer stores from the persistent storage.
 --- @param 	CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 M.load_cache = function(CacheDataAccessor)
-	TimerStore = CacheDataAccessor["TimerStore"]
+	TimerStore = CacheDataAccessor["TimerStore"] or TimerStore
 end
 --- Register a timer for a component.
 --- @param comp ManagedComponent The component to register the timer for.

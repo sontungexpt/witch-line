@@ -74,17 +74,11 @@ local function measure(callback, name)
 	write_all_stats(stats)
 
 	-- Print for debugging
-	vim.defer_fn(function()
-		print(
-			string.format(
-				"%s loaded in %.2f ms | avg %.2f ms (%d runs)",
-				name,
-				elapsed,
-				entry.avg,
-				entry.count
-			)
-		)
-	end, 300)
+	vim.notify(
+		string.format("%s loaded in %.2f ms | avg %.2f ms (%d runs)", name, elapsed, entry.avg, entry.count),
+		vim.log.levels.DEBUG,
+		{ title = "WitchLine Benchmark" }
+	)
 
 	return elapsed
 end
@@ -93,7 +87,13 @@ end
 
 measure(function()
 	vim.o.statusline = " "
-	require("witch-line").setup()
+	require("witch-line").setup {
+		-- auto_theme = false,
+		-- cache = {
+		-- 	-- func_strip = true,
+		-- 	enabled = true,
+		-- },
+	}
 end, "witch-line")
 
 measure(function()
