@@ -1,4 +1,3 @@
-local require = require
 local Manager = require("witch-line.core.manager")
 local lookup_dynamic_value, lookup_plain_value, plain_inherit =
 	Manager.lookup_dynamic_value, Manager.lookup_plain_value, Manager.plain_inherit

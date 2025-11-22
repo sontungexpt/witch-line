@@ -325,7 +325,7 @@ function M.update_comp_graph(comp, sid, dep_graph_kind, seen)
 		for _, kind in ipairs(dep_graph_kind) do
 			for dep_id, dep_comp in Manager.iterate_dependents(kind, id) do
 				if not seen[dep_id] then
-					M.update_comp_graph(dep_comp, sid, dep_graph_kind, seen)
+					M.update_comp_graph(dep_comp, sid, kind, seen)
 				end
 			end
 		end
@@ -632,6 +632,8 @@ end
 --- @param CacheDataAccessor? Cache.DataAccessor The accessor to cache data if had cache ortherwise nil
 M.setup = function(user_configs, CacheDataAccessor)
 	local statusline = user_configs.statusline
+	--- @cast statusline UserConfig.Statusline
+
 	if not CacheDataAccessor then
 		local abstracts = user_configs.abstracts
 		if type(abstracts) == "table" then

@@ -76,7 +76,7 @@ M.setup = function(user_configs)
 		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.full_scan, cache_opts.notification)
 
 		-- Capture initial context of component so that when it is cached, the context can be restored
-		require("witch-line.core.manager").set_captured_initial_context(true)
+		require("witch-line.core.manager").enable_captured_initial_context()
 
 		local CACHE_MODS = {
 			"witch-line.core.manager.event",

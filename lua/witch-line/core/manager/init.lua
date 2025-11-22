@@ -16,8 +16,8 @@ local M = {
 local captured_initial_context = false
 
 --- Set whether the initial context should be captured.
-M.set_captured_initial_context = function(value)
-	captured_initial_context = value
+M.enable_captured_initial_context = function()
+	captured_initial_context = true
 end
 
 ---@alias DepSet table<CompId, true>

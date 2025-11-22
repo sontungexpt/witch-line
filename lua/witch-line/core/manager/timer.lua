@@ -115,41 +115,42 @@ M.on_timer_trigger = function(work)
 		local timer = uv.new_timer()
 		local tick = 0
 		local threshold = base
-		timer:start(
-			0,
-			base,
-			vim.schedule_wrap(function()
-				tick = tick + 1
-				local elapsed = tick * base
-				local queue, qn = {}, 0
 
-				for interval, comp_ids in pairs(group) do
-					if elapsed % interval == 0 then
-						for i = 1, #comp_ids do
-							-- Collect all components whose intervals match this tick
-							qn = qn + 1
-							queue[qn] = comp_ids[i]
+		if timer then
+			timer:start(0, base, function()
+				vim.schedule(function()
+					tick = tick + 1
+					local elapsed = tick * base
+					local queue, qn = {}, 0
+
+					for interval, comp_ids in pairs(group) do
+						if elapsed % interval == 0 then
+							for i = 1, #comp_ids do
+								-- Collect all components whose intervals match this tick
+								qn = qn + 1
+								queue[qn] = comp_ids[i]
+							end
+						end
+						if threshold % interval ~= 0 then
+							threshold = lcm(threshold, interval)
 						end
 					end
-					if threshold % interval ~= 0 then
-						threshold = lcm(threshold, interval)
+
+					if qn > 0 then
+						Session.with_session(function(sid)
+							work(sid, queue, base)
+							queue, qn = {}, 0
+						end)
 					end
-				end
 
-				if qn > 0 then
-					Session.with_session(function(sid)
-						work(sid, queue, base)
-						queue, qn = {}, 0
-					end)
-				end
-
-				-- Reset cycle when reaching threshold			-- reach the threshold cycle then reset tick
-				if elapsed >= threshold then
-					tick = 0
-				end
+					-- Reset cycle when reaching threshold			-- reach the threshold cycle then reset tick
+					if elapsed >= threshold then
+						tick = 0
+					end
+				end)
 			end)
-		)
-		Timers[base] = timer
+			Timers[base] = timer
+		end
 	end
 end
 

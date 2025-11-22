@@ -302,34 +302,32 @@ end
 local function register_string_event(e, comp_id)
 	-- Extract the event name and trailing pattern section.
 	local event_name, patterns = e:match("^(%S+)%s*(.*)$")
-	if event_name and event_name ~= "" then
-		if event_name == "User" then
-			-- User LazyLoad
-			if patterns and patterns ~= "" then
-				local store = EventStore.user_events
-				for p in patterns:gmatch("[^,%s]+") do
-					if patterns ~= "*" then
-						register_normal_event(store, p, comp_id)
-					end
-				end
+	if not event_name then
+		return
+	elseif patterns == "" then
+		-- No patterns (E.g.: "CursorHold")
+		register_normal_event(EventStore.events, event_name, comp_id)
+	elseif event_name == "User" then
+		-- E.g User LazyLoad
+		local store = EventStore.user_events
+		for p in patterns:gmatch("[^,%s]+") do
+			if p ~= "*" then
+				register_normal_event(store, p, comp_id)
 			end
-		elseif patterns and patterns ~= "" then
-			local ps, n = {}, 0
-			for p in patterns:gmatch("[^,%s]+") do
-				if p ~= "*" then
-					n = n + 1
-					ps[n] = p
-				end
-			end
-			local store = EventStore.special_events
-			register_special_event_entry(store, {
-				name = event_name,
-				pattern = n > 1 and ps or ps[1], -- store string if only 1 value for reduce memory usage.,
-			}, comp_id)
-		else
-			-- BufEnter
-			register_normal_event(EventStore.events, event_name, comp_id)
 		end
+	else
+		-- E.g BufEnter *.lua
+		local ps, n = {}, 0
+		for p in patterns:gmatch("[^,%s]+") do
+			if p ~= "*" then
+				n = n + 1
+				ps[n] = p
+			end
+		end
+		register_special_event_entry(EventStore.special_events, {
+			name = event_name,
+			pattern = n > 1 and ps or ps[1], -- store string if only 1 value for reduce memory usage.,
+		}, comp_id)
 	end
 end
 
@@ -470,7 +468,7 @@ M.get_event_info = function(comp, sid)
 end
 
 --- Initialize the autocmd for events and user events.
---- @param work fun(sid: SessionId, ids: CompId[], event_info: table<string, any>) The function to execute when an event is triggered. It receives the sid, component IDs, and event information as arguments.
+--- @param work fun(sid: SessionId, ids: CompId[], event_info: table<CompId, vim.api.keyset.create_autocmd.callback_args>) The function to execute when an event is triggered. It receives the sid, component IDs, and event information as arguments.
 M.on_event = function(work)
 	local events, user_events, spectial_events =
 		EventStore.events, EventStore.user_events, EventStore.special_events
