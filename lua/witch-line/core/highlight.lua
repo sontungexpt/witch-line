@@ -189,13 +189,11 @@ M.merge_hl = function(child, parent, n)
 	return child
 end
 
---- Adjust a 24-bit RGB color for better contrast against a background.
---- Steps:
---- 1) Lighten or darken the color depending on background luminance.
---- 2) Apply soft desaturation to avoid harsh colors.
---- 3) Push color components away from background values if too similar.
---- 4) Restore some saturation while preserving hue.
---- The goal is to improve visibility without blowing the color to white.
+--- Adjust a 24-bit RGB foreground color to improve readability on a background.
+--- Makes the color softer, clearer, and slightly more saturated without glare.
+--- @param c integer Foreground color (0xRRGGBB)
+--- @param bg integer Background color (0xRRGGBB)
+--- @return integer adjusted 24-bit RGB color
 local adjust = function(c, bg)
 	-- Unpack background RGB
 	local bg_r = rshift(bg, 16)
@@ -212,18 +210,24 @@ local adjust = function(c, bg)
 	local is_dark = Lbg < 140000
 
 	-- Balanced lighten/darken (safer on bright backgrounds)
-	local gain = is_dark and 1080 or 860
+	local gain = is_dark and 1100 or 860
 	r = rshift(r * gain, 10)
 	g = rshift(g * gain, 10)
 	b = rshift(b * gain, 10)
 
 	-- Soft desaturation (push toward a soft gray)
-	local gray = rshift(r + g + b, 2)
 	-- Light background → reduce saturation stronger to reduce glare
+	local gray = rshift(r + g + b, 2)
 	local desat = is_dark and 0.75 or 0.5
 	r = gray + (r - gray) * desat
 	g = gray + (g - gray) * desat
 	b = gray + (b - gray) * desat
+
+	-- Softly blend with background for a smoother, less glaring appearance
+	local blend = is_dark and 0.05 or 0.08
+	r = r * (1 - blend) + bg_r * blend
+	g = g * (1 - blend) + bg_g * blend
+	b = b * (1 - blend) + bg_b * blend
 
 	-- Push components away if too close to background
 	local threshold = is_dark and 58 or 68
