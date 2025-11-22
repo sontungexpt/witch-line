@@ -37,13 +37,13 @@ end
 --- Cache the timer store before exiting Neovim.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for caching the timer store.
 M.on_vim_leave_pre = function(CacheDataAccessor)
-	CacheDataAccessor.set("TimerStore", TimerStore)
+	CacheDataAccessor["TimerStore"] = TimerStore
 end
 
 --- Load the event and timer stores from the persistent storage.
 --- @param 	CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 M.load_cache = function(CacheDataAccessor)
-	TimerStore = CacheDataAccessor.get("TimerStore") or TimerStore
+	TimerStore = CacheDataAccessor["TimerStore"]
 end
 --- Register a timer for a component.
 --- @param comp ManagedComponent The component to register the timer for.

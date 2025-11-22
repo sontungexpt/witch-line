@@ -76,15 +76,15 @@ api.nvim_create_autocmd("Colorscheme", {
 --- The function to be called before Vim exits to save the highlight cache.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the highlight cache.
 M.on_vim_leave_pre = function(CacheDataAccessor)
-	CacheDataAccessor.set("ColorRgb24Bit", ColorRgb24Bit)
-	CacheDataAccessor.set("HighlightStyles", Styles)
+	CacheDataAccessor["ColorRgb24Bit"] = ColorRgb24Bit
+	CacheDataAccessor["HighlightStyles"] = Styles
 end
 
 --- Loads the data from cache  from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the highlight cache.
 M.load_cache = function(CacheDataAccessor)
-	ColorRgb24Bit = CacheDataAccessor.get("ColorRgb24Bit")
-	Styles = CacheDataAccessor.get("HighlightStyles")
+	ColorRgb24Bit = CacheDataAccessor["ColorRgb24Bit"]
+	Styles = CacheDataAccessor["HighlightStyles"]
 	restore_highlight_styles()
 end
 

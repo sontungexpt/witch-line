@@ -264,13 +264,13 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 			end
 		end
 	end
-	CacheDataAccessor.set("GlobalStatusline", GlobalStatusline)
+	CacheDataAccessor["GlobalStatusline"] = GlobalStatusline
 end
 
 --- Loads the statusline cache.
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
 M.load_cache = function(CacheDataAccessor)
-	Statusline[0] = CacheDataAccessor.get("GlobalStatusline")
+	Statusline[0] = CacheDataAccessor["GlobalStatusline"]
 end
 
 --- Computes the total display width of a statusline component including its left and right parts.

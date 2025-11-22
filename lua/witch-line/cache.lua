@@ -21,12 +21,12 @@ local loaded = false
 --- @param config_checksum any The checksum derived from the user config.
 --- @return string checksum The concatenated checksum string.
 local create_checksum = function(config_checksum)
-	return concat({
+	return concat {
 		tostring(config_checksum),
 		tostring(msec),
 		tostring(mnsec),
 		tostring(size),
-	})
+	}
 end
 
 --- Check if the cache has been read and load data to ram
@@ -42,31 +42,21 @@ M.cache_file_readable = function()
 end
 
 --- @alias DataKey string|number
---- @type table<DataKey, any>
-local Data = {}
+--- @class Cache.DataAccessor
+--- @field [DataKey] any The Data table
+
+--- @type Cache.DataAccessor
+local DataAccessor = {}
+M.DataAccessor = DataAccessor
 
 local load_data = function(data)
-	Data = data
+	DataAccessor = data
 	loaded = true
 end
 
---- Encapsulate Data table access
---- This is to prevent direct access to Data table from outside
---- @class Cache.DataAccessor
---- @field get fun(key: DataKey): any Get the value associated with the key in the Data table
---- @field set fun(key: DataKey, value: any): nil Set the value associated
-M.DataAccessor = {
-	get = function(key)
-		return Data[key]
-	end,
-	set = function(key, value)
-		Data[key] = value
-	end,
-}
-
 --- Inspect the Data table
 M.inspect = function()
-	require("witch-line.utils.notifier").info("WitchLine Cache Data\n" .. vim.inspect(Data))
+	require("witch-line.utils.notifier").info("WitchLine Cache Data\n" .. vim.inspect(DataAccessor))
 end
 
 --- Read modification info of the `witch-line` plugin directory.
@@ -116,14 +106,14 @@ M.save = function(config_checksum, dumped_func_strip)
 	end
 
 	local Persist = require("witch-line.utils.persist")
-	local bytecode = Persist.serialize_table_as_bytecode(Data, true, dumped_func_strip)
+	local bytecode = Persist.serialize_table_as_bytecode(DataAccessor, true, dumped_func_strip)
 	if not bytecode then
 		M.clear()
 		return
 	end
 
 	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
-	assert(uv.fs_write(fd, concat({ create_checksum(config_checksum), "\0", bytecode }), 0))
+	assert(uv.fs_write(fd, concat { create_checksum(config_checksum), "\0", bytecode }, 0))
 	assert(uv.fs_close(fd))
 end
 
@@ -134,7 +124,7 @@ M.clear = function(notification)
 		if err then
 			require("witch-line.utils.notifier").error("Error while deleting cache file: " .. err)
 		else
-			Data = {}
+			DataAccessor = {}
 			if notification ~= false then
 				require("witch-line.utils.notifier").info(
 					"Cache deleted successfully. Please restart Neovim for changes to take effect."
@@ -250,8 +240,7 @@ M.read = function(config_checksum, full_scan, notification)
 	end
 
 	load_data(data)
-
-	return M.DataAccessor
+	return DataAccessor
 end
 
 return M

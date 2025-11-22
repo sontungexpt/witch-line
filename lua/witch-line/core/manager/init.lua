@@ -76,16 +76,16 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 		Component.format_state_before_cache(comp)
 		require("witch-line.utils.persist").serialize_function(comp)
 	end
-	CacheDataAccessor.set("CachedComps", ManagedComps)
-	CacheDataAccessor.set("DepGraph", DepGraphRegistry)
-	CacheDataAccessor.set("Urgents", EmergencyIds)
-	CacheDataAccessor.set("PendingInit", InitializePendingIds)
+	CacheDataAccessor["CachedComps"] = ManagedComps
+	CacheDataAccessor["DepGraph"] = DepGraphRegistry
+	CacheDataAccessor["Urgents"] = EmergencyIds
+	CacheDataAccessor["PendingInit"] = InitializePendingIds
 end
 
 --- Load the cache for components and dependency stores.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 M.load_cache = function(CacheDataAccessor)
-	local CachedComps = CacheDataAccessor.get("CachedComps")
+	local CachedComps = CacheDataAccessor["CachedComps"]
 	local Persist = require("witch-line.utils.persist")
 	setmetatable(ManagedComps, {
 		__index = function(t, k)
@@ -98,9 +98,10 @@ M.load_cache = function(CacheDataAccessor)
 			return comp
 		end,
 	})
-	DepGraphRegistry = CacheDataAccessor.get("DepGraph")
-	InitializePendingIds = CacheDataAccessor.get("PendingInit")
-	EmergencyIds = CacheDataAccessor.get("Urgents")
+
+	DepGraphRegistry = CacheDataAccessor["DepGraph"]
+	InitializePendingIds = CacheDataAccessor["PendingInit"]
+	EmergencyIds = CacheDataAccessor["Urgents"]
 end
 
 --- Iterate over all registered components.
