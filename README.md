@@ -230,11 +230,11 @@ If some one remake your current statusline with "witch-line", could you send me 
 
 The benchmarks is run with `nvim -u` with only the statusline plugin loaded.
 
-| Plugin     | Load Time (ms) | Avg Update Time (ms) |
-| ---------- | -------------- | -------------------- |
-| witch-line | 3.4137         |
-| lualine    | 4.4964         |                      |
-| heirline   | 6.3693         |                      |
+| Plugin     | Load Time (ms)        | Avg Update Time (ms) |
+| ---------- | --------------------- | -------------------- |
+| witch-line | 3.4137 (cached: 2.22) |
+| lualine    | 4.4964                |                      |
+| heirline   | 6.3693                |                      |
 
 ---
 

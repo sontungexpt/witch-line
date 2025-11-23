@@ -60,11 +60,16 @@ local EVENT_INFO_STORE_ID = "EventInfo"
 ---     }
 ---   }
 --- @field special_events SpecialEvent[]
-local EventStore = {
-	events = {},
-	user_events = {},
-	special_events = {},
-}
+local EventStore = {}
+
+--- Ensures a store exists.
+--- @param store_name string The name of the store to ensure.
+--- @return table store The store.
+local ensures_store = function(store_name)
+	local store = EventStore[store_name] or {}
+	EventStore[store_name] = store
+	return store
+end
 
 --- The function to be called before Vim exits.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for saving the stores.
@@ -76,7 +81,7 @@ M.on_vim_leave_pre = function(CacheDataAccessor)
 			Persist.serialize_function(entry)
 		end
 	end
-	CacheDataAccessor["EventStore"] = EventStore
+	CacheDataAccessor.EventStore = EventStore
 end
 
 --- Load the event and timer stores from the persistent storage.
@@ -306,10 +311,10 @@ local function register_string_event(e, comp_id)
 		return
 	elseif patterns == "" then
 		-- No patterns (E.g.: "CursorHold")
-		register_normal_event(EventStore.events, event_name, comp_id)
+		register_normal_event(ensures_store("events"), event_name, comp_id)
 	elseif event_name == "User" then
 		-- E.g User LazyLoad
-		local store = EventStore.user_events
+		local store = ensures_store("user_events")
 		for p in patterns:gmatch("[^,%s]+") do
 			if p ~= "*" then
 				register_normal_event(store, p, comp_id)
@@ -324,7 +329,7 @@ local function register_string_event(e, comp_id)
 				ps[n] = p
 			end
 		end
-		register_special_event_entry(EventStore.special_events, {
+		register_special_event_entry(ensures_store("special_events"), {
 			name = event_name,
 			pattern = n > 1 and ps or ps[1], -- store string if only 1 value for reduce memory usage.,
 		}, comp_id)
@@ -395,7 +400,7 @@ local function register_tbl_event(e, comp_id)
 
 	-- No options, no pattern → register as normal event
 	if outs_count == 0 and not pattern then
-		local store = EventStore.events
+		local store = ensures_store("events")
 		for k = 1, event_count do
 			register_normal_event(store, event_names[k], comp_id)
 		end
@@ -412,7 +417,7 @@ local function register_tbl_event(e, comp_id)
 	end
 
 	-- Otherwise → special event
-	register_special_event_entry(EventStore.special_events, new, comp_id)
+	register_special_event_entry(ensures_store("special_events"), new, comp_id)
 end
 
 --- Register events declared by a component.
@@ -448,13 +453,13 @@ end
 --- Register the component for VimResized event.
 --- @param comp ManagedComponent The component to register for VimResized event.
 M.register_vim_resized = function(comp)
-	register_normal_event(EventStore.events, "VimResized", comp.id)
+	register_normal_event(ensures_store("events"), "VimResized", comp.id)
 end
 
 --- Register the component for WinEnter event.
 --- @param comp ManagedComponent The component to register for WinEnter event.
 M.register_win_enter = function(comp)
-	register_normal_event(EventStore.events, "WinEnter", comp.id)
+	register_normal_event(ensures_store("events"), "WinEnter", comp.id)
 end
 
 --- Get the event information for a component in a session.
@@ -484,9 +489,9 @@ M.on_event = function(work)
 
 	local dispatch_debounce = require("witch-line.utils").debounce(function()
 		Session.with_session(dispatch_events)
-	end, 100)
+	end, 110)
 
-	if next(events) then
+	if events and next(events) then
 		nvim_create_autocmd(vim.tbl_keys(events), {
 			group = AUGROUP,
 			callback = function(e)
@@ -498,7 +503,7 @@ M.on_event = function(work)
 		})
 	end
 
-	if next(user_events) then
+	if user_events and next(user_events) then
 		nvim_create_autocmd("User", {
 			pattern = vim.tbl_keys(user_events),
 			group = AUGROUP,
@@ -511,7 +516,7 @@ M.on_event = function(work)
 		})
 	end
 
-	if next(spectial_events) then
+	if spectial_events and next(spectial_events) then
 		for i = 1, #spectial_events do
 			local entry = spectial_events[i]
 			nvim_create_autocmd(entry.name, {

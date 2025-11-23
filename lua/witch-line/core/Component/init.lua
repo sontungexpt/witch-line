@@ -315,7 +315,7 @@ end
 
 --- Returns the field name for the style of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
---- @return CompStyle|nil|SideStyleFunc|SepStyle field_name the field name for the style of the specified side
+--- @return CompStyle|nil|SideStyleFunc|SepStyle side_style the field name for the style of the specified side
 Component.side_style = function(comp, side)
 	return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
 end
