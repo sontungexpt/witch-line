@@ -249,10 +249,10 @@ measure(function()
 
 	require("witch-line").setup {
 		auto_theme = false,
-		cache = {
-			func_strip = true,
-			enabled = true,
-		},
+		-- cache = {
+		-- 	func_strip = true,
+		-- 	enabled = true,
+		-- },
 	}
 end, "witch-line")
 

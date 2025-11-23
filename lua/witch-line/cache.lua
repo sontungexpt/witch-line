@@ -75,11 +75,16 @@ end
 ---
 --- @param config_checksum integer The checksum representing the current user config state.
 --- @param debug_strip? boolean Whether to strip debug info when dumping functions.
-M.save = function(config_checksum, debug_strip)
+--- @param pre_work? fun(CacheDataAccessor: Cache.DataAccessor) A function to run before saving the cache.
+M.save = function(config_checksum, debug_strip, pre_work)
 	local success = fn.mkdir(CACHED_DIR, "p")
 	if success < 0 then
 		error("Failed to create cache directory: " .. CACHED_DIR)
 		return
+	end
+
+	if pre_work then
+		pre_work(DataAccessor)
 	end
 
 	local bytecode =

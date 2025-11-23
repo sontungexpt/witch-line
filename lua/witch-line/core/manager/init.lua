@@ -12,14 +12,6 @@ local M = {
 	},
 }
 
---- Should the initial context be captured?
-local captured_initial_context = false
-
---- Set whether the initial context should be captured.
-M.enable_captured_initial_context = function()
-	captured_initial_context = true
-end
-
 ---@alias DepSet table<CompId, true>
 ---@alias DepGraphMap table<CompId, DepSet>
 ---@type table<DepGraphKind, DepGraphMap>
@@ -115,7 +107,7 @@ end
 --- @param comp ManagedComponent The component to register.
 --- @return ManagedComponent comp The registered component.
 M.register = function(comp)
-	local id = Component.setup(comp, captured_initial_context)
+	local id = Component.setup(comp)
 	local managed = ManagedComps[id]
 	if managed then
 		return managed
