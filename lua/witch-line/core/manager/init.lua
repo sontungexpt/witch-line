@@ -77,7 +77,7 @@ end
 --- Load the cache for components and dependency stores.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 M.load_cache = function(CacheDataAccessor)
-	local CachedComps = CacheDataAccessor["CachedComps"]
+	local CachedComps = CacheDataAccessor.CachedComps
 	local Persist = require("witch-line.utils.persist")
 	setmetatable(ManagedComps, {
 		__index = function(t, k)
@@ -91,9 +91,9 @@ M.load_cache = function(CacheDataAccessor)
 		end,
 	})
 
-	DepGraphRegistry = CacheDataAccessor["DepGraph"] or DepGraphRegistry
-	InitializePendingIds = CacheDataAccessor["PendingInit"] or InitializePendingIds
-	EmergencyIds = CacheDataAccessor["Urgents"] or EmergencyIds
+	DepGraphRegistry = CacheDataAccessor.DepGraph or DepGraphRegistry
+	InitializePendingIds = CacheDataAccessor.PendingInit or InitializePendingIds
+	EmergencyIds = CacheDataAccessor.Urgents or EmergencyIds
 end
 
 --- Iterate over all registered components.

@@ -275,7 +275,7 @@ end
 --- Loads the statusline cache.
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
 M.load_cache = function(CacheDataAccessor)
-	Statusline[0] = CacheDataAccessor["GlobalStatusline"]
+	Statusline[0] = CacheDataAccessor.GlobalStatusline
 end
 
 --- Computes the total display width of a statusline component including its left and right parts.
