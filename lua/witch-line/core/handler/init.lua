@@ -1,5 +1,5 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
-local o, api = vim.o, vim.api
+local api = vim.api
 
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
@@ -207,7 +207,8 @@ local function update_comp(comp, sid)
 	--- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
 	local min_screen_width = Component.min_screen_width(comp, sid)
 
-	local hidden = min_screen_width and o.columns < min_screen_width or Component.hidden(comp, sid)
+	local hidden = min_screen_width and api.nvim_get_option_value("columns", {}) < min_screen_width
+		or Component.hidden(comp, sid)
 
 	if hidden then
 		hide_component(comp)

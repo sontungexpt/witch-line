@@ -2,8 +2,10 @@ local bit = require("bit")
 local bor, band, lshift = bit.bor, bit.band, bit.lshift
 
 local vim, concat, type, rawget = vim, table.concat, type, rawget
-local o, api = vim.o, vim.api
-local nvim_strwidth, nvim_get_current_win = api.nvim_strwidth, api.nvim_get_current_win
+
+local api = vim.api
+local nvim_strwidth, nvim_get_current_win, nvim_get_option_value, nvim_set_option_value =
+	api.nvim_strwidth, api.nvim_get_current_win, api.nvim_get_option_value, api.nvim_set_option_value
 
 local Highlight = require("witch-line.core.highlight")
 local assign_highlight_name = Highlight.assign_highlight_name
@@ -76,8 +78,10 @@ end
 --- since each segment’s positional indices can be updated arithmetically
 --- without rebuilding layout tables.
 --- @class CompState
+--- @diagnostic disable: undefined-doc-name
 --- @field [VALUE_SHIFT]? string The main content area index.
 --- @field [WIDTH_SHIFT]? integer The computed width of main value index.
+--- @diagnostic enable: undefined-doc-name
 --- @field click_handler_form? string The name or ID of the click handler assigned to the segment (not cached).
 --- @field total_width? integer The total rendered width of the segment (not cached).
 --- @field flex? integer The priority of the flexible component.
@@ -171,7 +175,8 @@ end
 --- @param winid? integer Window ID to fetch. Defaults to current window.
 --- @return Statusline state Window-level state table.
 local get_statusline = function(winid)
-	return (o.laststatus == 3 or winid == nil) and GlobalStatusline or Statusline[winid]
+	return ((nvim_get_option_value("laststatus", {}) or 3) == 3 or winid == nil) and GlobalStatusline
+		or Statusline[winid]
 end
 
 --- Returns the sorted list of flexible components.
@@ -357,7 +362,7 @@ end
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param winid? integer The window ID to render the statusline for.
 M.render = function(winid)
-	local laststatus = o.laststatus
+	local laststatus = api.nvim_get_option_value("laststatus", {}) or 3
 	if
 		(winid and not api.nvim_win_is_valid(winid))
 		or laststatus == 0
@@ -367,10 +372,10 @@ M.render = function(winid)
 		return
 	end
 
-	local statusline, opt = GlobalStatusline, vim.o
+	local statusline = GlobalStatusline
 	if laststatus ~= 3 then
 		winid = winid or nvim_get_current_win()
-		statusline, opt = Statusline(winid), vim.wo[winid]
+		statusline = Statusline(winid)
 	end
 
 	local comp_state = statusline.state_map
@@ -379,7 +384,7 @@ M.render = function(winid)
 	local current_flex = flex_list[1]
 
 	if not current_flex then
-		opt.statusline = build_value(statusline.slots, comp_state)
+		nvim_set_option_value("statusline", build_value(statusline.slots, comp_state), { win = winid })
 		return
 	end
 
@@ -390,7 +395,7 @@ M.render = function(winid)
 	local rendered_width = compute_statusline_width(statusline)
 
 	-- Allowed width of window or entire screen
-	local max_width = winid and api.nvim_win_get_width(winid) or o.columns
+	local max_width = winid and api.nvim_win_get_width(winid) or api.nvim_get_option_value("columns", {})
 
 	-- Iterate through flexible components, hiding them one by one
 	-- until the statusline fits the max width.
@@ -404,7 +409,11 @@ M.render = function(winid)
 		current_flex = flex_list[flex_idx]
 	end
 
-	opt.statusline = build_value(statusline.slots, comp_state, hidden_slots)
+	nvim_set_option_value(
+		"statusline",
+		build_value(statusline.slots, comp_state, hidden_slots),
+		{ win = winid }
+	)
 end
 
 --- Renders the statusline with a debounce.
@@ -550,10 +559,8 @@ M.setup = function(disabled_opts)
 		local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
 
 		if disabled_buftypes or disabled_filetypes then
-			local bo = vim.bo
 			--- For automatically toggle `laststatus` based on buffer filetype and buftype.
-			local user_laststatus = o.laststatus or 3
-
+			local user_laststatus = nvim_get_option_value("laststatus", {}) or 3
 			api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 				callback = function(e)
 					local bufnr = e.buf
@@ -562,19 +569,26 @@ M.setup = function(disabled_opts)
 							return
 						end
 
-						local buf_o = bo[bufnr]
 						local disabled = (
-							disabled_filetypes and vim.list_contains(disabled_filetypes, buf_o.filetype)
+							disabled_filetypes
+							and vim.list_contains(
+								disabled_filetypes,
+								nvim_get_option_value("filetype", { buf = bufnr })
+							)
 						)
-							or (disabled_buftypes and vim.list_contains(disabled_buftypes, buf_o.buftype))
+							or (disabled_buftypes and vim.list_contains(
+								disabled_buftypes,
+								nvim_get_option_value("buftype", { buf = bufnr })
+							))
 							or false
 
-						if not disabled and o.laststatus == 0 then
-							api.nvim_set_option_value("laststatus", user_laststatus, {})
+						local laststatus = nvim_get_option_value("laststatus", {})
+						if not disabled and laststatus == 0 then
+							nvim_set_option_value("laststatus", user_laststatus, {})
 							M.render_debounce() -- rerender statusline after enabling
-						elseif disabled and o.laststatus ~= 0 then
-							user_laststatus = o.laststatus
-							api.nvim_set_option_value("laststatus", 0, {})
+						elseif disabled and laststatus ~= 0 then
+							user_laststatus = laststatus
+							nvim_set_option_value("laststatus", 0, {})
 						else
 							return -- no change no need to redrawstatus
 						end
