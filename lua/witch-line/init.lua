@@ -5,7 +5,6 @@ local M = {}
 
 --- @class UserConfig.Cache
 --- @field enabled? boolean Enable cache. Default false.
---- @field full_scan? boolean Perform full plugin scan for cache expiration. Default false.
 --- @field notification? boolean Show notification when cache is cleared. Default true.
 --- @field func_strip? boolean Strip debug info when caching dumped functions. Default false.
 
@@ -68,12 +67,13 @@ end
 M.setup = function(user_configs)
 	local cache_opts = type(user_configs) == "table" and user_configs.cache
 	local CacheDataAccessor
+
 	if type(cache_opts) == "table" and cache_opts.enabled then
 		local Cache = require("witch-line.cache")
 		local conf_checksum = Cache.config_checksum(user_configs)
 
 		-- Read cache
-		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.full_scan, cache_opts.notification)
+		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.notification)
 
 		-- Capture initial context of component so that when it is cached, the context can be restored
 		require("witch-line.core.manager").enable_captured_initial_context()

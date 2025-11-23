@@ -1,5 +1,5 @@
-local vim, concat, tostring, assert = vim, table.concat, tostring, assert
-local fn, uv, nvim_get_runtime_file = vim.fn, vim.uv or vim.loop, vim.api.nvim_get_runtime_file
+local vim, tostring, assert = vim, tostring, assert
+local fn, uv = vim.fn, vim.uv or vim.loop
 
 ---@class Cache
 local M = {}
@@ -7,9 +7,6 @@ local M = {}
 local sep = package.config:sub(1, 1)
 local CACHED_DIR = fn.stdpath("cache") .. sep .. "witch-line"
 local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
-
---- The witch-line plugin dir stat to check if should expire cacche when update plug
-local msec, mnsec, size = 0, 0, 0
 
 local loaded = false
 
@@ -20,12 +17,13 @@ local loaded = false
 ---
 --- @param config_checksum any The checksum derived from the user config.
 --- @return string checksum The concatenated checksum string.
-local create_checksum = function(config_checksum)
-	return concat {
+local create_checksum = function(config_checksum, msec, mnsec, size)
+	return table.concat {
 		tostring(config_checksum),
 		tostring(msec),
 		tostring(mnsec),
 		tostring(size),
+		"\0",
 	}
 end
 
@@ -49,11 +47,6 @@ end
 local DataAccessor = {}
 M.DataAccessor = DataAccessor
 
-local load_data = function(data)
-	DataAccessor = data
-	loaded = true
-end
-
 --- Inspect the Data table
 M.inspect = function()
 	require("witch-line.utils.notifier").info("WitchLine Cache Data\n" .. vim.inspect(DataAccessor))
@@ -61,34 +54,18 @@ end
 
 --- Read modification info of the `witch-line` plugin directory.
 --- Used to detect if the plugin was updated (mtime/size changed).
---- @param deep? boolean If true, also scans all subfiles recursively
-local function read_plugin_stat(deep)
-	local root_dir = nvim_get_runtime_file("**/witch-line", false)[1]
-	local stat = uv.fs_stat(root_dir)
-	if stat then
-		size = size + stat.size
-		local mtime = stat.mtime
-		if mtime then
-			msec, mnsec = mtime.sec, mtime.nsec
-		end
+local read_plugin_stat = function()
+	local root = vim.api.nvim_get_option_value("runtimepath", {}):match("[^,]*/witch%-line")
+	local stat = uv.fs_stat(root)
+	if not stat then
+		return 0, 0, 0
 	end
-	if deep then
-		local paths = nvim_get_runtime_file("**/witch-line/**", true)
-		for i = 1, #paths do
-			local p = paths[i]
-			stat = uv.fs_stat(p)
-			if stat then
-				size = size + stat.size
-				local mtime = stat.mtime
-				if mtime then
-					local sec, nsec = mtime.sec, mtime.nsec
-					if sec > msec or nsec > mnsec then
-						msec, mnsec = sec, nsec
-					end
-				end
-			end
-		end
+
+	local mtime = stat.mtime
+	if mtime then
+		return stat.size or 0, mtime.sec, mtime.nsec
 	end
+	return stat.size or 0, 0, 0
 end
 
 --- Save the current Data table to a cache file.
@@ -97,23 +74,24 @@ end
 --- against changes in configuration or environment.
 ---
 --- @param config_checksum integer The checksum representing the current user config state.
---- @param dumped_func_strip? boolean Whether to strip debug info when dumping functions.
-M.save = function(config_checksum, dumped_func_strip)
+--- @param debug_strip? boolean Whether to strip debug info when dumping functions.
+M.save = function(config_checksum, debug_strip)
 	local success = fn.mkdir(CACHED_DIR, "p")
 	if success < 0 then
 		error("Failed to create cache directory: " .. CACHED_DIR)
 		return
 	end
 
-	local Persist = require("witch-line.utils.persist")
-	local bytecode = Persist.serialize_table_as_bytecode(DataAccessor, true, dumped_func_strip)
+	local bytecode =
+		require("witch-line.utils.persist").serialize_table_as_bytecode(DataAccessor, true, debug_strip)
 	if not bytecode then
 		M.clear()
 		return
 	end
 
 	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
-	assert(uv.fs_write(fd, concat { create_checksum(config_checksum), "\0", bytecode }, 0))
+	local msec, mnsec, size = read_plugin_stat()
+	assert(uv.fs_write(fd, create_checksum(config_checksum, msec, mnsec, size) .. bytecode, 0))
 	assert(uv.fs_close(fd))
 end
 
@@ -186,21 +164,6 @@ M.config_checksum = function(user_configs)
 	})
 end
 
---- Validate the cache file content against the user configs
---- @param content string The content of the cache file
---- @return string|nil bytecode The bytecode part of the cache file if valid, nil otherwise
-local validate_expiration = function(config_checksum, content)
-	local checksum = create_checksum(config_checksum)
-	local len = #checksum
-	if content:sub(1, len) ~= checksum then
-		return nil
-	elseif content:byte(len + 1) ~= 0 then
-		-- the next byte must be \0
-		return nil
-	end
-	return content:sub(len + 2)
-end
-
 --- Read and validate data from the cache file.
 --- This function loads the cache content, verifies the checksum header
 --- against the current configuration state, and optionally performs
@@ -210,36 +173,36 @@ end
 --- or needs to be regenerated.
 ---
 --- @param config_checksum integer The checksum representing the current user configuration.
---- @param full_scan boolean Whether to scan all plugin stat.
 --- @param notification boolean|nil Whether to show a notification when cache is invalid or refreshed.
 --- @return Cache.DataAccessor|nil DataAccessor The DataAccessor if the cache is valid, or nil otherwise.
-M.read = function(config_checksum, full_scan, notification)
+M.read = function(config_checksum, notification)
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
 	if err and err == "ENOENT" then
 		return nil
 	end
-
-	---@diagnostic disable: param-type-mismatch
 	local stat = assert(uv.fs_fstat(fd))
 	local content = assert(uv.fs_read(fd, stat.size, 0))
 	assert(uv.fs_close(fd))
-	---@diagnostic enable: param-type-mismatch
 
-	read_plugin_stat(full_scan)
-	local bytecode = validate_expiration(config_checksum, content)
-	if not bytecode then
-		M.clear(notification)
+	--- Validate the cache file content against the user configs
+	local msec, mnsec, size = read_plugin_stat()
+	local checksum = create_checksum(config_checksum, msec, mnsec, size)
+	local checksum_end = #checksum
+	if content:sub(1, checksum_end) ~= checksum then
 		return nil
 	end
 
-	local Persist = require("witch-line.utils.persist")
-	local data = Persist.deserialize_table_from_bytecode(bytecode)
+	local bytecode = content:sub(checksum_end + 1)
+
+	local data = require("witch-line.utils.persist").deserialize_table_from_bytecode(bytecode)
 	if not data then
 		M.clear(notification)
 		return nil
 	end
 
-	load_data(data)
+	DataAccessor = data
+	loaded = true
+
 	return DataAccessor
 end
 
