@@ -19,7 +19,7 @@ M.debounce = function(func, delay)
 	--- @param ... any Arguments to pass to `func`.
 	return function(...)
 		if not timer then
-			timer = (vim.uv or vim.loop).new_timer()
+			timer = assert((vim.uv or vim.loop).new_timer())
 		elseif running then
 			---@diagnostic disable-next-line: need-check-nil
 			timer:stop()
@@ -27,7 +27,6 @@ M.debounce = function(func, delay)
 		running = true
 
 		local args = { ... }
-		---@diagnostic disable-next-line: need-check-nil
 		timer:start(
 			delay,
 			0,
