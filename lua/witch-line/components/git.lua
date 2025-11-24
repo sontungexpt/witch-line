@@ -19,16 +19,6 @@ local Branch = {
 	},
 	context = {
 		root_dir = nil, -- the root directory of the current git repository
-
-		-- The slower but simpler version
-		-- get_head_file_path = function()
-		--   local fn = vim.fn
-		--   local git_dir = fn.finddir(".git", ".;")
-		--   if git_dir ~= "" then
-		--     return fn.fnamemodify(git_dir, ":p") .. "HEAD"
-		--   end
-		--   return nil
-		-- end,
 	},
 	init = function(self, session_id)
 		local uv, api = vim.uv or vim.loop, vim.api
@@ -36,8 +26,6 @@ local Branch = {
 		--- @cast static { disabled: { filetypes: string[] }, icon: string }
 		local ctx = self.context
 		--- @cast ctx {root_dir: string|nil }
-
-		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
 
 		local get_root_by_git = function(dir_path)
 			local prev = ""
@@ -72,31 +60,30 @@ local Branch = {
 			return nil
 		end
 
-		local file_changed, sec_arg = nil, nil
-		if uv.os_uname().sysname == "Windows_NT" then
-			file_changed = uv.new_fs_poll()
-			sec_arg = 1000
-		else
-			file_changed = uv.new_fs_event()
-			sec_arg = {}
-		end
-
 		-- local last_head_file_path = nil
 		local last_root_dir = nil
 
+		local file_changed, sec_arg = nil, nil
 		-- helper: restart watcher + trigger event
 		local function update_repo(new_dir_path)
 			if not file_changed then
-				return
+				if uv.os_uname().sysname == "Windows_NT" then
+					file_changed = assert(uv.new_fs_poll())
+					sec_arg = 1000
+				else
+					file_changed = assert(uv.new_fs_event())
+					sec_arg = {}
+				end
 			end
 			file_changed:stop()
 
 			if new_dir_path then
 				file_changed:start(
 					new_dir_path,
+					---@cast sec_arg integer|table
 					sec_arg,
 					vim.schedule_wrap(function()
-						refresh_component_graph(self)
+						require("witch-line.core.handler").refresh_component_graph(self)
 					end)
 				)
 			end
@@ -106,7 +93,7 @@ local Branch = {
 			last_root_dir = new_dir_path
 			ctx.root_dir = new_dir_path
 			-- Trigger immediately so the branch text updates
-			refresh_component_graph(self)
+			require("witch-line.core.handler").refresh_component_graph(self)
 		end
 
 		api.nvim_create_autocmd("BufEnter", {

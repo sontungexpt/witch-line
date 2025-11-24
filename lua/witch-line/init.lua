@@ -35,14 +35,6 @@ local M = {}
 --- @return UserConfig normalized The user config with defaults safely applied.
 local use_default_config = function(user_configs)
 	user_configs = type(user_configs) == "table" and user_configs or {}
-	if type(user_configs.disabled) ~= "table" then
-		user_configs.disabled = {
-			-- buftypes = {
-			-- 	-- "terminal",
-			-- },
-		}
-	end
-
 	if type(user_configs.statusline) ~= "table" then
 		---@diagnostic disable-next-line: missing-fields
 		user_configs.statusline = {}
