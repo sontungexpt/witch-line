@@ -1,11 +1,10 @@
+local api = vim.api
 local bit = require("bit")
 local bor, band, lshift = bit.bor, bit.band, bit.lshift
+local concat, type, rawget = table.concat, type, rawget
 
-local vim, concat, type, rawget = vim, table.concat, type, rawget
-
-local api = vim.api
-local nvim_strwidth, nvim_get_current_win, nvim_get_option_value, nvim_set_option_value =
-	api.nvim_strwidth, api.nvim_get_current_win, api.nvim_get_option_value, api.nvim_set_option_value
+local nvim_strwidth, nvim_get_option_value, nvim_set_option_value =
+	api.nvim_strwidth, api.nvim_get_option_value, api.nvim_set_option_value
 
 local Highlight = require("witch-line.core.highlight")
 local assign_highlight_name = Highlight.assign_highlight_name
@@ -275,7 +274,7 @@ end
 --- Loads the statusline cache.
 --- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
 M.load_cache = function(CacheDataAccessor)
-	Statusline[0] = CacheDataAccessor["GlobalStatusline"]
+	Statusline[0] = CacheDataAccessor.GlobalStatusline
 end
 
 --- Computes the total display width of a statusline component including its left and right parts.
@@ -362,7 +361,7 @@ end
 --- If the statusline is disabled, it sets `o.statusline` to a single space.
 --- @param winid? integer The window ID to render the statusline for.
 M.render = function(winid)
-	local laststatus = api.nvim_get_option_value("laststatus", {}) or 3
+	local laststatus = nvim_get_option_value("laststatus", {})
 	if
 		(winid and not api.nvim_win_is_valid(winid))
 		or laststatus == 0
@@ -374,8 +373,8 @@ M.render = function(winid)
 
 	local statusline = GlobalStatusline
 	if laststatus ~= 3 then
-		winid = winid or nvim_get_current_win()
-		statusline = Statusline(winid)
+		winid = winid or api.nvim_get_current_win()
+		statusline = Statusline[winid]
 	end
 
 	local comp_state = statusline.state_map
@@ -395,7 +394,7 @@ M.render = function(winid)
 	local rendered_width = compute_statusline_width(statusline)
 
 	-- Allowed width of window or entire screen
-	local max_width = winid and api.nvim_win_get_width(winid) or api.nvim_get_option_value("columns", {})
+	local max_width = winid and api.nvim_win_get_width(winid) or nvim_get_option_value("columns", {})
 
 	-- Iterate through flexible components, hiding them one by one
 	-- until the statusline fits the max width.
@@ -547,8 +546,8 @@ M.setup = function(disabled_opts)
 	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
 	api.nvim_create_autocmd("VimResized", {
 		callback = function()
-			local flexs = get_statusline(nvim_get_current_win()).flexs
-			if flexs and #flexs > 0 then
+			local flexs = get_statusline(api.nvim_get_current_win()).flexs
+			if flexs and next(flexs) then
 				M.render_debounce()
 			end
 		end,
@@ -560,7 +559,7 @@ M.setup = function(disabled_opts)
 
 		if disabled_buftypes or disabled_filetypes then
 			--- For automatically toggle `laststatus` based on buffer filetype and buftype.
-			local user_laststatus = nvim_get_option_value("laststatus", {}) or 3
+			local user_laststatus = nvim_get_option_value("laststatus", {})
 			api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
 				callback = function(e)
 					local bufnr = e.buf

@@ -12,14 +12,6 @@ local M = {
 	},
 }
 
---- Should the initial context be captured?
-local captured_initial_context = false
-
---- Set whether the initial context should be captured.
-M.enable_captured_initial_context = function()
-	captured_initial_context = true
-end
-
 ---@alias DepSet table<CompId, true>
 ---@alias DepGraphMap table<CompId, DepSet>
 ---@type table<DepGraphKind, DepGraphMap>
@@ -85,7 +77,7 @@ end
 --- Load the cache for components and dependency stores.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the stores.
 M.load_cache = function(CacheDataAccessor)
-	local CachedComps = CacheDataAccessor["CachedComps"]
+	local CachedComps = CacheDataAccessor.CachedComps
 	local Persist = require("witch-line.utils.persist")
 	setmetatable(ManagedComps, {
 		__index = function(t, k)
@@ -98,10 +90,9 @@ M.load_cache = function(CacheDataAccessor)
 			return comp
 		end,
 	})
-
-	DepGraphRegistry = CacheDataAccessor["DepGraph"] or DepGraphRegistry
-	InitializePendingIds = CacheDataAccessor["PendingInit"] or InitializePendingIds
-	EmergencyIds = CacheDataAccessor["Urgents"] or EmergencyIds
+	DepGraphRegistry = CacheDataAccessor.DepGraph or DepGraphRegistry
+	InitializePendingIds = CacheDataAccessor.PendingInit or InitializePendingIds
+	EmergencyIds = CacheDataAccessor.Urgents or EmergencyIds
 end
 
 --- Iterate over all registered components.
@@ -115,7 +106,7 @@ end
 --- @param comp ManagedComponent The component to register.
 --- @return ManagedComponent comp The registered component.
 M.register = function(comp)
-	local id = Component.setup(comp, captured_initial_context)
+	local id = Component.setup(comp)
 	local managed = ManagedComps[id]
 	if managed then
 		return managed

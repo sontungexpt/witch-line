@@ -258,10 +258,9 @@ end
 
 --- Ensures that the component has a valid id, generating one if it does not.
 --- @param comp Component|DefaultComponent the component to get the id from
---- @param context_capture? boolean whether to capture the context of the component
 --- @return CompId id the id of the component
 --- @return Component comp the component itself, or nil if it is a default component
-Component.setup = function(comp, context_capture)
+Component.setup = function(comp)
 	local id = comp.id
 	if comp._plug_provided then
 		---@cast id CompId
@@ -272,9 +271,7 @@ Component.setup = function(comp, context_capture)
 		id = tostring(comp) .. tostring(math.random(1, 1000000))
 		rawset(comp, "id", id) -- Ensure the component has an ID field
 	end
-	if context_capture then
-		require("witch-line.core.Component.initial_state").save_initial_context(comp)
-	end
+	require("witch-line.core.Component.initial_state").save_initial_context(comp)
 	---@cast id CompId
 	return id, comp
 end
@@ -318,7 +315,7 @@ end
 
 --- Returns the field name for the style of the specified side.
 --- @param side "left"|"right" the side to get the field name for, either "left" or "right"
---- @return CompStyle|nil|SideStyleFunc|SepStyle field_name the field name for the style of the specified side
+--- @return CompStyle|nil|SideStyleFunc|SepStyle side_style the field name for the style of the specified side
 Component.side_style = function(comp, side)
 	return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
 end
@@ -359,10 +356,7 @@ end
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require_by_id = function(id)
 	local path = require("witch-line.constant.id").path(id)
-	if not path then
-		return nil
-	end
-	return Component.require(path)
+	return path and Component.require(path) or nil
 end
 
 --- Requires a default component by its path.

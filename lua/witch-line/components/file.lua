@@ -33,7 +33,7 @@ local Interface = {
 	context = function(self)
 		local api, fs, bo = vim.api, vim.fs, vim.bo
 		local static = self.static
-		--- @cast static {formatter: {filetype: table<string, string>, buftype: table<string, string>}, extensions:{filetypes: table<string, {[1]:string, [2]:string, [3]:string}>}}
+		--- @cast static {formatter: {filetype: table<string, {[1]:string|function, [2]:string, [3]:string}>, buftype: table<string, {[1]: string|function, [2]: string, [3]: string}>} }
 		local fmt = static.formatter
 		local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
 		if formatter then
@@ -46,7 +46,7 @@ local Interface = {
 			}
 		end
 		local basename, icon, color_icon
-		basename = vim.fs.basename(vim.api.nvim_buf_get_name(0))
+		basename = fs.basename(api.nvim_buf_get_name(0))
 
 		local ok, devicons = pcall(require, "nvim-web-devicons")
 		if ok then

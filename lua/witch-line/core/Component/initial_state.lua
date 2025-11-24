@@ -7,7 +7,6 @@ local M = {}
 --- @note The context is deep-copied to avoid mutations
 M.save_initial_context = function(comp)
 	local id = comp.id
-	---@cast id CompId
 	local ctx = comp.context
 	if type(ctx) == "table" then
 		ctx = vim.deepcopy(ctx)
@@ -20,12 +19,8 @@ end
 --- @note This should be called when exit vim and the component is prepared to cache
 M.restore_initial_context = function(comp)
 	local id = comp.id
-	---@cast id CompId
 	local ctx = initial_context[id]
 	if ctx then
-		if type(ctx) == "table" then
-			ctx = vim.deepcopy(ctx)
-		end
 		rawset(comp, "context", ctx)
 	end
 end

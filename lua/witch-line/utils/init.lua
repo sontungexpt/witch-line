@@ -12,12 +12,14 @@ local M = {}
 --- @generic A...  -- generic varargs for LSP
 --- @param func fun(...: A...) The function to debounce. All arguments will be passed through.
 --- @param delay number Delay in milliseconds before invoking `func`.
---- @return fun(...: A...) debounced_func A debounced version of `func`.
+--- @return fun(...: A...)   debounced_func A debounced version of `func`.
 M.debounce = function(func, delay)
 	local timer, running = nil, false
+
+	--- @param ... any Arguments to pass to `func`.
 	return function(...)
 		if not timer then
-			timer = (vim.uv or vim.loop).new_timer()
+			timer = assert((vim.uv or vim.loop).new_timer())
 		elseif running then
 			---@diagnostic disable-next-line: need-check-nil
 			timer:stop()
@@ -25,7 +27,6 @@ M.debounce = function(func, delay)
 		running = true
 
 		local args = { ... }
-		---@diagnostic disable-next-line: need-check-nil
 		timer:start(
 			delay,
 			0,

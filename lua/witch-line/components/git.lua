@@ -19,8 +19,15 @@ local Branch = {
 	},
 	context = {
 		root_dir = nil, -- the root directory of the current git repository
-		get_root_by_git = function(dir_path)
-			local uv = vim.uv or vim.loop
+	},
+	init = function(self, session_id)
+		local uv, api = vim.uv or vim.loop, vim.api
+		local static = self.static
+		--- @cast static { disabled: { filetypes: string[] }, icon: string }
+		local ctx = self.context
+		--- @cast ctx {root_dir: string|nil }
+
+		local get_root_by_git = function(dir_path)
 			local prev = ""
 			local dir = dir_path or uv.cwd()
 			while dir ~= prev do
@@ -51,48 +58,32 @@ local Branch = {
 				dir = dir:match("^(.*)[/\\][^/\\]+$") or dir -- fallback to prevent infinite loop when reaching root
 			end
 			return nil
-		end,
-
-		-- The slower but simpler version
-		-- get_head_file_path = function()
-		--   local fn = vim.fn
-		--   local git_dir = fn.finddir(".git", ".;")
-		--   if git_dir ~= "" then
-		--     return fn.fnamemodify(git_dir, ":p") .. "HEAD"
-		--   end
-		--   return nil
-		-- end,
-	},
-	init = function(self, session_id)
-		local uv, api = vim.uv or vim.loop, vim.api
-		local static = self.static
-		--- @cast static { disabled: { filetypes: string[] }, icon: string }
-		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx {root_dir: string|nil, get_root_by_git: fun():string }
-		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
-
-		local file_changed, sec_arg = nil, nil
-		if uv.os_uname().sysname == "Windows_NT" then
-			file_changed = uv.new_fs_poll()
-			sec_arg = 1000
-		else
-			file_changed = uv.new_fs_event()
-			sec_arg = {}
 		end
 
 		-- local last_head_file_path = nil
 		local last_root_dir = nil
 
+		local file_changed, sec_arg = nil, nil
 		-- helper: restart watcher + trigger event
 		local function update_repo(new_dir_path)
+			if not file_changed then
+				if uv.os_uname().sysname == "Windows_NT" then
+					file_changed = assert(uv.new_fs_poll())
+					sec_arg = 1000
+				else
+					file_changed = assert(uv.new_fs_event())
+					sec_arg = {}
+				end
+			end
 			file_changed:stop()
 
 			if new_dir_path then
 				file_changed:start(
 					new_dir_path,
+					---@cast sec_arg integer|table
 					sec_arg,
 					vim.schedule_wrap(function()
-						refresh_component_graph(self)
+						require("witch-line.core.handler").refresh_component_graph(self)
 					end)
 				)
 			end
@@ -102,7 +93,7 @@ local Branch = {
 			last_root_dir = new_dir_path
 			ctx.root_dir = new_dir_path
 			-- Trigger immediately so the branch text updates
-			refresh_component_graph(self)
+			require("witch-line.core.handler").refresh_component_graph(self)
 		end
 
 		api.nvim_create_autocmd("BufEnter", {
@@ -115,7 +106,7 @@ local Branch = {
 					return -- still in the same repo
 				end
 
-				local new_root_dir = ctx.get_root_by_git(file:match("^(.*)/[^/]*$"))
+				local new_root_dir = get_root_by_git(file:match("^(.*)/[^/]*$"))
 
 				--local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
 
@@ -148,8 +139,9 @@ local Branch = {
 	end,
 	style = { fg = colors.green },
 	update = function(self, session_id)
-		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx {root_dir: string|nil, get_root_by_git: fun():string }
+		local ctx = self.context
+
+		--- @cast ctx {root_dir: string|nil }
 		if not ctx.root_dir then
 			return ""
 		end
@@ -190,7 +182,6 @@ Diff.Interface = {
 		},
 	},
 	context = {
-
 		-- get_diff = function (bufnr)
 		--   -- return self.temp.diff[bufnr]
 		-- end,

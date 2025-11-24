@@ -82,8 +82,8 @@ end
 --- Loads the data from cache  from the persistent storage.
 --- @param CacheDataAccessor Cache.DataAccessor The cache module to use for loading the highlight cache.
 M.load_cache = function(CacheDataAccessor)
-	ColorRgb24Bit = CacheDataAccessor["ColorRgb24Bit"] or ColorRgb24Bit
-	Styles = CacheDataAccessor["HighlightStyles"] or Styles
+	ColorRgb24Bit = CacheDataAccessor.ColorRgb24Bit or ColorRgb24Bit
+	Styles = CacheDataAccessor.HighlightStyles or Styles
 	restore_highlight_styles()
 end
 

@@ -1,15 +1,11 @@
-local vim, concat, tostring, assert = vim, table.concat, tostring, assert
-local fn, uv, nvim_get_runtime_file = vim.fn, vim.uv or vim.loop, vim.api.nvim_get_runtime_file
+local vim, assert, substring = vim, assert, string.sub
+local uv = vim.uv or vim.loop
 
 ---@class Cache
 local M = {}
-
-local sep = package.config:sub(1, 1)
-local CACHED_DIR = fn.stdpath("cache") .. sep .. "witch-line"
+local sep = substring(package.config, 1, 1)
+local CACHED_DIR = vim.fn.stdpath("cache") .. sep .. "witch-line"
 local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
-
---- The witch-line plugin dir stat to check if should expire cacche when update plug
-local msec, mnsec, size = 0, 0, 0
 
 local loaded = false
 
@@ -19,14 +15,11 @@ local loaded = false
 --- in either the user configuration or environment state.
 ---
 --- @param config_checksum any The checksum derived from the user config.
+--- @param commit_hash string The git commit hash.
 --- @return string checksum The concatenated checksum string.
-local create_checksum = function(config_checksum)
-	return concat {
-		tostring(config_checksum),
-		tostring(msec),
-		tostring(mnsec),
-		tostring(size),
-	}
+local create_checksum = function(config_checksum, commit_hash)
+	-- return tostring(config_checksum) .. commit_hash .. "\0"
+	return tostring(config_checksum) .. commit_hash
 end
 
 --- Check if the cache has been read and load data to ram
@@ -49,46 +42,35 @@ end
 local DataAccessor = {}
 M.DataAccessor = DataAccessor
 
-local load_data = function(data)
-	DataAccessor = data
-	loaded = true
-end
-
 --- Inspect the Data table
 M.inspect = function()
 	require("witch-line.utils.notifier").info("WitchLine Cache Data\n" .. vim.inspect(DataAccessor))
 end
 
---- Read modification info of the `witch-line` plugin directory.
---- Used to detect if the plugin was updated (mtime/size changed).
---- @param deep? boolean If true, also scans all subfiles recursively
-local function read_plugin_stat(deep)
-	local root_dir = nvim_get_runtime_file("**/witch-line", false)[1]
-	local stat = uv.fs_stat(root_dir)
-	if stat then
-		size = size + stat.size
-		local mtime = stat.mtime
-		if mtime then
-			msec, mnsec = mtime.sec, mtime.nsec
-		end
+--- Get the current git commit hash
+--- @return string commit_hash The git commit hash
+local get_current_commit = function()
+	local repo = vim.api.nvim_get_option_value("runtimepath", {}):match("[^,]*/witch%-line")
+	local head_fd = assert(uv.fs_open(repo .. "/.git/HEAD", "r", 438))
+	local head_content = assert(uv.fs_read(head_fd, 40, 0))
+	if substring(head_content, 1, 4) ~= "ref:" then
+		assert(uv.fs_close(head_fd))
+		return head_content
 	end
-	if deep then
-		local paths = nvim_get_runtime_file("**/witch-line/**", true)
-		for i = 1, #paths do
-			local p = paths[i]
-			stat = uv.fs_stat(p)
-			if stat then
-				size = size + stat.size
-				local mtime = stat.mtime
-				if mtime then
-					local sec, nsec = mtime.sec, mtime.nsec
-					if sec > msec or nsec > mnsec then
-						msec, mnsec = sec, nsec
-					end
-				end
-			end
-		end
+
+	-- HEAD is a reference
+	local ref_path = repo .. "/.git/" .. substring(head_content, 6):gsub("%s*$", "")
+	local ref_fd, _, err = uv.fs_open(ref_path, "r", 438)
+	if err == "ENOENT" then -- 40 byte is not enough for a branch name (rarely)
+		local head_stat = assert(uv.fs_fstat(head_fd))
+		head_content = assert(uv.fs_read(head_fd, head_stat.size, 0))
+		assert(uv.fs_close(head_fd))
+		ref_path = repo .. "/.git/" .. substring(head_content, 6):gsub("%s*$", "")
+		ref_fd = assert(uv.fs_open(ref_path, "r", 438))
 	end
+	local hash = assert(uv.fs_read(ref_fd, 40, 0))
+	assert(uv.fs_close(ref_fd))
+	return hash
 end
 
 --- Save the current Data table to a cache file.
@@ -97,23 +79,28 @@ end
 --- against changes in configuration or environment.
 ---
 --- @param config_checksum integer The checksum representing the current user config state.
---- @param dumped_func_strip? boolean Whether to strip debug info when dumping functions.
-M.save = function(config_checksum, dumped_func_strip)
-	local success = fn.mkdir(CACHED_DIR, "p")
+--- @param debug_strip? boolean Whether to strip debug info when dumping functions.
+--- @param pre_work? fun(CacheDataAccessor: Cache.DataAccessor) A function to run before saving the cache.
+M.save = function(config_checksum, debug_strip, pre_work)
+	local success = vim.fn.mkdir(CACHED_DIR, "p")
 	if success < 0 then
 		error("Failed to create cache directory: " .. CACHED_DIR)
 		return
 	end
 
-	local Persist = require("witch-line.utils.persist")
-	local bytecode = Persist.serialize_table_as_bytecode(DataAccessor, true, dumped_func_strip)
+	if pre_work then
+		pre_work(DataAccessor)
+	end
+
+	local bytecode =
+		require("witch-line.utils.persist").serialize_table_as_bytecode(DataAccessor, true, debug_strip)
 	if not bytecode then
 		M.clear()
 		return
 	end
 
 	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
-	assert(uv.fs_write(fd, concat { create_checksum(config_checksum), "\0", bytecode }, 0))
+	assert(uv.fs_write(fd, create_checksum(config_checksum, get_current_commit()) .. bytecode, 0))
 	assert(uv.fs_close(fd))
 end
 
@@ -144,61 +131,45 @@ M.config_checksum = function(user_configs)
 	return require("witch-line.utils.hash").hash_tbl(user_configs, "version", {
 		-- For Component field
 		id = 1,
-		version = 2,
-		inherit = 3,
-		timing = 4,
-		lazy = 5,
-		flexible = 6,
-		events = 7,
-		min_screen_width = 8,
-		ref = 9,
-		left_style = 11,
-		left = 12,
-		right_style = 13,
-		right = 14,
-		padding = 15,
-		init = 16,
-		style = 17,
-		temp = 18,
-		static = 19,
-		context = 20,
-		pre_update = 21,
-		update = 22,
-		post_update = 23,
-		hidden = 24,
-		on_click = 25,
-		win_individual = 26,
+		inherit = 2,
+		timing = 3,
+		lazy = 4,
+		flexible = 5,
+		events = 6,
+		min_screen_width = 7,
+		ref = 8,
+		left_style = 10,
+		left = 11,
+		right_style = 12,
+		right = 13,
+		padding = 14,
+		init = 15,
+		style = 16,
+		temp = 17,
+		static = 18,
+		context = 19,
+		pre_update = 20,
+		update = 21,
+		post_update = 22,
+		hidden = 23,
+		on_click = 24,
+		win_individual = 25,
 
 		--- For UserConfig field
-		cache = 27,
-		full_scan = 28,
-		notification = 29,
-		func_strip = 30,
+		cache = 26,
+		full_scan = 27,
+		notification = 28,
+		func_strip = 29,
 
-		disabled = 31,
-		filetypes = 32,
-		buftypes = 33,
+		disabled = 30,
+		filetypes = 31,
+		buftypes = 32,
 
-		abstracts = 34,
-		statusline = 35,
-		global = 36,
-		win = 37,
+		abstracts = 33,
+		statusline = 34,
+		global = 35,
+		win = 36,
 	})
-end
-
---- Validate the cache file content against the user configs
---- @param content string The content of the cache file
---- @return string|nil bytecode The bytecode part of the cache file if valid, nil otherwise
-local validate_expiration = function(config_checksum, content)
-	local checksum = create_checksum(config_checksum)
-	local len = #checksum
-	if content:sub(1, len) ~= checksum then
-		return nil
-	elseif content:byte(len + 1) ~= 0 then
-		-- the next byte must be \0
-		return nil
-	end
-	return content:sub(len + 2)
 end
 
 --- Read and validate data from the cache file.
@@ -210,36 +181,35 @@ end
 --- or needs to be regenerated.
 ---
 --- @param config_checksum integer The checksum representing the current user configuration.
---- @param full_scan boolean Whether to scan all plugin stat.
 --- @param notification boolean|nil Whether to show a notification when cache is invalid or refreshed.
 --- @return Cache.DataAccessor|nil DataAccessor The DataAccessor if the cache is valid, or nil otherwise.
-M.read = function(config_checksum, full_scan, notification)
+M.read = function(config_checksum, notification)
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
 	if err and err == "ENOENT" then
 		return nil
 	end
-
-	---@diagnostic disable: param-type-mismatch
 	local stat = assert(uv.fs_fstat(fd))
 	local content = assert(uv.fs_read(fd, stat.size, 0))
 	assert(uv.fs_close(fd))
-	---@diagnostic enable: param-type-mismatch
 
-	read_plugin_stat(full_scan)
-	local bytecode = validate_expiration(config_checksum, content)
-	if not bytecode then
-		M.clear(notification)
+	--- Validate the cache file content against the user configs
+	local checksum = create_checksum(config_checksum, get_current_commit())
+	local checksum_end = #checksum
+	if substring(content, 1, checksum_end) ~= checksum then
 		return nil
 	end
 
-	local Persist = require("witch-line.utils.persist")
-	local data = Persist.deserialize_table_from_bytecode(bytecode)
+	local bytecode = substring(content, checksum_end + 1)
+
+	local data = require("witch-line.utils.persist").deserialize_table_from_bytecode(bytecode)
 	if not data then
 		M.clear(notification)
 		return nil
 	end
 
-	load_data(data)
+	DataAccessor = data
+	loaded = true
+
 	return DataAccessor
 end
 
