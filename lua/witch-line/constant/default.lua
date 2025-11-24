@@ -1,10 +1,7 @@
 ---@type CombinedComponent
 return {
 	"mode",
-	{
-		[0] = "file.name",
-		padding = { left = 1 },
-	},
+	"file.name",
 	"file.icon",
 	"file.modifier",
 
