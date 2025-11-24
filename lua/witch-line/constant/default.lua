@@ -25,7 +25,7 @@ return {
 	"windsurf",
 
 	"indent",
-	"encoding",
+	-- "encoding",
 	"cursor.pos",
 	"cursor.progress",
 }
