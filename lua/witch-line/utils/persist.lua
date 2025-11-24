@@ -1,136 +1,11 @@
-local type, pairs, tostring, load = type, pairs, tostring, load
+local type, pairs, tostring, load, table = type, pairs, tostring, load, table
 local rshift = require("bit").rshift
 
-local M = {} ---Urly name to reduce collision with t==able key
+local M = {}
+
+---Urly name to reduce collision with table key
 local META_FUNC = "__WITCH_META::FUNC::hQ92d@@GzL"
 local META_TBL = "__WITCH_META::TBL::XpL3w9F@@"
-
---- Perform a binary search to locate the index of a given key in a sorted list.
----
---- This helper efficiently finds whether a function name (key) was encoded
---- by searching inside the sorted `meta_func` array.
---- Instead of returning a boolean, it returns the index position if found,
---- or `nil` otherwise — making it more flexible for future use cases.
----
---- Example:
---- ```lua
---- local idx = M.find_encoded_key(meta_func, "update_state")
---- if idx then
----   print("Encoded function found at index:", idx)
---- else
----   print("Not encoded")
---- end
---- ```
----
---- @param meta_func string[] Sorted list of encoded function key names.
---- @param key string Key name to search for.
---- @return integer index Index of the key if found, otherwise -1.
-local function find_encoded_key(meta_func, key)
-	local low, high = 1, #meta_func
-	while low <= high do
-		-- Bitwise shift right by 1 → faster than math.floor((low + high) / 2)
-		local mid = rshift(low + high, 1)
-		local mid_val = meta_func[mid]
-
-		if key == mid_val then
-			return mid
-		elseif key < mid_val then
-			high = mid - 1
-		else
-			low = mid + 1
-		end
-	end
-	return -1
-end
-
-M.find_encoded_key = find_encoded_key
-
---- Check whether a given key refers to an encoded (lazy-loaded) function
---- and return its index position if found.
----
---- This function determines whether a table field corresponds to a
---- function that was serialized (encoded as bytecode).
---- It checks the `[META_FUNC]` list — which stores all encoded function keys —
---- using an efficient binary search (`find_encoded_key`).
----
---- Example:
---- ```lua
---- local idx = M.get_encoded_func_index(my_table, "on_render")
---- if idx then
----   print("Found encoded function at index:", idx)
---- else
----   print("Not encoded or invalid key")
---- end
---- ```
----
---- @param tbl table The table that may contain encoded functions.
---- @param key string The key name to check.
---- @return integer index Index position of the encoded key, or -1 if not encoded.
---- @return table|nil meta_func The metadata table (`META_FUNC`) used for lookup, or `nil` if unavailable.
-local function find_encoded_func(tbl, key)
-	assert(type(tbl) == "table")
-	-- Retrieve metadata list of encoded function keys
-	local meta_func = tbl[META_FUNC]
-	if not meta_func then
-		return -1, meta_func
-	end
-	-- Use binary search to locate index of the key
-	return find_encoded_key(meta_func, key), meta_func
-end
-
-M.find_encoded_func = find_encoded_func
-
---- Lazily decode and prepare a function from bytecode.
----
---- This helper ensures that a serialized (bytecode) method inside a table
---- is compiled back into a callable Lua function **only when needed**.
---- Once decoded, the function is cached in-place, and its entry is removed
---- from the `[META_FUNC]` metadata list to avoid redundant decoding.
----
---- Behavior:
---- - If the value at `tbl[key]` is **already a function**, it is returned as-is.
---- - If it is a **string** and marked as encoded (via `[META_FUNC]`), the string
----   is compiled to a function using `load()` in binary mode, stored back into
----   the table, and returned.
---- - If the string is **not** marked as encoded, it is treated as a raw string.
----
---- Example:
---- ```lua
---- local func = M.lazy_decode(my_table, "on_click")
---- if type(func) == "function" then
----   func()  -- Safely invoke the lazily-decoded function
---- end
---- ```
----
---- @param tbl table The table containing the potentially encoded method.
---- @param key string The method name to decode and/or return.
---- @return any decoded The decoded function, or the original value if not encoded.
-M.lazy_decode = function(tbl, key)
-	-- Defensive check
-	local val = tbl[key]
-	if type(val) ~= "string" then
-		return val
-	end
-	local idx, meta_func = find_encoded_func(tbl, key)
-	if idx < 1 then
-		-- raw string
-		return val
-	end
-
-	-- Decode bytecode
-	local func, err = load(val, nil, "b")
-	if not func then
-		error(("Failed to load function '%s' from bytecode: %s"):format(key, err))
-		return nil
-	end
-	rawset(tbl, key, func)
-	---@cast meta_func table
-	table.remove(meta_func, idx)
-	if not meta_func[1] then
-		tbl[META_FUNC] = nil
-	end
-	return func
-end
 
 --- Recursively serialize a table containing functions into a table of strings.
 --- Only supports values of type `function`, `table`, `string`, `number`, or `boolean`.
@@ -236,7 +111,7 @@ end
 function M.serialize_function(value, dumped_func_strip)
 	local t = type(value)
 	if t == "function" then
-		return string.dump(value)
+		return string.dump(value, dumped_func_strip)
 	elseif t == "table" then
 		return serialize_tbl_funcs_rec(value, dumped_func_strip, {})
 	end
@@ -281,21 +156,28 @@ local function deserialize_tbl_funcs_rec(tbl, seen)
 		--- Decode nested tables first
 		for i = 1, #encoded_tbls do
 			local key = encoded_tbls[i]
-			tbl[key] = deserialize_tbl_funcs_rec(tbl[key], seen)
+			local child_tbl = tbl[key]
+			-- Avoid case where table is already decoded but it's not updated to parent `META_TBL`
+			if child_tbl[META_FUNC] or child_tbl[META_TBL] then
+				tbl[key] = deserialize_tbl_funcs_rec(child_tbl, seen)
+			end
 		end
 	end
 
 	--- Start decoding functions in the current table
-	local funs = tbl[META_FUNC]
-	if funs then
-		for i = 1, #funs do
-			local k = funs[i]
-			-- local func, err = loadstring(value[k], k)
-			local func, err = load(tbl[k], k, "b")
-			if err then
-				error("Failed to load function from string: " .. err)
-			else
-				tbl[k] = func
+	local fn_list = tbl[META_FUNC]
+	if fn_list then
+		for i = 1, #fn_list do
+			local fn_name = fn_list[i]
+			local encoded = tbl[fn_name]
+			--- Avoid case where function is already decoded but it's not updated to parent `META_TBL`
+			if type(encoded) ~= "function" then
+				local func, err = load(tbl[fn_name], fn_name, "b")
+				if err then
+					error("Failed to load function from string: " .. err)
+				else
+					tbl[fn_name] = func
+				end
 			end
 		end
 
@@ -476,4 +358,132 @@ function M.deserialize_table_from_bytecode(bytecode, eager)
 	return result
 end
 
+--- Perform a binary search to locate the index of a given key in a sorted list.
+---
+--- This helper efficiently finds whether a function name (key) was encoded
+--- by searching inside the sorted `meta_func` array.
+--- Instead of returning a boolean, it returns the index position if found,
+--- or `nil` otherwise — making it more flexible for future use cases.
+---
+--- Example:
+--- ```lua
+--- local idx = M.find_encoded_key(meta_func, "update_state")
+--- if idx then
+---   print("Encoded function found at index:", idx)
+--- else
+---   print("Not encoded")
+--- end
+--- ```
+---
+--- @param meta_func string[] Sorted list of encoded function key names.
+--- @param key string Key name to search for.
+--- @return integer index Index of the key if found, otherwise -1.
+local function find_encoded_key(meta_func, key)
+	local low, high = 1, #meta_func
+	while low <= high do
+		-- Bitwise shift right by 1 → faster than math.floor((low + high) / 2)
+		local mid = rshift(low + high, 1)
+		local mid_val = meta_func[mid]
+
+		if key == mid_val then
+			return mid
+		elseif key < mid_val then
+			high = mid - 1
+		else
+			low = mid + 1
+		end
+	end
+	return -1
+end
+
+M.find_encoded_key = find_encoded_key
+
+--- Check whether a given key refers to an encoded (lazy-loaded) function
+--- and return its index position if found.
+---
+--- This function determines whether a table field corresponds to a
+--- function that was serialized (encoded as bytecode).
+--- It checks the `[META_FUNC]` list — which stores all encoded function keys —
+--- using an efficient binary search (`find_encoded_key`).
+---
+--- Example:
+--- ```lua
+--- local idx = M.get_encoded_func_index(my_table, "on_render")
+--- if idx then
+---   print("Found encoded function at index:", idx)
+--- else
+---   print("Not encoded or invalid key")
+--- end
+--- ```
+---
+--- @param tbl table The table that may contain encoded functions.
+--- @param key string The key name to check.
+--- @return integer index Index position of the encoded key, or -1 if not encoded.
+--- @return table|nil meta_func The metadata table (`META_FUNC`) used for lookup, or `nil` if unavailable.
+local function find_encoded_func(tbl, key)
+	-- Retrieve metadata list of encoded function keys
+	local meta_func = tbl[META_FUNC]
+	if not meta_func then
+		return -1, meta_func
+	end
+	-- Use binary search to locate index of the key
+	return find_encoded_key(meta_func, key), meta_func
+end
+
+M.find_encoded_func = find_encoded_func
+
+--- Lazily decode and prepare a function from bytecode.
+---
+--- This helper ensures that a serialized (bytecode) method inside a table
+--- is compiled back into a callable Lua function **only when needed**.
+--- Once decoded, the function is cached in-place, and its entry is removed
+--- from the `[META_FUNC]` metadata list to avoid redundant decoding.
+---
+--- Behavior:
+--- - If the value at `tbl[key]` is **already a function**, it is returned as-is.
+--- - If it is a **string** and marked as encoded (via `[META_FUNC]`), the string
+---   is compiled to a function using `load()` in binary mode, stored back into
+---   the table, and returned.
+--- - If the string is **not** marked as encoded, it is treated as a raw string.
+---
+--- Example:
+--- ```lua
+--- local func = M.lazy_decode(my_table, "on_click")
+--- if type(func) == "function" then
+---   func()  -- Safely invoke the lazily-decoded function
+--- end
+--- ```
+---
+--- @param tbl table The table containing the potentially encoded method.
+--- @param key string The method name to decode and/or return.
+--- @return any decoded The decoded function, or the original value if not encoded.
+M.lazy_decode = function(tbl, key)
+	-- Defensive check
+	local val = tbl[key]
+	local val_t = type(val)
+	if val_t == "table" and (val[META_FUNC] or val[META_TBL]) then
+		return deserialize_tbl_funcs_rec(val)
+	elseif val_t ~= "string" then
+		return val
+	end
+	local idx, meta_func = find_encoded_func(tbl, key)
+	if idx < 1 then
+		-- raw string
+		return val
+	end
+
+	-- Decode bytecode
+	local func, err = load(val, key, "b")
+	if not func then
+		error(("Failed to load function '%s' from bytecode: %s"):format(key, err))
+		return nil
+	end
+	rawset(tbl, key, func)
+	---@cast meta_func table
+	table.remove(meta_func, idx)
+	if not meta_func[1] then
+		tbl[META_FUNC] = nil
+	end
+	return func
+end
 return M

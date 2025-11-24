@@ -90,7 +90,6 @@ M.load_cache = function(CacheDataAccessor)
 			return comp
 		end,
 	})
-
 	DepGraphRegistry = CacheDataAccessor.DepGraph or DepGraphRegistry
 	InitializePendingIds = CacheDataAccessor.PendingInit or InitializePendingIds
 	EmergencyIds = CacheDataAccessor.Urgents or EmergencyIds

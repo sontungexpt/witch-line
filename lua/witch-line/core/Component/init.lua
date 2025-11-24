@@ -356,10 +356,7 @@ end
 --- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
 Component.require_by_id = function(id)
 	local path = require("witch-line.constant.id").path(id)
-	if not path then
-		return nil
-	end
-	return Component.require(path)
+	return path and Component.require(path) or nil
 end
 
 --- Requires a default component by its path.

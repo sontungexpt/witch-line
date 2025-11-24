@@ -19,8 +19,27 @@ local Branch = {
 	},
 	context = {
 		root_dir = nil, -- the root directory of the current git repository
-		get_root_by_git = function(dir_path)
-			local uv = vim.uv or vim.loop
+
+		-- The slower but simpler version
+		-- get_head_file_path = function()
+		--   local fn = vim.fn
+		--   local git_dir = fn.finddir(".git", ".;")
+		--   if git_dir ~= "" then
+		--     return fn.fnamemodify(git_dir, ":p") .. "HEAD"
+		--   end
+		--   return nil
+		-- end,
+	},
+	init = function(self, session_id)
+		local uv, api = vim.uv or vim.loop, vim.api
+		local static = self.static
+		--- @cast static { disabled: { filetypes: string[] }, icon: string }
+		local ctx = self.context
+		--- @cast ctx {root_dir: string|nil }
+
+		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
+
+		local get_root_by_git = function(dir_path)
 			local prev = ""
 			local dir = dir_path or uv.cwd()
 			while dir ~= prev do
@@ -51,25 +70,7 @@ local Branch = {
 				dir = dir:match("^(.*)[/\\][^/\\]+$") or dir -- fallback to prevent infinite loop when reaching root
 			end
 			return nil
-		end,
-
-		-- The slower but simpler version
-		-- get_head_file_path = function()
-		--   local fn = vim.fn
-		--   local git_dir = fn.finddir(".git", ".;")
-		--   if git_dir ~= "" then
-		--     return fn.fnamemodify(git_dir, ":p") .. "HEAD"
-		--   end
-		--   return nil
-		-- end,
-	},
-	init = function(self, session_id)
-		local uv, api = vim.uv or vim.loop, vim.api
-		local static = self.static
-		--- @cast static { disabled: { filetypes: string[] }, icon: string }
-		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx {root_dir: string|nil, get_root_by_git: fun():string }
-		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
+		end
 
 		local file_changed, sec_arg = nil, nil
 		if uv.os_uname().sysname == "Windows_NT" then
@@ -85,6 +86,9 @@ local Branch = {
 
 		-- helper: restart watcher + trigger event
 		local function update_repo(new_dir_path)
+			if not file_changed then
+				return
+			end
 			file_changed:stop()
 
 			if new_dir_path then
@@ -115,7 +119,7 @@ local Branch = {
 					return -- still in the same repo
 				end
 
-				local new_root_dir = ctx.get_root_by_git(file:match("^(.*)/[^/]*$"))
+				local new_root_dir = get_root_by_git(file:match("^(.*)/[^/]*$"))
 
 				--local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
 
@@ -148,8 +152,9 @@ local Branch = {
 	end,
 	style = { fg = colors.green },
 	update = function(self, session_id)
-		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx {root_dir: string|nil, get_root_by_git: fun():string }
+		local ctx = self.context
+
+		--- @cast ctx {root_dir: string|nil }
 		if not ctx.root_dir then
 			return ""
 		end
@@ -190,7 +195,6 @@ Diff.Interface = {
 		},
 	},
 	context = {
-
 		-- get_diff = function (bufnr)
 		--   -- return self.temp.diff[bufnr]
 		-- end,

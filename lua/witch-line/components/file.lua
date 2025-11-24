@@ -19,6 +19,7 @@ local Interface = {
 				["dashboard"] = { nil, "", colors.red },
 				["toggleterm"] = {
 					function()
+						print("test")
 						return "ToggleTerm " .. vim.b.toggle_number
 					end,
 					"",
