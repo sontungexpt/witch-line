@@ -87,7 +87,8 @@ end
 -- BENCHMARKS -------------------------------------------------------
 
 measure(function()
-	-- vim.o.statusline = " "
+	vim.o.statusline = " "
+
 	-- local colors = require("catppuccin.palettes").get_palette("macchiato")
 	-- local color_map = {
 	-- 	n = colors.blue,
@@ -242,17 +243,12 @@ measure(function()
 	-- 			},
 	-- 		},
 	-- 	},
-	-- 	cache = {
-	-- 		enabled = true,
-	-- 	},
 	-- }
-
 	require("witch-line").setup {
 		auto_theme = false,
-		-- cache = {
-		-- 	func_strip = true,
-		-- 	enabled = true,
-		-- },
+		cache = {
+			func_strip = true,
+		},
 	}
 end, "witch-line")
 

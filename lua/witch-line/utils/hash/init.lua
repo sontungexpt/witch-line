@@ -1,4 +1,5 @@
-local type, pairs, dump = type, pairs, string.dump
+local type, pairs, tostring, uv, getinfo = type, pairs, tostring, vim.uv or vim.loop, debug.getinfo
+
 local xxh32 = require("witch-line.utils.hash.xxhash")
 
 --- Converts a Lua value into a deterministic byte string for hashing.
@@ -22,8 +23,6 @@ local function simple_serialize(v)
 		return tostring(v)
 	elseif t == "boolean" then
 		return v and "1" or "0"
-	elseif t == "function" then
-		return dump(v, true)
 	end
 	return t
 end
@@ -66,6 +65,7 @@ local hash_tbl = function(tbl, hash_key, key_priority_map)
 	local stack, stack_size = { tbl }, 1
 	local seen = { [tbl] = true }
 	local current, keys, keys_size = nil, {}, 0
+	local mtime_cache = {}
 	key_priority_map = key_priority_map or {}
 
 	while stack_size > 0 do
@@ -77,6 +77,9 @@ local hash_tbl = function(tbl, hash_key, key_priority_map)
 		else
 			keys_size = 0 --- reset key buffer
 			for k in pairs(current) do
+				--- If is function, then check the modified time instead
+				--- It is not very accurate but this is the only way to check the function modification.
+
 				keys_size = keys_size + 1
 				local i, rk = keys_size, key_priority_map[k]
 				-- custom compare using pre-cached rank
@@ -120,17 +123,25 @@ local hash_tbl = function(tbl, hash_key, key_priority_map)
 			for i = 1, keys_size do
 				local k = keys[i]
 				local v = current[k]
-
 				xxh32_update(st, simple_serialize(k))
-
 				-- Add value
-				if type(v) == "table" then
+				local v_type = type(v)
+				if v_type == "table" then
 					if not seen[v] then
 						seen[v] = true
 						stack_size = stack_size + 1
 						stack[stack_size] = v
 					end
 					xxh32_update(st, "tbl")
+				elseif v_type == "function" then
+					local source = getinfo(v, "S").source
+					local mtime_str = mtime_cache[source]
+					if not mtime_str then
+						local mtime = uv.fs_stat(source:sub(2)).mtime
+						mtime_str = tostring(mtime.sec) .. tostring(mtime.nsec)
+						mtime_cache[source] = mtime_str
+					end
+					xxh32_update(st, mtime_str)
 				else
 					xxh32_update(st, simple_serialize(v))
 				end

@@ -4,6 +4,7 @@ local nvim_create_autocmd = vim.api.nvim_create_autocmd
 local M = {}
 
 --- @class UserConfig.Cache
+--- @field enabled? boolean Enable the cache. Default true.
 --- @field notification? boolean Show notification when cache is cleared. Default true.
 --- @field func_strip? boolean Strip debug info when caching dumped functions. Default false.
 
@@ -58,37 +59,41 @@ end
 M.setup = function(user_configs)
 	local Cache = require("witch-line.cache")
 	local conf_checksum = Cache.config_checksum(user_configs)
-
 	user_configs = use_default_config(user_configs)
-	local cache_option = type(user_configs.cache) == "table" and user_configs.cache or {}
 
-	-- Read cache
-	local CacheDataAccessor = Cache.read(conf_checksum, cache_option.notification)
+	local cache_opts = type(user_configs.cache) == "table" and user_configs.cache or {}
+	local CacheDataAccessor
+	if cache_opts.enabled ~= false then
+		-- Read cache
+		CacheDataAccessor = Cache.read(conf_checksum, cache_opts.notification)
 
-	local CACHE_MODS = {
-		"witch-line.core.manager.event",
-		"witch-line.core.manager.timer",
-		"witch-line.core.manager",
-		"witch-line.core.statusline",
-		"witch-line.core.highlight",
-	}
+		local CACHE_MODS = {
+			"witch-line.core.manager.timer",
+			"witch-line.core.manager.event",
+			"witch-line.core.manager",
+			"witch-line.core.statusline",
+			"witch-line.core.highlight",
+		}
 
-	if CacheDataAccessor then
-		for i = 1, #CACHE_MODS do
-			require(CACHE_MODS[i]).load_cache(CacheDataAccessor)
+		if CacheDataAccessor then
+			for i = 1, #CACHE_MODS do
+				require(CACHE_MODS[i]).load_cache(CacheDataAccessor)
+			end
+		else
+			nvim_create_autocmd("VimLeavePre", {
+				once = true,
+				callback = function()
+					Cache.save(conf_checksum, cache_opts.func_strip, function(DataAccessor)
+						for i = 1, #CACHE_MODS do
+							require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
+						end
+					end)
+				end,
+			})
 		end
-	else
-		nvim_create_autocmd("VimLeavePre", {
-			once = true,
-			callback = function()
-				Cache.save(conf_checksum, cache_option.func_strip, function(DataAccessor)
-					for i = 1, #CACHE_MODS do
-						require(CACHE_MODS[i]).on_vim_leave_pre(DataAccessor)
-					end
-				end)
-			end,
-		})
+	end
 
+	if not CacheDataAccessor then
 		-- Cached is disabled or no cached data
 		apply_statusline_default_components(user_configs.statusline)
 	end
