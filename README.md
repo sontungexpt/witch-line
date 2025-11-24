@@ -316,16 +316,10 @@ require("witch-line").setup({
   },
 
   cache = {
-      -- You can enable cache here.
-      -- If you use default configuration or simple configuration. You don't need to enable it, it's
-      -- not affect performance.
-      -- If your components configuration is so complex such as with many nested child levels. You can try
-      -- cache it.
-      -- Please consider the performance because reading file from disk is not free. If
-      -- configuration is so simple it will make your loading time longer instead of faster.
-      enabled = false,
-      -- Perform full plugin scan for cache expiration. Default false. Faster but less accurate.
-      full_scan = false,
+      -- You can disable cache here.
+      -- If you enable cache you can not use any up-value in your component functions otherwise your
+      -- cache will be broken.
+      enabled = true,
       -- Show notification when cache is cleared. Default true.
       notification = true,
       -- Strip debug info when caching dumped functions. Default false. Faster but harder to debug.
@@ -395,11 +389,11 @@ require("witch-line").setup({
 
 #### cache
 
-| Key            | Type      | Default | Description                                                                         |
-| -------------- | --------- | ------- | ----------------------------------------------------------------------------------- |
-| `full_scan`    | `boolean` | `false` | Performs a full plugin scan to detect cache expiration. Heavier, but more reliable. |
-| `notification` | `boolean` | `true`  | Shows a notification when the cache is cleared.                                     |
-| `func_strip`   | `boolean` | `false` | Strips debug info from dumped functions to reduce cache size.                       |
+| Key            | Type      | Default | Description                                                   |
+| -------------- | --------- | ------- | ------------------------------------------------------------- |
+| `enabled`      | `boolean` | `true`  | Enable caching.                                               |
+| `notification` | `boolean` | `true`  | Shows a notification when the cache is cleared.               |
+| `func_strip`   | `boolean` | `false` | Strips debug info from dumped functions to reduce cache size. |
 
 #### disabled
 
