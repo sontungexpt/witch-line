@@ -188,6 +188,7 @@ M.read = function(config_checksum, notification)
 	if err and err == "ENOENT" then
 		return nil
 	end
+
 	local stat = assert(uv.fs_fstat(fd))
 	local content = assert(uv.fs_read(fd, stat.size, 0))
 	assert(uv.fs_close(fd))
@@ -195,7 +196,9 @@ M.read = function(config_checksum, notification)
 	--- Validate the cache file content against the user configs
 	local checksum = create_checksum(config_checksum, get_current_commit())
 	local checksum_end = #checksum
+
 	if substring(content, 1, checksum_end) ~= checksum then
+		M.clear(notification)
 		return nil
 	end
 
