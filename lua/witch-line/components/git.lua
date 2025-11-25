@@ -165,7 +165,9 @@ local Branch = {
 
 local Diff = {}
 
---- @alias DiffResult { added: integer, modified: integer, removed: integer }
+--- @alias Git.Diff.Interface.DiffResult { added: uinteger, modified: uinteger, removed: uinteger }
+--- @class Git.Diff.Interface.Context
+--- @field get_diff fun(bufnr?: integer): Git.Diff.Interface.DiffResult
 --- @type DefaultComponent
 Diff.Interface = {
 	id = Id["git.diff.interface"],
@@ -181,6 +183,7 @@ Diff.Interface = {
 			},
 		},
 	},
+
 	context = {
 		-- get_diff = function (bufnr)
 		--   -- return self.temp.diff[bufnr]
@@ -188,25 +191,23 @@ Diff.Interface = {
 	},
 	init = function(self, session_id)
 		local vim = vim
-		local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
-		local api, bo, tonumber, list_contains, gmatch =
-			vim.api, vim.bo, tonumber, vim.list_contains, string.gmatch
+		local api = vim.api
 
 		--- @type table<integer, vim.SystemObj>
 		local processes = {}
 
-		--- @type table<integer, DiffResult?>
+		--- @type table<integer, Git.Diff.Interface.DiffResult?>
 		local diff = {}
 
 		local static = self.static
 		--- @cast static { disabled: { filetypes: string[] } }
 
 		local ctx = self.context
-		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
+		--- @cast ctx Git.Diff.Interface.Context
 
 		--- Export function to get the diff of a buffer
 		--- @param bufnr? integer Buffer number, defaults to current buffer
-		--- @return DiffResult
+		--- @return Git.Diff.Interface.DiffResult
 		ctx.get_diff = function(bufnr)
 			return diff[bufnr or api.nvim_get_current_buf()]
 		end
@@ -214,8 +215,9 @@ Diff.Interface = {
 		local function process_diff(stdout)
 			-- Adapted from https://github.com/wbthomason/nvim-vcs.lua
 			local added, removed, modified = 0, 0, 0
+			local tonumber = tonumber
 			for old_start, old_count, new_start, new_count in
-				gmatch(stdout, "@@%s*%-(%d+),?(%d*)%s*%+(%d+),?(%d*)%s*@@")
+				string.gmatch(stdout, "@@%s*%-(%d+),?(%d*)%s*%+(%d+),?(%d*)%s*@@")
 			do
 				old_count = (old_count == nil and 0) or (old_count == "" and 1) or tonumber(old_count) or 0
 				new_count = (new_count == nil and 0) or (new_count == "" and 1) or tonumber(new_count) or 0
@@ -257,9 +259,8 @@ Diff.Interface = {
 
 				if event ~= "BufDelete" then
 					--- If diff is caculated and filetype is not disabled, just refresh
-					if diff[bufnr] or list_contains(static.disabled.filetypes, bo[bufnr].filetype) then
-						refresh_component_graph(self) -- trigger update
-
+					if diff[bufnr] or vim.list_contains(static.disabled.filetypes, vim.bo[bufnr].filetype) then
+						require("witch-line.core.handler").refresh_component_graph(self) -- trigger update
 						return
 					end
 					local file = e.file
@@ -298,7 +299,7 @@ Diff.Interface = {
 							vim.schedule(function()
 								if api.nvim_buf_is_valid(bufnr) then
 									diff[bufnr] = process_diff(stdout)
-									refresh_component_graph(self) -- trigger update
+									require("witch-line.core.handler").refresh_component_graph(self) -- trigger update
 								end
 							end)
 							return
@@ -308,7 +309,7 @@ Diff.Interface = {
 						-- so we need to hide the components
 						vim.schedule(function()
 							if api.nvim_buf_is_valid(bufnr) then
-								refresh_component_graph(self) -- trigger update
+								require("witch-line.core.handler").refresh_component_graph(self) -- trigger update
 							end
 						end)
 					end)
@@ -346,7 +347,7 @@ Diff.Added = {
 		--- @cast static { icon: string }
 
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
+		--- @cast ctx Git.Diff.Interface.Context
 		local diff = ctx.get_diff()
 		if diff then
 			local added = diff.added
@@ -377,7 +378,7 @@ Diff.Modified = {
 		local static = self.static
 		--- @cast static { icon: string }
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
+		--- @cast ctx Git.Diff.Interface.Context
 		local diff = ctx.get_diff()
 		if diff then
 			local modified = diff.modified
@@ -408,7 +409,7 @@ Diff.Removed = {
 		local static = self.static
 		--- @cast static { icon: string }
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
-		--- @cast ctx { get_diff: fun(bufnr?: integer): DiffResult? }
+		--- @cast ctx Git.Diff.Interface.Context
 		local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
 		if diff then
 			local removed = diff.removed
