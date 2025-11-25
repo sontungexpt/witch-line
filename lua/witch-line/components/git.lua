@@ -20,45 +20,11 @@ local Branch = {
 	context = {
 		root_dir = nil, -- the root directory of the current git repository
 	},
-	init = function(self, session_id)
-		local uv, api = vim.uv or vim.loop, vim.api
-		local static = self.static
-		--- @cast static { disabled: { filetypes: string[] }, icon: string }
-		local ctx = self.context
+	init = function(self, sid)
+		local api = vim.api
+		local ctx, static = self.context, self.static
 		--- @cast ctx {root_dir: string|nil }
-
-		local get_root_by_git = function(dir_path)
-			local prev = ""
-			local dir = dir_path or uv.cwd()
-			while dir ~= prev do
-				local git_path = dir .. "/.git"
-				local stat = uv.fs_stat(git_path)
-				if stat then
-					if stat.type == "directory" then
-						return dir
-					elseif stat.type == "file" then
-						local fd = io.open(git_path, "r")
-						if fd then
-							local line = fd:read("*l")
-							fd:close()
-							local gitdir = line:match("^gitdir:%s*(.-)%s*$")
-							if gitdir then
-								-- Handle relative gitdir path
-								if not gitdir:match("^/") and not gitdir:match("^%a:[/\\]") then
-									gitdir = dir .. "/" .. gitdir
-								end
-								-- Normalize and verify
-								return uv.fs_realpath(gitdir)
-							end
-						end
-					end
-				end
-
-				prev = dir
-				dir = dir:match("^(.*)[/\\][^/\\]+$") or dir -- fallback to prevent infinite loop when reaching root
-			end
-			return nil
-		end
+		--- @cast static { disabled: { filetypes: string[] }, icon: string }
 
 		-- local last_head_file_path = nil
 		local last_root_dir = nil
@@ -67,6 +33,7 @@ local Branch = {
 		-- helper: restart watcher + trigger event
 		local function update_repo(new_dir_path)
 			if not file_changed then
+				local uv = vim.uv or vim.loop
 				if uv.os_uname().sysname == "Windows_NT" then
 					file_changed = assert(uv.new_fs_poll())
 					sec_arg = 1000
@@ -106,7 +73,7 @@ local Branch = {
 					return -- still in the same repo
 				end
 
-				local new_root_dir = get_root_by_git(file:match("^(.*)/[^/]*$"))
+				local new_root_dir = require("witch-line.utils.git").get_root_by_git(file:match("^(.*)/[^/]*$"))
 
 				--local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
 
