@@ -1,5 +1,4 @@
 local type, pairs, tostring, load, table = type, pairs, tostring, load, table
-local rshift = require("bit").rshift
 
 local M = {}
 
@@ -382,7 +381,7 @@ local function find_encoded_key(meta_func, key)
 	local low, high = 1, #meta_func
 	while low <= high do
 		-- Bitwise shift right by 1 → faster than math.floor((low + high) / 2)
-		local mid = rshift(low + high, 1)
+		local mid = require("bit").rshift(low + high, 1)
 		local mid_val = meta_func[mid]
 
 		if key == mid_val then

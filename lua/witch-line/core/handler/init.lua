@@ -9,7 +9,6 @@ local Session = require("witch-line.core.Session")
 local Manager = require("witch-line.core.manager")
 local Component = require("witch-line.core.Component")
 local DepGraphKind = Manager.DepGraphKind
-local SepStyle = Component.SepStyle
 
 local M = {}
 
@@ -136,6 +135,7 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 	local hl_name = comp[hl_name_field]
 	local dynamic = t == "function"
 
+	local SepStyle = Component.SepStyle
 	-- Return early if no need to update
 	if
 		not (
@@ -145,8 +145,8 @@ local function update_comp_side_style(comp, sid, side, main_style_updated, main_
 				main_style_updated
 				and t == "number"
 				and (
-					side_style == SepStyle.SepFg
-					or side_style == SepStyle.SepBg
+					side_style == SepStyle.SepBg -- This is use frequently for separators
+					or side_style == SepStyle.SepFg
 					or side_style == SepStyle.Reverse
 					or side_style == SepStyle.Inherited
 				)
@@ -227,7 +227,13 @@ local function update_comp(comp, sid)
 				local auto_theme = Component.auto_theme(comp, sid)
 				-- Main part
 				-- Update style first to make sure comp._hl_name is not nil
-				local style_updated, style = update_comp_style(comp, sid, auto_theme, override_style)
+				local style_updated, style = update_comp_style(
+					comp,
+					sid,
+					auto_theme,
+					comp._use_returned_style ~= false and override_style or nil
+				)
+
 				Statusline.set_value(cid, value, comp._hl_name, winid)
 
 				--- Left part
@@ -549,7 +555,7 @@ local function register_component(comp, parent_id, winid)
 		-- If c is nil, assume that the user is trying to add the [0] field for other purpose
 		-- so we just ignore it
 		if c then
-			comp = Component.overrides(c, comp)
+			comp = require("witch-line.core.Component.override").override(c, comp)
 		end
 	end
 

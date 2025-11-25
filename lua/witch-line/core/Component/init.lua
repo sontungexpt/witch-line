@@ -235,10 +235,12 @@ Component.SepStyle = SepStyle
 --- @field _loaded? boolean If true, the component is loaded
 --- @field _abstract? boolean If true, the component is abstract and should not be displayed directly (all component are abstract)
 --- @field _renderable? boolean If true, the component is renderable
+--- @field _hidden? boolean If true, the component is hidden and should not be displayed
+--- @field _use_returned_style? boolean Whether the component should use the style returned by its `update()` method. Disabled automatically when the user overrides the `style` field.
+---
 --- @field _hl_name? string The highlight group name for the component
 --- @field _left_hl_name? string The highlight group name for the left part of the component
 --- @field _right_hl_name? string The highlight group name for the right part of the component
---- @field _hidden? boolean If true, the component is hidden and should not be displayed
 --- @field _click_handler? string The name of the click handler function for the component
 
 --- @class DefaultComponent : Component The default components provided by witch-line
@@ -395,79 +397,6 @@ Component.format_state_before_cache = function(comp)
 	end
 end
 
---- Recursively overrides the values of a component with the values from another component.
---- If the types of the values are different, the value from the original component is kept.
---- If the values are not tables, the value from the new component is used.
---- If both values are tables, the function is called recursively on the tables.
---- If one of the tables is empty, the other table is used.
---- If both tables are empty, the original table is kept.
---- If both values are lists, the value from the new component is used.
---- @param to any the original component value
---- @param from any the new component value
---- @param skip_type_check boolean|nil if true, skips the type check and always overrides
---- @return any value the overridden component value
-local function overrides_component_value(to, from, skip_type_check)
-	if to == nil then
-		return from
-	elseif from == nil then
-		return to
-	end
-
-	local to_type, from_type = type(to), type(from)
-
-	if not skip_type_check and to_type ~= from_type then
-		return to
-	elseif from_type ~= "table" then
-		return from
-		-- both are table from here
-	elseif next(to) == nil then
-		return from
-	elseif next(from) == nil then
-		return to
-	elseif vim.islist(to) and vim.islist(from) then
-		return from
-	end
-
-	for k, v in pairs(from) do
-		to[k] = overrides_component_value(to[k], v, skip_type_check)
-	end
-	return to
-end
-
---- Creates a custom statistic component, which can be used to display custom statistics in the status line.
---- @param comp DefaultComponent the component to create the statistic for
---- @param override table|nil a table of overrides for the component, can be used to set custom fields or values
---- @return Component stat_comp the statistic component with the necessary fields set
-Component.overrides = function(comp, override)
-	if type(override) ~= "table" then
-		return comp
-	end
-
-	if override.style or override.left_style or override.right_style then
-		comp.auto_theme = false
-	end
-
-	local accepted = require("witch-line.core.Component.overrideable_fields")
-	for k, v in pairs(override) do
-		local types_accepted = accepted[k]
-		if types_accepted then
-			local type_v = type(v)
-			if
-				type(types_accepted) == "table" and vim.list_contains(accepted[k], type_v)
-				or types_accepted == type_v -- single type
-			then
-				if type_v == "table" then
-					rawset(comp, k, overrides_component_value(comp[k], v, true))
-				else
-					rawset(comp, k, v)
-				end
-			end
-		end
-	end
-
-	return comp
-end
-
 --- Gets the minimum screen width required to display the component.
 --- @param comp Component|DefaultComponent the component to get the minimum screen width from
 --- @param sid SessionId the session id to use for the component update
@@ -496,8 +425,7 @@ end
 --- @param sid SessionId the session id to use for the component update
 --- @return boolean hidden whether the component is hidden
 Component.hidden = function(comp, sid)
-	local hidden = resolve(comp.hidden, comp, sid)
-	return hidden == true
+	return resolve(comp.hidden, comp, sid) == true
 end
 
 --- Register a function to be called when a clickable component is clicked.

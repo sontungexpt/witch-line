@@ -157,7 +157,7 @@ M.config_checksum = function(user_configs)
 
 		--- For UserConfig field
 		cache = 26,
-		full_scan = 27,
+		enabled = 27,
 		notification = 28,
 		func_strip = 29,
 

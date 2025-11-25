@@ -305,8 +305,7 @@ local function resolve_color(c, field, auto_adjust)
 	elseif t ~= "number" then
 		return nil
 	end
-
-	--- num is number here
+	--- @cast num integer num is number here
 	if auto_theme_enabled and auto_adjust then
 		local stbg = nvim_get_hl(0, STATUSLINE_HL).bg
 		return stbg and adjust(num, stbg) or num

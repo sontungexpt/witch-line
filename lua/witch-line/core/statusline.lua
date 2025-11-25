@@ -1,6 +1,4 @@
 local api = vim.api
-local bit = require("bit")
-local bor, band, lshift = bit.bor, bit.band, bit.lshift
 local concat, type, rawget = table.concat, type, rawget
 
 local nvim_strwidth, nvim_get_option_value, nvim_set_option_value =
@@ -217,22 +215,6 @@ local get_flex_sorted = function(statusline)
 	return flex_sorted
 end
 
---- Marks specific indices to be skipped during the merging process.
---- @param bitmasks integer The current bitmask representing indices to skip.
---- @param idx integer The index to mark for skipping.
---- @return integer new_mask The updated bitmask with the specified index marked for skipping.
-local mark_bit = function(bitmasks, idx)
-	return bor(bitmasks, lshift(1, idx - 1))
-end
-
---- Checks if a specific index is marked to be skipped in the bitmask.
---- @param bitmasks integer The bitmask representing indices to skip.
---- @param idx integer The index to check for skipping.
---- @return boolean is_skipped True if the index is marked to be skipped, false otherwise.
-local is_marked = function(bitmasks, idx)
-	return band(bitmasks, lshift(1, idx - 1)) ~= 0
-end
-
 --- Tracks a component as flexible with a given priority.
 --- Components with lower priority values are considered more important and will be retained longer when space is limited.
 --- @param comp_id CompId The component ID of the flexible component.
@@ -314,11 +296,10 @@ end
 --- @param skip_mask? integer A bitmask (1-based indices) specifying which segments should be skipped. If nil, no skipping is applied.
 --- @return string value Final concatenated statusline string.
 local build_value = function(slots, state_map, skip_mask)
-	skip_mask = skip_mask or 0ULL
-
 	local out, n = {}, 0
+	local is_marked = require("witch-line.utils.bitmask").is_marked
 	for i = 1, #slots do
-		if not is_marked(skip_mask, i) then
+		if not skip_mask or not is_marked(skip_mask, i - 1) then
 			local state = state_map[slots[i]]
 			local val = state[VALUE_SHIFT] or ""
 
@@ -387,26 +368,25 @@ M.render = function(winid)
 		return
 	end
 
-	-- Bitmask describing which slots should be hidden
-	local hidden_slots = 0ULL
-
 	-- Total width of current statusline
 	local rendered_width = compute_statusline_width(statusline)
 
 	-- Allowed width of window or entire screen
 	local max_width = winid and api.nvim_win_get_width(winid) or nvim_get_option_value("columns", {})
+	if rendered_width <= max_width then
+		nvim_set_option_value("statusline", build_value(statusline.slots, comp_state), { win = winid })
+		return
+	end
 
-	-- Iterate through flexible components, hiding them one by one
-	-- until the statusline fits the max width.
-	local flex_idx = 1
-
-	while current_flex and rendered_width > max_width do
+	local flex_idx, hidden_slots = 1, 0ULL -- Bitmask describing which slots should be hidden
+	local mark_bit = require("witch-line.utils.bitmask").mark_bit
+	repeat
 		local slot_id, comp_id = current_flex[1], current_flex[2]
-		hidden_slots = mark_bit(hidden_slots, slot_id)
+		hidden_slots = mark_bit(hidden_slots, slot_id - 1)
 		rendered_width = rendered_width - compute_slot_width(comp_state[comp_id])
 		flex_idx = flex_idx + 1
 		current_flex = flex_list[flex_idx]
-	end
+	until rendered_width <= max_width or not current_flex
 
 	nvim_set_option_value(
 		"statusline",
