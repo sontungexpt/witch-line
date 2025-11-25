@@ -19,7 +19,8 @@ return {
 
 	"lsp.clients",
 
-	"windsurf",
+	"windsurf.neocodeium",
+	-- "windsurf",
 
 	"indent",
 	-- "encoding",

@@ -419,34 +419,35 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ### 🔖 Default Components
 
-| Name                | Module File      | Description                               |
-| ------------------- | ---------------- | ----------------------------------------- |
-| `mode`              | `mode.lua`       | Shows the current Neovim mode             |
-| `file.name`         | `file.lua`       | Displays the filename                     |
-| `file.icon`         | `file.lua`       | Displays an icon for the file             |
-| `file.modifier`     | `file.lua`       | Indicates if the file has unsaved changes |
-| `file.size`         | `file.lua`       | Shows the file size                       |
-| `%=`                | _(builtin)_      | Separator to align left/right components  |
-| `copilot`           | `copilot.lua`    | Shows Copilot status (if available)       |
-| `windsurf`          | `windsurf.lua`   | Shows Codeium status (if available)       |
-| `diagnostic.error`  | `diagnostic.lua` | Shows number of error diagnostics         |
-| `diagnostic.warn`   | `diagnostic.lua` | Shows number of warning diagnostics       |
-| `diagnostic.info`   | `diagnostic.lua` | Shows number of info diagnostics          |
-| `diagnostic.hint`   | `diagnostic.lua` | Shows number of hint diagnostics          |
-| `encoding`          | `encoding.lua`   | Displays file encoding (e.g., utf-8)      |
-| `cursor.pos`        | `cursor.lua`     | Shows the current cursor line/column      |
-| `cursor.progress`   | `cursor.lua`     | Shows the cursor position as a % progress |
-| `lsp.clients`       | `lsp.lua`        | Lists active LSP clients                  |
-| `git.branch`        | `git.lua`        | Shows current Git branch                  |
-| `git.diff.added`    | `git.lua`        | Number of added lines in Git diff         |
-| `git.diff.removed`  | `git.lua`        | Number of removed lines in Git diff       |
-| `git.diff.modified` | `git.lua`        | Number of changed lines in Git diff       |
-| `datetime`          | `datetime.lua`   | Displays current date and time            |
-| `battery`           | `battery.lua`    | Shows battery status (if applicable)      |
-| `os_uname`          | `os_uname.lua`   | Displays the operating system name        |
-| `nvim_dap`          | `nvim_dap.lua`   | Shows nvim-dap status (if available)      |
-| `search.count`      | `search.lua`     | Shows number of searching value           |
-| `selection.count`   | `selection.lua`  | Shows number of selection zone            |
+| Name                  | Module File       | Description                               |
+| --------------------- | ----------------- | ----------------------------------------- |
+| `mode`                | `mode.lua`        | Shows the current Neovim mode             |
+| `file.name`           | `file.lua`        | Displays the filename                     |
+| `file.icon`           | `file.lua`        | Displays an icon for the file             |
+| `file.modifier`       | `file.lua`        | Indicates if the file has unsaved changes |
+| `file.size`           | `file.lua`        | Shows the file size                       |
+| `%=`                  | _(builtin)_       | Separator to align left/right components  |
+| `copilot`             | `ai/copilot.lua`  | Shows Copilot status (if available)       |
+| `windsurf`            | `ai/windsurf.lua` | Shows Codeium status (if available)       |
+| `windsurf.neocodeium` | `ai/windsurf.lua` | Shows Neocodium status (if available)     |
+| `diagnostic.error`    | `diagnostic.lua`  | Shows number of error diagnostics         |
+| `diagnostic.warn`     | `diagnostic.lua`  | Shows number of warning diagnostics       |
+| `diagnostic.info`     | `diagnostic.lua`  | Shows number of info diagnostics          |
+| `diagnostic.hint`     | `diagnostic.lua`  | Shows number of hint diagnostics          |
+| `encoding`            | `encoding.lua`    | Displays file encoding (e.g., utf-8)      |
+| `cursor.pos`          | `cursor.lua`      | Shows the current cursor line/column      |
+| `cursor.progress`     | `cursor.lua`      | Shows the cursor position as a % progress |
+| `lsp.clients`         | `lsp.lua`         | Lists active LSP clients                  |
+| `git.branch`          | `git.lua`         | Shows current Git branch                  |
+| `git.diff.added`      | `git.lua`         | Number of added lines in Git diff         |
+| `git.diff.removed`    | `git.lua`         | Number of removed lines in Git diff       |
+| `git.diff.modified`   | `git.lua`         | Number of changed lines in Git diff       |
+| `datetime`            | `datetime.lua`    | Displays current date and time            |
+| `battery`             | `battery.lua`     | Shows battery status (if applicable)      |
+| `os_uname`            | `os_uname.lua`    | Displays the operating system name        |
+| `nvim_dap`            | `nvim_dap.lua`    | Shows nvim-dap status (if available)      |
+| `search.count`        | `search.lua`      | Shows number of searching value           |
+| `selection.count`     | `selection.lua`   | Shows number of selection zone            |
 
 ---
 

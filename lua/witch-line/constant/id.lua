@@ -22,8 +22,9 @@ local IdPathMap = {
 	["file.modifier"] = "file\0modifier",
 	["file.size"] = "file\0size",
 
-	["copilot"] = "copilot",
-	["windsurf"] = "windsurf",
+	["copilot"] = "ai.copilot",
+	["windsurf"] = "ai.windsurf\0windsurf",
+	["windsurf.neocodeium"] = "ai.windsurf\0neocodeium",
 
 	["diagnostic.interface"] = "diagnostic\0interface",
 	["diagnostic.error"] = "diagnostic\0error",
@@ -62,6 +63,8 @@ local IdPathMap = {
 --- @field ["file.modifier"] DefaultId
 --- @field ["file.size"] DefaultId
 --- @field ["copilot"] DefaultId
+--- @field ["windsurf"] DefaultId
+--- @field ["windsurf.neocodeium"] DefaultId
 --- @field ["diagnostic.interface"] DefaultId
 --- @field ["diagnostic.error"] DefaultId
 --- @field ["diagnostic.warn"] DefaultId
@@ -83,7 +86,6 @@ local IdPathMap = {
 --- @field ["nvim_dap"] DefaultId
 --- @field ["search.count"] DefaultId
 --- @field ["selection.count"] DefaultId
---- @field ["windsurf"] DefaultId
 --- @field ["weather"] DefaultId
 local Id = setmetatable({}, {
 	__index = function(_, key)
