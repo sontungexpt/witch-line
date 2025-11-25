@@ -23,7 +23,7 @@ local Branch = {
 	init = function(self, sid)
 		local api = vim.api
 		local ctx, static = self.context, self.static
-		--- @cast ctx {root_dir: string|nil }
+		--- @cast ctx {root_dir?: string }
 		--- @cast static { disabled: { filetypes: string[] }, icon: string }
 
 		-- local last_head_file_path = nil
@@ -73,7 +73,8 @@ local Branch = {
 					return -- still in the same repo
 				end
 
-				local new_root_dir = require("witch-line.utils.git").get_root_by_git(file:match("^(.*)/[^/]*$"))
+				local new_root_dir =
+					require("witch-line.components.git.utils").get_root_by_git(file:match("^(.*)/[^/]*$"))
 
 				--local head_file_path = ctx.get_head_file_path(e.file:gsub("\\", "/"):match("^(.*)/[^/]*$"))
 
@@ -108,21 +109,19 @@ local Branch = {
 	update = function(self, session_id)
 		local ctx = self.context
 
-		--- @cast ctx {root_dir: string|nil }
+		--- @cast ctx { root_dir?: string }
 		if not ctx.root_dir then
 			return ""
 		end
 
 		local branch = ""
 		local head_file_path = ctx.root_dir .. "/.git/HEAD"
-		if head_file_path then
-			local head_file = io.open(head_file_path, "r")
-			if head_file then
-				local content = head_file:read("*all")
-				head_file:close()
-				-- branch name or commit hash
-				branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
-			end
+		local head_file = io.open(head_file_path, "r")
+		if head_file then
+			local content = head_file:read("*all")
+			head_file:close()
+			-- branch name or commit hash
+			branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
 		end
 		local static = self.static
 		--- @cast static { icon: string }
@@ -132,9 +131,8 @@ local Branch = {
 
 local Diff = {}
 
---- @alias Git.Diff.Interface.DiffResult { added: uinteger, modified: uinteger, removed: uinteger }
 --- @class Git.Diff.Interface.Context
---- @field get_diff fun(bufnr?: integer): Git.Diff.Interface.DiffResult
+--- @field get_diff fun(bufnr?: integer): DiffResult
 --- @type DefaultComponent
 Diff.Interface = {
 	id = Id["git.diff.interface"],
@@ -163,7 +161,7 @@ Diff.Interface = {
 		--- @type table<integer, vim.SystemObj>
 		local processes = {}
 
-		--- @type table<integer, Git.Diff.Interface.DiffResult?>
+		--- @type table<integer, DiffResult?>
 		local diff = {}
 
 		local static = self.static
@@ -172,35 +170,8 @@ Diff.Interface = {
 		local ctx = self.context
 		--- @cast ctx Git.Diff.Interface.Context
 
-		--- Export function to get the diff of a buffer
-		--- @param bufnr? integer Buffer number, defaults to current buffer
-		--- @return Git.Diff.Interface.DiffResult
 		ctx.get_diff = function(bufnr)
 			return diff[bufnr or api.nvim_get_current_buf()]
-		end
-
-		local function process_diff(stdout)
-			-- Adapted from https://github.com/wbthomason/nvim-vcs.lua
-			local added, removed, modified = 0, 0, 0
-			local tonumber = tonumber
-			for old_start, old_count, new_start, new_count in
-				string.gmatch(stdout, "@@%s*%-(%d+),?(%d*)%s*%+(%d+),?(%d*)%s*@@")
-			do
-				old_count = (old_count == nil and 0) or (old_count == "" and 1) or tonumber(old_count) or 0
-				new_count = (new_count == nil and 0) or (new_count == "" and 1) or tonumber(new_count) or 0
-
-				if old_count == 0 and new_count > 0 then
-					added = added + new_count
-				elseif old_count > 0 and new_count == 0 then
-					removed = removed + old_count
-				else
-					local minv = old_count < new_count and old_count or new_count
-					modified = modified + minv
-					added = added + (new_count - minv)
-					removed = removed + (old_count - minv)
-				end
-			end
-			return { added = added, modified = modified, removed = removed }
 		end
 
 		api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
@@ -265,7 +236,7 @@ Diff.Interface = {
 						elseif stdout and #stdout > 0 then
 							vim.schedule(function()
 								if api.nvim_buf_is_valid(bufnr) then
-									diff[bufnr] = process_diff(stdout)
+									diff[bufnr] = require("witch-line.components.git.utils").process_diff(stdout)
 									require("witch-line.core.handler").refresh_component_graph(self) -- trigger update
 								end
 							end)
@@ -377,7 +348,7 @@ Diff.Removed = {
 		--- @cast static { icon: string }
 		local ctx = require("witch-line.core.manager.hook").use_context(self, session_id)
 		--- @cast ctx Git.Diff.Interface.Context
-		local diff = ctx.get_diff(vim.api.nvim_get_current_buf())
+		local diff = ctx.get_diff()
 		if diff then
 			local removed = diff.removed
 			if removed then
