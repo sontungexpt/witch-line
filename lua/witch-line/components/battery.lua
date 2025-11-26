@@ -1,6 +1,14 @@
 local Id = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
+--- @class witch-line.componets.battery.Static
+--- @field icons {charging: string[], discharging: string[]}
+--- @field colors {battery_high: string, battery_medium: string, battery_weak : string}
+---
+--- @class witch-line.componets.battery.Context
+--- @field charge_anim_index integer
+--- @field get_status? fun():string
+--- @field get_capacity? fun():number
 --- @type DefaultComponent
 return {
 	id = Id["battery"],
@@ -45,7 +53,7 @@ return {
 		fg = colors.green,
 	},
 	context = {
-		current_charging_index = 0,
+		charge_anim_index = 0,
 	},
 	init = function(self, session_id)
 		local sysname = (vim.uv or vim.loop).os_uname().sysname
@@ -70,7 +78,7 @@ return {
 				return read_battery_file("status")
 			end
 			ctx.get_capacity = function()
-				return read_battery_file("capacity")
+				return tonumber(read_battery_file("capacity"))
 			end
 		elseif sysname == "Windows_NT" then
 			local ffi = require("ffi")
@@ -182,41 +190,43 @@ return {
 		end
 	end,
 	update = function(self, session_id)
-		local hook = require("witch-line.core.manager.hook")
-		local ctx, static = hook.use_context(self, session_id), hook.use_static(self)
-		--- @cast static {icons: {charging: string[], discharging: string[]}, colors: {	battery_high: string, battery_medium: string, battery_weak : string}}
-		--- @cast ctx { get_status: nil|fun():string} | { get_capacity: nil|fun():number}| { current_charging_index: integer }
+		local ctx, static = self.context, self.static
+		--- @cast static witch-line.componets.battery.Static
+		--- @cast ctx witch-line.componets.battery.Context
+
 		if not ctx.get_status or not ctx.get_capacity then
 			return ""
 		end
 
 		local status = ctx.get_status()
 		local capacity = ctx.get_capacity()
-		local icon_index = math.floor(capacity / 10) + 1
+		local level_index = math.floor(capacity / 10) + 1
 
-		local battery_color = icon_index > 8 and static.colors.battery_high
-			or icon_index > 3 and static.colors.battery_medium
+		local battery_color = level_index > 8 and static.colors.battery_high
+			or level_index > 3 and static.colors.battery_medium
 			or static.colors.battery_weak
+
+		local charge_anim_index = ctx.charge_anim_index
 
 		local value = ""
 		if status == "Charging" then
-			ctx.current_charging_index = ctx.current_charging_index == 0 and icon_index
-				or ctx.current_charging_index < #static.icons.charging and ctx.current_charging_index + 1
-				or icon_index
+			charge_anim_index = charge_anim_index == 0 and level_index
+				or charge_anim_index < #static.icons.charging and charge_anim_index + 1
+				or level_index
 
-			value = static.icons.charging[ctx.current_charging_index] .. " " .. capacity .. "%%"
+			value = static.icons.charging[charge_anim_index] .. " " .. capacity .. "%%"
 		elseif status == "Discharging" or status == "Not charging" then
-			ctx.current_charging_index = 0
-
-			value = static.icons.discharging[icon_index] .. " " .. capacity .. "%%"
+			charge_anim_index = 0
+			value = static.icons.discharging[level_index] .. " " .. capacity .. "%%"
 		elseif status == "Full" then
-			ctx.current_charging_index = 0
+			charge_anim_index = 0
 			value = "󰂄 " .. capacity .. "%%"
 		else
-			ctx.current_charging_index = 0
-			return "Battery: " .. capacity .. "%%"
+			charge_anim_index = 0
+			value = "Battery: " .. capacity .. "%%"
 		end
 
+		ctx.charge_anim_index = charge_anim_index
 		return value, { fg = battery_color }
 	end,
 }
