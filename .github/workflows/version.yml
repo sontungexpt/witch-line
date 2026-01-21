@@ -5,11 +5,11 @@ on:
     branches: [main]
 
 permissions:
-  contents: write # cho phép github-actions push
+  contents: write # allow github-actions push
 
 jobs:
   version:
-    # 🚫 Ngăn loop: không chạy nếu commit do github-actions tạo
+    # Avoid infinity loop: skip if commit by github-actions
     if: github.actor != 'github-actions[bot]'
 
     runs-on: ubuntu-latest

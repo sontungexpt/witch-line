@@ -6,6 +6,7 @@ local M = {}
 local sep = substring(package.config, 1, 1)
 local CACHED_DIR = vim.fn.stdpath("cache") .. sep .. "witch-line"
 local CACHED_FILE = CACHED_DIR .. sep .. "cache.luac"
+local COMMIT_HASH = require("witch-line._version").commit
 
 local loaded = false
 
@@ -15,11 +16,10 @@ local loaded = false
 --- in either the user configuration or environment state.
 ---
 --- @param config_checksum any The checksum derived from the user config.
---- @param commit_hash string The git commit hash.
 --- @return string checksum The concatenated checksum string.
-local create_checksum = function(config_checksum, commit_hash)
+local create_checksum = function(config_checksum)
 	-- return tostring(config_checksum) .. commit_hash .. "\0"
-	return tostring(config_checksum) .. commit_hash
+	return tostring(config_checksum) .. COMMIT_HASH
 end
 
 --- Check if the cache has been read and load data to ram
@@ -45,32 +45,6 @@ M.DataAccessor = DataAccessor
 --- Inspect the Data table
 M.inspect = function()
 	require("witch-line.utils.notifier").info("WitchLine Cache Data\n" .. vim.inspect(DataAccessor))
-end
-
---- Get the current git commit hash
---- @return string commit_hash The git commit hash
-local get_current_commit = function()
-	local repo = vim.api.nvim_get_option_value("runtimepath", {}):match("[^,]*/witch%-line")
-	local head_fd = assert(uv.fs_open(repo .. "/.git/HEAD", "r", 438))
-	local head_content = assert(uv.fs_read(head_fd, 40, 0))
-	if substring(head_content, 1, 4) ~= "ref:" then
-		assert(uv.fs_close(head_fd))
-		return head_content
-	end
-
-	-- HEAD is a reference
-	local ref_path = repo .. "/.git/" .. substring(head_content, 6):gsub("%s*$", "")
-	local ref_fd, _, err = uv.fs_open(ref_path, "r", 438)
-	if err == "ENOENT" then -- 40 byte is not enough for a branch name (rarely)
-		local head_stat = assert(uv.fs_fstat(head_fd))
-		head_content = assert(uv.fs_read(head_fd, head_stat.size, 0))
-		assert(uv.fs_close(head_fd))
-		ref_path = repo .. "/.git/" .. substring(head_content, 6):gsub("%s*$", "")
-		ref_fd = assert(uv.fs_open(ref_path, "r", 438))
-	end
-	local hash = assert(uv.fs_read(ref_fd, 40, 0))
-	assert(uv.fs_close(ref_fd))
-	return hash
 end
 
 --- Save the current Data table to a cache file.
@@ -100,7 +74,7 @@ M.save = function(config_checksum, debug_strip, pre_work)
 	end
 
 	local fd = assert(uv.fs_open(CACHED_FILE, "w", 438))
-	assert(uv.fs_write(fd, create_checksum(config_checksum, get_current_commit()) .. bytecode, 0))
+	assert(uv.fs_write(fd, create_checksum(config_checksum) .. bytecode, 0))
 	assert(uv.fs_close(fd))
 end
 
@@ -185,7 +159,7 @@ end
 --- @return Cache.DataAccessor|nil DataAccessor The DataAccessor if the cache is valid, or nil otherwise.
 M.read = function(config_checksum, notification)
 	local fd, _, err = uv.fs_open(CACHED_FILE, "r", 438)
-	if err and err == "ENOENT" then
+	if err and err == "ENOENT" or not fd then
 		return nil
 	end
 
@@ -194,7 +168,7 @@ M.read = function(config_checksum, notification)
 	assert(uv.fs_close(fd))
 
 	--- Validate the cache file content against the user configs
-	local checksum = create_checksum(config_checksum, get_current_commit())
+	local checksum = create_checksum(config_checksum)
 	local checksum_end = #checksum
 
 	if substring(content, 1, checksum_end) ~= checksum then
