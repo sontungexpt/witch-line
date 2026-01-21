@@ -1,0 +1,50 @@
+name: Update version file
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # cho phép github-actions push
+
+jobs:
+  version:
+    # 🚫 Ngăn loop: không chạy nếu commit do github-actions tạo
+    if: github.actor != 'github-actions[bot]'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # để git rev-parse chính xác
+
+      - name: Generate version file
+        run: |
+          COMMIT=$(git rev-parse --short HEAD)
+          TIME=$(date +%s)
+
+          mkdir -p lua/witch-line
+
+          cat > lua/witch-line/_version.lua <<EOF
+          -- This file is auto-generated. DO NOT EDIT.
+          return {
+            commit = "$COMMIT",
+            time = $TIME,
+          }
+          EOF
+
+      - name: Commit version file if changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          # chỉ commit nếu file thực sự thay đổi
+          if ! git diff --quiet; then
+            git add lua/witch-line/_version.lua
+            git commit -m "chore: auto update version [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi
