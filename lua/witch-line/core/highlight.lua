@@ -68,7 +68,7 @@ M.toggle_auto_theme = function()
 	)
 end
 
-api.nvim_create_autocmd("Colorscheme", {
+api.nvim_create_autocmd("ColorScheme", {
 	callback = restore_highlight_styles,
 })
 
