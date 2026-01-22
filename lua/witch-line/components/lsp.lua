@@ -31,7 +31,7 @@ local Clients = {
 	update = function(self, session_id)
 		local api = vim.api
 		local bufnr = api.nvim_get_current_buf()
-		local buf_clients = vim.lsp.get_clients({ bufnr = bufnr })
+		local buf_clients = vim.lsp.get_clients { bufnr = bufnr }
 		local server_names = {}
 
 		local has_null_ls = false
