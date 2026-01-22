@@ -4,20 +4,20 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write # allow github-actions push
-
 jobs:
   version:
     # Avoid infinity loop: skip if commit by github-actions
     if: github.actor != 'github-actions[bot]'
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # allow github-actions push
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.CI_PUSH_TOKEN }}
           fetch-depth: 0 # để git rev-parse chính xác
 
       - name: Generate version file
@@ -37,8 +37,8 @@ jobs:
 
       - name: Commit version file if changed
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
 
           # chỉ commit nếu file thực sự thay đổi
           if ! git diff --quiet; then
