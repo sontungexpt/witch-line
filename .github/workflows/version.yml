@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.CI_PUSH_TOKEN }}
+          token: ${{ secrets.CI_PUSH_TOKEN }} # push access must be recreate when token expired
           fetch-depth: 0 # để git rev-parse chính xác
 
       - name: Generate version file
