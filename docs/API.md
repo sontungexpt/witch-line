@@ -1,75 +1,301 @@
-## 📚 Public APIs
+## Module `witch-line`
 
-The api docs are not enough yet, but you can read the code to understand how to use the public APIs.
+Main entry point. Call `setup(opts)` to initialize the plugin.
 
-## Module `witch-line.core.statusline`
+```lua
+require("witch-line").setup({
+  abstracts = { ... },  -- CombinedComponent[] (optional)
+  statusline = { ... },  -- { global: CombinedComponent[], win?: fun(winid): CombinedComponent[] }
+  disabled = { ... },    -- { filetypes: string[], buftypes: string[] }
+  cache = { ... },       -- { enabled: boolean, notification: boolean, func_strip: boolean }
+  auto_theme = true,     -- boolean | nil
+})
+```
 
-This module provides functions to manage and manipulate the statusline values and rendering.
+- `setup(user_config)` — Initializes WitchLine with the given configuration. See README.md for full option reference.
 
-- `render(max_width)`: Renders the statusline with a specified maximum width.
+---
 
-  - `max_width`: The maximum width for the statusline rendering.
+## Module `witch-line.builtin`
 
-## Module `witch-line.core.handler`
+Helpers for creating custom variants of default components.
 
-This module handles the setup and management of statusline components.
+- `comp(path, override)` — Returns a component table that inherits from the default component at `path` (e.g. `"file.name"`) with the given `override` fields applied.
 
-- `refresh_component_graph(comp, dep_graph_kind, seen)`: Updates the component state and its dependencies then rerenders the statusline.
+  ```lua
+  local my_comp = require("witch-line.builtin").comp("file.name", {
+    padding = { left = 2 },
+    min_screen_width = 60,
+  })
+  ```
 
-  - `comp`: The component to refresh along with its dependencies.
-  - `dep_graph_kind`: Optional. A list of dependency store IDs to refresh. (Defaults to Timer and Event)
-  - `seen`: A set of already processed components to avoid infinite loops.
+---
 
-- `update_comp(comp, sid)`: Updates the value and style of a specific component but does not rerender the statusline.
+## Module `witch-line.handler`
 
-  - `comp`: The component to update.
-  - `sid`: The session identifier for the current update.
+Functions for programmatic component updates and registration.
 
-- `update_comp_graph(comp, sid, dep_graph_kind, seen)`: Recursively updates a component and all its dependent components, then rerenders the statusline.
+- `refresh_component_graph(comp, eager?, dep_graph_kind?, seen?)` — Updates a component and its dependencies, then re-renders the statusline. Call this from custom autocmds to trigger updates. `eager` (boolean) skips debounce if true.
 
-  - `comp`: The component to update along with its dependencies.
-  - `sid`: The session identifier for the current update.
-  - `dep_graph_kind`: A list of dependency store IDs to update.
-  - `seen`: A set of already processed components to avoid infinite loops.
+- `update_comp_graph(comp, sid, dep_graph_kind?, seen?)` — Recursively updates a component and all its dependents without re-rendering.
 
-- `update_comp_graph_by_ids = function(ids, sid, dep_graph_kind, seen)`: Updates components by their IDs along with their dependencies, then rerenders the statusline.
+- `update_by_ids(ids, sid, dep_graph_kind?, seen?)` — Updates components by ID list and their dependents.
 
-  - `ids`: A list of component IDs to update.
-  - `sid`: The session identifier for the current update.
-  - `dep_graph_kind`: A list of dependency store IDs to update.
-  - `seen`: A set of already processed components to avoid infinite loops.
+- `register_abstract(comp, winid?)` — Registers an abstract (non-rendered) component for use as a dependency.
 
-- `register_abstract_component(comp)`: Registers an abstract component that can be used as a base for other components.
+- `register_combined(comp, parent_id?, winid?)` — Registers a combined component (string, table, or list) for rendering.
 
-  - `comp`: The abstract component to register.
+---
 
-- `register_combined_component(comp, parent_id)`: Registers a combined component that inherits properties from a parent component.
+## Module `witch-line.hook`
 
-  - `comp`: The combined component to register.
-  - `parent_id`: The ID of the parent component to inherit from.
+Hooks for accessing component data from within component functions.
 
-## Module `witch-line.core.Session`
+- `use_static(comp)` — Returns the resolved static data (merged through inherit/reference chain) for the given component.
 
-This module provides functions to manage sessions for the statusline.
+- `use_context(comp, session_id)` — Returns the resolved context data for the component in the given session.
 
-- `new(): sid` : Creates a new session instance.
+- `use_event_info(comp, session_id)` — Returns the event info table that triggered the current update cycle, or nil if not triggered by an event. The result matches `vim.api.keyset.create_autocmd.callback_args`.
 
-- `remove(sid)`: Removes the current session instance.
+- `use_plain_field(comp_id, field_name)` — Look up a raw (non-evaluated) field value from any registered component by its ID.
 
-  - `sid`: The session identifier to remove.
+- `use_dynamic_field(comp_id, field_name, sid)` — Look up an evaluated field value from any registered component by its ID.
 
-- `with_session(sid, fn)`: Executes a function within the context of a specific session.
+---
 
-  - `sid`: The session identifier to use.
-  - `fn`: The function to execute within the session context.
+## Module `witch-line.session`
 
-- `new_store(sid, store_id, initial_value)`: Creates a new store for a specific session.
+Recycled session cache for storing ephemeral data during a single render cycle.
 
-  - `sid`: The session identifier.
-  - `store_id`: The identifier for the store.
-  - `initial_value`: The initial value for the store.
+- `with_session(fn)` — Clears the session cache and calls `fn(sid)` where `sid` is always `1`. Use this to scope temporary data.
 
-- `get_store(sid, store_id)`: Retrieves the value of a specific store for a session.
+- `get(key)` — Returns the value of a store by key.
 
-  - `sid`: The session identifier.
-  - `store_id`: The identifier for the store.
+- `get_deep(key, sub_key)` — Returns a specific sub-value within a store.
+
+- `set_deep(key, sub_key, value)` — Sets a specific sub-value within a store.
+
+---
+
+## Module `witch-line.statusline`
+
+Low-level statusline rendering and segment management.
+
+- `render(winid?)` — Renders the statusline immediately for the given window (or global if laststatus=3).
+
+- `render_debounce(winid?)` — Renders the statusline with 80ms debounce.
+
+- `push(comp_id?, value, winid?)` — Appends a component segment (or literal string if comp_id is nil) to the layout.
+
+- `set_value(comp_id, value, hl_name?, winid?)` — Sets the display value of a component segment.
+
+- `set_side_value(comp_id, shift_side, value, hl_name?, force?, winid?)` — Sets left (-1) or right (1) side decoration.
+
+- `set_click_handler(comp_id, click_handler, force?, winid?)` — Attaches a click handler string to a segment.
+
+- `hide_segment(comp_id, winid?)` — Hides a segment by clearing its value.
+
+- `track_flexible(comp_id, priority, winid?)` — Marks a component as flexible with the given priority.
+
+- `inspect()` — Logs the internal statusline state for debugging.
+
+- `on_vim_leave_pre(CacheDataAccessor)` — Freezes state for cache persistence.
+
+- `load_cache(CacheDataAccessor)` — Restores statusline from cache.
+
+---
+
+## Module `witch-line.highlight`
+
+Highlight group management and color utilities.
+
+- `highlight(group_name, hl_style)` — Defines or updates a Neovim highlight group. `hl_style` can be a string (link target) or a `ThemeAwareStyle` table.
+
+- `make_hl_name_from_id(id)` — Generates a valid highlight group name from a component ID.
+
+- `assign_highlight_name(str, hl_name)` — Wraps a string with highlight group markers (`%#...#`).
+
+- `replace_highlight_name(str, new_hl_name, n?)` — Replaces highlight group markers in a string.
+
+- `merge_hl(child, parent, n)` — Merges two highlight definitions (child takes precedence).
+
+- `safe_nvim_get_hl(opts)` — Safely queries Neovim's highlight table via pcall.
+
+- `get_style(comp)` — Retrieves the cached style for a component.
+
+- `set_auto_theme(value)` — Enables/disables the auto-theme feature.
+
+- `toggle_auto_theme()` — Toggles the auto-theme feature on/off.
+
+- `inspect(target?)` — Logs the highlight cache for debugging (`"rgb24bit"`, `"styles"`, or both).
+
+---
+
+## Module `witch-line.cache`
+
+Cache persistence layer — saves and loads component state across Neovim restarts using bytecode serialization.
+
+- `loaded()` — Returns true if cache data has been loaded.
+
+- `cache_file_readable()` — Returns true if the cache file exists and is readable.
+
+- `read(config_checksum, notification?)` — Reads and validates the cache file. Returns a `DataAccessor` object, or nil if the cache is invalid.
+
+- `save(config_checksum, func_strip?, pre_work?)` — Serializes current state to the cache file.
+
+- `clear(notification?)` — Deletes the cache file.
+
+- `config_checksum(user_configs)` — Computes a stable checksum from the user configuration for cache invalidation.
+
+- `inspect()` — Logs the current cache data for debugging.
+
+---
+
+## Module `witch-line.registry`
+
+Component and dependency graph registry.
+
+- `register(comp)` — Registers a component. Returns the existing one if already registered.
+
+- `get(id)` — Returns a registered component by ID, or nil.
+
+- `is_existed(id)` — Checks if a component is registered.
+
+- `iterate()` — Iterates over all registered components.
+
+- `mark_emergency(id)` — Marks a component for immediate update on startup.
+
+- `get_emergency_ids()` — Returns the list of emergency component IDs.
+
+- `queue_init(id)` — Queues a component's `init()` call.
+
+- `iterate_pending_init()` — Iterates over queued init components.
+
+- `link_dependency(ref_id, comp_id, dep_graph_kind)` — Creates a dependency edge in the dependency graph.
+
+- `iterate_dependents(dep_graph_kind, comp_id)` — Iterates over all components that depend on the given component.
+
+- `iterate_missing_dep_ids(comp_id)` — Finds dependencies that are referenced but not yet registered.
+
+- `inspect()` — Returns the internal registry state for debugging.
+
+---
+
+## Module `witch-line.resolver`
+
+Value resolution with inheritance and reference chain traversal.
+
+- `lookup_plain(comp, key, seen?)` — Finds the raw (un-evaluated) value for a key, traversing local → inherit → ref chains.
+
+- `lookup_dynamic(comp, key, sid, seen?, ...)` — Same as `lookup_plain` but evaluates functions. Caches results per session cycle.
+
+- `deepest_reference(comp, key, seen?)` — Returns the deepest reference component for a given key.
+
+- `dynamic_inherit(comp, key, sid, merge, self_val?)` — Resolves and merges inherited values (e.g. styles) through the inherit chain using a merge function.
+
+- `clear_raw_cache()` — Clears the internal raw value cache.
+
+---
+
+## Module `witch-line.command`
+
+Registers the `:WitchLine` user command with subcommands:
+
+| Command | Description |
+| --- | --- |
+| `:WitchLine clear_cache` | Clears the cache |
+| `:WitchLine toggle_auto_theme` | Toggles auto theme adjustment |
+| `:WitchLine inspect` | Inspect internal state (aliases at `:WitchLine inspect --help`) |
+
+---
+
+## Module `witch-line.events`
+
+Neovim autocmd event management for component updates.
+
+- `register(events, comp_id)` — Registers a component's event declarations (strings or tables).
+
+- `register_resized(comp_id)` — Registers a component for `VimResized`.
+
+- `register_win_enter(comp_id)` — Registers a component for `WinEnter`.
+
+- `get_event_info(comp, _sid)` — Returns the event info that triggered the component's update.
+
+- `listen(work)` — Initializes autocmds and sets up event dispatch. The `work` callback receives `(sid, queue)`.
+
+- `inspect()` — Returns the internal event store for debugging.
+
+---
+
+## Module `witch-line.timers`
+
+libuv timer management for periodic component updates.
+
+- `register(interval, comp_id)` — Registers a component for timer-based updates. `true` = 1000ms. Numbers specify custom ms.
+
+- `start(work)` — Starts all registered timers. The `work` callback receives `(sid, queue)`.
+
+- `stop_all()` — Stops and closes all active timers.
+
+- `inspect()` — Returns the internal timer store for debugging.
+
+---
+
+## Module `witch-line.constant.default`
+
+Returns a table with the default statusline component list:
+
+```lua
+"mode", "file.name", "file.icon", "file.modifier",
+"git.branch", "git.diff.added", "git.diff.removed", "git.diff.modified",
+"%=",
+"diagnostic.error", "diagnostic.warn", "diagnostic.info", "diagnostic.hint",
+"lsp.clients", "windsurf.neocodeium", "indent", "cursor.pos", "cursor.progress"
+```
+
+---
+
+## Module `witch-line.constant.id`
+
+Default component ID mapping and validation.
+
+- `Id` — Metatable-based enum of all default IDs (e.g. `require("witch-line.constant.id").Id["mode"]` → `"mode"`).
+
+- `path(id)` — Returns the internal module path for a default ID, or nil if not found.
+
+- `existed(id)` — Checks if an ID corresponds to a default component.
+
+- `validate(id)` — Validates that an ID is a non-empty string and not a default ID.
+
+---
+
+## Module `witch-line.override`
+
+Allows overriding default component fields with type-safe merging.
+
+- `override(comp, override)` — Merges `override` fields into the default component. Only fields listed in `OVERRIDEABLE_TYPE_MAP` are accepted, with type validation.
+
+---
+
+## Module `witch-line.config`
+
+Configuration normalization.
+
+- `normalize(user_configs)` — Applies defaults and ensures required fields exist. Returns the normalized config.
+
+---
+
+## Module `witch-line.component`
+
+Low-level component utilities — id assignment, evaluate, hidden check, click handler registration.
+
+- `setup(comp)` — Ensures the component has a valid id.
+- `require(path)` — Loads a default component by dotted path.
+- `require_by_id(id_or_path)` — Loads a component by its id.
+- `evaluate(comp, sid)` — Calls `update` and applies padding.
+- `hidden(comp, sid)` — Returns true if the component is hidden.
+- `min_screen_width(comp, sid)` — Returns the min screen width for the component.
+- `auto_theme(comp, sid)` — Returns whether auto theme is enabled for the component.
+- `register_click_handler(comp)` — Registers a click handler and returns its global name.
+- `side_style(comp, side)` — Returns the side style for left or right.
+- `hl_name_field(side)` — Returns the internal hl name field key for the side.
