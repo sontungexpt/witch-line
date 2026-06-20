@@ -94,7 +94,7 @@ local component = {
   | **Type**:                      | **Description**                                    |
   | ------------------------------ | -------------------------------------------------- |
   | `table`                        | A table that holds dynamic data for the component. |
-  | `fun(self, session_id): table` | A function that returns a table context            |
+   | `fun(self): table`             | A function that returns a table context            |
 
   **Description**: A table or a function that holds dynamic data for the component. It can be used to store values that can change frequently and are reactive.
 
@@ -126,11 +126,11 @@ local component = {
   }
   ```
 
-  - Type: `fun(self, ctx, static, session_id) -> table`
+  - Type: `fun(self) -> table`
 
   ```lua
   local component = {
-    context = function(self, ctx, static, session_id)
+    context = function(self)
         return {
             dynamic_value = math.random(1, 100), -- Random value between 1 and 100
             another_dynamic_value = os.date("%Y-%m-%d %H:%M:%S") -- Current date and time
@@ -201,7 +201,7 @@ local component = {
 | `[integer]`    | `string`              | Event name (e.g., `"BufEnter"`, `"InsertLeave"`). Each entry in the array represents an event. |
 | `once?`        | `boolean`             | _(Optional)_ If `true`, the event triggers only once.                                          |
 | `pattern?`     | `string  \| string[]` | (Optional) A pattern or list of patterns the event should match (e.g., `"*.lua"`).             |
-| `remove_when?` | `function `           | (Optional) Remove this special event if `remmove_when` return true.                            |
+| `remove_when?` | `function ` | (Optional) Remove this special event if `remove_when` return true.                            |
 
 - events type
 
@@ -230,10 +230,10 @@ local component = {
         "BufEnter *lua,*js",
         {
             "User",
-            pattern = { "VeryLazy", "LazyLoad"}
+            pattern = { "VeryLazy", "LazyLoad" },
         },
         {
-            "CursorHold", "CursorHoldI"
+            "CursorHold", "CursorHoldI",
             once = true,
         }
     }
@@ -373,7 +373,7 @@ local component = {
 
   **Description**: The padding to be applied to the component. It can be a number, a function, or a table with `left` and `right` fields. If not provided, a default padding of 1 space will be applied to both sides of the component.
 
-  - Note: Padding is applied inner separator if separator is provided. For example, if padding = 1 and separator = "|", the output will be "| text |".
+  - Note: Padding is applied inside the separator if separator is provided. For example, if padding = 1 and separator = "|", the output will be "| text |".
 
   **Example**:
 
@@ -551,11 +551,11 @@ local component = {
   ```
 
 - **update**:
-  **Type**: `fun(self, session_id): string , vim.api.keyset.highlight|string|nil`
+  **Type**: `string|nil|fun(self, session_id): string|nil , CompStyle|nil`
 
-  **Description**: A function that updates the component. It is called every time the component needs to be rerendered. It should return the text to be displayed and the highlight properties to be applied.
+  **Description**: A string or a function that updates the component. It is called every time the component needs to be rerendered. It should return the text to be displayed and the highlight properties to be applied.
 
-  The reason for the second return value is to allow dynamic highlights based on the current state of the component. Although we had the `style` field to define
+  The reason for the second return value is to allow dynamic highlights based on the current state of the component. Although we have the `style` field to define
   style, but sometimes the style needs to change based on the value, and this allows for that flexibility.
 
   **Example**:
@@ -654,6 +654,7 @@ local component = {
 
   | **Type**                        | **Description**                                                                     |
   | ------------------------------- | ----------------------------------------------------------------------------------- |
+  | `nil`                           | No left separator will be used (default behavior).                                   |
   | `string`                        | A static string to be used as the left separator of the component.                  |
   | `fun(self, session_id): string` | A function that returns a string to be used as the left separator of the component. |
 
@@ -733,7 +734,7 @@ local component = {
   | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
   | `SepStyle`                                                            | A predefined style based on the component's style.                                                                                |
   | `ThemeAwareStyle`                                                     | A static highlight group to be applied to the left part of the component.                                                         |
-  | `nil`                                                                 | No specific highlight group will be applied to the left part (default behavior).                                                  |
+  | `nil`                                                                 | Defaults to SepStyle.SepBg (uses the component's background color as the separator's foreground).                                |
   | `fun(self, session_id): ThemeAwareStyle \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
   | `string`                                                              | A highlight group name to be applied to the left part of the component.                                                           |
 
@@ -761,11 +762,11 @@ local component = {
   }
   ```
 
-  - Type: `fun(self, ctx, static, session_id) -> ThemeAwareStyle`
+  - Type: `fun(self, session_id) -> ThemeAwareStyle`
 
   ```lua
   local component = {
-      left_style = function(self, ctx, static, session_id)
+      left_style = function(self, session_id)
           if static.config_value then
               return { fg = "#00ff00" } -- Green text if config_value is true
           else
@@ -822,7 +823,7 @@ local component = {
   | `fun(self, session_id): ThemeAwareStyle \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
   | `string`                                                              | A highlight group name to be applied to the right part of the component.                                                          |
 
-  **Description**: The highlight style to be applied to the right part of the component. It can be a static highlight group or a function that returns a highlight group. If not provided, the default highlight group will be used. The function can be used to create dynamic styles based on the current state of the component, this accepts the `context` field as the second argument, and `static` as the third argument, so you can use those values to determine the style dynamically.
+  **Description**: The highlight style to be applied to the right part of the component. It can be a static highlight group or a function that returns a highlight group. If not provided, the default highlight group will be used.
 
   **Example**:
 
@@ -846,11 +847,11 @@ local component = {
   }
   ```
 
-  - Type: `fun(self, ctx, static, session_id) -> ThemeAwareStyle`
+  - Type: `fun(self, session_id) -> ThemeAwareStyle`
 
   ```lua
   local component = {
-      right_style = function(self, ctx, static, session_id)
+      right_style = function(self, session_id)
           if static.config_value then
               return { fg = "#00ff00" } -- Green text if config_value is true
           else
@@ -860,11 +861,11 @@ local component = {
   }
   ```
 
-  - Type: `fun(self, ctx, static, session_id) -> SepStyle`
+  - Type: `fun(self, session_id) -> SepStyle`
 
   ```lua
       local component = {
-          right_style = function(self, ctx, static, session_id)
+          right_style = function(self, session_id)
               if static.config_value then
                   return 1 -- Use SepStyle 1 if config_value is true
               else
@@ -876,7 +877,7 @@ local component = {
 
 - **on_click**:
 
-  **Alias**: `OnClickFunc` : `fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil`
+  **Alias**: `OnClickFunc` : `fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil`
 
   | **Type**                                | **Description**                                                            |
   | --------------------------------------- | -------------------------------------------------------------------------- |
@@ -891,18 +892,18 @@ local component = {
   | **Parameter** | **Type** | **Description** |
   | -------------------- | ---------------------------- | ---------------------------------------------------- |
   | `self` | `ManagedComponent` | The component instance. |
-  | `minwid` | `number` | The minimum width of the component. |
+  | `minwid` | `number` | The window number where the component was clicked. |
   | `click_times` | `number` | The number of clicks (1 for single click, 2 for double click, etc.). |
-  | `mouse button` | `"l" \| "r" \| "m"` | The mouse button that was clicked (`"l"` for left, `"r"` for right, `"m"` for middle). |
+  | `mouse_button` | `"l" \| "r" \| "m"` | The mouse button that was clicked (`"l"` for left, `"r"` for right, `"m"` for middle). |
   | `modifier_pressed` | `"s" \| "c" \| "a" \| "m"` | The modifier key that was pressed (`"s"` for Shift, `"c"` for Control, `"a"` for Alt, `"m"` for Meta). |
 
   **Example**:
 
   ```lua
   local component = {
-      on_click = function(self, minwid, button, clicks, mouse_pos)
+      on_click = function(self, minwid, click_times, mouse_button, modifier_pressed)
           -- Click handling code here
-          print("Component clicked with button: " .. button .. ", clicks: " .. clicks)
+          print("Component clicked with button: " .. mouse_button .. ", clicks: " .. click_times)
       end
   }
   ```
@@ -928,7 +929,7 @@ An component can reference other components for some of its fields. This allows 
       timing = true,
       style = { fg = "#ffffff", bg = "#000000" },
       padding = 1,
-      update = function(self, ctx, static, session_id)
+      update = function(self, session_id)
           return "Base Component"
       end
   }
@@ -938,7 +939,7 @@ An component can reference other components for some of its fields. This allows 
       -- and have the same style and padding as the base component.
       id = "child_component",
       inherit = "base_component",
-      update = function(self, ctx, static, session_id)
+      update = function(self, session_id)
           return "Child Component"
       end
   }
@@ -949,22 +950,23 @@ An component can reference other components for some of its fields. This allows 
 
   **Type**: `table`
 
-  **Description**: A table that maps fields of the current component to the ids of other components. This allows for referencing specific fields from other components without inheriting all their fields. The fields that can be referenced are:
+  **Description**: A table that maps field names to component IDs. When a field is not found locally or via `inherit`, the `ref[key]` is checked as a fallback. Any field name can be used as a key — the entries below are the most common.
 
-  | Field              | Type                 | Description                                                                                |
-  | ------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
-  | `events`           | `CompId \| CompId[]` | The component will be updated when the referenced events are triggered.                    |
-  | `user_events`      | `CompId \| CompId[]` | The component will be updated when the referenced user-defined events are triggered.       |
-  | `timing`           | `CompId \| CompId[]` | The component will be updated based on the timing provided by the referenced components.   |
-  | `style`            | `CompId`             | The style of the component will be taken from the referenced component.                    |
-  | `left_style`       | `CompId`             | The style of the left separator of component will be taken from the referenced component.  |
-  | `right_style`      | `CompId`             | The style of the right separator of component will be taken from the referenced component. |
-  | `left`             | `CompId`             | The left separator of the component will be taken from the referenced component.           |
-  | `right`            | `CompId`             | The right separator of the component will be taken from the referenced component.          |
-  | `static`           | `CompId`             | The component will be updated with static values from the referenced component.            |
-  | `context`          | `CompId`             | The component will be updated with context values from the referenced component.           |
-  | `hidden`           | `CompId \| CompId[]` | The component will be hidden when the referenced components are hidden.                    |
-  | `min_screen_width` | `CompId \| CompId[]` | The component will be updated with min screen width logic from the referenced components.  |
+  Some ref keys also create **dependency graph links** (see the **Dependency** column), meaning the current component is re-rendered whenever the referenced component updates.
+
+  | Field              | Type                 | Value Behavior                                                         | Dependency              |
+  | ------------------ | -------------------- | ---------------------------------------------------------------------- | ----------------------- |
+  | `events`           | `CompId \| CompId[]` | — (no value fallback)                                                   | Linked as Event dep     |
+  | `timing`           | `CompId \| CompId[]` | — (no value fallback)                                                   | Linked as Timer dep     |
+  | `style`            | `CompId`             | Fallback for the `style` field                                         | —                       |
+  | `left_style`       | `CompId`             | Fallback for the `left_style` field                                    | —                       |
+  | `right_style`      | `CompId`             | Fallback for the `right_style` field                                   | —                       |
+  | `left`             | `CompId`             | Fallback for the `left` field                                          | —                       |
+  | `right`            | `CompId`             | Fallback for the `right` field                                         | —                       |
+  | `static`           | `CompId`             | Fallback for the `static` field                                        | —                       |
+  | `context`          | `CompId`             | Fallback for the `context` field                                       | —                       |
+  | `hidden`           | `CompId \| CompId[]` | Fallback for the `hidden` field                                        | Linked as Visible dep   |
+  | `min_screen_width` | `CompId \| CompId[]` | Fallback for the `min_screen_width` field                              | Linked as Visible dep   |
 
   **Example**:
 
@@ -973,14 +975,14 @@ An component can reference other components for some of its fields. This allows 
       id = "event_component",
       events = {"BufEnter", "CursorHold"},
       static = { event_info = "Event Info" },
-      update = function(self, ctx, static, session_id)
+      update = function(self, session_id)
           return "Event Component"
       end
   }
   local style_component = {
       id = "style_component",
       style = { fg = "#00ff00", bg = "#000000" },
-      update = function(self, ctx, static, session_id)
+      update = function(self, session_id)
           return "Style Component"
       end
   }
@@ -991,7 +993,7 @@ An component can reference other components for some of its fields. This allows 
           events = "event_component", -- The main component will update on BufEnter and CursorHold events. In this case, the main component will update when event_component updates.
           style = "style_component"    -- The main component will have the style defined in style_component, In this case fg = "#00ff00", bg = "#000000"
       },
-      update = function(self, ctx, static, session_id)
+      update = function(self, session_id)
           -- static.event_info is available here because we referenced static from event_component
           return "Main Component"
       end
@@ -1107,7 +1109,7 @@ local Comp = {
           id = "child_component_1",
           -- So the child will have the same style and padding as the parent component.
           -- The child will also update every 1000ms (default timing for true).
-          update = function(self, ctx, static, session_id)
+          update = function(self, session_id)
               return "Child 2"
           end
       },
@@ -1116,7 +1118,7 @@ local Comp = {
           -- This child will also have the same style as the parent component, but will override the padding.
           -- The child will also update every 1000ms (default timing for true).
           padding = 2, -- This child will override the padding of the parent component.
-          update = function(self, ctx, static, session_id)
+          update = function(self, session_id)
               return "Child 3"
           end
       }
@@ -1130,11 +1132,12 @@ local Comp = {
 - `pre_update` : Called every time the component needs to be update, right before calling `min_screen_width` -> `hidden` -> `update` functions.
 - `min_screen_width` : Called every time the component needs to be update, right after calling `pre_update` function, right before calling `hidden` function.
 - `hidden` : Called every time the component needs to be update, right after calling `min_screen_width` function, right before calling `update` function.
-- `update` : Called every time the component needs to be update, right after calling `hidden` function, right before calling `padding` -> `post_update` function.
+- `update` : Called every time the component needs to be update, right after calling `hidden` function, to get the content of the component. Padding is applied right after this.
 - `padding` : Called every time the component needs to be update, right after calling `update` function, to get the padding of the component.
-- `post_update` : Called every time the component needs to be update, right after calling `update` function.
-- `style` : Called every time the component updated successfully, after calling `update` function, to get the style of the component.
-- `left` : Called every time the component updated successfully, after calling `update` function, to get the left part of the component.
-- `right` : Called every time the component updated successfully, after calling `update` function, to get the right part of the component.
-- `left_style` : Called every time the component updated successfully, after calling `update` function, to get the style of the left part of the component.
-- `right_style` : Called every time the component updated successfully, after calling `update` function, to get the style of the right part of the component.
+- `style` : Called every time the component updated successfully, after calling `update` function, right before setting the value in the statusline, to get the style of the component.
+- `left` : Called after the style is resolved, to get the left side decoration of the component.
+- `right` : Called after `left`, to get the right side decoration of the component.
+- `left_style` : Called after `left`, to get the style of the left decoration.
+- `right_style` : Called after `right`, to get the style of the right decoration.
+- `on_click` : The click handler is registered in the statusline after all decorations are resolved.
+- `post_update` : Called at the very end of the update cycle, after all values and styles are set.
