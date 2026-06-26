@@ -1,15 +1,12 @@
-local Id = require("witch-line.constant.id").Id
 local colors = require("witch-line.constant.color")
 
 --- @type DefaultComponent
 local SelectionCount = {
-	id = Id["selection.count"],
+	id = "selection.count",
 	_plug_provided = true,
-	style = {
-		fg = colors.cyan,
-	},
+	style = { fg = colors.cyan },
 	events = { "ModeChanged", "CursorMoved" },
-	update = function(self, session_id)
+	update = function(self, _)
 		local mode = vim.api.nvim_get_mode().mode
 		local line_start, col_start = vim.fn.line("v"), vim.fn.col("v")
 		local line_end, col_end = vim.fn.line("."), vim.fn.col(".")

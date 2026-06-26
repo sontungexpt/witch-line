@@ -1,11 +1,12 @@
 local M = {}
 
-M.register = function(comp, on_click)
+M.register = function(comp)
     local cached = comp._click_handler
     if cached then
         return cached
     end
 
+    local on_click = comp.on_click
     local t = type(on_click)
     if t == "table" then
         local name = on_click.name

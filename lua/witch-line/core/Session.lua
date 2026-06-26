@@ -1,65 +1,96 @@
-local next = next
-local Store = {}
-local Session = {}
+local M = {}
 
 --- @class SessionId : integer
 
----@type SessionId
-local next_id = 0
 
---- @return SessionId id of new session
-local new = function()
-    next_id = next_id + 1
-    Store[next_id] = {}
-    return next_id
+--- @class Session
+--- @field id SessionId
+--- Retrieve a value from the session memory.
+--- @field get fun(k: any): any|nil
+---
+--- Store a value in the session memory.
+--- @field set fun(k: any, v: any): any
+---
+--- Retrieve a cached value from the session memo.
+--- @field get_cache fun(k: any): any|nil
+---
+--- Store a value in the session memo.
+--- @field set_cache fun(k: any, v: any): any
+---
+--- Retrieve or populate a memoized value for the current session.
+---
+--- Supported call forms:
+---   1. `session:memo(factory, ...)`
+---      - Uses `factory` itself as the cache key.
+---      - Calls `factory(...)` once and caches the result.
+--- Cached values live for the lifetime of the current session.
+--- @field memo fun(key_or_factory: any, factory_or_value: any, ...: any): any
+
+local next_sid = 0
+local Sessions = {}
+
+
+--- Allocate a new session id.
+--- The backing store and memo cache are created lazily on first `set`/`memo` access.
+---@return Session
+local function new()
+    local sid = next_sid
+    next_sid = next_sid + 1
+    local cache = {}
+    Sessions[sid] = { cache = cache }
+    return {
+        id = sid,
+        get = function(k)
+            local data = Sessions[sid].data
+            return data and data[k]
+        end,
+        set = function(k, v)
+            local data = Sessions[sid].data or {}
+            data[k] = v
+            Sessions[sid].data = data
+            return v
+        end,
+        set_cache = function(key, value)
+            cache[key] = value
+            return value
+        end,
+        get_cache = function(key)
+            return cache[key]
+        end,
+        memo = function(fn, ...)
+            local v = cache[fn]
+            if v ~= nil then
+                return v
+            end
+
+            if type(fn) ~= "function" then
+                error("memo: fn must be a function, got " .. type(fn))
+                return
+            end
+
+            v = fn(...)
+            cache[fn] = v
+            return v
+        end
+    }
 end
-Session.new = new
 
---- Sets the session data associated with the given session ID and key.
---- @param sid SessionId id of the session
---- @param store_id NotNil key to retrieve session data
---- @param value any value to set for the key
-Session.new_store = function(sid, store_id, value)
-    local store = Store[sid]
-    if not store then
-        error("Session with id " .. tostring(sid) .. " does not exist.")
+--- Destroy a session and free its backing store.
+--- Resets the id counter when the last session is removed.
+---@param sid SessionId
+local function remove(sid)
+    Sessions[sid] = nil
+    if next(Sessions) == nil then
+        next_sid = 0
     end
-    store[store_id] = value
-    return value
 end
 
---- Retrieves the session data associated with the given session ID and key.
---- If the key does not exist, it will create an empty table for that key.
---- @param sid SessionId id of the session
---- @param store_id NotNil key to retrieve session data
---- @return any|nil value associated with the key, or nil if the key does not exist
-Session.get_store = function(sid, store_id)
-    local store = Store[sid]
-    if not store then
-        error("Session with id " .. tostring(sid) .. " does not exist.")
-    end
-    local value = store[store_id]
-    return value
+--- Create a session, invoke the callback, then tear it down.
+---@param cb fun(session: Session)
+M.with_session = function(cb)
+    local session = new()
+    cb(session)
+    remove(session.id)
 end
 
---- Clears the session data associated with the given session ID.
---- @param id SessionId
-local remove = function(id)
-    Store[id] = nil
-    if not next(Store) then
-        next_id = 0 -- reset id counter if no sessions exist
-    end
-end
-Session.remove = remove
-
---- Wraps a callback function in a new session.
---- This function creates a new session, calls the callback with the session ID,
---- and then removes the session when the callback is done.
---- @param cb fun(sid: SessionId) Callback function to call if the session does not exist
-Session.with_session = function(cb)
-    local id = new()
-    cb(id)
-    remove(id)
-end
-
-return Session
+return M

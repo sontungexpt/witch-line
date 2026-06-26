@@ -48,6 +48,10 @@
 --- | "weather"
 
 
+--- Identity map for default component IDs.
+--- @type table<DefaultId, DefaultId>
+local Id = {}
+
 --- @type table<DefaultId, string[]>
 local PathMap = {
     mode                     = { "mode" },
@@ -94,10 +98,16 @@ local PathMap = {
     ["weather.icon"]         = { "weather", "icon" },
     ["weather.temp"]         = { "weather", "temp" },
     ["weather.text"]         = { "weather", "text" },
-    weather                  = { "weather", "weather" },
+    weather                  = { "weather" },
 }
 
+for k in pairs(PathMap) do
+    Id[k] = k
+end
+
 return {
+    Id = Id,
+
     ---@param id DefaultId
     ---@return string[]|nil
     path = function(id) return PathMap[id] end,

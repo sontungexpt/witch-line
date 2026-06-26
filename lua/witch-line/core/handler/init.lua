@@ -1,5 +1,5 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
-local api, is_list = vim.api, vim.islist
+local api = vim.api
 
 local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
@@ -10,7 +10,7 @@ local Manager = require("witch-line.core.manager")
 local DepGraphKind = Manager.DepGraphKind
 local link_dependency = Manager.link_dependency
 
--- Lazy-loaded modules (self-replacing on first access)
+-- Lazy-loaded modules
 local Highlight
 Highlight = setmetatable({}, {
     __index = function(tbl, k)
@@ -21,18 +21,8 @@ Highlight = setmetatable({}, {
 
 local M = {}
 
---- Clear a component's visual representation from the statusline.
----
---- If the component is currently rendered it is hidden via
---- `Statusline.hide_segment`.  The `_hidden` flag is set so subsequent
---- updates can skip re-render if the component remains suppressed.
----
----@param comp ManagedComponent  The component to hide.  Must have been
----           previously registered with `Manager.register`.  Only acts if
----           `comp._renderable` is truthy (i.e. the component has an
----           `update` field and has been indexed).  When `win_individual`
----           is set, the window-specific segment is hidden via
----           `api.nvim_get_current_win()`.
+--- Hide a component's segment. Skips if not renderable.
+---@param comp ManagedComponent
 local hide_component = function(comp)
     if comp._renderable then
         Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
@@ -40,24 +30,10 @@ local hide_component = function(comp)
     end
 end
 
---- Normalise a side value before passing it to the statusline.
----
---- Dynamic (function-based) values that do not produce a string are
---- replaced with the empty string so the side slot still occupies space.
---- Static non-string values are discarded (`nil`).
----
----@param val any  The raw value returned by a side-field evaluator (e.g.
----                `comp.left` or `comp.right` after resolving via
----                `resolve_field(lval, comp, ctx)`).  May be any type.
----@param is_func boolean  `true` if the raw value originally came from a
----                        function invocation (i.e. the side field was a
----                        function that was called).  When `true`, non-string
----                        results become `""` instead of `nil` so the side
----                        slot preserves its space in the layout.
----@return string|nil  A string suitable for the statusline side-value API,
----                    or `nil` to skip setting the side value entirely
----                    (when the raw value was a static non-string that
----                    cannot be rendered).
+--- Normalise a side value. Dynamic non-strings become `""`, static non-strings become `nil`.
+---@param val any
+---@param is_func boolean
+---@return string|nil
 local format_side_value = function(val, is_func)
     if is_func then
         return type(val) ~= "string" and "" or val
@@ -67,31 +43,10 @@ local format_side_value = function(val, is_func)
     return val
 end
 
---- Resolve a field value: call functions with session memo, pass through others.
---- @param value any
---- @param comp ManagedComponent
---- @param ctx table
---- @return any
-local function resolve_field(value, comp, ctx)
-    if type(value) == "function" then
-        return ctx.session:memo(value, comp, ctx)
-    end
-    return value
-end
-
---- Conditionally attach `auto_theme` to a style table.
----
---- If `style` is a table and the component has auto-theming enabled (or
---- none was set yet), the table receives the `auto_theme` flag.
----
----@param style HighlightStyle|nil  The resolved style table to potentially
----                                 modify.  When nil, returned as-is.
----@param enable_auto_theme boolean  The component's auto-theme setting from
----                                  `Component.auto_theme(comp, ctx)`.
----                                  Only applied if `style.auto_theme` is
----                                  already nil/false.
----@return HighlightStyle|nil  The (possibly mutated) input `style`, returned
----                            unchanged when `style` is not a table.
+--- Attach `auto_theme` to a style table if not already set.
+---@param style HighlightStyle|nil
+---@param enable_auto_theme boolean
+---@return HighlightStyle|nil
 local apply_auto_theme = function(style, enable_auto_theme)
     if type(style) == "table" then
         style.auto_theme = style.auto_theme or enable_auto_theme
@@ -99,108 +54,98 @@ local apply_auto_theme = function(style, enable_auto_theme)
     return style
 end
 
---- Resolve the effective style for a component, with optional override merge.
----@param comp ManagedComponent  The component whose style to resolve.
----@param ctx table  The session context (unused directly but forwarded
----                  to `Component.auto_theme`).
----@param override_style HighlightStyle|string|nil  An optional style to
----                  merge on top of the component's own style.  Usually
----                  the override returned by `Component.evaluate`.
----                  Pass nil to skip.
----@return HighlightStyle  The resolved style table with auto-theme applied.
-local function resolve_comp_style(comp, ctx, override_style)
-    local override_type = type(override_style)
-    local style = comp.style
-
-    if override_type == "table" or override_type == "string" then
-        style = Highlight.merge_hl(override_style, style)
-    end
-
-    style = apply_auto_theme(style, Component.auto_theme(comp, ctx))
-
-    return style
-end
-
---- Apply the main (center) style of a component.
+--- Update or apply a component's highlight style.
 ---
---- Computes the effective style (see `resolve_comp_style`), creates or
---- reuses a highlight group, and returns both whether the style changed
---- and the resolved style table for downstream side-style processing.
+--- Resolves the final `style` (including overrides, inheritance, and references),
+--- generates or reuses `_hl_name`, and applies it via `Highlight.highlight()`.
 ---
----@param comp ManagedComponent  The component to style.  Its `_hl_name`
----           cache is populated if this is the first call.
----@param ctx table  Session context, forwarded to `resolve_comp_style`.
----@param auto_theme boolean  Pre-computed auto-theme flag from
----                           `Component.auto_theme(comp, ctx)`.
----@param override_style HighlightStyle|string|nil  Optional override style
----                  passed through to `resolve_comp_style`.  May be nil.
----@return boolean  `true` if the highlight was freshly created or changed
----                 (used downstream to decide whether side styles derived
----                 from the main style must be re-applied).
----@return HighlightStyle|nil  The resolved style table returned by
----                 `resolve_comp_style`.  Non-nil when the highlight
----                 call succeeds; nil only if `Highlight.highlight`
----                 returns nil (unusual).
-local function update_comp_style(comp, ctx, auto_theme, override_style)
-    local style = resolve_comp_style(comp, ctx, override_style)
+--- Logic:
+--- 1. Merge local, inherited, and referenced styles using `Manager.dynamic_inherit()` and `Highlight.merge_hl()`.
+--- 2. If `_hl_name` exists, reapply highlight if dynamic (`force`) or overridden (`override_style`).
+--- 3. If `_hl_name` is missing, generate via `Highlight.make_hl_name_from_id()`:
+---    - Assign own name if component has parents.
+---    - Otherwise, reuse deepest referenced `_hl_name` if available.
+--- 4. Apply highlight and update `_hl_name` cache.
+---
+--- @param comp ManagedComponent  Component to update.
+--- @param session Session          Session for dynamic style resolution.
+--- @param auto_theme boolean Optional auto-theme flag.
+--- @param override_style? CompStyle  Optional style override.
+--- @return boolean updated  True if highlight changed, false if skipped.
+--- @return CompStyle style  The resolved style.
+local function update_comp_style(comp, session, auto_theme, override_style)
+    local override_style_t = type(override_style)
+    local style, force, pcount = Manager.inherit(
+        comp,
+        "style",
+        Highlight.merge_hl,
+        (override_style_t == "table" or override_style_t == "string") and override_style or nil,
+        session
+    )
+
+    style = apply_auto_theme(style, auto_theme)
     local hl_name = comp._hl_name
     if hl_name then
+        if force or override_style then
+            return Highlight.highlight(hl_name, style), style
+        end
+    else
+        if pcount > 0 then
+            hl_name = Highlight.make_hl_name_from_id(comp.id)
+        else
+            local ref_comp = Manager.deepest_reference_component(comp, "style")
+            if ref_comp then
+                hl_name = ref_comp._hl_name or Highlight.make_hl_name_from_id(ref_comp.id)
+                rawset(ref_comp, "_hl_name", hl_name)
+            else
+                hl_name = Highlight.make_hl_name_from_id(comp.id)
+            end
+        end
+        rawset(comp, "_hl_name", hl_name)
         return Highlight.highlight(hl_name, style), style
     end
-    hl_name = Highlight.make_hl_name_from_id(comp.id)
-    rawset(comp, "_hl_name", hl_name)
-    return Highlight.highlight(hl_name, style), style
+    return false, style
 end
 
---- Apply the left or right side style of a component.
+--- Update and apply the highlight style for a component’s side (left or right).
 ---
---- Handles special `SepStyle` constants (`SepBg`, `SepFg`, `Reverse`,
---- `Inherited`) which derive colours from the main resolved style, as
---- well as dynamic function-based styles.
+--- This function determines and applies a side-specific highlight style
+--- (e.g. separators between components in a statusline or UI block).
+--- It reuses the main component style if possible or evaluates dynamic styles.
 ---
---- When the side style resolves to a concrete spec it is highlighted and
---- the highlight name is stored on the component.
+--- **Behavior:**
+--- 1. If a custom highlight already exists and doesn’t need re-rendering, it returns early.
+--- 2. If the side style is a function, it’s dynamically evaluated using `(comp, sid)`.
+--- 3. If the side style is a numeric code (`SepStyle`), it derives a new highlight table
+---    based on the main style:
+---    - `SepFg`:  `{ fg = main_style.fg, bg = "NONE" }`
+---    - `SepBg`:  `{ fg = main_style.bg, bg = "NONE" }`
+---    - `Reverse`: `{ fg = main_style.bg, bg = main_style.fg }`
+---    - `Inherited`: Inherit the component’s `_hl_name` directly.
 ---
----@param comp ManagedComponent  The component whose side style to update.
----           Must have `side`-specific fields (e.g. `comp.left_style`,
----           `comp._left_hl_name`).  These are mutated in-place via
----           `rawset` when the hl_name changes.
----@param ctx table  Session context, forwarded to any function-based
----                  side style for evaluation.
----@param side "left"|"right"  Which side to update.  Determines which
----                  hl_name field (`_left_hl_name` vs `_right_hl_name`)
----                  and style field (`left_style` vs `right_style`) are
----                  read/written.
----@param main_style_updated boolean  `true` if the main style changed
----                  during this update cycle.  When `false`, static (non-
----                  dynamic) side styles that reference SepStyle constants
----                  are *not* re-applied, because their derived values
----                  would be identical.
----@param main_style HighlightStyle|nil  The resolved main style from
----                  `update_comp_style`.  Used to derive fg/bg for
----                  `SepStyle.Reverse`, `SepStyle.SepFg`, etc.  May be
----                  nil if the main style could not be resolved.
----@param auto_theme boolean  Pre-computed auto-theme flag, forwarded to
----                  `apply_auto_theme` when the side style produces a
----                  concrete color table.
----@return boolean  `true` if the side highlight was updated or is
----                 inherited from the main style (caller should use the
----                 return hl_name).  `false` when no update occurred
----                 (e.g. static side style unchanged, or SepStyle
----                 constants used with nil main_style).
----@return string|nil  When non-nil, the hl_name to use for this side.
----                    When nil, the caller should use the component's
----                    cached `_left_hl_name` / `_right_hl_name` instead.
----                    A nil hl_name with `true` status means "use the
----                    main hl_name" (Inherited static case).
-local function update_comp_side_style(comp, ctx, side, main_style_updated, main_style, auto_theme)
+--- **Return values:**
+--- - `true`:  Style was updated and applied.
+--- - `false`: No change was necessary or style was invalid.
+---
+--- @param comp ManagedComponent The component whose side style should be updated.
+--- @param session Session The session used for dynamic style evaluation.
+--- @param side "left"|"right" The side to update.
+--- @param main_style_updated boolean Whether the main style was recently updated (forces re-render).
+--- @param main_style? CompStyle The component’s main style used as reference.
+--- @param auto_theme boolean Flag to enable auto theme.
+--- @return boolean updated Whether the side highlight was changed.
+--- @return string|nil hl_name The dynamic highlight name as side.
+local function update_comp_side_style(comp, session, side, main_style_updated, main_style, auto_theme)
     local side_style = Component.side_style(comp, side)
+    ---@cast side_style CompStyle|nil|SideStyleFunc|SepStyle
+
     local t = type(side_style)
     local hl_name_field = Component.hl_name_field(side)
     local hl_name = comp[hl_name_field]
     local dynamic = t == "function"
 
     local SepStyle = Component.SepStyle
+    -- Return early if no need to update
     if
         not (
             hl_name == nil
@@ -209,7 +154,7 @@ local function update_comp_side_style(comp, ctx, side, main_style_updated, main_
                 main_style_updated
                 and t == "number"
                 and (
-                    side_style == SepStyle.SepBg
+                    side_style == SepStyle.SepBg -- This is use frequently for separators
                     or side_style == SepStyle.SepFg
                     or side_style == SepStyle.Reverse
                     or side_style == SepStyle.Inherited
@@ -221,7 +166,7 @@ local function update_comp_side_style(comp, ctx, side, main_style_updated, main_
     end
 
     if t == "function" then
-        side_style = side_style(comp, ctx)
+        side_style = side_style(comp, sid)
         t = type(side_style)
     end
 
@@ -246,132 +191,134 @@ local function update_comp_side_style(comp, ctx, side, main_style_updated, main_
                 rawset(comp, hl_name_field, comp._hl_name)
                 return true, nil
             end
+            -- dynamic hl name it's change between comp._left_hl_name or comp._hl_name continually
             return true, comp._hl_name
         else
+            --- invalid styles
             return false, nil
         end
     end
-
+    -- Ensure highlight name exists and apply the new highlight
     hl_name = hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
     rawset(comp, hl_name_field, hl_name)
     ---@diagnostic disable-next-line: param-type-mismatch
     return Highlight.highlight(hl_name, apply_auto_theme(side_style, auto_theme)), nil
 end
 
---- Update a single component: value, style, side styles, click handler.
----
---- This is the core per-component update routine.  It:
---- 1. Fires the `pre_update` hook
---- 2. Checks minimum screen width and `hidden` condition; hides if needed
---- 3. Evaluates the component value and optional override style
---- 4. Sets the main value and highlight on the statusline
---- 5. Optionally updates left/right side values and their highlights
---- 6. Registers click handlers
---- 7. Fires the `post_update` hook
----
----@param comp ManagedComponent  The component to render.  Must already be
----           registered via `Manager.register` and have `_renderable` set
----           (i.e. have an `update` field and be indexed).  Fields like
----           `comp.left`, `comp.right`, `comp.on_click` are read directly
----           and may be functions or static values.
----@param ctx table  Session context providing per-cycle memoisation and
----                  storage.  Forwarded to all component hooks and
----                  evaluators (e.g. `Component.evaluate`, side style
----                  functions, `emit_pre_update`, etc.).
-local function update_comp(comp, ctx)
+--- Update a component and its value in the statusline.
+--- @param comp ManagedComponent The component to update.
+--- @param session Session The session to use for this update.
+--- @return boolean hidden True if the component is hidden after the update, false otherwise.
+local function update_comp(comp, session)
     local cid = comp.id
-    Component.emit_pre_update(comp, ctx)
+    Component.emit_pre_update(comp)
 
-    local min_screen_width = Component.min_screen_width(comp, ctx)
+    --- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
+    local min_screen_width = Component.min_screen_width(comp, session)
+
     local hidden = min_screen_width and api.nvim_get_option_value("columns", {}) < min_screen_width
-        or Component.hidden(comp, ctx)
+        or Component.hidden(comp, session)
 
     if hidden then
         hide_component(comp)
-        return true
-    end
+    else
+        local value, override_style = Component.evaluate(comp, session)
 
-    local value, override_style = Component.evaluate(comp, ctx)
+        -- A abstract component will not have indices
+        -- It's just call the update function for other purpose and we not affect to the statusline
+        -- So we just ignore it even the value is empty string
+        if comp._renderable then
+            if value == "" then
+                hide_component(comp)
+                hidden = true
+            else
+                local winid = comp.win_individual and api.nvim_get_current_win() or nil
+                local auto_theme = Component.auto_theme(comp, session)
+                -- Main part
+                -- Update style first to make sure comp._hl_name is not nil
+                local style_updated, style = update_comp_style(
+                    comp,
+                    session,
+                    auto_theme,
+                    comp._use_returned_style ~= false and override_style or nil
+                )
 
-    if comp._renderable then
-        if value == "" then
-            hide_component(comp)
-        else
-            local winid = comp.win_individual and api.nvim_get_current_win() or nil
-            local auto_theme = Component.auto_theme(comp, ctx)
-            local style_updated, style = update_comp_style(
-                comp,
-                ctx,
-                auto_theme,
-                comp._use_returned_style ~= false and override_style or nil
-            )
+                Statusline.set_value(cid, value, comp._hl_name, winid)
 
-            Statusline.set_value(cid, value, comp._hl_name, winid)
-
-            local lval = comp.left
-            if lval then
-                lval = format_side_value(resolve_field(lval, comp, ctx), type(lval) == "function")
+                --- Left part
+                local lval, lforce = Manager.inherit(comp, "left", nil, nil, session)
                 if lval then
-                    local updated, lhl_name =
-                        update_comp_side_style(comp, ctx, "left", style_updated, style, auto_theme)
-                    if not lhl_name then
-                        Statusline.set_side_value(cid, -1, lval, comp._left_hl_name, type(lval) == "function", winid)
-                    else
-                        Statusline.set_side_value(
-                            cid, -1, lval,
-                            lhl_name or comp._left_hl_name,
-                            updated or lhl_name ~= nil, winid
-                        )
+                    lval = format_side_value(lval, lforce)
+                    if lval then
+                        local updated, lhl_name =
+                            update_comp_side_style(comp, session, "left", style_updated, style, auto_theme)
+                        if not lhl_name then -- never meet dynamic hl_name
+                            Statusline.set_side_value(cid, -1, lval, comp._left_hl_name, lforce, winid)
+                        else
+                            Statusline.set_side_value(
+                                cid,
+                                -1,
+                                lval,
+                                lhl_name or comp._left_hl_name,
+                                lforce or (updated and lhl_name ~= nil),
+                                winid
+                            )
+                        end
                     end
                 end
-            end
 
-            local rval = comp.right
-            if rval then
-                rval = format_side_value(resolve_field(rval, comp, ctx), type(rval) == "function")
+                --- Right part
+                local rval, rforce = Manager.inherit(comp, "right", nil, nil, session)
                 if rval then
-                    local updated, rhl_name =
-                        update_comp_side_style(comp, ctx, "right", style_updated, style, auto_theme)
-                    if not rhl_name then
-                        Statusline.set_side_value(cid, 1, rval, comp._right_hl_name, type(rval) == "function", winid)
-                    else
-                        Statusline.set_side_value(
-                            cid, 1, rval,
-                            rhl_name or comp._right_hl_name,
-                            updated or rhl_name ~= nil, winid
-                        )
+                    rval = format_side_value(rval, rforce)
+                    if rval then
+                        local updated, rhl_name =
+                            update_comp_side_style(comp, session, "right", style_updated, style, auto_theme)
+                        if not rhl_name then -- never meet dynamic hl_name
+                            Statusline.set_side_value(cid, 1, rval, comp._right_hl_name, rforce, winid)
+                        else
+                            Statusline.set_side_value(
+                                cid,
+                                1,
+                                rval,
+                                rhl_name or comp._right_hl_name,
+                                rforce or (updated and rhl_name ~= nil),
+                                winid
+                            )
+                        end
                     end
                 end
-            end
 
-            if comp.on_click then
-                Statusline.set_click_handler(cid, Component.register_click_handler(comp), nil, winid)
-            end
+                if comp.on_click then
+                    local click_manager = require("witch-line.core.manager.click")
+                    Statusline.set_click_handler(cid, click_manager.register(comp), nil, winid)
+                end
 
-            rawset(comp, "_hidden", false)
+                rawset(comp, "_hidden", false) -- Reset hidden state
+            end
         end
     end
 
-    Component.emit_post_update(comp, ctx)
+    Component.emit_post_update(comp)
+    return hidden
 end
 M.update_comp = update_comp
 
 
 
---- Update a component and its dependencies through the dep graph.
---- Recursively walks dependents via `iterate_dependents`, deduped by `seen`.
---- When the component becomes hidden, all its Visible dependents are hidden too.
+--- Update a component and its dependencies recursively.
+--- Hides Visible dependents when the component becomes hidden.
 ---@param comp ManagedComponent
----@param ctx table Session context
+---@param session Session
 ---@param dep_graph_kind DepGraphKind|DepGraphKind[]
 ---@param seen? table<CompId, true>
-M.update_comp_graph = function(comp, ctx, dep_graph_kind, seen)
+M.update_comp_graph = function(comp, session, dep_graph_kind, seen)
     seen = seen or {}
     local id = comp.id
     if seen[id] then return end
     seen[id] = true
 
-    local hidden = update_comp(comp, ctx)
+    local hidden = update_comp(comp, session)
 
     if hidden then
         for dep_id in Manager.iterate_dependents(DepGraphKind.Visible, id) do
@@ -388,7 +335,7 @@ M.update_comp_graph = function(comp, ctx, dep_graph_kind, seen)
                 if not seen[dep_id] then
                     local dep = Manager.get_comp(dep_id)
                     if dep then
-                        M.update_comp_graph(dep, ctx, kind, seen)
+                        M.update_comp_graph(dep, session, kind, seen)
                     end
                 end
             end
@@ -398,61 +345,58 @@ M.update_comp_graph = function(comp, ctx, dep_graph_kind, seen)
             if not seen[dep_id] then
                 local dep = Manager.get_comp(dep_id)
                 if dep then
-                    M.update_comp_graph(dep, ctx, dep_graph_kind, seen)
+                    M.update_comp_graph(dep, session, dep_graph_kind, seen)
                 end
             end
         end
     end
 end
 
---- Refresh a component and its dependencies in the next session.
+--- Update a component and its deps in a new session, then debounce render.
 ---@param comp ManagedComponent
 ---@param dep_graph_kind? DepGraphKind|DepGraphKind[]
 ---@param seen? table<CompId, true>
 M.request_update_comp_graph = function(comp, dep_graph_kind, seen)
-    require("witch-line.core.Session").with_session(function(ctx)
-        M.update_comp_graph(comp, ctx, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
+    require("witch-line.core.Session").with_session(function(session)
+        M.update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
         Statusline.render_debounce()
     end)
 end
 
+--- Update a component and its deps immediately, optionally skip debounce.
+---@param comp ManagedComponent
+---@param eager? boolean
+---@param dep_graph_kind? DepGraphKind|DepGraphKind[]
+---@param seen? table<CompId, true>
+M.refresh_component_graph = function(comp, eager, dep_graph_kind, seen)
+    require("witch-line.core.Session").with_session(function(session)
+        M.update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
+        if eager then
+            Statusline.render()
+        else
+            Statusline.render_debounce()
+        end
+    end)
+end
 
-
---- Update multiple components by their IDs, expanding through the dep graph.
---- Update multiple components by their IDs.
---- @param ids CompId[] The IDs of the components to update.
---- @param ctx table  Session context
---- @param dep_graph_kind DepGraphKind|DepGraphKind[] Optional.
---- @param seen table<CompId, true>|nil Optional.
-function M.update_comp_graph_by_ids(ids, ctx, dep_graph_kind, seen)
+--- Update multiple components by IDs through the dep graph.
+---@param ids CompId[]
+---@param session Session
+---@param dep_graph_kind DepGraphKind|DepGraphKind[]|nil
+---@param seen table<CompId, true>|nil
+function M.update_comp_graph_by_ids(ids, session, dep_graph_kind, seen)
     seen = seen or {}
     for _, id in ipairs(ids) do
         if not seen[id] then
             local comp = Manager.get_comp(id)
             if comp then
-                M.update_comp_graph(comp, ctx, dep_graph_kind, seen)
+                M.update_comp_graph(comp, session, dep_graph_kind, seen)
             end
         end
     end
 end
 
-local function ensure_inherit_chain_registered(id, visiting)
-    visiting = visiting or {}
-    if visiting[id] then return nil end
-    local existing = Manager.get_comp(id)
-    if existing then return existing end
-    local c = Component.require_by_id(id)
-    if not c or c._loaded then return c end
-    visiting[id] = true
-    local ancestor = rawget(c, "inherit")
-    if ancestor then
-        ensure_inherit_chain_registered(ancestor, visiting)
-    end
-    visiting[id] = nil
-    return Manager.register(c)
-end
-
---- Register update triggers for a component (timers, events, screen-width).
+--- Bind timers, events, screen-width, and win-individual triggers.
 ---@param comp ManagedComponent
 local function bind_update_conditions(comp)
     if comp.timing then
@@ -470,7 +414,8 @@ local function bind_update_conditions(comp)
 end
 
 local function register_dependency_links(kind, ids, dependent_id)
-    if type(ids) == "table" then
+    local ids_type = type(ids)
+    if ids_type == "table" then
         for _, id in ipairs(ids) do
             link_dependency(kind, id, dependent_id)
 
@@ -481,36 +426,30 @@ local function register_dependency_links(kind, ids, dependent_id)
                 end
             end
         end
-        return
-    end
-
-    link_dependency(kind, ids, dependent_id)
-    if not Manager.is_existed(ids) then
-        local dep = Component.require_by_id(ids)
-        if dep then
-            M.register_dependency_source(dep)
+    elseif ids_type == "string" then
+        link_dependency(kind, ids, dependent_id)
+        if not Manager.is_existed(ids) then
+            local dep = Component.require_by_id(ids)
+            if dep then
+                M.register_dependency_source(dep)
+            end
         end
     end
 end
 
 
---- Register an abstract (non-rendered) component for use as an event/timer
---- dependency source.  Wires triggers, inherit/ref metatable, registers
---- dependency edges in the central dep graph, then recursively registers
---- any missing deps.
----
---- Flow: bind_update_conditions → bind_dependencies → pull_missing_dependencies
----       ↓ (recursive)
----       register_abstract_component for each missing dep
----
----@param comp Component|table  Component definition (may have `[0]` path).
----@return ManagedComponent  Registered component with `_loaded` set.
+--- Register a component: wire triggers, inherit/ref meta, dep links.
+---@param comp Component|table
+---@return ManagedComponent
 M.register_dependency_source = function(comp)
-    if comp._loaded then return comp end
+    if comp._loaded then
+        --- @cast comp ManagedComponent
+        return comp
+    end
 
-    local comp_path = comp[0]
-    if type(comp_path) == "string" then
-        local c = Component.require_by_id(comp_path)
+    local path = comp[0]
+    if type(path) == "string" then
+        local c = Component.require_by_id(path)
         if c then
             comp = require("witch-line.core.Component.override")(c, comp)
         end
@@ -522,8 +461,6 @@ M.register_dependency_source = function(comp)
     if comp.init then
         Component.emit_init(comp)
     end
-
-    Component.setup_inherit_ref(comp)
 
     bind_update_conditions(comp)
 
@@ -537,18 +474,9 @@ M.register_dependency_source = function(comp)
 
     local inherit = rawget(comp, "inherit")
     if inherit then
-        local ids = type(inherit) == "table" and inherit or { inherit }
-        local kinds = Manager.DepGraphKinds
-        local nk = #kinds
-        for _, id in ipairs(ids) do
-            for i = 1, nk do
-                link_dependency(kinds[i], id, comp.id)
-            end
-            if not Manager.is_existed(id) then
-                local dep = Component.require_by_id(id)
-                if dep then M.register_dependency_source(dep) end
-            end
-        end
+        register_dependency_links(DepGraphKind.Event, inherit, comp.id)
+        register_dependency_links(DepGraphKind.Timer, inherit, comp.id)
+        register_dependency_links(DepGraphKind.Visible, inherit, comp.id)
     end
 
     if comp.lazy == false then
@@ -558,20 +486,10 @@ M.register_dependency_source = function(comp)
     return comp
 end
 
---- Build statusline indices for a component.
----
---- Pushes the component's id onto the statusline segment list and, if
---- the component is flexible, registers it with the flex tracking
---- system.  Marks the component as renderable.
----
----@param comp ManagedComponent  The component to index.  Its `id` must
----           already be assigned.  If the component has no `update`
----           field (i.e. it is a pure container), indexing is skipped
----           and `_renderable` remains falsy.
----@param winid integer|nil  When non-nil, the index is pushed to a
----                          window-local statusline segment list rather
----                          than the global one.  Used for per-window
----                          component trees from `statusline.win()`.
+--- Push component to the segment list and mark renderable.
+--- Skips components without an `update` field.
+---@param comp ManagedComponent
+---@param winid integer|nil  Window-local list when set.
 local function build_indices(comp, winid)
     local update = comp.update
     if not update then
@@ -588,16 +506,12 @@ local function build_indices(comp, winid)
     rawset(comp, "_renderable", true)
 end
 
---- Register a single component.
---- Resolves string id, merges overrides, registers in Manager,
---- emits init hook, sets up inheritance, binds triggers, builds indices.
---- For combined components, only the parent is processed here.
----@param comp Component  Resolved table or raw config. If list-like (numeric keys),
----           registration is skipped (combined parent — children handled by caller).
+--- Register a component: resolve, override, initialize, index.
+--- Skips list-like tables (combined parent — children handled by caller).
+---@param comp Component
 ---@param parent_id CompId|nil
----@param winid integer|nil  When set, marks component window-local and pushes
----                  indices to the window-specific segment list.
----@return ManagedComponent  Fully initialised component with triggers bound.
+---@param winid integer|nil  When set, marks window-local and pushes to the win-specific index.
+---@return ManagedComponent
 local function register_component(comp, parent_id, winid)
     if comp._loaded then
         --- @cast comp ManagedComponent
@@ -605,9 +519,8 @@ local function register_component(comp, parent_id, winid)
         return comp
     end
 
-    Component._ensure_chain = Component._ensure_chain or ensure_inherit_chain_registered
 
-    if not is_list(comp) then
+    if not vim.islist(comp) then
         if winid then
             rawset(comp, "win_individual", true)
         end
@@ -621,18 +534,11 @@ local function register_component(comp, parent_id, winid)
     return comp
 end
 
---- Register a literal string value in the statusline.
----
---- If `comp` is not the empty string it is pushed directly onto the
---- statusline segment list as a non-component literal.
----
----@param comp string  The string literal to display.  Empty string `""`
----                    is silently ignored (it would produce a zero-width
----                    segment that serves no purpose).
----@param win_id integer|nil  When non-nil, the literal is pushed to a
----                          window-local statusline segment list.
----@return string  The input `comp`, returned unchanged for convenience
----                in chained expressions.
+--- Push a literal string onto the statusline segment list.
+--- Empty strings are silently ignored.
+---@param comp string
+---@param win_id integer|nil  Window-local segment list when set.
+---@return string  The input string.
 local function register_literal_comp(comp, win_id)
     if comp ~= "" then
         Statusline.push(nil, comp, win_id)
@@ -640,26 +546,12 @@ local function register_literal_comp(comp, win_id)
     return comp
 end
 
---- Register a combined component tree.
----
---- Combined components have both their own definition and an ordered
---- list of children.  This function registers the parent, then
---- recursively registers each child (which may itself be combined).
---- Literal strings encountered at any level are pushed directly.
----
----@param comp CombinedComponent|DefaultId|string  The component to
----                  register.  Strings are resolved via `Component.require_by_id`
----                  first; if no component is found, they are pushed as
----                  literal text.  Tables must be non-empty; empty tables
----                  raise an error.
----@param parent_id CompId|nil  The parent component id.  Pass nil for
----                  top-level components (they have yes parent).
----@param winid integer|nil  Window-local statusline window id.  Pass nil
----                  for the global statusline.
----@return ManagedComponent|string  The registered component table (with `_loaded`,
----                  `_renderable`, etc.) or the original string if it was
----                  pushed as a literal.  Return value is the same object
----                  that was passed in (or its resolved equivalent).
+--- Register a combined component tree: parent first, then children recursively.
+--- Strings resolve via `Component.require_by_id` or pushed as literal text.
+---@param comp CombinedComponent|DefaultId|string
+---@param parent_id CompId|nil
+---@param winid integer|nil  Window-local statusline window id.  Pass nil for global.
+---@return ManagedComponent|string  The registered component or literal string.
 function M.register_combined_component(comp, parent_id, winid)
     local kind = type(comp)
     if kind == "string" then
@@ -685,16 +577,10 @@ function M.register_combined_component(comp, parent_id, winid)
     return comp
 end
 
---- Initialise the plugin.
---- Registers global components, optional per-window components
---- (via `statusline.win`), wires event/timer handlers, processes
---- emergency (non-lazy) components registered during setup.
----@param user_configs UserConfig  Must contain `statusline.global`.
----                  `statusline.win` is optional — `(winid) → component_tree`.
-function M.setup(user_configs)
-    local statusline = user_configs.statusline
-    --- @cast statusline UserConfig.Statusline
-
+--- Initialise global components, per-window components, event/timer handlers,
+--- and emergency components.
+---@param statusline UserConfig.Statusline
+function M.setup(statusline)
     M.register_combined_component(statusline.global)
 
     if statusline.win then
@@ -725,26 +611,26 @@ function M.setup(user_configs)
     end
 
     Event.on_event(function(ids, event_info)
-        require("witch-line.core.Session").with_session(function(ctx)
+        require("witch-line.core.Session").with_session(function(session)
             if event_info then
-                ctx.session:set("EventInfo", event_info)
+                session.set("EventInfo", event_info)
             end
-            M.update_comp_graph_by_ids(ids, ctx, DepGraphKind.Event)
+            M.update_comp_graph_by_ids(ids, session, DepGraphKind.Event)
             Statusline.render_debounce()
         end)
     end)
 
     Timer.on_timer_trigger(function(ids)
-        require("witch-line.core.Session").with_session(function(ctx)
-            M.update_comp_graph_by_ids(ids, ctx, DepGraphKind.Timer)
+        require("witch-line.core.Session").with_session(function(session)
+            M.update_comp_graph_by_ids(ids, session, DepGraphKind.Timer)
             Statusline.render_debounce()
         end)
     end)
 
     local emergency_ids = Manager.get_emergency_ids()
     if next(emergency_ids) ~= nil then
-        require("witch-line.core.Session").with_session(function(ctx)
-            M.update_comp_graph_by_ids(emergency_ids, ctx,
+        require("witch-line.core.Session").with_session(function(session)
+            M.update_comp_graph_by_ids(emergency_ids, session,
                 { DepGraphKind.Event, DepGraphKind.Timer })
             Statusline.render_debounce()
         end)

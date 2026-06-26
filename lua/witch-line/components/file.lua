@@ -1,169 +1,191 @@
 local colors = require("witch-line.constant.color")
-local Id = require("witch-line.constant.id").Id
 
-local INTERFACE_ID = Id["file.interface"]
---- @type DefaultComponent
+local INTERFACE_ID = "file.interface"
+
+---@type DefaultComponent
 local Interface = {
-	id = INTERFACE_ID,
-	_plug_provided = true,
-	events = "BufEnter",
-	static = {
-		formatter = {
-			filetype = {
-				["NvimTree"] = { "NvimTree", "", colors.red },
-				["TelescopePrompt"] = { "Telescope", "", colors.red },
-				["mason"] = { "Mason", "󰏔", colors.red },
-				["lazy"] = { "Lazy", "󰏔", colors.red },
-				["checkhealth"] = { "Health", "", colors.red },
-				["plantuml"] = { nil, "", colors.green },
-				["dashboard"] = { nil, "", colors.red },
-				["toggleterm"] = {
-					function()
-						return "ToggleTerm " .. vim.b.toggle_number
-					end,
-					"",
-					colors.red,
-				},
-			},
-			buftype = {
-				["terminal"] = { "Terminal", "", colors.red },
-			},
-		},
-	},
-	context = function(self)
-		local api, fs, bo = vim.api, vim.fs, vim.bo
-		local static = self.static
-		--- @cast static {formatter: {filetype: table<string, {[1]:string|function, [2]:string, [3]:string}>, buftype: table<string, {[1]: string|function, [2]: string, [3]: string}>} }
-		local fmt = static.formatter
-		local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
-		if formatter then
-			local resolve = require("witch-line.utils").resolve
-			local basename = resolve(formatter[1]) or fs.basename(api.nvim_buf_get_name(0))
-			return {
-				basename = basename ~= "" and basename or "No File",
-				icon = resolve(formatter[2]) or "",
-				color = resolve(formatter[3]) or "#ffffff",
-			}
-		end
-		local basename, icon, color_icon
-		basename = fs.basename(api.nvim_buf_get_name(0))
+    id = INTERFACE_ID,
+    _plug_provided = true,
 
-		local ok, devicons = pcall(require, "nvim-web-devicons")
-		if ok then
-			local extension = basename:match("%.([^%.]+)$")
-			icon, color_icon = devicons.get_icon_color(basename, extension)
-		end
+    events = "BufEnter",
 
-		return {
-			basename = basename ~= "" and basename or "No File",
-			icon = icon or "",
-			color = color_icon or "#ffffff",
-		}
-	end,
+    static = {
+        formatter = {
+            filetype = {
+                ["NvimTree"] = { "NvimTree", "", colors.red },
+                ["TelescopePrompt"] = { "Telescope", "", colors.red },
+                ["mason"] = { "Mason", "󰏔", colors.red },
+                ["lazy"] = { "Lazy", "󰏔", colors.red },
+                ["checkhealth"] = { "Health", "", colors.red },
+                ["plantuml"] = { nil, "", colors.green },
+                ["dashboard"] = { nil, "", colors.red },
+                ["toggleterm"] = {
+                    function()
+                        return "ToggleTerm " .. vim.b.toggle_number
+                    end,
+                    "",
+                    colors.red,
+                },
+            },
+
+            buftype = {
+                ["terminal"] = { "Terminal", "", colors.red },
+            },
+        },
+    },
+
+    context = function(self)
+        local api, fs, bo = vim.api, vim.fs, vim.bo
+
+        local fmt = self.static.formatter
+        local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
+
+        if formatter then
+            local resolve = require("witch-line.utils").resolve
+
+            return {
+                basename = resolve(formatter[1]) or fs.basename(api.nvim_buf_get_name(0)) or "No File",
+                icon = resolve(formatter[2]) or "",
+                color = resolve(formatter[3]) or "#ffffff",
+            }
+        end
+
+        local basename = fs.basename(api.nvim_buf_get_name(0))
+        local icon, color
+
+        local ok, devicons = pcall(require, "nvim-web-devicons")
+        if ok then
+            local ext = basename:match("%.([^%.]+)$")
+            icon, color = devicons.get_icon_color(basename, ext)
+        end
+
+        return {
+            basename = basename ~= "" and basename or "No File",
+            icon = icon or "",
+            color = color or "#ffffff",
+        }
+    end,
 }
 
 ---@type DefaultComponent
 local Name = {
-	id = Id["file.name"],
-	_plug_provided = true,
-	ref = {
-		events = INTERFACE_ID,
-		context = INTERFACE_ID,
-	},
-	style = {
-		fg = colors.orange,
-	},
-	update = function(self, sid)
-		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
-		---@cast ctx {basename:string, icon:string, color:string}
-		return ctx.basename
-	end,
+    id = "file.name",
+    _plug_provided = true,
+
+    ref = {
+        events = INTERFACE_ID,
+        context = INTERFACE_ID,
+    },
+
+    style = {
+        fg = colors.orange,
+    },
+
+    update = function(self, session)
+        local ctx = self:with_session(session).context(self, session)
+        return ctx.basename
+    end,
 }
 
 ---@type DefaultComponent
 local Icon = {
-	id = Id["file.icon"],
-	_plug_provided = true,
-	ref = {
-		events = INTERFACE_ID,
-		context = INTERFACE_ID,
-	},
-	update = function(self, sid)
-		local ctx = require("witch-line.core.manager.hook").use_context(self, sid)
-		---@cast ctx {basename:string, icon:string, color:string}
-		return ctx.icon, { fg = ctx.color }
-	end,
+    id = "file.icon",
+    _plug_provided = true,
+
+    ref = {
+        events = INTERFACE_ID,
+        context = INTERFACE_ID,
+    },
+
+    update = function(self, session)
+        local ctx = self:with_session(session).context(self, session)
+        return ctx.icon, {
+            fg = ctx.color,
+        }
+    end,
 }
 
---- @type DefaultComponent
+---@type DefaultComponent
 local Modifier = {
-	id = Id["file.modifier"],
-	_plug_provided = true,
-	events = { "BufEnter", "BufWritePost", "TextChangedI", "TextChanged" },
-	style = {
-		fg = colors.fg,
-	},
-	update = function(self, sid)
-		local bo = vim.bo
-		if bo.buftype == "prompt" then
-			return ""
-		elseif not bo.modifiable or bo.readonly then
-			return ""
-		elseif bo.modified then
-			-- ●
-			return ""
-		end
-		return ""
-	end,
+    id = "file.modifier",
+    _plug_provided = true,
+
+    events = {
+        "BufEnter",
+        "BufWritePost",
+        "TextChangedI",
+        "TextChanged",
+    },
+
+    style = {
+        fg = colors.fg,
+    },
+
+    update = function()
+        local bo = vim.bo
+
+        if bo.buftype == "prompt" then
+            return ""
+        elseif not bo.modifiable or bo.readonly then
+            return ""
+        elseif bo.modified then
+            return ""
+        end
+
+        return ""
+    end,
 }
 
---- @type DefaultComponent
+---@type DefaultComponent
 local Size = {
-	id = Id["file.size"],
-	_plug_provided = true,
-	events = "BufWritePost",
-	ref = {
-		events = INTERFACE_ID,
-	},
-	style = {
-		fg = colors.green,
-	},
-	static = {
-		icon = "",
-	},
-	update = function(self, sid)
-		local current_file = vim.api.nvim_buf_get_name(0)
-		if current_file == "" then
-			return ""
-		end
+    id = "file.size",
+    _plug_provided = true,
 
-		local stat = (vim.uv or vim.loop).fs_stat(current_file)
-		if type(stat) ~= "table" then
-			return ""
-		end
-		local file_size = stat.size
-		if not file_size or file_size == 0 then
-			return ""
-		end
+    events = "BufWritePost",
 
-		local suffixes = { "B", "KB", "MB", "GB" }
-		local i = 1
-		while file_size > 1024 and i < #suffixes do
-			file_size = file_size / 1024
-			i = i + 1
-		end
+    ref = {
+        events = INTERFACE_ID,
+    },
 
-		local format = i == 1 and "%d%s" or "%.1f%s"
-		local static = self.static
-		--- @cast static {icon: string}
-		return static.icon .. " " .. string.format(format, file_size, suffixes[i])
-	end,
+    style = {
+        fg = colors.green,
+    },
+
+    static = {
+        icon = "",
+    },
+
+    update = function(self)
+        local file = vim.api.nvim_buf_get_name(0)
+        if file == "" then
+            return ""
+        end
+
+        local stat = (vim.uv or vim.loop).fs_stat(file)
+        if type(stat) ~= "table" or not stat.size or stat.size == 0 then
+            return ""
+        end
+
+        local size = stat.size
+        local units = { "B", "KB", "MB", "GB" }
+        local i = 1
+
+        while size > 1024 and i < #units do
+            size = size / 1024
+            i = i + 1
+        end
+
+        return ("%s %s"):format(
+            self.static.icon,
+            string.format(i == 1 and "%d%s" or "%.1f%s", size, units[i])
+        )
+    end,
 }
 
 return {
-	interface = Interface,
-	name = Name,
-	icon = Icon,
-	modifier = Modifier,
-	size = Size,
+    interface = Interface,
+    name = Name,
+    icon = Icon,
+    modifier = Modifier,
+    size = Size,
 }

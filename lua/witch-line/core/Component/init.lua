@@ -27,8 +27,6 @@ Component.SepStyle = SepStyle
 --- @field hidden? CompId|CompId[] A table of ids of components that this component references for its hide function
 --- @field min_screen_width? CompId|CompId[] A table of ids of components that this component references for its minimum screen width
 ---
---- @field static? CompId A id of a component that this component references for its static values
---- @field context? CompId A id of a component that this component references for its context
 --- @field style? CompId A id of a component that this component references for its style
 --- @field left? CompId A id of a component that this components references for left separator
 --- @field left_style? CompId A id of a component that this component references for its left_style
@@ -40,25 +38,22 @@ Component.SepStyle = SepStyle
 --- @class CombinedComponent : Component, LiteralComponent
 --- @field [integer] CombinedComponent a table of childs, can be used to create a list of components
 
---- @alias PaddingFunc fun(self: ManagedComponent, sid: SessionId): number|PaddingTable
+
+--- @alias PaddingFunc fun(self: ManagedComponent, session: Session): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
 ---
---- @alias UpdateFunc fun(self: ManagedComponent, sid: SessionId): string|nil, CompStyle|nil
+--- @alias UpdateFunc fun(self: ManagedComponent, session: Session): string|nil, CompStyle|nil
 ---
 --- @alias CompStyle ThemeAwareStyle|string
---- @alias StyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle
---- @alias SideStyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle|SepStyle
+--- @alias StyleFunc fun(self: ManagedComponent, session: Session): CompStyle
+--- @alias SideStyleFunc fun(self: ManagedComponent, session: Session): CompStyle|SepStyle
 
---- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
+
+--- @alias OnClickMouseButton "l"|"r"|"m"
+--- @alias OnClickModifier "s"|"c"|"a"|"m"
+--- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: OnClickMouseButton, modifier_pressed: OnClickModifier)
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 
-
-
----
-
-
----
----
 --- @class SpecialEvent
 --- @field [integer] string event name
 --- @field once? boolean Optional flag. If true, the event is triggered only once.
@@ -92,11 +87,17 @@ Component.SepStyle = SepStyle
 --- A flag indicating whether the component should be lazy loaded or not.
 --- @field lazy? boolean
 ---
+--- A table of static values that can be overridden by users.
+--- Useful for exposing configurable constants (e.g. `{chars = {"_", "▁", "▂"}}`, `{format = "default"}`).
+--- Access via `self.static` within component lifecycle functions.
+--- Overridable via the component config — values are deep-merged with the built-in defaults.
+--- @field static? table
+---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated
 --- @field flexible? number
 ---
 --- A function to determine whether the component should be automatically adjusted to suit the theme
---- @field auto_theme? boolean|fun(self: ManagedComponent, sid: SessionId): boolean
+--- @field auto_theme? boolean|fun(self: ManagedComponent, session: Session): boolean
 ---
 --- A flag indicating whether the component should show individual value for each window.
 --- @field win_individual? boolean
@@ -109,8 +110,8 @@ Component.SepStyle = SepStyle
 --- - If integer: component is hidden when screen width is smaller.
 --- - If nil: always visible.
 --- - If function: called and its return value is used as above.
---- - Example of min_screen_width function: `function(self: ManagedComponent, sid: SessionId) return 80 end`
---- @field min_screen_width? integer|fun(self: ManagedComponent, sid: SessionId): number|nil
+--- - Example of min_screen_width function: `function(self: ManagedComponent, session: Session) return 80 end`
+--- @field min_screen_width? integer|fun(self: ManagedComponent, session: Session): number|nil
 ---
 --- @field ref? Reference A table of references to other components that this component depends on
 ---
@@ -124,14 +125,14 @@ Component.SepStyle = SepStyle
 --- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
 --- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
---- - Example of left_style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of left_style function: `function(self, ctx) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field left_style? CompStyle|SideStyleFunc|SepStyle
 ---
 --- The left separator of the component
 --- - If string: used as is.
 --- - If nil: no left part.
 --- - If function: called and its return value is used as the left part.
---- - Example of left function: `function(self, sid) return "<" end`
+--- - Example of left function: `function(self, ctx) return "<" end`
 --- @field left? string|UpdateFunc
 ---
 --- A table of styles that will be applied to the right part of the component
@@ -144,14 +145,14 @@ Component.SepStyle = SepStyle
 --- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
 --- 	- Inherited: inherits the main style directly.
 --- - If function: called and its return value is used as above.
---- - Example of right_style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of right_style function: `function(self, ctx) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field right_style? CompStyle|SideStyleFunc|SepStyle
 ---
 --- The right separator of the component
 --- - If string: used as is.
 --- - If nil: no right part.
 --- - If function: called and its return value is used as the right part.
---- - Example of right function: `function(self, sid) return ">" end`
+--- - Example of right function: `function(self, ctx) return ">" end`
 --- @field right? string|UpdateFunc
 ---
 --- The padding of the component
@@ -168,12 +169,12 @@ Component.SepStyle = SepStyle
 ---  	- Example: `{left = 2, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
 ---  	- Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
 ---	- If function: called and its return value is used as above.
---- - Example of padding function: `function(self, sid) return {left = 2, right = 1} end`
---- - Example of padding function: `function(self, sid) return 2 end` (adds 2 spaces to both sides)
+--- - Example of padding function: `function(self, session) return {left = 2, right = 1} end`
+--- - Example of padding function: `function(self, session) return 2 end` (adds 2 spaces to both sides)
 --- @field padding? integer|PaddingTable|PaddingFunc
 ---
 --- An initialization function that will be called when the component is first loaded.
---- @field init? fun(self: ManagedComponent, sid: SessionId)
+--- @field init? fun(self: ManagedComponent, session: Session)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.
@@ -181,27 +182,28 @@ Component.SepStyle = SepStyle
 --- - If nil: No style will be applied.
 --- - If function: called and its return value is used as above.
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
---- - Example of style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of style function: `function(self, session) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field style? CompStyle|StyleFunc
 ---
 --- A function that will be called before the component is updated
---- @field pre_update? fun(self: ManagedComponent, sid: SessionId)
+--- @field pre_update? fun(self: ManagedComponent, session: Session)
 ---
 --- The update function that will be called to get the value of the component
 --- - If string: used as is.
 --- - If nil: the component will not be updated.
 --- - If function: called and its return value and style are used as the new value and style of the component
---- - Example of update function: `function(self, sid) return "Hello World" end`
---- - Example of update function with style: `function(self, sid) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example of update function: `function(self, session) return "Hello World" end`
+--- - Example of update function with style: `function(self, session) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- - Example sharing state between components via `session.state`: see git/init.lua
 --- @field update? string|UpdateFunc
 ---
 --- A function that will be called after the component is updated
---- @field post_update? fun(self: ManagedComponent, sid: SessionId)
+--- @field post_update? fun(self: ManagedComponent, session: Session)
 ---
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
 --- - If function: called and its return value is used to determine if the component should be visible
---- @field hidden? fun(self: ManagedComponent, sid: SessionId): boolean|nil
+--- @field hidden? fun(self: ManagedComponent, session: Session): boolean|nil
 ---
 ---
 --- A function or the name of a global function to call when the component is clicked
@@ -224,7 +226,6 @@ Component.SepStyle = SepStyle
 ---
 --- @private The following fields are used internally by witch-line and should not be set manually
 --- @field _loaded? boolean If true, the component is loaded
---- @field _abstract? boolean If true, the component is abstract and should not be displayed directly (all component are abstract)
 --- @field _renderable? boolean If true, the component is renderable
 --- @field _hidden? boolean If true, the component is hidden and should not be displayed
 --- @field _use_returned_style? boolean Whether the component should use the style returned by its `update()` method. Disabled automatically when the user overrides the `style` field.
@@ -241,22 +242,22 @@ Component.SepStyle = SepStyle
 --- @class ManagedComponent : Component, DefaultComponent
 --- @field id CompId the id of component
 --- @field [integer] CompId -- Child components by their IDs
---- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
+--- @field _loaded true Always true, indicates that the component is abstract and should not be rendered directly
 
 --- Resolve a field value: call functions with session memo, pass through others.
---- @param value any    Raw field value (function → invoke, else passthrough).
 --- @param comp ManagedComponent  Owner component, passed to function calls.
---- @param ctx table|nil  Session context; nil means no memoization.
+--- @param key string  The field key to resolve.
+--- @param session Session  Session context; nil means no memoization.
 --- @return any  Resolved value (function return or literal).
-local function resolve_with_shared(value, comp, ctx)
+local function resolve_value(comp, key, session)
+    local value = rawget(comp, key)
     if type(value) == "function" then
-        if ctx then
-            return ctx.session:memo(value, comp, ctx)
-        end
-        return value(comp, ctx)
+        return session.memo(value, comp, session)
     end
     return value
 end
+Component.resolve_value = resolve_value
+
 
 --- Check whether a component is a built-in default component.
 --- @param comp ManagedComponent
@@ -293,42 +294,29 @@ end
 --- Call a lifecycle field if it is a function.
 --- @param field string  Component field name (e.g. `"init"`, `"pre_update"`).
 --- @param comp ManagedComponent  Passed as `self` to the callback.
---- @param ctx table|nil  Passed as second argument; nil ok for init.
-local function call_lifecycle(field, comp, ctx)
+local function call_lifecycle(field, comp)
     local value = comp[field]
     if type(value) == "function" then
-        value(comp, ctx)
+        value(comp)
     end
 end
 
 --- Emit the pre_update lifecycle hook.
 --- @param comp ManagedComponent
---- @param ctx table
-Component.emit_pre_update = function(comp, ctx)
-    call_lifecycle("pre_update", comp, ctx)
+Component.emit_pre_update = function(comp)
+    call_lifecycle("pre_update", comp)
 end
 
 --- Emit the post_update lifecycle hook.
 --- @param comp ManagedComponent
---- @param ctx table
-Component.emit_post_update = function(comp, ctx)
-    call_lifecycle("post_update", comp, ctx)
+Component.emit_post_update = function(comp)
+    call_lifecycle("post_update", comp)
 end
 
 --- Emit the init lifecycle hook.
 --- @param comp ManagedComponent
---- @param ctx table|nil
-Component.emit_init = function(comp, ctx)
-    call_lifecycle("init", comp, ctx or {})
-end
-
---- Read event info (nvim autocmd args) for this component from the current session.
---- @param comp ManagedComponent
---- @param ctx table
---- @return vim.api.keyset.create_autocmd.callback_args|nil
-Component.use_event_info = function(comp, ctx)
-    local event_info = ctx and ctx.session:get("EventInfo")
-    return event_info and event_info[comp.id] or nil
+Component.emit_init = function(comp)
+    call_lifecycle("init", comp)
 end
 
 --- Return the internal hl_name storage field for a given side.
@@ -350,23 +338,23 @@ end
 --- Run `update`, apply padding, return rendered string and optional style.
 --- Non-string results become `""`.  Padding: number → both sides, table → left/right.
 --- @param comp ManagedComponent  Evaluated component; reads `update`, `padding`.
---- @param ctx table  Session context for memoized function calls.
+--- @param session Session  Session context for memoized function calls.
 --- @return string  Rendered text (empty string for non-string/nil results).
 --- @return CompStyle|nil  Style override from `update`, or nil.
-Component.evaluate = function(comp, ctx)
-    local result, style = resolve_with_shared(comp.update, comp, ctx)
+Component.evaluate = function(comp, session)
+    local result, style = resolve_value(comp, "update", session)
 
     if type(result) ~= "string" then
         result = ""
     elseif result ~= "" then
-        local padding = resolve_with_shared(comp.padding or 1, comp, ctx)
+        local padding = resolve_value(comp, "padding" or 1, session)
         local pt = type(padding)
         if pt == "number" and padding > 0 then
             local pad = str_rep(" ", padding)
             result = pad .. result .. pad
         elseif pt == "table" then
-            local left = resolve_with_shared(padding.left, comp, ctx)
-            local right = resolve_with_shared(padding.right, comp, ctx)
+            local left = resolve_value(comp, "padding.left" or 0, session)
+            local right = resolve_value(comp, "padding.right" or 0, session)
 
             if type(left) == "number" and left > 0 then
                 result = str_rep(" ", left) .. result
@@ -406,19 +394,19 @@ end
 
 --- Resolve the minimum screen width constraint for a component.
 --- @param comp ManagedComponent
---- @param ctx table
+--- @param session Session
 --- @return integer|nil
-Component.min_screen_width = function(comp, ctx)
-    local m = resolve_with_shared(comp.min_screen_width, comp, ctx)
+Component.min_screen_width = function(comp, session)
+    local m = resolve_value(comp, "min_screen_width", session)
     return type(m) == "number" and m or nil
 end
 
 --- Resolve auto_theme for a component; falls back to `_plug_provided`.
 --- @param comp ManagedComponent
---- @param ctx table
+--- @param session Session
 --- @return boolean
-Component.auto_theme = function(comp, ctx)
-    local auto = resolve_with_shared(comp.auto_theme, comp, ctx)
+Component.auto_theme = function(comp, session)
+    local auto = resolve_value(comp, "auto_theme", session)
     if auto ~= nil then
         return auto
     end
@@ -427,101 +415,12 @@ end
 
 --- Determine whether a component should be hidden in the current context.
 --- @param comp ManagedComponent
---- @param ctx table
+--- @param session Session
 --- @return boolean
-Component.hidden = function(comp, ctx)
-    return resolve_with_shared(comp.hidden, comp, ctx) == true
+Component.hidden = function(comp, session)
+    return resolve_value(comp, "hidden", session) == true
 end
 
 
-local NIL = vim.NIL
-local raw_cache = {}
-local WEAK_K = { __mode = "k" }
-
-Component._ensure_chain = nil
-
---- Walk inherit/ref chain for a raw field value.  Cached by (comp, key); `NIL`
---- sentinel avoids re-walking absent fields.  Cycle-safe via `seen`.
---- @param comp ManagedComponent  Start here; `inherit`/`ref` read via rawget.
---- @param key string             Field name (e.g. `"update"`, `"highlight"`).
---- @param seen table<CompId, true>  Cycle guard; caller passes `{}`, threaded through recursion.
---- @return {[0]: any, [1]: ManagedComponent}|nil  `{ value, owner_comp }` or nil when absent/cyclic.
-local function find_raw_value(comp, key, seen)
-    local cid = comp.id
-    if seen[cid] then
-        return nil
-    end
-    seen[cid] = true
-
-    local entry = raw_cache[key]
-    if not entry then
-        entry = setmetatable({}, WEAK_K)
-        raw_cache[key] = entry
-    end
-    local cached = entry[comp]
-    if cached ~= nil then
-        return cached ~= NIL and cached or nil
-    end
-
-    local v = rawget(comp, key)
-    if v ~= nil then
-        local result = { v, comp }
-        entry[comp] = result
-        return result
-    end
-
-    local inherit_id = rawget(comp, "inherit")
-    if inherit_id then
-        local parent = Component._ensure_chain and Component._ensure_chain(inherit_id)
-        if parent then
-            local result = find_raw_value(parent, key, seen)
-            if result then
-                entry[comp] = result
-                return result
-            end
-        end
-    end
-
-    local ref_map = rawget(comp, "ref")
-    if
-        ref_map
-        and key ~= "events"
-        and key ~= "timing"
-        and key ~= "hidden"
-        and key ~= "min_screen_width"
-    then
-        local ref_id = ref_map[key]
-        if ref_id then
-            local ref_comp = Component._ensure_chain and Component._ensure_chain(ref_id)
-            if ref_comp then
-                local result = find_raw_value(ref_comp, key, seen)
-                if result then
-                    entry[comp] = result
-                    return result
-                end
-            end
-        end
-    end
-
-    entry[comp] = NIL
-    return nil
-end
-Component.find_raw_value = find_raw_value
-
-local inherit_ref_meta = {
-    __index = function(comp, key)
-        local r = find_raw_value(comp, key, {})
-        return r and r[1] or nil
-    end,
-}
-
---- Apply inherit/ref resolver metatable.  No-op for components without
---- `inherit` or `ref` (they keep default metatable, zero overhead).
---- @param comp ManagedComponent  Modified in-place when it has inherit or ref.
-Component.setup_inherit_ref = function(comp)
-    if rawget(comp, "inherit") or rawget(comp, "ref") then
-        setmetatable(comp, inherit_ref_meta)
-    end
-end
 
 return Component

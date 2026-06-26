@@ -46,7 +46,7 @@ local M = {}
 --- @field states CompStateMap
 --- @field order CompId[]
 --- @field lit_count integer
---- @field flexs {[1]: integer, [2]: CompId}[]
+--- @field flexs? {[1]: integer, [2]: CompId}[]
 
 --- @type Statusline
 local GlobalStatusline = {
@@ -367,48 +367,53 @@ end
 
 --- @param disabled_opts? UserConfig.Disabled
 M.setup = function(disabled_opts)
-    if type(disabled_opts) ~= "table" then return end
-    local disabled_filetypes = type(disabled_opts.filetypes) == "table" and disabled_opts.filetypes
-    local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
-    if not disabled_buftypes and not disabled_filetypes then return end
+    if type(disabled_opts) == "table" then
+        local disabled_filetypes = type(disabled_opts.filetypes) == "table" and disabled_opts.filetypes
+        local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
 
-    local user_laststatus = nvim_get_option_value("laststatus", {})
-    api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
-        callback = function(e)
-            local bufnr = e.buf
-            vim.schedule(function()
-                if not api.nvim_buf_is_valid(bufnr) then return end
+        if disabled_buftypes or disabled_filetypes then
+            --- For automatically toggle `laststatus` based on buffer filetype and buftype.
+            local user_laststatus = nvim_get_option_value("laststatus", {})
+            api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+                callback = function(e)
+                    local bufnr = e.buf
+                    vim.schedule(function()
+                        if not api.nvim_buf_is_valid(bufnr) then
+                            return
+                        end
 
-                local disabled = (
-                        disabled_filetypes
-                        and vim.list_contains(
-                            disabled_filetypes,
-                            nvim_get_option_value("filetype", { buf = bufnr })
-                        )
-                    )
-                    or (disabled_buftypes and vim.list_contains(
-                        disabled_buftypes,
-                        nvim_get_option_value("buftype", { buf = bufnr })
-                    ))
-                    or false
+                        local disabled = (
+                                disabled_filetypes
+                                and vim.list_contains(
+                                    disabled_filetypes,
+                                    nvim_get_option_value("filetype", { buf = bufnr })
+                                )
+                            )
+                            or (disabled_buftypes and vim.list_contains(
+                                disabled_buftypes,
+                                nvim_get_option_value("buftype", { buf = bufnr })
+                            ))
+                            or false
 
-                local laststatus = nvim_get_option_value("laststatus", {})
-                if not disabled and laststatus == 0 then
-                    nvim_set_option_value("laststatus", user_laststatus, {})
-                    M.render_debounce()
-                elseif disabled and laststatus ~= 0 then
-                    user_laststatus = laststatus
-                    nvim_set_option_value("laststatus", 0, {})
-                else
-                    return
-                end
+                        local laststatus = nvim_get_option_value("laststatus", {})
+                        if not disabled and laststatus == 0 then
+                            nvim_set_option_value("laststatus", user_laststatus, {})
+                            M.render_debounce() -- rerender statusline after enabling
+                        elseif disabled and laststatus ~= 0 then
+                            user_laststatus = laststatus
+                            nvim_set_option_value("laststatus", 0, {})
+                        else
+                            return -- no change no need to redrawstatus
+                        end
 
-                if api.nvim_get_mode().mode == "c" then
-                    vim.cmd("redrawstatus")
-                end
-            end)
-        end,
-    })
+                        if api.nvim_get_mode().mode == "c" then
+                            vim.cmd("redrawstatus")
+                        end
+                    end)
+                end,
+            })
+        end
+    end
 end
 
 return M

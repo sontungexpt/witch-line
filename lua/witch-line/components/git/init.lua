@@ -1,6 +1,5 @@
 local colors = require("witch-line.constant.color")
 
-local BRANCH_ICON = ""
 local DISABLED_FILETYPES = {
     "NvimTree",
     "neo-tree",
@@ -15,6 +14,10 @@ local BRANCH_CTX = { root_dir = nil }
 local Branch = {
     id = "git.branch",
     _plug_provided = true,
+    static = {
+        branch_icon = "",
+        disabled_filetypes = DISABLED_FILETYPES,
+    },
     on_click = function(comp, minwid, click_times, mouse_button, modifier_pressed)
         vim.notify("test")
     end,
@@ -55,7 +58,7 @@ local Branch = {
 
         api.nvim_create_autocmd("BufEnter", {
             callback = function(e)
-                if vim.list_contains(DISABLED_FILETYPES, vim.bo[e.buf].filetype) then
+                if vim.list_contains(self.static.disabled_filetypes, vim.bo[e.buf].filetype) then
                     return
                 end
                 local file = e.file:gsub("\\", "/")
@@ -94,7 +97,7 @@ local Branch = {
             head_file:close()
             branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
         end
-        return branch ~= "" and BRANCH_ICON .. " " .. branch or ""
+        return branch ~= "" and self.static.branch_icon .. " " .. branch or ""
     end,
 }
 
@@ -132,7 +135,7 @@ Diff.Interface = {
 
                 if event ~= "BufDelete" then
                     if self._diff_cache[bufnr] or vim.list_contains(DISABLED_FILETYPES, vim.bo[bufnr].filetype) then
-                        require("witch-line.core.handler").request_update(self)
+                        require("witch-line.core.handler").request_update_comp_graph(self)
                         return
                     end
                     local file = e.file
@@ -171,14 +174,14 @@ Diff.Interface = {
                                 if api.nvim_buf_is_valid(bufnr) then
                                     self._diff_cache[bufnr] = require("witch-line.components.git.utils").process_diff(
                                         stdout)
-                                    require("witch-line.core.handler").request_update(self)
+                                    require("witch-line.core.handler").request_update_comp_graph(self)
                                 end
                             end)
                             return
                         end
                         vim.schedule(function()
                             if api.nvim_buf_is_valid(bufnr) then
-                                require("witch-line.core.handler").request_update(self)
+                                require("witch-line.core.handler").request_update_comp_graph(self)
                             end
                         end)
                     end)

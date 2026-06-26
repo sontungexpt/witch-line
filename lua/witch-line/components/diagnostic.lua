@@ -1,24 +1,27 @@
-local Id = require("witch-line.constant.id").Id
 local DiagnosticSevrity = vim.diagnostic.severity
 
 --- @type DefaultComponent
 local Interface = {
-	id = Id["diagnostic.interface"],
+	id = "diagnostic.interface",
 	_plug_provided = true,
 	events = "DiagnosticChanged",
 	static = {
-		[DiagnosticSevrity.ERROR] = "",
-		[DiagnosticSevrity.WARN] = "",
-		[DiagnosticSevrity.INFO] = "",
-		[DiagnosticSevrity.HINT] = "",
+		icons = {
+			[DiagnosticSevrity.ERROR] = "",
+			[DiagnosticSevrity.WARN] = "",
+			[DiagnosticSevrity.INFO] = "",
+			[DiagnosticSevrity.HINT] = "",
+		},
 	},
-	hidden = function(self, sid)
+	hidden = function(self, _)
 		return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 	end,
-	context = function(self)
-		local icon = require("witch-line.core.manager.hook").use_static(self)
+	update = function(self, ctx)
+		local icon = {}
 		local diagnostic = vim.diagnostic
-		--- @cast icon table<integer, string>
+		for id, value in pairs(self.static.icons) do
+			icon[id] = value
+		end
 		local signs = diagnostic.config().signs
 		if type(signs) == "table" then
 			local text = signs.text
@@ -29,98 +32,73 @@ local Interface = {
 				end
 			end
 		end
-		return {
-			count = vim.diagnostic.count(0),
-			icon = icon,
-		}
+		ctx.state.count = diagnostic.count(0)
+		ctx.state.icon = icon
+		return ""
 	end,
 }
 
 --- @type DefaultComponent
 local Error = {
-	id = Id["diagnostic.error"],
+	id = "diagnostic.error",
 	_plug_provided = true,
-	style = {
-		fg = "DiagnosticError",
-	},
+	style = { fg = "DiagnosticError" },
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = "diagnostic.interface",
+		hidden = "diagnostic.interface",
 	},
-	update = function(self, session_id)
-		local hook = require("witch-line.core.manager.hook")
-		local ctx = hook.use_context(self, session_id)
-		--- @cast ctx {count: table, icon: table}
+	update = function(self, ctx)
 		local id = vim.diagnostic.severity.ERROR
-		local count = ctx.count[id] or 0
-		return count > 0 and ctx.icon[id] .. " " .. count or ""
+		local count = ctx.state.count[id] or 0
+		return count > 0 and ctx.state.icon[id] .. " " .. count or ""
 	end,
 }
 
 --- @type DefaultComponent
 local Warn = {
-	id = Id["diagnostic.warn"],
+	id = "diagnostic.warn",
 	_plug_provided = true,
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = "diagnostic.interface",
+		hidden = "diagnostic.interface",
 	},
-	style = {
-		fg = "DiagnosticWarn",
-	},
-	update = function(self, session_id)
-		local hook = require("witch-line.core.manager.hook")
-		local ctx = hook.use_context(self, session_id)
-		--- @cast ctx {count: table, icon: table}
+	style = { fg = "DiagnosticWarn" },
+	update = function(self, ctx)
 		local id = vim.diagnostic.severity.WARN
-		local count = ctx.count[id] or 0
-		return count > 0 and ctx.icon[id] .. " " .. count or ""
+		local count = ctx.state.count[id] or 0
+		return count > 0 and ctx.state.icon[id] .. " " .. count or ""
 	end,
 }
 
 ---@type DefaultComponent
 local Info = {
-	id = Id["diagnostic.info"],
+	id = "diagnostic.info",
 	_plug_provided = true,
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = "diagnostic.interface",
+		hidden = "diagnostic.interface",
 	},
-	style = {
-		fg = "DiagnosticInfo",
-	},
-	update = function(self, session_id)
-		local hook = require("witch-line.core.manager.hook")
-		local ctx = hook.use_context(self, session_id)
-		--- @cast ctx {count: table, icon: table}
+	style = { fg = "DiagnosticInfo" },
+	update = function(self, ctx)
 		local id = vim.diagnostic.severity.INFO
-		local count = ctx.count[id] or 0
-		return count > 0 and ctx.icon[id] .. " " .. count or ""
+		local count = ctx.state.count[id] or 0
+		return count > 0 and ctx.state.icon[id] .. " " .. count or ""
 	end,
 }
 
 --- @type DefaultComponent
 local Hint = {
-	id = Id["diagnostic.hint"],
+	id = "diagnostic.hint",
 	_plug_provided = true,
 	ref = {
-		events = Id["diagnostic.interface"],
-		context = Id["diagnostic.interface"],
-		hidden = Id["diagnostic.interface"],
+		events = "diagnostic.interface",
+		hidden = "diagnostic.interface",
 	},
-	style = {
-		fg = "DiagnosticHint",
-	},
-	update = function(self, session_id)
-		local hook = require("witch-line.core.manager.hook")
-		local ctx = hook.use_context(self, session_id)
-		--- @cast ctx {count: table, icon: table}
+	style = { fg = "DiagnosticHint" },
+	update = function(self, ctx)
 		local id = vim.diagnostic.severity.HINT
-		local count = ctx.count[id] or 0
-		return count > 0 and ctx.icon[id] .. " " .. count or ""
+		local count = ctx.state.count[id] or 0
+		return count > 0 and ctx.state.icon[id] .. " " .. count or ""
 	end,
 }
 

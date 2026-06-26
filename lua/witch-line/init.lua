@@ -36,7 +36,7 @@ M.setup = function(user_config)
     M.user_config = user_config
 
     require("witch-line.core.statusline").setup(user_config.disabled)
-    require("witch-line.core.handler").setup(user_config)
+    require("witch-line.core.handler").setup(user_config.statusline)
 
     vim.api.nvim_create_autocmd("CmdlineEnter", {
         once = true,

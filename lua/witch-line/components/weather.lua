@@ -1,10 +1,8 @@
-local Id = require("witch-line.constant.id").Id
-
 --- @type DefaultComponent
 local Weather = {
-	id = Id["weather"],
+	id = "weather",
 	_plug_provided = true,
-	update = function(self, sid)
+	update = function(self, _)
 		return ""
 	end,
 }
