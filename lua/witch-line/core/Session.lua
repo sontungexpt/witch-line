@@ -9,9 +9,9 @@ local next_id = 0
 
 --- @return SessionId id of new session
 local new = function()
-	next_id = next_id + 1
-	Store[next_id] = {}
-	return next_id
+    next_id = next_id + 1
+    Store[next_id] = {}
+    return next_id
 end
 Session.new = new
 
@@ -20,12 +20,12 @@ Session.new = new
 --- @param store_id NotNil key to retrieve session data
 --- @param value any value to set for the key
 Session.new_store = function(sid, store_id, value)
-	local store = Store[sid]
-	if not store then
-		error("Session with id " .. tostring(sid) .. " does not exist.")
-	end
-	store[store_id] = value
-	return value
+    local store = Store[sid]
+    if not store then
+        error("Session with id " .. tostring(sid) .. " does not exist.")
+    end
+    store[store_id] = value
+    return value
 end
 
 --- Retrieves the session data associated with the given session ID and key.
@@ -34,21 +34,21 @@ end
 --- @param store_id NotNil key to retrieve session data
 --- @return any|nil value associated with the key, or nil if the key does not exist
 Session.get_store = function(sid, store_id)
-	local store = Store[sid]
-	if not store then
-		error("Session with id " .. tostring(sid) .. " does not exist.")
-	end
-	local value = store[store_id]
-	return value
+    local store = Store[sid]
+    if not store then
+        error("Session with id " .. tostring(sid) .. " does not exist.")
+    end
+    local value = store[store_id]
+    return value
 end
 
 --- Clears the session data associated with the given session ID.
 --- @param id SessionId
 local remove = function(id)
-	Store[id] = nil
-	if not next(Store) then
-		next_id = 0 -- reset id counter if no sessions exist
-	end
+    Store[id] = nil
+    if not next(Store) then
+        next_id = 0 -- reset id counter if no sessions exist
+    end
 end
 Session.remove = remove
 
@@ -57,9 +57,9 @@ Session.remove = remove
 --- and then removes the session when the callback is done.
 --- @param cb fun(sid: SessionId) Callback function to call if the session does not exist
 Session.with_session = function(cb)
-	local id = new()
-	cb(id)
-	remove(id)
+    local id = new()
+    cb(id)
+    remove(id)
 end
 
 return Session

@@ -1,5 +1,7 @@
-local require, type, str_rep, rawset = require, type, string.rep, rawset
-local resolve = require("witch-line.utils").resolve
+local require, type, str_rep, rawset, rawget, setmetatable =
+    require, type, string.rep, rawset, rawget, setmetatable
+
+local id_module = require("witch-line.constant.id")
 
 local COMP_MODULE_PATH = "witch-line.components."
 
@@ -7,10 +9,10 @@ local Component = {}
 
 --- @enum SepStyle
 local SepStyle = {
-	Inherited = 0, -- use the style of the component
-	SepFg = 1,
-	SepBg = 2,
-	Reverse = 3, -- use the reverse style of the component }
+    Inherited = 0,
+    SepFg = 1,
+    SepBg = 2,
+    Reverse = 3,
 }
 Component.SepStyle = SepStyle
 
@@ -41,17 +43,23 @@ Component.SepStyle = SepStyle
 --- @alias PaddingFunc fun(self: ManagedComponent, sid: SessionId): number|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
 ---
---- @alias UpdateFunc fun(self:ManagedComponent,  sid: SessionId): string|nil , CompStyle|nil|
+--- @alias UpdateFunc fun(self: ManagedComponent, sid: SessionId): string|nil, CompStyle|nil
 ---
 --- @alias CompStyle ThemeAwareStyle|string
 --- @alias StyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, sid: SessionId): CompStyle|SepStyle
----
+
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
+
+
+
+---
+
+
 ---
 ---
---- @class Component.SpecialEvent
+--- @class SpecialEvent
 --- @field [integer] string event name
 --- @field once? boolean Optional flag. If true, the event is triggered only once.
 ---
@@ -64,7 +72,7 @@ Component.SepStyle = SepStyle
 --- @field pattern? string|string[]
 --- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
 ---
---- @class Component : table
+--- @class Component
 --- @field id? CompId The unique identifier for the component, can be a string or a number
 ---
 --- The version of the component, can be used to force reload the component when it changes
@@ -88,21 +96,21 @@ Component.SepStyle = SepStyle
 --- @field flexible? number
 ---
 --- A function to determine whether the component should be automatically adjusted to suit the theme
---- @field auto_theme? boolean | fun(self: ManagedComponent, sid: SessionId): boolean
+--- @field auto_theme? boolean|fun(self: ManagedComponent, sid: SessionId): boolean
 ---
 --- A flag indicating whether the component should show individual value for each window.
 --- @field win_individual? boolean
 ---
 --- A table of events that the component will listen to
 ---
---- @field events? string|string[]|Component.SpecialEvent[]
+--- @field events? string|string[]|SpecialEvent[]
 ---
 --- Minimum screen width required to show the component.
 --- - If integer: component is hidden when screen width is smaller.
 --- - If nil: always visible.
 --- - If function: called and its return value is used as above.
 --- - Example of min_screen_width function: `function(self: ManagedComponent, sid: SessionId) return 80 end`
---- @field min_screen_width? integer|fun(self: ManagedComponent, sid: SessionId):number|nil
+--- @field min_screen_width? integer|fun(self: ManagedComponent, sid: SessionId): number|nil
 ---
 --- @field ref? Reference A table of references to other components that this component depends on
 ---
@@ -164,10 +172,7 @@ Component.SepStyle = SepStyle
 --- - Example of padding function: `function(self, sid) return 2 end` (adds 2 spaces to both sides)
 --- @field padding? integer|PaddingTable|PaddingFunc
 ---
---- An initialization function that will be called when the component is first loaded
---- - If nil: no initialization function will be called.
---- - If string: required the string as a module and called it with the component and sid as arguments.
---- - If function: called with the component and sid as arguments.
+--- An initialization function that will be called when the component is first loaded.
 --- @field init? fun(self: ManagedComponent, sid: SessionId)
 ---
 --- A table of styles that will be applied to the component
@@ -178,20 +183,6 @@ Component.SepStyle = SepStyle
 --- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
 --- - Example of style function: `function(self, sid) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field style? CompStyle|StyleFunc
----
---- @field temp any A temporary field that can be used to store temporary values, will not be cached
----
---- A static field that can be accessed by the`use_static` hook
---- - If nil: no static will be passed.
---- - If table: used as is.
---- @field static? table
----
---- A context field that can be accessed by the `use_context` hook
---- - If nil: no context will be passed.
---- - If function: called and its return value is used as above.
---- - If string: required the string as a module and used as is.
---- - Example of context function: `function(self, sid) return {buffer = vim.api.nvim_get_current_buf()} end`
---- @field context? table|fun(self: ManagedComponent): table
 ---
 --- A function that will be called before the component is updated
 --- @field pre_update? fun(self: ManagedComponent, sid: SessionId)
@@ -209,7 +200,7 @@ Component.SepStyle = SepStyle
 ---
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
---- - If function: called and its return value is used to determine if the component should be
+--- - If function: called and its return value is used to determine if the component should be visible
 --- @field hidden? fun(self: ManagedComponent, sid: SessionId): boolean|nil
 ---
 ---
@@ -252,246 +243,285 @@ Component.SepStyle = SepStyle
 --- @field [integer] CompId -- Child components by their IDs
 --- @field _abstract true Always true, indicates that the component is abstract and should not be rendered directly
 
---- Check if is default component
---- @param comp Component the component to get the id from
+--- Resolve a field value: call functions with session memo, pass through others.
+--- @param value any    Raw field value (function → invoke, else passthrough).
+--- @param comp ManagedComponent  Owner component, passed to function calls.
+--- @param ctx table|nil  Session context; nil means no memoization.
+--- @return any  Resolved value (function return or literal).
+local function resolve_with_shared(value, comp, ctx)
+    if type(value) == "function" then
+        if ctx then
+            return ctx.session:memo(value, comp, ctx)
+        end
+        return value(comp, ctx)
+    end
+    return value
+end
+
+--- Check whether a component is a built-in default component.
+--- @param comp ManagedComponent
+--- @return boolean
 Component.is_default = function(comp)
-	return require("witch-line.constant.id").existed(comp.id)
+    return id_module.existed(comp.id)
 end
 
---- Ensures that the component has a valid id, generating one if it does not.
---- @param comp Component|DefaultComponent the component to get the id from
---- @return CompId id the id of the component
---- @return Component comp the component itself, or nil if it is a default component
+--- Assign and validate a unique id.  Built-ins (`_plug_provided`) skip generation.
+--- @param comp Component  May have `id` pre-set; otherwise one is generated.
+--- @return CompId The component's (validated or generated) identifier.
+--- @return Component The component table (same as `comp`).
 Component.setup = function(comp)
-	local id = comp.id
-	if comp._plug_provided then
-		---@cast id CompId
-		return id, comp
-	elseif id then
-		id = require("witch-line.constant.id").validate(id)
-	else
-		id = tostring(comp) .. tostring(math.random(1, 1000000))
-		rawset(comp, "id", id) -- Ensure the component has an ID field
-	end
-	require("witch-line.core.Component.initial_state").save_initial_context(comp)
-	---@cast id CompId
-	return id, comp
+    local id = comp.id
+
+    --- @cast comp DefaultComponent
+    if comp._plug_provided then
+        --- @cast id DefaultId
+        return id, comp
+    end
+
+    if id then
+        id = id_module.validate(id)
+    else
+        id = tostring(comp) .. tostring(math.random(1, 1000000))
+        rawset(comp, "id", id)
+    end
+
+    --- @cast comp Component
+    --- @cast id CompId
+    return id, comp
 end
 
---- Emits the `pre_update` event for the component, calling the pre_update function if it exists.
---- @param comp Component the component to emit the event for
---- @param sid SessionId the session id to use for the component, used for lazy loading components
-Component.emit_pre_update = function(comp, sid)
-	local pre_update = comp.pre_update
-	if type(pre_update) == "function" then
-		pre_update(comp, sid)
-	end
+--- Call a lifecycle field if it is a function.
+--- @param field string  Component field name (e.g. `"init"`, `"pre_update"`).
+--- @param comp ManagedComponent  Passed as `self` to the callback.
+--- @param ctx table|nil  Passed as second argument; nil ok for init.
+local function call_lifecycle(field, comp, ctx)
+    local value = comp[field]
+    if type(value) == "function" then
+        value(comp, ctx)
+    end
 end
 
---- Emits the `post_update` event for the component, calling the post_update function if it exists.
---- @param comp Component the component to emit the event for
---- @param sid SessionId the session id to use for the component, used for lazy
-Component.emit_post_update = function(comp, sid)
-	local post_update = comp.post_update
-	if type(post_update) == "function" then
-		post_update(comp, sid)
-	end
+--- Emit the pre_update lifecycle hook.
+--- @param comp ManagedComponent
+--- @param ctx table
+Component.emit_pre_update = function(comp, ctx)
+    call_lifecycle("pre_update", comp, ctx)
 end
 
---- Emits the `init` event for the component, calling the init function if it exists.
---- @param comp Component the component to emit the event for
---- @param sid SessionId the session id to use for the component, used for lazy loading components
-Component.emit_init = function(comp, sid)
-	local init = comp.init
-	if type(init) == "function" then
-		init(comp, sid)
-	end
+--- Emit the post_update lifecycle hook.
+--- @param comp ManagedComponent
+--- @param ctx table
+Component.emit_post_update = function(comp, ctx)
+    call_lifecycle("post_update", comp, ctx)
 end
 
---- Returns the field name for the highlight name of the specified side.
---- @param side "left"|"right" the side to get the field name for, either "left" or "right"
---- @return string field_name the field name for the highlight name of the specified side
+--- Emit the init lifecycle hook.
+--- @param comp ManagedComponent
+--- @param ctx table|nil
+Component.emit_init = function(comp, ctx)
+    call_lifecycle("init", comp, ctx or {})
+end
+
+--- Read event info (nvim autocmd args) for this component from the current session.
+--- @param comp ManagedComponent
+--- @param ctx table
+--- @return vim.api.keyset.create_autocmd.callback_args|nil
+Component.use_event_info = function(comp, ctx)
+    local event_info = ctx and ctx.session:get("EventInfo")
+    return event_info and event_info[comp.id] or nil
+end
+
+--- Return the internal hl_name storage field for a given side.
+--- @param "left"|"right" side
+--- @return "_left_hl_name"|"_right_hl_name"
 Component.hl_name_field = function(side)
-	return side == "left" and "_left_hl_name" or "_right_hl_name"
+    return side == "left" and "_left_hl_name" or "_right_hl_name"
 end
 
---- Returns the field name for the style of the specified side.
---- @param side "left"|"right" the side to get the field name for, either "left" or "right"
---- @return CompStyle|nil|SideStyleFunc|SepStyle side_style the field name for the style of the specified side
+--- Resolve the separator style for a side of a component.
+--- Defaults to SepStyle.SepBg.
+--- @param comp ManagedComponent
+--- @param "left"|"right" side
+--- @return SepStyle|CompStyle
 Component.side_style = function(comp, side)
-	return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
+    return comp[side == "left" and "left_style" or "right_style"] or SepStyle.SepBg
 end
 
---- Evaluates the component's update function and applies padding if necessary, returning the resulting string.
---- @param comp Component the component to resolveuate
---- @param sid SessionId the session id to use for the component
---- @return string value the new value of the component
---- @return CompStyle|nil style the new style of the component
-Component.evaluate = function(comp, sid)
-	local result, style = resolve(comp.update, comp, sid)
+--- Run `update`, apply padding, return rendered string and optional style.
+--- Non-string results become `""`.  Padding: number → both sides, table → left/right.
+--- @param comp ManagedComponent  Evaluated component; reads `update`, `padding`.
+--- @param ctx table  Session context for memoized function calls.
+--- @return string  Rendered text (empty string for non-string/nil results).
+--- @return CompStyle|nil  Style override from `update`, or nil.
+Component.evaluate = function(comp, ctx)
+    local result, style = resolve_with_shared(comp.update, comp, ctx)
 
-	if type(result) ~= "string" then
-		result = ""
-	elseif result ~= "" then
-		local padding = resolve(comp.padding or 1, comp, sid)
-		local p_type = type(padding)
-		if p_type == "number" and padding > 0 then
-			local pad = str_rep(" ", padding)
-			result = pad .. result .. pad
-		elseif p_type == "table" then
-			local left, right = resolve(padding.left, comp, sid), resolve(padding.right, comp, sid)
+    if type(result) ~= "string" then
+        result = ""
+    elseif result ~= "" then
+        local padding = resolve_with_shared(comp.padding or 1, comp, ctx)
+        local pt = type(padding)
+        if pt == "number" and padding > 0 then
+            local pad = str_rep(" ", padding)
+            result = pad .. result .. pad
+        elseif pt == "table" then
+            local left = resolve_with_shared(padding.left, comp, ctx)
+            local right = resolve_with_shared(padding.right, comp, ctx)
 
-			if type(left) == "number" and left > 0 then
-				result = str_rep(" ", left) .. result
-			end
-			if type(right) == "number" and right > 0 then
-				result = result .. str_rep(" ", right)
-			end
-		end
-	end
+            if type(left) == "number" and left > 0 then
+                result = str_rep(" ", left) .. result
+            end
+            if type(right) == "number" and right > 0 then
+                result = result .. str_rep(" ", right)
+            end
+        end
+    end
 
-	return result, style
+    return result, style
 end
 
---- Requires a default component by its id.
---- @param id CompId the path to the component, e.g. "file.name" or "git.status"
---- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
+--- Load a component by its module path id (derived from a DefaultId).
+--- Falls back to Component.require internally.
+--- @param id DefaultId
+--- @return Component|nil
 Component.require_by_id = function(id)
-	local path = require("witch-line.constant.id").path(id)
-	return path and Component.require(path) or nil
+    local path = id_module.path(id)
+    return path and Component.require(path) or nil
 end
 
---- Requires a default component by its path.
---- @param path DefaultComponentPath the path to the component, e.g. "file.name" or "git.status"
---- @return DefaultComponent|nil comp the component if it exists, or nil if it does not
+--- Load a component module by path segments.  First segment is
+--- prefixed with `"witch-line.components."`.
+--- @param path string[]  Segments, e.g. `{"statusline", "mode"}`.
+--- @return table|nil  The resolved module table, or nil if not found.
 Component.require = function(path)
-	local zero = path:find("\0", 2, true)
-	if not zero then
-		return require(COMP_MODULE_PATH .. path)
-	end
-
-	local module_path, idx_path = path:sub(1, zero - 1), path:sub(zero + 1)
-	local component = require(COMP_MODULE_PATH .. module_path)
-
-	for key in idx_path:gmatch("[^%.]+") do
-		component = component[key]
-		if not component then
-			return nil
-		end
-	end
-	return component
+    local component = require(COMP_MODULE_PATH .. path[1])
+    for i = 2, #path do
+        component = component[path[i]]
+        if not component then
+            return nil
+        end
+    end
+    return component
 end
 
---- Removes the state of the component before caching it, ensuring that it does not retain any state from previous updates.
---- @param comp Component the component to remove the state from
-Component.format_state_before_cache = function(comp)
-	require("witch-line.core.Component.initial_state").restore_initial_context(comp)
-	rawset(comp, "_hidden", nil)
-	local temp = comp.temp
-	if type(temp) == "table" then
-		for key, _ in pairs(temp) do
-			rawset(temp, key, nil)
-		end
-	else
-		rawset(comp, "temp", nil)
-	end
+--- Resolve the minimum screen width constraint for a component.
+--- @param comp ManagedComponent
+--- @param ctx table
+--- @return integer|nil
+Component.min_screen_width = function(comp, ctx)
+    local m = resolve_with_shared(comp.min_screen_width, comp, ctx)
+    return type(m) == "number" and m or nil
 end
 
---- Gets the minimum screen width required to display the component.
---- @param comp Component|DefaultComponent the component to get the minimum screen width from
---- @param sid SessionId the session id to use for the component update
---- @return number|nil min_screen_width the minimum screen width required to display the component, or nil if it is not defined
-Component.min_screen_width = function(comp, sid)
-	local min_screen_width = resolve(comp.min_screen_width, comp, sid)
-	return type(min_screen_width) == "number" and min_screen_width or nil
+--- Resolve auto_theme for a component; falls back to `_plug_provided`.
+--- @param comp ManagedComponent
+--- @param ctx table
+--- @return boolean
+Component.auto_theme = function(comp, ctx)
+    local auto = resolve_with_shared(comp.auto_theme, comp, ctx)
+    if auto ~= nil then
+        return auto
+    end
+    return comp._plug_provided or false
 end
 
---- Gets the auto theme of the component.
---- @param comp Component|DefaultComponent the component to get auto theme from
---- @param sid SessionId the session id to use for the component update
---- @return boolean auto_theme the auto theme of the component, or nil if it is not defined
-Component.auto_theme = function(comp, sid)
-	local auto_theme = resolve(comp.auto_theme, comp, sid)
-	if auto_theme ~= nil then
-		-- auto_theme true or false
-		return auto_theme
-	end
-	-- fallback to plug provided
-	return comp._plug_provided or false
+--- Determine whether a component should be hidden in the current context.
+--- @param comp ManagedComponent
+--- @param ctx table
+--- @return boolean
+Component.hidden = function(comp, ctx)
+    return resolve_with_shared(comp.hidden, comp, ctx) == true
 end
 
---- Checks if the component is hidden based on its `hidden` field.
---- @param comp Component|DefaultComponent the component to checks
---- @param sid SessionId the session id to use for the component update
---- @return boolean hidden whether the component is hidden
-Component.hidden = function(comp, sid)
-	return resolve(comp.hidden, comp, sid) == true
+
+local NIL = vim.NIL
+local raw_cache = {}
+local WEAK_K = { __mode = "k" }
+
+Component._ensure_chain = nil
+
+--- Walk inherit/ref chain for a raw field value.  Cached by (comp, key); `NIL`
+--- sentinel avoids re-walking absent fields.  Cycle-safe via `seen`.
+--- @param comp ManagedComponent  Start here; `inherit`/`ref` read via rawget.
+--- @param key string             Field name (e.g. `"update"`, `"highlight"`).
+--- @param seen table<CompId, true>  Cycle guard; caller passes `{}`, threaded through recursion.
+--- @return {[0]: any, [1]: ManagedComponent}|nil  `{ value, owner_comp }` or nil when absent/cyclic.
+local function find_raw_value(comp, key, seen)
+    local cid = comp.id
+    if seen[cid] then
+        return nil
+    end
+    seen[cid] = true
+
+    local entry = raw_cache[key]
+    if not entry then
+        entry = setmetatable({}, WEAK_K)
+        raw_cache[key] = entry
+    end
+    local cached = entry[comp]
+    if cached ~= nil then
+        return cached ~= NIL and cached or nil
+    end
+
+    local v = rawget(comp, key)
+    if v ~= nil then
+        local result = { v, comp }
+        entry[comp] = result
+        return result
+    end
+
+    local inherit_id = rawget(comp, "inherit")
+    if inherit_id then
+        local parent = Component._ensure_chain and Component._ensure_chain(inherit_id)
+        if parent then
+            local result = find_raw_value(parent, key, seen)
+            if result then
+                entry[comp] = result
+                return result
+            end
+        end
+    end
+
+    local ref_map = rawget(comp, "ref")
+    if
+        ref_map
+        and key ~= "events"
+        and key ~= "timing"
+        and key ~= "hidden"
+        and key ~= "min_screen_width"
+    then
+        local ref_id = ref_map[key]
+        if ref_id then
+            local ref_comp = Component._ensure_chain and Component._ensure_chain(ref_id)
+            if ref_comp then
+                local result = find_raw_value(ref_comp, key, seen)
+                if result then
+                    entry[comp] = result
+                    return result
+                end
+            end
+        end
+    end
+
+    entry[comp] = NIL
+    return nil
 end
+Component.find_raw_value = find_raw_value
 
---- Register a function to be called when a clickable component is clicked.
---- @param comp Component|DefaultComponent The component to register the click event for.
---- @return string fun_name The name of the click handler function, or an empty string if the component is not clickable.
---- @throws if has an invalid field type
-Component.register_click_handler = function(comp)
-	local click_handler = comp._click_handler
-	if click_handler then
-		return click_handler
-	end
+local inherit_ref_meta = {
+    __index = function(comp, key)
+        local r = find_raw_value(comp, key, {})
+        return r and r[1] or nil
+    end,
+}
 
-	local on_click = comp.on_click
-
-	local t = type(on_click)
-	if t == "table" then
-		-- {
-		--    name = "MyClickHandler", -- optional
-		--    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
-		--    -- If callback is a string, don't care about the name field
-		--    -- or callback = "MyClickHandler" -- the name of a global function
-		-- }
-
-		local name = on_click.name
-		if name and type(name) ~= "string" or name == "" then
-			require("witch-line.utils.notifier").error("on_click.name must be a non-empty string")
-			return ""
-		end
-		click_handler = type(name) == "string" and name or nil
-		on_click = on_click.callback
-		t = type(on_click)
-	end
-
-	if t == "string" and _G[on_click] then
-		click_handler = on_click
-	elseif t == "function" then
-		-- Fastest possible func_name derivation
-		if not click_handler then
-			click_handler = ("WLClickHandler" .. comp.id):gsub("[^%w_]", "")
-		end
-		if not _G[click_handler] then
-			_G[click_handler] = function(...)
-				on_click(comp, ...)
-			end
-		end
-	else
-		require("witch-line.utils.notifier").error(
-			"on_click must be a function or the name of a global function"
-		)
-		return ""
-	end
-
-	comp._click_handler = click_handler
-	return click_handler
-end
-
---- Determine whether a function-type value should receive the `sid` argument
---- when being evaluated for a given key.
----
---- Some keys (like "context") should not receive a session ID, since
---- their logic is independent of the session state.
----
---- @param key string The key name to check
---- @return boolean should_pass True if the `sid` argument should be passed to the function
-Component.should_pass_sid = function(key)
-	return key ~= "context"
+--- Apply inherit/ref resolver metatable.  No-op for components without
+--- `inherit` or `ref` (they keep default metatable, zero overhead).
+--- @param comp ManagedComponent  Modified in-place when it has inherit or ref.
+Component.setup_inherit_ref = function(comp)
+    if rawget(comp, "inherit") or rawget(comp, "ref") then
+        setmetatable(comp, inherit_ref_meta)
+    end
 end
 
 return Component

@@ -1,585 +1,414 @@
-local api = vim.api
 local concat, type, rawget = table.concat, type, rawget
 
-local nvim_strwidth, nvim_get_option_value, nvim_set_option_value =
-	api.nvim_strwidth, api.nvim_get_option_value, api.nvim_set_option_value
+local api = vim.api
+local
+nvim_strwidth,
+nvim_get_option_value,
+nvim_set_option_value =
+    api.nvim_strwidth,
+    api.nvim_get_option_value,
+    api.nvim_set_option_value
 
-local Highlight = require("witch-line.core.highlight")
-local assign_highlight_name = Highlight.assign_highlight_name
+-- Lazy-loaded modules (self-replacing on first access)
+local Highlight
+Highlight = setmetatable({}, {
+    __index = function(tbl, k)
+        Highlight = require("witch-line.core.highlight")
+        return Highlight[k]
+    end
+})
+
+local is_marked, mark_bit
+is_marked = function(...)
+    is_marked = require("witch-line.utils.bitmask").is_marked
+    return is_marked(...)
+end
+mark_bit = function(...)
+    mark_bit = require("witch-line.utils.bitmask").mark_bit
+    return mark_bit(...)
+end
 
 local M = {}
 
--- Constants controlling the relative index positions for layout calculation.
--- These are typically used to determine horizontal shifts (e.g., for padding, borders, etc.)
----@type integer  Offset index for the left side.
-local LEFT_SHIFT = -1
----@type integer  Offset index for the right side
-local RIGHT_SHIFT = 1
----@type integer  Distance (gap) between consecutive shift indices.
-local SHIFT_GAP = 3
----@type integer  Base offset applied to value computations.
-local VALUE_SHIFT = 2
----@type integer  Derived offset for string width calculations
-local WIDTH_SHIFT = VALUE_SHIFT + SHIFT_GAP
-
---- Compute the left-side index based on a given shift value.
---- Used when aligning or spacing elements to the left.
---- @param shift integer The base shift amount.
---- @return integer idx The computed index for the left side.
-local left_idx = function(shift)
-	return shift + LEFT_SHIFT
-end
-
---- Compute the right-side index based on a given shift value.
---- Used when aligning or spacing elements to the right.
---- @param shift integer The base shift amount.
---- @return integer idx The computed index for the right side.
-local right_idx = function(shift)
-	return shift + RIGHT_SHIFT
-end
-
---- Compute the side index dynamically based on direction.
---- This function generalizes `left_idx` and `right_idx` into one,
---- where `side_shift` determines the direction of offset.
----
---- Example:
---- ```lua
---- side_idx(5, -1) --> 4   (left side)
---- side_idx(5,  1) --> 6   (right side)
---- ```
----
---- @param shift_base integer The base shift value to offset from.
---- @param side_shift 1|-1 Direction multiplier: `-1` for left, `1` for right.
---- @return integer idx The computed index corresponding to the side.
-local side_idx = function(shift_base, side_shift)
-	return shift_base + side_shift
-end
-
---- Represents a single segment within the statusline layout.
---- Each segment defines a visual or interactive element, such as text,
---- icons, or clickable areas.
----
---- The layout uses a system of indexed "shifts" to manage relative positions.
---- These indices determine where each visual property is stored and how
---- it aligns with neighboring segments:
----   - `VALUE_SHIFT` →  The main content area index.
----   - `WIDTH_SHIFT` →  The computed width of main value index.
----
---- Using these shift constants, the positions of the **left** and **right**
---- edges can be derived programmatically via:
----   - `left_idx(VALUE_SHIFT)`   → left boundary index
----   - `right_idx(VALUE_SHIFT)`  → right boundary index
----   - or dynamically with `side_idx(VALUE_SHIFT, -1 | 1)`
----
---- This structure allows fast spatial computation and efficient redraws,
---- since each segment’s positional indices can be updated arithmetically
---- without rebuilding layout tables.
 --- @class CompState
---- @diagnostic disable: undefined-doc-name
---- @field [VALUE_SHIFT]? string The main content area index.
---- @field [WIDTH_SHIFT]? integer The computed width of main value index.
---- @diagnostic enable: undefined-doc-name
---- @field click_handler_form? string The name or ID of the click handler assigned to the segment (not cached).
---- @field total_width? integer The total rendered width of the segment (not cached).
---- @field flex? integer The priority of the flexible component.
+--- @field value? string
+--- @field width? integer
+--- @field left? string
+--- @field left_width? integer
+--- @field right? string
+--- @field right_width? integer
+--- @field click_handler? string
+--- @field flex? integer
 
---- @alias Statusline.CompId CompId|integer
 --- @alias CompStateMap table<CompId, CompState>
---- @alias FlexSorted ({[1]: integer, [2]: CompId}[])
---- @alias Slots Statusline.CompId[]
 
 --- @class Statusline
---- @field state_map CompStateMap The window-specific component state map.
---- @field slots Slots The list of components in the statusline.
---- @field flexs? FlexSorted The sorted list of flexible components.
---- @field literal_n integer The number of literal components.
-
---- Map: window_id -> (component_id -> CompState)
---- @type table<integer, Statusline>
-local Statusline = {}
+--- @field states CompStateMap
+--- @field order CompId[]
+--- @field lit_count integer
+--- @field flexs {[1]: integer, [2]: CompId}[]
 
 --- @type Statusline
-local GlobalStatusline
+local GlobalStatusline = {
+    states = {},
+    order = {},
+    lit_count = 0,
+}
 
---- Lazy-initialize global & per-window statusline state.
----
---- Summary:
----   - `Statusline[0]` = global default state.
----   - `Statusline[winid]` = per-window state that falls back to global.
----   - `state_map` (component states) is created per window; each entry
----       inherits from the global component defaults via metatable.
----   - Window state is created only when accessed.
----   - When a window closes, its state table is removed.
----
---- Structure:
----   Statusline = {
----     [0] = { state_map = {...}, slots = {...}, ... },
----     [win] = {
----       state_map = setmetatable({}, { __index = Statusline[0].state_map }),
----       slots = (fallback to global),
----       ...
----     },
----   }
----
---- Notes:
----   - Only global tables exist initially; per-window tables appear on demand.
----   - Component state uses shallow inheritance per window, but each component
----     merges from global defaults automatically.
-local lazy_setup = function()
-	GlobalStatusline = Statusline[0]
-	if not GlobalStatusline then
-		GlobalStatusline = {
-			state_map = {},
-			slots = {},
-			literal_n = 0,
-		}
-		Statusline[0] = GlobalStatusline
-	end
+--- @type table<integer, Statusline>
+local Statusline = {
+    [0] = GlobalStatusline,
+}
 
-	local auid, state_map_mt = nil, nil
-	setmetatable(Statusline, {
-		__index = function(t, winid)
-			--- Lazily create shared state map metatable
-			state_map_mt = state_map_mt or {
-				__index = GlobalStatusline.state_map,
-			}
+local fallback_states_mt, win_closed_auid
+setmetatable(Statusline, {
+    __index = function(t, winid)
+        fallback_states_mt = fallback_states_mt or { __index = GlobalStatusline.states }
+        win_closed_auid = win_closed_auid or api.nvim_create_autocmd("WinClosed", {
+            callback = function(e)
+                Statusline[tonumber(e.match)] = nil
+            end,
+        })
 
-			--- Lazily create autocmd for window close
-			auid = auid
-				or api.nvim_create_autocmd("WinClosed", {
-					callback = function(e)
-						Statusline[tonumber(e.match)] = nil
-					end,
-				})
+        local new_statusline = setmetatable({
+            lit_count = 0,
+            states = setmetatable({}, fallback_states_mt),
+        }, { __index = GlobalStatusline })
 
-			local win_state = setmetatable({
-				literal_n = 0, -- each window has its own literal count
-				state_map = setmetatable({}, state_map_mt),
-			}, {
-				__index = GlobalStatusline,
-			})
-			t[winid] = win_state
-			return win_state
-		end,
-	})
+        t[winid] = new_statusline
+        return new_statusline
+    end,
+})
+
+local function get_statusline(winid)
+    local laststatus = nvim_get_option_value("laststatus", {})
+    if laststatus == 3 or winid == nil then
+        return GlobalStatusline
+    end
+    return Statusline[winid]
 end
 
---- Returns the window-level statusline state.
---- If `vim.o.laststatus` is 3, returns the global statusline state.
---- If `winid` is nil, returns the global statusline state.
---- If `winid` is 0, returns the global statusline state.
---- Otherwise, returns the per-window statusline state.
---- @param winid? integer Window ID to fetch. Defaults to current window.
---- @return Statusline state Window-level state table.
-local get_statusline = function(winid)
-	return ((nvim_get_option_value("laststatus", {}) or 3) == 3 or winid == nil) and GlobalStatusline
-		or Statusline[winid]
+--- Collect and sort flexible components by descending flex value.
+local function get_flex_sorted(statusline)
+    local flex_sorted = statusline.flexs
+    if flex_sorted then
+        return flex_sorted
+    end
+
+    local sorted, n = {}, 0
+    local comps, slots = statusline.states, statusline.order
+    for i = 1, #slots do
+        local flex = comps[slots[i]].flex
+        if flex then
+            n = n + 1
+            local l = n
+            while l > 1 and flex > sorted[l - 1][1] do
+                sorted[l] = sorted[l - 1]
+                l = l - 1
+            end
+            sorted[l] = { flex, i, slots[i] }
+        end
+    end
+
+    flex_sorted = {}
+    for i = 1, n do
+        local e = sorted[i]
+        flex_sorted[i] = { e[2], e[3] }
+    end
+
+    statusline.flexs = flex_sorted
+    return flex_sorted
 end
 
---- Returns the sorted list of flexible components.
---- @param statusline Statusline The window state to fetch the sorted list from.
---- @return Statusline.CompId[] sorted The sorted list of flexible components.
-local get_flex_sorted = function(statusline)
-	-- use cached value
-	local flex_sorted = statusline.flexs
-	if flex_sorted then
-		return flex_sorted
-	end
-
-	local sorted, n = {}, 0
-	local comps, slots = statusline.state_map, statusline.slots
-	for i = 1, #slots do
-		local comp_id = slots[i]
-		local flex = comps[comp_id].flex
-		if flex then
-			n = n + 1
-
-			--- insertion sort by decreasing flex
-			local l = n
-			while l > 1 and flex > sorted[l - 1][1] do
-				sorted[l] = sorted[l - 1]
-				l = l - 1
-			end
-			sorted[l] = { flex, i, comp_id }
-		end
-	end
-
-	flex_sorted = {}
-	for i = 1, n do
-		local e = sorted[i]
-		flex_sorted[i] = { e[2], e[3] }
-	end
-
-	-- cache flexible_sorted
-	statusline.flexs = flex_sorted
-	return flex_sorted
+--- @param comp_state CompState
+local function compute_slot_width(comp_state)
+    local width = comp_state.width or 0
+    if width > 0 then
+        width = width + (comp_state.left_width or 0) + (comp_state.right_width or 0)
+    end
+    return width
 end
 
---- Tracks a component as flexible with a given priority.
---- Components with lower priority values are considered more important and will be retained longer when space is limited.
---- @param comp_id CompId The component ID of the flexible component.
---- @param priority integer The priority of the component; lower values indicate higher importance.
---- @param winid? integer The window ID to track the flexible component for.
-M.track_flexible = function(comp_id, priority, winid)
-	get_statusline(winid).state_map[comp_id].flex = priority
+--- @param win_state Statusline
+local function compute_statusline_width(win_state)
+    local total, slots, comps = 0, win_state.order, win_state.states
+    for i = 1, #slots do
+        total = total + compute_slot_width(comps[slots[i]])
+    end
+    return total
 end
 
---- Inspects the current statusline values.
-M.inspect = function()
-	require("witch-line.utils.notifier").info(vim.inspect(Statusline))
+--- @param slots CompId[]
+--- @param state_map CompStateMap
+--- @param skip_mask? integer
+local function build_value(slots, state_map, skip_mask)
+    local out, n = {}, 0
+    for i = 1, #slots do
+        if not skip_mask or not is_marked(skip_mask, i - 1) then
+            local state = state_map[slots[i]]
+            local val = state.value or ""
+            if val ~= "" then
+                local click_handler = state.click_handler
+                if click_handler then
+                    n = n + 1
+                    out[n] = click_handler
+                end
+
+                local left, right = state.left, state.right
+                if left and left ~= "" then
+                    n = n + 1
+                    out[n] = left
+                end
+
+                n = n + 1
+                out[n] = val
+
+                if right and right ~= "" then
+                    n = n + 1
+                    out[n] = right
+                end
+
+                if click_handler then
+                    n = n + 1
+                    out[n] = "%X"
+                end
+            end
+        end
+    end
+    local result = concat(out)
+    return result ~= "" and result or " "
 end
 
---- Handles necessary operations before Vim exits.
---- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for caching the statusline.
-M.on_vim_leave_pre = function(CacheDataAccessor)
-	local frozen_fields = {
-		"flex",
-		"idxs",
-	}
-	--- Format the state before cache
-	for key, state in pairs(GlobalStatusline.state_map) do
-		-- Clear unfrozen values to reset statusline on next startup
-		local frozen = type(key) == "number"
-		for k, _ in pairs(state) do
-			if k == VALUE_SHIFT then
-				if not frozen then
-					state[k] = "" -- Clear unfrozen main value
-				end
-			elseif not vim.tbl_contains(frozen_fields, k) then
-				state[k] = nil
-			end
-		end
-	end
-	CacheDataAccessor["GlobalStatusline"] = GlobalStatusline
-end
-
---- Loads the statusline cache.
---- @param CacheDataAccessor Cache.DataAccessor The data accessor module to use for loading the statusline.
-M.load_cache = function(CacheDataAccessor)
-	Statusline[0] = CacheDataAccessor.GlobalStatusline
-end
-
---- Computes the total display width of a statusline component including its left and right parts.
---- This function caches the computed width to optimize performance.
---- @param comp_state CompState The statusline component to compute the width for.
---- @return integer width The total display width of the component including its left and right parts.
-local compute_slot_width = function(comp_state)
-	local width = comp_state.total_width
-	if width then
-		return width
-	end
-	width = comp_state[WIDTH_SHIFT] or 0
-	if width > 0 then
-		width = width + (comp_state[left_idx(WIDTH_SHIFT)] or 0) + (comp_state[right_idx(WIDTH_SHIFT)] or 0)
-	end
-	comp_state.total_width = width
-	return width
-end
-
---- Computes the total display width of all statusline components.
---- This function caches the computed widths to optimize performance.
---- @param win_state Statusline The window state to compute the width for.
---- @return integer total_width The total display width of all statusline components.
-local compute_statusline_width = function(win_state)
-	local total, slots, comps = 0, win_state.slots, win_state.state_map
-	for i = 1, #slots do
-		total = total + compute_slot_width(comps[slots[i]])
-	end
-	return total
-end
-
---- Builds the final statusline string by merging highlight segments and optional
---- click-handler wrappers, while skipping any indices marked in a bitmask.
----
---- @param slots Slots The indices of the statusline components to build the value for.
---- @param state_map CompStateMap The statusline component to build the value for.
---- @param skip_mask? integer A bitmask (1-based indices) specifying which segments should be skipped. If nil, no skipping is applied.
---- @return string value Final concatenated statusline string.
-local build_value = function(slots, state_map, skip_mask)
-	local out, n = {}, 0
-	local is_marked = require("witch-line.utils.bitmask").is_marked
-	for i = 1, #slots do
-		if not skip_mask or not is_marked(skip_mask, i - 1) then
-			local state = state_map[slots[i]]
-			local val = state[VALUE_SHIFT] or ""
-
-			-- If no main value, skip the whole segment including its left and right parts
-			if val ~= "" then
-				local click_handler_form = state.click_handler_form
-				if click_handler_form then
-					n = n + 1
-					out[n] = click_handler_form
-				end
-
-				local left, right = state[left_idx(VALUE_SHIFT)], state[right_idx(VALUE_SHIFT)]
-				if left and left ~= "" then
-					n = n + 1
-					out[n] = left
-				end
-
-				--- Main part
-				n = n + 1
-				out[n] = val
-
-				--- Right part
-				if right and right ~= "" then
-					n = n + 1
-					out[n] = right
-				end
-
-				if click_handler_form then
-					n = n + 1
-					out[n] = "%X"
-				end
-			end
-		end
-	end
-	local result = concat(out)
-	return result ~= "" and result or " "
-end
-
---- Renders the statusline by concatenating all component values and setting it to `o.statusline`.
---- If the statusline is disabled, it sets `o.statusline` to a single space.
---- @param winid? integer The window ID to render the statusline for.
+--- @param winid? integer
 M.render = function(winid)
-	local laststatus = nvim_get_option_value("laststatus", {})
-	if
-		(winid and not api.nvim_win_is_valid(winid))
-		or laststatus == 0
-		or (laststatus == 1 and #api.nvim_tabpage_list_wins(0) < 2)
-	then
-		-- statusline is hidden no need to render
-		return
-	end
+    local laststatus = nvim_get_option_value("laststatus", {})
+    if
+        (winid and not api.nvim_win_is_valid(winid))
+        or laststatus == 0
+        or (laststatus == 1 and #api.nvim_tabpage_list_wins(0) < 2)
+    then
+        return
+    end
 
-	local statusline = GlobalStatusline
-	if laststatus ~= 3 then
-		winid = winid or api.nvim_get_current_win()
-		statusline = Statusline[winid]
-	end
+    local statusline = GlobalStatusline
+    if laststatus ~= 3 then
+        winid = winid or api.nvim_get_current_win()
+        statusline = Statusline[winid]
+    end
 
-	local comp_state = statusline.state_map
+    local comp_state = statusline.states
+    local flex_list = get_flex_sorted(statusline)
+    local current_flex = flex_list[1]
 
-	local flex_list = get_flex_sorted(statusline)
-	local current_flex = flex_list[1]
+    if not current_flex then
+        nvim_set_option_value("statusline", build_value(statusline.order, comp_state), { win = winid })
+        return
+    end
 
-	if not current_flex then
-		nvim_set_option_value("statusline", build_value(statusline.slots, comp_state), { win = winid })
-		return
-	end
+    local rendered_width = compute_statusline_width(statusline)
+    local max_width = winid and api.nvim_win_get_width(winid) or nvim_get_option_value("columns", {})
 
-	-- Total width of current statusline
-	local rendered_width = compute_statusline_width(statusline)
+    if rendered_width <= max_width then
+        nvim_set_option_value("statusline", build_value(statusline.order, comp_state), { win = winid })
+        return
+    end
 
-	-- Allowed width of window or entire screen
-	local max_width = winid and api.nvim_win_get_width(winid) or nvim_get_option_value("columns", {})
-	if rendered_width <= max_width then
-		nvim_set_option_value("statusline", build_value(statusline.slots, comp_state), { win = winid })
-		return
-	end
+    local flex_idx, hidden_slots = 1, 0ULL
+    repeat
+        local slot_id, comp_id = current_flex[1], current_flex[2]
+        hidden_slots = mark_bit(hidden_slots, slot_id - 1)
+        rendered_width = rendered_width - compute_slot_width(comp_state[comp_id])
+        flex_idx = flex_idx + 1
+        current_flex = flex_list[flex_idx]
+    until rendered_width <= max_width or not current_flex
 
-	local flex_idx, hidden_slots = 1, 0ULL -- Bitmask describing which slots should be hidden
-	local mark_bit = require("witch-line.utils.bitmask").mark_bit
-	repeat
-		local slot_id, comp_id = current_flex[1], current_flex[2]
-		hidden_slots = mark_bit(hidden_slots, slot_id - 1)
-		rendered_width = rendered_width - compute_slot_width(comp_state[comp_id])
-		flex_idx = flex_idx + 1
-		current_flex = flex_list[flex_idx]
-	until rendered_width <= max_width or not current_flex
-
-	nvim_set_option_value(
-		"statusline",
-		build_value(statusline.slots, comp_state, hidden_slots),
-		{ win = winid }
-	)
+    nvim_set_option_value("statusline", build_value(statusline.order, comp_state, hidden_slots), { win = winid })
 end
 
---- Renders the statusline with a debounce.
-M.render_debounce = require("witch-line.utils").debounce(M.render, 80)
+-- Debounced version of `M.render`
+-- @param ... any Arguments to pass to `M.render`.
+M.render_debounce = function(...)
+    M.render_debounce = require("witch-line.utils").debounce(M.render, 80)
+    return M.render_debounce(...)
+end
 
---- Appends a new value to the statusline values list.
---- @param comp_id? CompId The component ID. Nil means it is a literal component
---- @param value string The value to append.
---- @param winid? integer The window ID to set the value for.
---- @return integer new_idx The index of the newly added value.
+--- @param comp_id? CompId
+--- @param value string
+--- @param winid? integer
 M.push = function(comp_id, value, winid)
-	local statusline = winid and Statusline[winid] or GlobalStatusline
-	-- local statusline = get_statusline(winid)
-	local slots = rawget(statusline, "slots")
-	if not slots then
-		slots = {}
-		statusline.slots = slots
-	end
+    local statusline = get_statusline(winid)
+    local slots = rawget(statusline, "order")
+    if not slots then
+        slots = {}
+        statusline.order = slots
+    end
 
-	local new_slots_size = #slots + 1
+    local new_slots_size = #slots + 1
 
-	if not comp_id then
-		---@diagnostic disable-next-line: cast-local-type
-		comp_id = statusline.literal_n + 1
-		statusline.literal_n = comp_id
-	end
+    if not comp_id then
+        comp_id = statusline.lit_count + 1
+        statusline.lit_count = comp_id
+    end
 
-	--- Rawget to avoid automatically creating the table
-	local state_map = statusline.state_map
-	local state = rawget(state_map, comp_id)
-	if not state then
-		local width = value == "" and 0 or nvim_strwidth(value)
-		--- @type CompState
-		state_map[comp_id] = {
-			[VALUE_SHIFT] = value,
-			[WIDTH_SHIFT] = width,
-			total_width = width,
-		}
-	end
-	slots[new_slots_size] = comp_id
-	return new_slots_size
+    local state_map = statusline.states
+    if not rawget(state_map, comp_id) then
+        local width = value == "" and 0 or nvim_strwidth(value)
+        state_map[comp_id] = { value = value, width = width }
+    end
+    slots[new_slots_size] = comp_id
+    return new_slots_size
 end
 
---- Ensures that a specific component state exists.
---- @param winid? integer The window ID to set the value for.
---- @param comp_id CompId The component ID to ensure.
---- @return CompState state The existing or newly created component state.
-local ensure_comp_state = function(winid, comp_id)
-	local state_map = get_statusline(winid).state_map
-	local state = rawget(state_map, comp_id) or {}
-	state_map[comp_id] = state
-	return state
+--- @param winid? integer
+--- @param comp_id CompId
+local function ensure_comp_state(winid, comp_id)
+    local state_map = get_statusline(winid).states
+    local state = rawget(state_map, comp_id) or {}
+    state_map[comp_id] = state
+    return state
 end
 
---- Hides a specific component by setting its value to an empty string.
---- @param comp_id CompId The index of the component to hide.
---- @param winid? integer The window ID to set the value for.
+local vim_resized_auid
+
+--- @param comp_id CompId
+--- @param priority integer
+--- @param winid? integer
+M.track_flexible = function(comp_id, priority, winid)
+    get_statusline(winid).states[comp_id].flex = priority
+    if not vim_resized_auid then
+        vim_resized_auid = api.nvim_create_autocmd("VimResized", {
+            callback = function()
+                if get_flex_sorted(get_statusline(api.nvim_get_current_win()))[1] then
+                    M.render_debounce()
+                end
+            end,
+        })
+    end
+end
+
+--- @param comp_id CompId
+--- @param winid? integer
 M.hide_segment = function(comp_id, winid)
-	local state = ensure_comp_state(winid, comp_id)
-	state[VALUE_SHIFT] = ""
-	state[WIDTH_SHIFT], state.total_width = 0, nil
+    local state = ensure_comp_state(winid, comp_id)
+    state.value = ""
+    state.width = 0
 end
 
---- Sets the value for a specific component.
---- @param comp_id CompId The index of the component to set the side value for.
---- @param value string The value to set for the specified side.
---- @param hl_name? string The highlight group name to set for segment.
---- @param winid? integer The window ID to set the value for.
+--- @param comp_id CompId
+--- @param value string
+--- @param hl_name? string
+--- @param winid? integer
 M.set_value = function(comp_id, value, hl_name, winid)
-	local state = ensure_comp_state(winid, comp_id)
-	state[WIDTH_SHIFT], state.total_width = nvim_strwidth(value), nil
-	state[VALUE_SHIFT] = assign_highlight_name(value, hl_name)
+    local state = ensure_comp_state(winid, comp_id)
+    state.width = nvim_strwidth(value)
+    state.value = Highlight.assign_highlight_name(value, hl_name)
 end
 
---- Sets the highlight_name for a specific component.
---- @param comp_id CompId The index of the component to set the side value for.
---- @param new_hl_name string|nil The new highlight group name to set for the segment.
---- @param winid? integer The window ID to set the value for.
+--- @param comp_id CompId
+--- @param new_hl_name string|nil
+--- @param winid? integer
 M.set_hl_name = function(comp_id, new_hl_name, winid)
-	local state = ensure_comp_state(winid, comp_id)
-	local curr_value = state[VALUE_SHIFT]
-	state[VALUE_SHIFT] = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1)
-		or curr_value
+    local state = ensure_comp_state(winid, comp_id)
+    local curr_value = state.value
+    state.value = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
 end
 
---- Sets the left or right side value for a specific component.
---- @param comp_id CompId The index of the component to set the side value for.
---- @param shift_side -1|1 The shift side value to get the side idx. 1 Right, -1 Left
---- @param value string The value to set for the specified side.
---- @param hl_name? string The highlight group name to set for the specified side.
---- @param force? boolean If true, forces the update even if a value already exists for the specified side.
---- @param winid? integer The window ID to set the value for.
+--- @param comp_id CompId
+--- @param shift_side -1|1
+--- @param value string
+--- @param hl_name? string
+--- @param force? boolean
+--- @param winid? integer
 M.set_side_value = function(comp_id, shift_side, value, hl_name, force, winid)
-	local state = ensure_comp_state(winid, comp_id)
-	local vidx = side_idx(VALUE_SHIFT, shift_side)
-	if force or not state[vidx] then
-		state[side_idx(WIDTH_SHIFT, shift_side)], state.total_width = nvim_strwidth(value), nil
-		state[vidx] = assign_highlight_name(value, hl_name)
-	end
+    local state = ensure_comp_state(winid, comp_id)
+    if shift_side == -1 then
+        if force or not state.left then
+            state.left_width = nvim_strwidth(value)
+            state.left = Highlight.assign_highlight_name(value, hl_name)
+        end
+    else
+        if force or not state.right then
+            state.right_width = nvim_strwidth(value)
+            state.right = Highlight.assign_highlight_name(value, hl_name)
+        end
+    end
 end
 
---- Sets the left or right side value for a specific component.
---- @param comp_id CompId The index of the component to set the side value for.
---- @param shift_side -1|1 The shift side value to get the side idx. 1 Right, -1 Left
---- @param new_hl_name? string The new highlight group name to set for the specified side.
---- @param winid? integer The window ID to set the value for.
+--- @param comp_id CompId
+--- @param shift_side -1|1
+--- @param new_hl_name? string
+--- @param winid? integer
 M.set_side_hl_name = function(comp_id, shift_side, new_hl_name, winid)
-	local state = ensure_comp_state(winid, comp_id)
-	local idx = side_idx(VALUE_SHIFT, shift_side)
-	local curr_value = state[idx]
-	state[idx] = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
+    local state = ensure_comp_state(winid, comp_id)
+    local curr_value = shift_side == -1 and state.left or state.right
+    local new_value = curr_value and Highlight.replace_highlight_name(curr_value, new_hl_name, 1) or curr_value
+    if shift_side == -1 then
+        state.left = new_value
+    else
+        state.right = new_value
+    end
 end
 
---- Updates the click handler for a specific component.
---- @param comp_id CompId The index in the statusline of the component to update the click handler for.
---- @param click_handler string The click handler to set for the specified component.
---- @param force? boolean If true, forces the update even if a click handler already exists.
---- @param winid? integer The window ID to set the value for.
+--- @param comp_id CompId
+--- @param click_handler string
+--- @param force? boolean
+--- @param winid? integer
 M.set_click_handler = function(comp_id, click_handler, force, winid)
-	local state = ensure_comp_state(winid, comp_id)
-	if force or not state.click_handler_form then
-		state.click_handler_form = "%@v:lua." .. click_handler .. "@"
-	end
+    local state = ensure_comp_state(winid, comp_id)
+    if force or not state.click_handler then
+        state.click_handler = "%@v:lua." .. click_handler .. "@"
+    end
 end
 
---- Setup the necessary things for statusline rendering.
---- @param disabled_opts? UserConfig.Disabled The disabled configuration to apply.
+--- @param winid? integer
+M.inspect = function(winid)
+    require("witch-line.utils.notifier").info(vim.inspect(winid and Statusline[winid] or Statusline))
+end
+
+--- @param disabled_opts? UserConfig.Disabled
 M.setup = function(disabled_opts)
-	lazy_setup()
+    if type(disabled_opts) ~= "table" then return end
+    local disabled_filetypes = type(disabled_opts.filetypes) == "table" and disabled_opts.filetypes
+    local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
+    if not disabled_buftypes and not disabled_filetypes then return end
 
-	--- For automatically rerender statusline on Vim or window resize when there are flexible components.
-	api.nvim_create_autocmd("VimResized", {
-		callback = function()
-			local flexs = get_statusline(api.nvim_get_current_win()).flexs
-			if flexs and next(flexs) then
-				M.render_debounce()
-			end
-		end,
-	})
+    local user_laststatus = nvim_get_option_value("laststatus", {})
+    api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+        callback = function(e)
+            local bufnr = e.buf
+            vim.schedule(function()
+                if not api.nvim_buf_is_valid(bufnr) then return end
 
-	if type(disabled_opts) == "table" then
-		local disabled_filetypes = type(disabled_opts.filetypes) == "table" and disabled_opts.filetypes
-		local disabled_buftypes = type(disabled_opts.buftypes) == "table" and disabled_opts.buftypes
+                local disabled = (
+                        disabled_filetypes
+                        and vim.list_contains(
+                            disabled_filetypes,
+                            nvim_get_option_value("filetype", { buf = bufnr })
+                        )
+                    )
+                    or (disabled_buftypes and vim.list_contains(
+                        disabled_buftypes,
+                        nvim_get_option_value("buftype", { buf = bufnr })
+                    ))
+                    or false
 
-		if disabled_buftypes or disabled_filetypes then
-			--- For automatically toggle `laststatus` based on buffer filetype and buftype.
-			local user_laststatus = nvim_get_option_value("laststatus", {})
-			api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
-				callback = function(e)
-					local bufnr = e.buf
-					vim.schedule(function()
-						if not api.nvim_buf_is_valid(bufnr) then
-							return
-						end
+                local laststatus = nvim_get_option_value("laststatus", {})
+                if not disabled and laststatus == 0 then
+                    nvim_set_option_value("laststatus", user_laststatus, {})
+                    M.render_debounce()
+                elseif disabled and laststatus ~= 0 then
+                    user_laststatus = laststatus
+                    nvim_set_option_value("laststatus", 0, {})
+                else
+                    return
+                end
 
-						local disabled = (
-							disabled_filetypes
-							and vim.list_contains(
-								disabled_filetypes,
-								nvim_get_option_value("filetype", { buf = bufnr })
-							)
-						)
-							or (disabled_buftypes and vim.list_contains(
-								disabled_buftypes,
-								nvim_get_option_value("buftype", { buf = bufnr })
-							))
-							or false
-
-						local laststatus = nvim_get_option_value("laststatus", {})
-						if not disabled and laststatus == 0 then
-							nvim_set_option_value("laststatus", user_laststatus, {})
-							M.render_debounce() -- rerender statusline after enabling
-						elseif disabled and laststatus ~= 0 then
-							user_laststatus = laststatus
-							nvim_set_option_value("laststatus", 0, {})
-						else
-							return -- no change no need to redrawstatus
-						end
-
-						if api.nvim_get_mode().mode == "c" then
-							vim.cmd("redrawstatus")
-						end
-					end)
-				end,
-			})
-		end
-	end
+                if api.nvim_get_mode().mode == "c" then
+                    vim.cmd("redrawstatus")
+                end
+            end)
+        end,
+    })
 end
 
 return M
