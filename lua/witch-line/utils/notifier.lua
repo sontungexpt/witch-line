@@ -1,3 +1,4 @@
+
 local M = {}
 
 local levels = vim.log.levels

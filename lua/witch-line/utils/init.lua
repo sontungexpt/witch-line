@@ -14,28 +14,28 @@ local M = {}
 --- @param delay number Delay in milliseconds before invoking `func`.
 --- @return fun(...: A...)   debounced_func A debounced version of `func`.
 M.debounce = function(func, delay)
-	local timer, running = nil, false
+    local timer, running = nil, false
 
-	--- @param ... any Arguments to pass to `func`.
-	return function(...)
-		if not timer then
-			timer = assert((vim.uv or vim.loop).new_timer())
-		elseif running then
-			---@diagnostic disable-next-line: need-check-nil
-			timer:stop()
-		end
-		running = true
+    --- @param ... any Arguments to pass to `func`.
+    return function(...)
+        if not timer then
+            timer = assert((vim.uv or vim.loop).new_timer())
+        elseif running then
+            ---@diagnostic disable-next-line: need-check-nil
+            timer:stop()
+        end
+        running = true
 
-		local args = { ... }
-		timer:start(
-			delay,
-			0,
-			vim.schedule_wrap(function()
-				running = false
-				func(unpack(args))
-			end)
-		)
-	end
+        local args = { ... }
+        timer:start(
+            delay,
+            0,
+            vim.schedule_wrap(function()
+                running = false
+                func(unpack(args))
+            end)
+        )
+    end
 end
 
 --- Resolves a value that may be a function or a direct value.
@@ -56,14 +56,14 @@ end
 --- -- Returns 42 (function result)
 --- local result2 = M.resolve(function(x) return x * 2 end, 21)
 M.resolve = function(value, ...)
-	--- Why don't use 3 opearator expression?
-	--- Because when a value is a function and returns more than one value,
-	--- the 3 operator expression will only return the first value.
-	--- So we have to use if statement here.
-	if type(value) == "function" then
-		return value(...)
-	end
-	return value
+    --- Why don't use 3 opearator expression?
+    --- Because when a value is a function and returns more than one value,
+    --- the 3 operator expression will only return the first value.
+    --- So we have to use if statement here.
+    if type(value) == "function" then
+        return value(...)
+    end
+    return value
 end
 
 return M

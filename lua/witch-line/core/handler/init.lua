@@ -66,9 +66,9 @@ local format_side_value = function(val, is_func)
 end
 
 --- Attach `auto_theme` to a style table if not already set.
----@param style HighlightStyle|nil
+---@param style CompStyle|nil
 ---@param enable_auto_theme boolean
----@return HighlightStyle|nil
+---@return CompStyle|nil
 local apply_auto_theme = function(style, enable_auto_theme)
     if type(style) == "table" then
         style.auto_theme = style.auto_theme or enable_auto_theme
@@ -94,7 +94,7 @@ end
 --- @param auto_theme boolean Optional auto-theme flag.
 --- @param override_style? CompStyle  Optional style override.
 --- @return boolean updated  True if highlight changed, false if skipped.
---- @return CompStyle style  The resolved style.
+--- @return CompStyle|nil style  The resolved style, or nil if unresolved.
 local function update_comp_style(comp, session, auto_theme, override_style)
     local override_style_t = type(override_style)
     local style, force, pcount = Registry.inherit(
@@ -390,6 +390,11 @@ update_comp_graph_by_ids = function(ids, session, dep_graph_kind, seen)
     end
 end
 
+--- Link a component's dependency to source IDs.
+--- Auto-loads any source that is not yet registered.
+---@param kind DepGraphKind
+---@param ids CompId|CompId[]
+---@param dependent_id CompId
 local function register_dependency_links(kind, ids, dependent_id)
     local ids_type = type(ids)
     if ids_type == "table" then

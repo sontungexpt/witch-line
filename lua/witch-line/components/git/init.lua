@@ -1,5 +1,9 @@
+
 local colors = require("witch-line.constant.color")
 
+---@class BranchCtx
+---@field root_dir string|nil
+---@type BranchCtx
 local BRANCH_CTX = { root_dir = nil }
 
 local DISABLED_FILETYPES = {
@@ -18,9 +22,6 @@ local Branch = {
         branch_icon = "",
         disabled_filetypes = DISABLED_FILETYPES,
     },
-    on_click = function(comp, minwid, click_times, mouse_button, modifier_pressed)
-        vim.notify("test")
-    end,
     init = function(self, _)
         local api = vim.api
         local ctx = BRANCH_CTX
@@ -200,6 +201,9 @@ Diff.Interface = {
     end,
 }
 
+--- Determine if diff should be hidden based on filetype.
+---@param self ManagedComponent
+---@return boolean
 local function diff_hidden(self, _)
     return vim.list_contains(self.static.disabled_filetypes, vim.bo.filetype)
 end

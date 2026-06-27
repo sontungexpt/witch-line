@@ -1,6 +1,5 @@
 local require, type = require, type
 
-
 --- @class UserConfig.Disabled
 --- @field filetypes? string[]
 --- @field buftypes? string[]
@@ -14,6 +13,10 @@ local require, type = require, type
 --- @field disabled? UserConfig.Disabled
 --- @field auto_theme? boolean
 
+--- Ensure defaults are applied to the user config table.
+--- Fills in missing `statusline.global` with the built-in default.
+---@param user_configs? UserConfig
+---@return UserConfig
 local use_default_config = function(user_configs)
     user_configs = type(user_configs) == "table" and user_configs or {}
     local statusline = user_configs.statusline
@@ -26,11 +29,12 @@ local use_default_config = function(user_configs)
     return user_configs
 end
 
-local M = {
-    user_config = nil
-}
+---@class WitchLine
+---@field user_config? UserConfig
+local M = {}
 
---- @param user_config? UserConfig
+--- Setup witch-line with the given user config.
+---@param user_config? UserConfig
 M.setup = function(user_config)
     user_config = use_default_config(user_config)
     M.user_config = user_config

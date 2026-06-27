@@ -1,5 +1,6 @@
 local colors = require("witch-line.constant.color")
 
+---@type DefaultComponent
 return {
     id = "mode",
     _plug_provided = true,

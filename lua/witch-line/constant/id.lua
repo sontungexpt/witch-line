@@ -47,7 +47,6 @@
 --- | "weather.text"
 --- | "weather"
 
-
 --- Identity map for default component IDs.
 --- @type table<DefaultId, DefaultId>
 local Id = {}
@@ -116,6 +115,8 @@ return {
     ---@return boolean
     existed = function(id) return PathMap[id] ~= nil end,
 
+    --- Validate a user-provided id string.
+    --- An error is emitted if the id collides with a built-in DefaultId.
     ---@param id string
     ---@return string?
     validate = function(id)

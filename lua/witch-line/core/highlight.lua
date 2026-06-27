@@ -30,6 +30,7 @@ local auto_theme_enabled = require("witch-line").user_config.auto_theme
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
 
+---@type table<string, CompStyle>
 local Styles = {}
 
 --- Highlight all styles in the Styles table.
@@ -50,6 +51,7 @@ M.get_style = function(comp)
 end
 
 --- Sets the auto theme value.
+---@param value boolean
 M.set_auto_theme_enabled = function(value)
     auto_theme_enabled = value
 end

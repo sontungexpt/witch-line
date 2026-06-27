@@ -1,3 +1,4 @@
+
 local require, setmetatable = require, setmetatable
 
 --- @type table<table, string>

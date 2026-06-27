@@ -27,7 +27,7 @@ local AUGROUP = vim.api.nvim_create_augroup("WitchLineEvent", { clear = true })
 --- One or more event names.
 --- After normalization, this is **always** a list-of-strings.
 --- @field name string|string[]
---- @field ids CompId[] Array of component IDs associated with this event.
+--- @field ids? CompId[] Array of component IDs associated with this event.
 
 --- Input shape for incoming special events before being stored.
 --- This type is used when registering new events.
@@ -74,6 +74,11 @@ M.inspect = function()
     }))
 end
 
+--- Compare two string-or-string[] values for equality.
+--- Single-element lists are treated as equivalent to bare strings.
+---@param a string|string[]
+---@param b string|string[]
+---@return boolean
 local function string_list_equal(a, b)
     local ta, tb = type(a), type(b)
 
@@ -107,6 +112,10 @@ local function string_list_equal(a, b)
     return false
 end
 
+--- Check whether two special event option tables are functionally identical.
+---@param a SpecialEvent
+---@param b SpecialEvent
+---@return boolean
 local same_special_event_opts = function(a, b)
     if a.once ~= b.once then
         return false
@@ -118,6 +127,10 @@ local same_special_event_opts = function(a, b)
     return true
 end
 
+--- Find an existing special event in the store that matches the given entry.
+---@param store SpecialEvent[]
+---@param e SpecialEvent
+---@return integer  Index of the matching entry, or -1 if not found.
 local find_matching_special_event = function(store, e)
     for k = 1, #store do
         local existed = store[k]
@@ -146,6 +159,11 @@ local function register_normal_event(store, event, comp_id)
     return list
 end
 
+--- Register a component for a special event entry.
+--- Merges with existing entries when options match, appending the component id.
+---@param store SpecialEvent[]
+---@param event SpecialEvent
+---@param comp_id CompId
 local function register_special_event_entry(store, event, comp_id)
     -- Normalize incoming_names into either string or list-of-strings
     local event_name = event.name

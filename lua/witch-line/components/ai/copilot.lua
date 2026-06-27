@@ -1,9 +1,16 @@
+
+---@type integer|nil
 local fps
+---@type string
 local status = ""
+---@type integer
 local progress_idx = 0
+---@type uv.uv_timer_t|nil
 local timer
+---@type fun(): boolean|nil
 local is_enabled
 
+---@type DefaultComponent
 local Copilot = {
     id = "copilot",
     _plug_provided = true,
@@ -76,7 +83,6 @@ local Copilot = {
             end,
         })
     end,
-
     update = function(self, _)
         local icons = self.static.icons
         if not is_enabled or not is_enabled() then

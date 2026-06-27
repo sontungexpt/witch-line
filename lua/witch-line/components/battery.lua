@@ -1,6 +1,11 @@
+
 local colors = require("witch-line.constant.color")
 
-local get_status, get_capacity
+---@type fun(): string|nil
+local get_status
+---@type fun(): integer|nil
+local get_capacity
+---@type fun()
 local battery_init
 
 battery_init = function()
@@ -109,8 +114,10 @@ battery_init = function()
     end
 end
 
+---@type integer
 local charge_anim_index = 0
 
+---@type DefaultComponent
 return {
     id = "battery",
     _plug_provided = true,

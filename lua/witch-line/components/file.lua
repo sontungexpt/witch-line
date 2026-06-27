@@ -1,3 +1,4 @@
+
 local colors = require("witch-line.constant.color")
 
 local INTERFACE_ID = "file.interface"
@@ -34,6 +35,8 @@ local Interface = {
         },
     },
 
+    ---@param self ManagedComponent
+    ---@return {basename: string, icon: string, color: string}
     context = function(self)
         local api, fs, bo = vim.api, vim.fs, vim.bo
 
@@ -80,7 +83,6 @@ local Name = {
     style = {
         fg = colors.orange,
     },
-
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
         return ctx.basename

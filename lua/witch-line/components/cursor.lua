@@ -1,5 +1,6 @@
 local colors = require("witch-line.constant.color")
 
+---@type DefaultComponent
 local Position = {
     id = "cursor.pos",
     _plug_provided = true,
@@ -12,6 +13,7 @@ local Position = {
 }
 
 
+---@type DefaultComponent
 local Progress = {
     id = "cursor.progress",
     _plug_provided = true,

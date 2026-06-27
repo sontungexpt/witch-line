@@ -1,3 +1,9 @@
+--- Benchmark utility.
+--- Measures execution time of a callback and logs it.
+---@param cb fun()  The function to benchmark.
+---@param name string  Label for the benchmark.
+---@param file_path? string  If set, appends result to file; otherwise uses vim.notify.
+---@return integer elapsed_ns  Nanoseconds elapsed.
 return function(cb, name, file_path)
 	local uv = vim.uv or vim.loop
 	local start = uv.hrtime()

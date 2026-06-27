@@ -1,5 +1,9 @@
 local M = {}
 
+--- Register a click handler for a component.
+--- Resolves `on_click` to a global function name and caches it on the component.
+---@param comp ManagedComponent
+---@return string handler_name  The global function name for the click handler.
 M.register = function(comp)
     local cached = comp._click_handler
     if cached then
@@ -37,6 +41,9 @@ M.register = function(comp)
     return cached
 end
 
+--- Unregister a click handler for a component.
+--- Removes the global function and clears the cached handler name.
+---@param comp ManagedComponent
 M.unregister = function(comp)
     local name = comp._click_handler
     if name then

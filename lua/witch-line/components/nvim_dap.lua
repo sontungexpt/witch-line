@@ -2,7 +2,7 @@
 return {
     id = "nvim_dap",
     _plug_provided = true,
-    events = { "CursorHold", "CursorMoved", "BufEnter" }, -- The component will be update when the event is triggered
+    events = { "CursorHold", "CursorMoved", "BufEnter" },
     update = function()
         return require("dap").status()
     end,

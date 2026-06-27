@@ -56,23 +56,27 @@ local GlobalStatusline = {
 }
 
 --- @type table<integer, Statusline>
-local Statusline = {
-    [0] = GlobalStatusline,
-}
+local Statusline = {}
 
-local fallback_states_mt, win_closed_auid
+local win_closed_auid
 setmetatable(Statusline, {
     __index = function(t, winid)
-        fallback_states_mt = fallback_states_mt or { __index = GlobalStatusline.states }
-        win_closed_auid = win_closed_auid or api.nvim_create_autocmd("WinClosed", {
-            callback = function(e)
-                Statusline[tonumber(e.match)] = nil
-            end,
-        })
+        if winid == 0 then
+            local active_win = api.nvim_get_current_win()
+            return Statusline[active_win]
+        end
+
+        if not win_closed_auid then
+            win_closed_auid = api.nvim_create_autocmd("WinClosed", {
+                callback = function(e)
+                    Statusline[tonumber(e.match)] = nil
+                end,
+            })
+        end
 
         local new_statusline = setmetatable({
             lit_count = 0,
-            states = setmetatable({}, fallback_states_mt),
+            states = setmetatable({}, { __index = GlobalStatusline.states }),
         }, { __index = GlobalStatusline })
 
         t[winid] = new_statusline
@@ -80,7 +84,11 @@ setmetatable(Statusline, {
     end,
 })
 
-local function get_statusline(winid)
+--- Get the Statusline for a given window.
+--- Returns GlobalStatusline when `laststatus == 3` or `winid` is nil.
+---@param winid? integer
+---@return Statusline
+local get_statusline = function(winid)
     local laststatus = nvim_get_option_value("laststatus", {})
     if laststatus == 3 or winid == nil then
         return GlobalStatusline
@@ -89,6 +97,9 @@ local function get_statusline(winid)
 end
 
 --- Collect and sort flexible components by descending flex value.
+--- Cache is stored on the statusline itself and cleared when order changes.
+---@param statusline Statusline
+---@return {integer, CompId}[]  Sorted array of {slot_index, comp_id}.
 local function get_flex_sorted(statusline)
     local flex_sorted = statusline.flexs
     if flex_sorted then
@@ -120,7 +131,9 @@ local function get_flex_sorted(statusline)
     return flex_sorted
 end
 
---- @param comp_state CompState
+--- Compute the total display width of a single component slot.
+---@param comp_state CompState
+---@return integer
 local function compute_slot_width(comp_state)
     local width = comp_state.width or 0
     if width > 0 then
@@ -129,7 +142,9 @@ local function compute_slot_width(comp_state)
     return width
 end
 
---- @param win_state Statusline
+--- Compute the total width of all slots in a statusline.
+---@param win_state Statusline
+---@return integer
 local function compute_statusline_width(win_state)
     local total, slots, comps = 0, win_state.order, win_state.states
     for i = 1, #slots do
@@ -138,9 +153,12 @@ local function compute_statusline_width(win_state)
     return total
 end
 
---- @param slots CompId[]
---- @param state_map CompStateMap
---- @param skip_mask? integer
+--- Build the statusline string value from slot states.
+--- Optionally skips hidden slots via bitmask.
+---@param slots CompId[]
+---@param state_map CompStateMap
+---@param skip_mask? integer  Bitmask of slot indices to skip.
+---@return string
 local function build_value(slots, state_map, skip_mask)
     local out, n = {}, 0
     for i = 1, #slots do
@@ -179,7 +197,11 @@ local function build_value(slots, state_map, skip_mask)
     return result ~= "" and result or " "
 end
 
---- @param winid? integer
+--- Render the statusline for a given window.
+---
+--- Handles flex-based truncation when the rendered content exceeds
+--- the available window width.  Debounced via `render_debounce`.
+---@param winid? integer
 M.render = function(winid)
     local laststatus = nvim_get_option_value("laststatus", {})
     if
@@ -225,16 +247,19 @@ M.render = function(winid)
     nvim_set_option_value("statusline", build_value(statusline.order, comp_state, hidden_slots), { win = winid })
 end
 
--- Debounced version of `M.render`
--- @param ... any Arguments to pass to `M.render`.
+--- Debounced version of `M.render` (80ms delay).
+---@param ... any  Arguments forwarded to `M.render`.
 M.render_debounce = function(...)
     M.render_debounce = require("witch-line.utils").debounce(M.render, 80)
     return M.render_debounce(...)
 end
 
---- @param comp_id? CompId
---- @param value string
---- @param winid? integer
+--- Push a component value onto the statusline order.
+--- Generates a numeric id when `comp_id` is nil.
+---@param comp_id? CompId
+---@param value string
+---@param winid? integer
+---@return integer slot_index
 M.push = function(comp_id, value, winid)
     local statusline = get_statusline(winid)
     local slots = rawget(statusline, "order")

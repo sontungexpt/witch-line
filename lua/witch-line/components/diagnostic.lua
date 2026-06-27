@@ -16,6 +16,8 @@ local Interface = {
     hidden = function(self, _)
         return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
     end,
+    ---@param self ManagedComponent
+    ---@return {count: table, icon: table}
     context = function(self)
         local icons = {}
         for id, value in pairs(self.static.icons) do

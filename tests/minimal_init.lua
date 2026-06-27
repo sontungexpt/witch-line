@@ -10,6 +10,8 @@ local base_dir = "/home/stilux/Data/Workspace/neovim-plugins/witch-line/tests/be
 local bench_file = base_dir .. "benchmarks.txt"
 
 local uv = vim.uv or vim.loop
+--- Ensure a file exists, creating it if necessary.
+---@param p string  File path.
 local function ensure_file(p)
 	if uv.fs_stat(p) == nil then
 		local fd = uv.fs_open(p, "w", 438)
@@ -19,7 +21,9 @@ end
 
 ensure_file(bench_file)
 
--- Read all benchmarks from file: <name> <count> <total> <avg>
+--- Read all benchmark stats from file.
+--- Format per line: <name> <count> <total> <avg>
+---@return table<string, {count: integer, total: number, avg: number}>
 local function read_all_stats()
 	local fd = uv.fs_open(bench_file, "r", 438)
 	if not fd then
@@ -45,7 +49,8 @@ local function read_all_stats()
 	return stats
 end
 
--- Write all stats back to file
+--- Write all benchmark stats back to file.
+---@param stats table<string, {count: integer, total: number, avg: number}>
 local function write_all_stats(stats)
 	local out = {}
 	for name, s in pairs(stats) do

@@ -1,6 +1,7 @@
 local M = {}
 
-local FALLBACK_KEY = "\0fallback\0"
+--- Sentinel key for the fallback handler in the command trie.
+local FALLBACK_KEY = {}
 
 local COMMANDS = {
     toggle_auto_theme = function(...)
@@ -35,6 +36,12 @@ local COMMANDS = {
     },
 }
 
+--- Completion function for the :WitchLine command.
+--- Walks the COMMANDS trie to find matching subcommand completions.
+---@param arg_lead string  The current argument being completed.
+---@param cmd_line string  The full command line so far.
+---@param cursor_pos integer  Cursor position in the command line.
+---@return string[] completions  List of matching subcommand names.
 local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
     local args = vim.split(cmd_line, "%s+")
 

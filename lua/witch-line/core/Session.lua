@@ -1,3 +1,4 @@
+
 local M = {}
 
 --- @class SessionId : integer
@@ -5,26 +6,11 @@ local M = {}
 
 --- @class Session
 --- @field id SessionId
---- Retrieve a value from the session memory.
---- @field get fun(k: any): any|nil
----
---- Store a value in the session memory.
---- @field set fun(k: any, v: any): any
----
---- Retrieve a cached value from the session memo.
---- @field get_cache fun(k: any): any|nil
----
---- Store a value in the session memo.
---- @field set_cache fun(k: any, v: any): any
----
---- Retrieve or populate a memoized value for the current session.
----
---- Supported call forms:
----   1. `session:memo(factory, ...)`
----      - Uses `factory` itself as the cache key.
----      - Calls `factory(...)` once and caches the result.
---- Cached values live for the lifetime of the current session.
---- @field memo fun(key_or_factory: any, factory_or_value: any, ...: any): any
+--- @field get fun(self: Session, k: any): any|nil
+--- @field set fun(self: Session, k: any, v: any): any
+--- @field get_cache fun(self: Session, k: any): any|nil
+--- @field set_cache fun(self: Session, k: any, v: any): any
+--- @field memo fun(self: Session, fn: fun(...):any, ...: any): any, any|nil
 
 local next_sid = 0
 local Sessions = {}
