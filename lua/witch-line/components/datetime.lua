@@ -1,4 +1,3 @@
-
 ---@type DefaultComponent
 return {
     id = "wl.datetime",

@@ -49,7 +49,6 @@ local require_by_id
 local get_managed
 local find_raw_value
 local lookup_plain_value
-local with_session
 local register
 local inherit
 
@@ -411,30 +410,21 @@ inherit = function(comp, key, merge, self_val, session, ...)
     return val, dynamic, n
 end
 
-local COMP_KEY = {}
-local SESSION_KEY = {}
-local session_proxy_meta = {
-    __index = function(proxy, key)
-        local comp = proxy[COMP_KEY]
-        local value = lookup_plain_value(comp, key)
 
-        if type(value) == "function" then
-            return function(...)
-                return proxy[SESSION_KEY].memo(value, ...)
+local create_session_comp = function(comp, session)
+    return setmetatable({}, {
+        __index = function(proxy, key)
+            local value = lookup_plain_value(comp, key)
+            if type(value) == "function" then
+                return function(...)
+                    return session.memo(value, ...)
+                end
             end
-        end
 
-        return value
-    end,
-}
-
-with_session = function(comp, session)
-    return setmetatable({
-        [COMP_KEY] = comp,
-        [SESSION_KEY] = session,
-    }, session_proxy_meta)
+            return value
+        end,
+    })
 end
-
 
 --- Assign and validate a unique id.  Built-ins (`_plug_provided`) skip generation.
 --- @param comp Component  May have `id` pre-set; otherwise one is generated.
@@ -462,7 +452,7 @@ end
 local shared_comp_meta = {
     __index = function(comp, key)
         if key == "with_session" then
-            return with_session
+            return create_session_comp
         end
 
         return lookup_plain_value(comp, key)
@@ -551,7 +541,7 @@ M.inspect = function(target)
 end
 
 M.require_by_id = require_by_id
-M.with_session = with_session
+M.create_session_comp = create_session_comp
 M.register = register
 M.lookup_plain_value = lookup_plain_value
 M.inherit = inherit

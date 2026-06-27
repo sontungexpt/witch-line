@@ -108,7 +108,7 @@ https://github.com/user-attachments/assets/241d091f-bfdb-4935-b33d-8c8a2626c2a4
 
 `witch-line` is a fast, lightweight, and fully customizable statusline plugin for Neovim. It focuses on modularity, caching, and performance. Below are the key features:
 
-- ⚡ **Blazing Fast**: Optimized with internal caching and minimal redraws to keep your statusline snappy and efficient. Just config for first time and **every thing** will be cache and run super fast later.
+- ⚡ **Blazing Fast**: Optimized with minimal redraws to keep your statusline snappy and efficient.
 
 - 🧩 **Modular Components**: Define reusable and nested components using a simple configuration format.
 
@@ -119,10 +119,6 @@ https://github.com/user-attachments/assets/241d091f-bfdb-4935-b33d-8c8a2626c2a4
 - 🔁 **Reactive Updates**: Smart detection of buffer/file changes to update only when necessary.
 
 - 📁 **Context-Aware Disabling**: Automatically disable the statusline for specific `filetypes` or `buftypes` (e.g. terminal, help, etc).
-
-- 🧠 **Config Hashing**: Detect if user config has changed via xxh32 hashing, ensuring minimal reinitialization.
-
-- 💾 **Persistent Caching**: Cache user configurations and state across sessions using a simple key-value system.
 
 - 🧪 **Testable & Maintainable**: Designed with testability and clear API boundaries in mind.
 
@@ -140,16 +136,6 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support for laststatus = 2
   - [x] Support for laststatus = 3
   - [x] Support for laststatus = 0
-
-- Cache
-
-  - [x] Implement caching mechanism (serialization + deserialization)
-  - [x] Cache all needed data
-  - [x] Use checksum to detect config changes with xxh32
-  - [x] Lazy compile function of component
-  - [x] Detect default component changed automatically when plugin was updated
-  - [ ] Support up-value for component function caching
-  - [ ] Support paritial cache loading
 
 - Customization
 
@@ -182,7 +168,6 @@ This plugin is ideal for developers who want full control over the look and feel
   - [x] Support post_update function to run after update function
   - [x] Support update function to generate component content
   - [x] Support ref field to reference other component fields (events, style, static, context, hidden, min_screen_width)
-  - [x] Support version field to manage component cache
   - [x] Support flexible field to hide component based on priority when space is limited
   - [x] Support on_click function to handle click events
   - [x] Support win_individual field to enable individual value for each window
@@ -197,8 +182,7 @@ This plugin is ideal for developers who want full control over the look and feel
 
 - Commands
 
-  - [x] Implement `:Witchline clear_cache` command to clear cache
-  - [x] Implement `:Witchline inspect` command to inspect some information
+  - [x] Implement `:Witchline` command to inspect and toggle features
 
 - Testing
 
@@ -208,9 +192,6 @@ This plugin is ideal for developers who want full control over the look and feel
 - Themes
 
   - [x] Auto adjust color of components based on theme
-
-- Bug fixs (Will fix soon this important)
-
   - [x] A probably inheritance logic when conflicting between parent and child happens
 
 ### Compare with other statusline plugins
@@ -263,62 +244,22 @@ You can setup the plugin by calling the `setup` function and passing in a table 
 
 ```lua
 require("witch-line").setup({
-  --- @type CombinedComponent[]
-  abstracts = {
-    "wl.file.name",
-    {
-      id = "file", -- Abstract component for file-related info
-      padding = { left = 1, right = 1 }, -- Padding around the component
-      static = { some_key = "some_value" }, -- Static metadata
-      style = { fg = "#ffffff", bg = "#000000", bold = true }, -- Style override
-      min_screen_width = 80,          -- Hide if screen width < 80
-    },
-  },
-
-  --- @type CombinedComponent[]
   statusline = {
-    --- The global statusline components
-    --- Set it to `nil` if you want to use default components in example
     global = {
         "wl.mode",
         "wl.file.name",
         "wl.git.branch",
         {
-          id = "component_id",               -- Unique identifier
-          padding = { left = 1, right = 1 }, -- Padding around the component
-          static = { some_key = "some_value" }, -- Static metadata
-          win_individual = false,
-          timing = false,                 -- No timing updates
-          style = { fg = "#ffffff", bg = "#000000", bold = true }, -- Style override
-          min_screen_width = 80,          -- Hide if screen width < 80
-          hidden = function()               -- Hide condition
-            return vim.bo.buftype == "nofile"
-          end,
-          left_style = { fg = "#ff0000" }, -- Left style override
-          update = function(self, ctx, static, session_id) -- Main content generator
+          id = "wl.my_comp",
+          padding = { left = 1, right = 1 },
+          static = { some_key = "some_value" },
+          style = { fg = "#ffffff", bg = "#000000", bold = true },
+          update = function(self, session)
             return vim.fn.expand("%:t")
           end,
-          ref = {                       -- References to other components
-            events = { "wl.file.name" },
-            style = "wl.file.name",
-            static = "wl.file.name",
-          },
         },
     },
-
-    -- @type fun(winid): CombinedComponent[]|nil
-    win = nil
-  },
-
-  cache = {
-      -- You can disable cache here.
-      -- If you enable cache you can not use any up-value in your component functions otherwise your
-      -- cache will be broken.
-      enabled = true,
-      -- Show notification when cache is cleared. Default true.
-      notification = true,
-      -- Strip debug info when caching dumped functions. Default false. Faster but harder to debug.
-      func_strip = false,
+    win = nil,
   },
 
   disabled = {
@@ -326,24 +267,17 @@ require("witch-line").setup({
     buftypes = { "nofile", "terminal" },
   },
 
-  --- Whether to automatically adjust the theme.
-  --- If it is set to false the `auto_theme` field of the component will be ignored.
-  --- Default: true.
-  --- You can toggle it by `:Witchline toggle_auto_theme`
-  auto_theme = true
-
+  auto_theme = true,
 })
-
 ```
 
 #### Top level options
 
-| Field        | Type                                                                     | Description                                                                                                               |
-| ------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `abstracts`  | `CombinedComponent[]`                                                    | A list of abstract components registered before everything else. Used for component references and dependency resolution. |
-| `statusline` | `{ global: CombinedComponent[], win?: fun(winid): CombinedComponent[] }` | Defines the global statusline and optional per-window statusline overrides.                                               |
-| `cache`      | `{ full_scan: boolean, notification: boolean, func_strip: boolean }`     | Cache behavior and optimizations.                                                                                         |
-| `disabled`   | `{ filetypes: string[], buftypes: string[] }`                            | Filetypes/buftypes where the plugin should be disabled.                                                                   |
+| Field        | Type                                                                     | Description                                                                 |
+| ------------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `statusline` | `{ global: CombinedComponent[], win?: fun(winid): CombinedComponent[] }` | Defines the global statusline and optional per-window overrides.            |
+| `disabled`   | `{ filetypes: string[], buftypes: string[] }`                            | Filetypes/buftypes where the plugin should be disabled.                     |
+| `auto_theme` | `boolean`                                                                | Whether to automatically adjust component colors to match the colorscheme. |
 
 #### statusline
 
@@ -356,39 +290,20 @@ Example config using `win` option
 
 ```lua
 require("witch-line").setup({
-    abstracts = {
-        "wl.battery", -- pre register battery to use in win option
-        -- require("your custom component")
-    }
     statusline = {
         global = {
             "wl.file.name",
             "wl.git.branch",
-            --- require("your custom component")
-            --- Other components
-        }
-        win = function(winid
-          --- Only show battery in NvimTree window
+        },
+        win = function(winid)
           local filetype = vim.bo[vim.api.nvim_win_get_buf(winid)].filetype
           if filetype == "NvimTree" then
-            return {
-                "wl.battery",
-                -- require("your custom component")
-            }
+            return { "wl.battery" }
           end
-        end
-    }
-
+        end,
+    },
 })
 ```
-
-#### cache
-
-| Key            | Type      | Default | Description                                                   |
-| -------------- | --------- | ------- | ------------------------------------------------------------- |
-| `enabled`      | `boolean` | `true`  | Enable caching.                                               |
-| `notification` | `boolean` | `true`  | Shows a notification when the cache is cleared.               |
-| `func_strip`   | `boolean` | `false` | Strips debug info from dumped functions to reduce cache size. |
 
 #### disabled
 
@@ -399,11 +314,18 @@ require("witch-line").setup({
 
 ### Commands
 
-The plugin provides the following commands:
+The plugin provides the `:Witchline` command with subcommands:
 
-- `:Witchline clear_cache` - Clear the plugin's cache.
-- `:Witchline inspect` - Use for debugging and inspecting internal state.
-- `:Witchline toggle_auto_theme` - Toggle automatic theme adjustment.
+| Command | Description |
+| --- | --- |
+| `:Witchline toggle_auto_theme` | Toggle automatic theme adjustment |
+| `:Witchline inspect event_store` | Inspect event store |
+| `:Witchline inspect timer_store` | Inspect timer store |
+| `:Witchline inspect comp_manager comps` | Inspect registered components |
+| `:Witchline inspect comp_manager dep_store` | Inspect dependency graph |
+| `:Witchline inspect highlight rgb24bit` | Inspect RGB color cache |
+| `:Witchline inspect highlight styles` | Inspect highlight style cache |
+| `:Witchline inspect statusline` | Inspect statusline state |
 
 ## 🧾 Default Components Reference
 
@@ -414,87 +336,42 @@ Each component is referenced by name and can be composed to build a flexible and
 
 ### 🔖 Default Components
 
-| Name                  | Module File       | Description                               |
-| --------------------- | ----------------- | ----------------------------------------- |
-| `mode`                | `mode.lua`        | Shows the current Neovim mode             |
-| `file.name`           | `file.lua`        | Displays the filename                     |
-| `file.icon`           | `file.lua`        | Displays an icon for the file             |
-| `file.modifier`       | `file.lua`        | Indicates if the file has unsaved changes |
-| `file.size`           | `file.lua`        | Shows the file size                       |
-| `%=`                  | _(builtin)_       | Separator to align left/right components  |
-| `copilot`             | `ai/copilot.lua`  | Shows Copilot status (if available)       |
-| `windsurf`            | `ai/windsurf.lua` | Shows Codeium status (if available)       |
-| `windsurf.neocodeium` | `ai/windsurf.lua` | Shows Neocodium status (if available)     |
-| `diagnostic.error`    | `diagnostic.lua`  | Shows number of error diagnostics         |
-| `diagnostic.warn`     | `diagnostic.lua`  | Shows number of warning diagnostics       |
-| `diagnostic.info`     | `diagnostic.lua`  | Shows number of info diagnostics          |
-| `diagnostic.hint`     | `diagnostic.lua`  | Shows number of hint diagnostics          |
-| `encoding`            | `encoding.lua`    | Displays file encoding (e.g., utf-8)      |
-| `cursor.pos`          | `cursor.lua`      | Shows the current cursor line/column      |
-| `cursor.progress`     | `cursor.lua`      | Shows the cursor position as a % progress |
-| `lsp.clients`         | `lsp.lua`         | Lists active LSP clients                  |
-| `git.branch`          | `git.lua`         | Shows current Git branch                  |
-| `git.diff.added`      | `git.lua`         | Number of added lines in Git diff         |
-| `git.diff.removed`    | `git.lua`         | Number of removed lines in Git diff       |
-| `git.diff.modified`   | `git.lua`         | Number of changed lines in Git diff       |
-| `datetime`            | `datetime.lua`    | Displays current date and time            |
-| `battery`             | `battery.lua`     | Shows battery status (if applicable)      |
-| `os_uname`            | `os_uname.lua`    | Displays the operating system name        |
-| `nvim_dap`            | `nvim_dap.lua`    | Shows nvim-dap status (if available)      |
-| `search.count`        | `search.lua`      | Shows number of searching value           |
-| `selection.count`     | `selection.lua`   | Shows number of selection zone            |
+| Name                       | Module File            | Description                               |
+| -------------------------- | ---------------------- | ----------------------------------------- |
+| `wl.mode`                  | `mode.lua`             | Shows the current Neovim mode             |
+| `wl.file.name`             | `file.lua`             | Displays the filename                     |
+| `wl.file.icon`             | `file.lua`             | Displays an icon for the file             |
+| `wl.file.modifier`         | `file.lua`             | Indicates if the file has unsaved changes |
+| `wl.file.size`             | `file.lua`             | Shows the file size                       |
+| `%=`                       | _(builtin)_            | Separator to align left/right components  |
+| `wl.copilot`               | `ai/copilot.lua`       | Shows Copilot status (if available)       |
+| `wl.windsurf`              | `ai/windsurf.lua`      | Shows Windsurf status (if available)      |
+| `wl.windsurf.neocodeium`   | `ai/windsurf.lua`      | Shows Neocodeium status (if available)    |
+| `wl.diagnostic.error`      | `diagnostic.lua`       | Shows number of error diagnostics         |
+| `wl.diagnostic.warn`       | `diagnostic.lua`       | Shows number of warning diagnostics       |
+| `wl.diagnostic.info`       | `diagnostic.lua`       | Shows number of info diagnostics          |
+| `wl.diagnostic.hint`       | `diagnostic.lua`       | Shows number of hint diagnostics          |
+| `wl.encoding`              | `encoding.lua`         | Displays file encoding (e.g., utf-8)      |
+| `wl.cursor.pos`            | `cursor.lua`           | Shows the current cursor line/column      |
+| `wl.cursor.progress`       | `cursor.lua`           | Shows the cursor position as a % progress |
+| `wl.lsp.clients`           | `lsp.lua`              | Lists active LSP clients                  |
+| `wl.indent`                | `indent.lua`           | Shows the indent level                    |
+| `wl.git.branch`            | `git.lua`              | Shows current Git branch                  |
+| `wl.git.diff.added`        | `git.lua`              | Number of added lines in Git diff         |
+| `wl.git.diff.removed`      | `git.lua`              | Number of removed lines in Git diff       |
+| `wl.git.diff.modified`     | `git.lua`              | Number of changed lines in Git diff       |
+| `wl.datetime`              | `datetime.lua`         | Displays current date and time            |
+| `wl.battery`               | `battery.lua`          | Shows battery status (if applicable)      |
+| `wl.os_uname`              | `os_uname.lua`         | Displays the operating system name        |
+| `wl.nvim_dap`              | `nvim_dap.lua`         | Shows nvim-dap status (if available)      |
+| `wl.search.count`          | `search.lua`           | Shows number of searching value           |
+| `wl.selection.count`       | `selection.lua`        | Shows number of selection zone            |
 
 ---
 
 ### 🛠️ Customizable Fields for Components
 
-Each component accepts a set of customization fields to control its behavior, style, visibility, and layout.
-
-Below is a table of all supported fields and their expected types:
-
-| Field              | Type(s)               | Description                                                                       |
-| ------------------ | --------------------- | --------------------------------------------------------------------------------- |
-| `padding`          | `number`, `table`     | Adds padding around the component. Can be a single number or `{ left, right }`.   |
-| `static`           | `any`                 | Any static value or metadata the component wants to keep.                         |
-| `timing`           | `boolean`, `number`   | Enables timing or sets a custom update interval for the component.                |
-| `style`            | `function`, `table`   | Style override for the entire component output (e.g., color, bold).               |
-| `min_screen_width` | `number`              | Hides the component if the screen width is below this threshold.                  |
-| `hidden`           | `function`, `boolean` | Hide condition. If `true` or a function that returns `true`, hides the component. |
-| `left_style`       | `function`, `table`   | Style override applied to the left part of the component.                         |
-| `left`             | `string`, `function`  | Left content to be rendered. Can be a string or a generator function.             |
-| `right_style`      | `function`, `table`   | Style override applied to the right part of the component.                        |
-| `right`            | `string`, `function`  | Right content to be rendered. Can be a string or a generator function.            |
-| `flexible`         | `number`              | Priority for hiding when space is limited. Lower numbers hide first.              |
-
----
-
-You can use the `require("witch-line.builtin").comp` builtin function to create a customized version of any default component by specifying overrides for these fields.
-
-```lua
-
-local my_component = require("witch-line.builtin").comp("wl.file.name", {
-  padding = { left = 2 },
-  min_screen_width = 60,
-  hidden = function()
-    return vim.bo.buftype == "nofile"
-  end,
-  style = { fg = "#ffffff", bg = "#222222", bold = true },
-})
-```
-
-Or you can also use the [0] field to override the default component.
-
-```lua
-local my_component = {
-  [0] = "wl.file.name",  -- Inherit from the default file.name component
-  padding = { left = 2 },
-  min_screen_width = 60,
-  hidden = function()
-    return vim.bo.buftype == "nofile"
-  end,
-  style = { fg = "#ffffff", bg = "#222222", bold = true },
-}
-```
+See the [COOKBOOK](./docs/COOKBOOK.md) for the full component field reference.
 
 ---
 
@@ -514,9 +391,6 @@ Here are a few areas where your help would be especially appreciated:
 
 - 📘 **API Documentation**
   Help rewrite and polish the API reference into clear and professional documentation. Better docs will make it easier for others to build powerful custom setups.
-
-- 🧬 **Serialization System**
-  Design and implement a robust system to serialize and deserialize component configurations. This would help cache system work better.
 
 - 🧪 **Component Testing Framework**
   Improve or design an ergonomic and declarative way to test components individually and ensure they behave consistently in different contexts.

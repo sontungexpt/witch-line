@@ -39,17 +39,18 @@ local Interface = {
         }
     end,
 }
+local SHARED_REF = {
+    events = "wl.diagnostic.interface",
+    context = "wl.diagnostic.interface",
+    hidden = "wl.diagnostic.interface",
+}
 
 --- @type DefaultComponent
 local Error = {
     id = "wl.diagnostic.error",
     _plug_provided = true,
     style = { fg = "DiagnosticError" },
-    ref = {
-        events = "wl.diagnostic.interface",
-        context = "wl.diagnostic.interface",
-        hidden = "wl.diagnostic.interface",
-    },
+    ref = SHARED_REF,
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
         local id = vim.diagnostic.severity.ERROR
@@ -62,11 +63,7 @@ local Error = {
 local Warn = {
     id = "wl.diagnostic.warn",
     _plug_provided = true,
-    ref = {
-        events = "wl.diagnostic.interface",
-        context = "wl.diagnostic.interface",
-        hidden = "wl.diagnostic.interface",
-    },
+    ref = SHARED_REF,
     style = { fg = "DiagnosticWarn" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
@@ -80,11 +77,7 @@ local Warn = {
 local Info = {
     id = "wl.diagnostic.info",
     _plug_provided = true,
-    ref = {
-        events = "wl.diagnostic.interface",
-        context = "wl.diagnostic.interface",
-        hidden = "wl.diagnostic.interface",
-    },
+    ref = SHARED_REF,
     style = { fg = "DiagnosticInfo" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
@@ -98,11 +91,7 @@ local Info = {
 local Hint = {
     id = "wl.diagnostic.hint",
     _plug_provided = true,
-    ref = {
-        events = "wl.diagnostic.interface",
-        context = "wl.diagnostic.interface",
-        hidden = "wl.diagnostic.interface",
-    },
+    ref = SHARED_REF,
     style = { fg = "DiagnosticHint" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)

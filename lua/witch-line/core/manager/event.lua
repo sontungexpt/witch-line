@@ -48,8 +48,6 @@ local UserEvents = {}
 --- @type SpecialEventManaged[]
 local SpecialEvents = {}
 
-
-
 M.inspect = function()
     require("witch-line.utils.notifier").info(vim.inspect({
         Events = Events,

@@ -234,7 +234,7 @@ end
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 update_comp = function(comp, session)
     local cid = comp.id
-    ComponentEvaluator.emit_pre_update(comp)
+    ComponentEvaluator.pre_update(comp, session)
 
     --- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
     local min_screen_width = ComponentEvaluator.min_screen_width(comp, session)
@@ -322,7 +322,7 @@ update_comp = function(comp, session)
         end
     end
 
-    ComponentEvaluator.emit_post_update(comp)
+    ComponentEvaluator.post_update(comp, session)
     return hidden
 end
 
@@ -457,8 +457,8 @@ register_dependency_source = function(comp)
     local cid, managed_comp = Registry.register(comp)
     rawset(managed_comp, "_loaded", true)
 
-    if managed_comp.init then
-        ComponentEvaluator.emit_init(managed_comp)
+    if type(managed_comp.init) == "function" then
+        managed_comp.init(managed_comp)
     end
 
     local ref = rawget(managed_comp, "ref")
@@ -610,7 +610,7 @@ M.setup = function(statusline)
     end
 
     Event.on_event(function(ids, event_info)
-        require("witch-line.core.Session").with_session(function(session)
+        require("witch-line.core.manager.session").with_session(function(session)
             if event_info then
                 session.set("EventInfo", event_info)
             end
@@ -620,7 +620,7 @@ M.setup = function(statusline)
     end)
 
     Timer.on_timer_trigger(function(ids)
-        require("witch-line.core.Session").with_session(function(session)
+        require("witch-line.core.manager.session").with_session(function(session)
             update_comp_graph_by_ids(ids, session, DepGraphKind.Timer)
             Statusline.render_debounce()
         end)
@@ -628,7 +628,7 @@ M.setup = function(statusline)
 
     local emergency_ids = Registry.get_emergency_ids()
     if next(emergency_ids) ~= nil then
-        require("witch-line.core.Session").with_session(function(session)
+        require("witch-line.core.manager.session").with_session(function(session)
             update_comp_graph_by_ids(emergency_ids, session,
                 { DepGraphKind.Event, DepGraphKind.Timer })
             Statusline.render_debounce()
@@ -642,7 +642,7 @@ end
 ---@param dep_graph_kind? DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
 ---@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
 M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
-    require("witch-line.core.Session").with_session(function(session)
+    require("witch-line.core.manager.session").with_session(function(session)
         update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
         if eager then
             Statusline.render()

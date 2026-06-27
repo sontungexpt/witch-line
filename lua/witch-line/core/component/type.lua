@@ -158,7 +158,7 @@
 --- @field padding? integer|PaddingTable|PaddingFunc
 ---
 --- An initialization function that will be called when the component is first loaded.
---- @field init? fun(self: ManagedComponent, session: Session)
+--- @field init? fun(self: ManagedComponent)
 ---
 --- A table of styles that will be applied to the component
 --- - If string: used as a highlight group name.

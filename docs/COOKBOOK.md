@@ -1,1138 +1,423 @@
-Cookbook is a collection of recipes that demonstrate how to use various features of the software. Each recipe provides step-by-step instructions, code examples, and explanations to help you understand and implement specific functionalities.
+## Your First Component
 
-## Navigation
-
-- ⚙️ [Component Fields](#-component-fields)
-  - 🗒️ [Notes](#-notes)
-  - 🎣 [Hooks to Access Component Data](#-hooks-to-access-component-data)
-  - 🔡 [Global Accessible Fields](#-global-accessible-fields)
-  - 🧰 [Basic Fields](#-basic-fields)
-  - 🧩 [Referencing Fields](#-referencing-fields)
-  - 🚀 [Advanced Fields](#-advanced-fields)
-  - 🧪 [Component Function Lifecycle](#-component-function-lifecycle)
-
-## ⚙️ Component Fields
-
-### ⚠️ Important Notes (Read Before Creating Components)
-
-Important about function fields to make the cache work properly:
-
-- Function fields should be pure functions without side effects.
-- They should only depend on their input parameters and not have any up-values.
-- The up-values allowed are only global variables such as `vim`, `package`, `require`.
-- The tips to remove up-values:
-  - Move the up-value inside the function.
-  - If you are using a module, require it inside the function.
-  - If you are using a global variable, use `vim` or `package` directly inside the function.
-
-Example of a pure function:
+A component is a Lua table with an `id` and an `update` function. The `update` function receives `self` (the component) and `session` (the current render cycle) and returns a string:
 
 ```lua
-local component = {
-  id = "identifier",
+local filename = {
+  id = "wl.filename",
   update = function(self, session)
-    local api = vim.api -- Allowed, as it's a global API call
-    return api.nvim_buf_get_name(0) -- Depends only on the current buffer
+    return vim.fn.expand("%:t")
+  end,
+}
+```
+
+Register it in your statusline config:
+
+```lua
+require("witch-line").setup({
+  statusline = { global = { "wl.filename" } },
+})
+```
+
+---
+
+## Adding Data
+
+### Static values
+
+Use `static` for fixed config that doesn't change per cycle:
+
+```lua
+local indicator = {
+  id = "wl.indicator",
+  static = { icon = "⚡", max_count = 5 },
+  update = function(self, session)
+    return self.static.icon .. " ready"
+  end,
+}
+```
+
+Access via `self.static` anywhere in your component functions.
+
+### Dynamic context
+
+Use `context` to compute data that other components consume via `ref` (see [Reuse](#reuse)):
+
+```lua
+local provider = {
+  id = "wl.provider",
+  context = function(self, session)
+    return { lines = vim.fn.line("$") }
+  end,
+}
+```
+
+The function receives `(self, session)` just like `update`.
+
+### Custom fields
+
+Any field you add is accessible via `self.<field>`:
+
+```lua
+local comp = {
+  id = "wl.my_comp",
+  my_data = { foo = "bar" },
+  update = function(self, session)
+    return self.my_data.foo
+  end,
+}
+```
+
+---
+
+## Controlling When to Update
+
+### Events
+
+Re-render on Neovim autocmd events:
+
+```lua
+local mode_indicator = {
+  id = "wl.mode",
+  events = "ModeChanged",
+  update = function(self, session)
+    return vim.fn.mode():upper()
+  end,
+}
+```
+
+Multiple events, patterns, and options:
+
+```lua
+events = {
+  "BufEnter",
+  "User VeryLazy,LazyLoad",
+  "BufEnter *.lua, *.py",
+  { "CursorHold", once = true },
+}
+```
+
+Special event fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `[1]` | `string` | Event name(s). |
+| `pattern?` | `string\|string[]` | Autocmd pattern. |
+| `once?` | `boolean` | Fire once then remove. |
+| `remove_when?` | `fun(): boolean` | Remove when returns true. |
+
+String syntax supports inline patterns: `"BufEnter *.lua,*.py"`, `"User LazyLoad"`.
+
+### Timer
+
+Update on a fixed interval in milliseconds:
+
+```lua
+local clock = {
+  id = "wl.clock",
+  timing = 1000,
+  update = function(self, session)
+    return os.date("%H:%M:%S")
+  end,
+}
+```
+
+Set `timing = true` for a default 1000 ms interval.
+
+### Per-window
+
+Re-render independently in each window:
+
+```lua
+local cwd = {
+  id = "wl.cwd",
+  win_individual = true,
+  update = function(self, session)
+    return vim.fn.getcwd()
+  end,
+}
+```
+
+---
+
+## Styling
+
+### Return inline style from `update`
+
+Return a second value with highlight overrides:
+
+```lua
+update = function(self, session)
+  return "Hello", { fg = "#00ff00" }
+end
+```
+
+### Static or dynamic `style`
+
+```lua
+-- Static highlight table
+style = { fg = "#ffffff", bg = "#000000" }
+
+-- Dynamic (evaluated each cycle)
+style = function(self, session)
+  return vim.bo.modified and { fg = "#ffff00" } or nil
+end
+
+-- Named highlight group
+style = "MyHighlightGroup"
+```
+
+### Padding
+
+Spaces around the text. Default is 1 on each side:
+
+```lua
+padding = 2                    -- 2 on each side
+padding = { left = 1, right = 3 }
+padding = function(self, session) return vim.bo.modified and 2 or 1 end
+```
+
+### Separators
+
+Decorative characters on each side:
+
+```lua
+left = "⦅", right = "⦆"
+left = function(self, session) return " " end
+```
+
+Separator highlight styles via `SepStyle` constants or explicit tables:
+
+```lua
+left_style = 1           -- Sep bg = NONE, Sep fg = comp fg
+left_style = { fg = "#fff" }
+```
+
+| SepStyle | Meaning |
+|---|---|
+| `0` | Inherit from component style. |
+| `1` | Sep fg = comp fg, sep bg = NONE. |
+| `2` | Sep fg = comp bg, sep bg = NONE. |
+| `3` | Sep fg = comp bg, sep bg = comp fg. |
+
+### Conditional visibility
+
+Hide the component without removing it:
+
+```lua
+hidden = true
+hidden = function(self, session)
+  return vim.bo.buftype == "nofile"
+end
+```
+
+Hide below a screen width:
+
+```lua
+min_screen_width = 80
+min_screen_width = function(self, session)
+  return session and 100 or 50
+end
+```
+
+---
+
+## Lifecycle Hooks
+
+### `init` — one-time setup
+
+Called once when the component is first loaded. No `session` available.
+
+```lua
+init = function(self)
+  self.static.icon = "⚡"
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    callback = function()
+      require("witch-line.core.handler").request_update_comp_graph(self, true)
+    end,
+  })
+end
+```
+
+### `pre_update` / `post_update` — before/after each render
+
+```lua
+pre_update = function(self, session)
+  -- runs before min_screen_width, hidden, update
+end
+post_update = function(self, session)
+  -- runs after all rendering is done
+end
+```
+
+Full cycle order:
+
+```
+init → pre_update → min_screen_width → hidden → update
+  → padding → style → left/right → left_style/right_style
+  → on_click → post_update
+```
+
+---
+
+## Interactivity
+
+### Click handler
+
+```lua
+local clickable = {
+  id = "wl.clickable",
+  update = function(self, session) return "click me" end,
+  on_click = function(self, minwid, click_times, mouse_button, modifier_pressed)
+    print("clicked!")
+  end,
+}
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `minwid` | `number` | Window number. |
+| `click_times` | `number` | 1=single, 2=double. |
+| `mouse_button` | `"l"\|"r"\|"m"` | Left/right/middle. |
+| `modifier_pressed` | `"s"\|"c"\|"a"\|"m"` | Shift/ctrl/alt/meta. |
+
+You can also pass a table with a `name` (for the global handler) and `callback`, or a string naming an existing global function.
+
+### Flexible (hiding priority)
+
+When space is tight, components with higher `flexible` values are hidden first:
+
+```lua
+flexible = 2   -- hidden before flexible = 1
+```
+
+---
+
+## Reuse
+
+### `inherit` — copy fields from another component
+
+Child values override parent. Functions from the parent run with `self = child`.
+
+```lua
+local base = {
+  id = "wl.base",
+  style = { fg = "#fff" },
+  padding = 1,
+}
+
+local child = {
+  id = "wl.child",
+  inherit = "wl.base",
+  update = function(self, session) return "child" end,
+}
+```
+
+### `ref` — read-only delegation
+
+Reference another component's field without copying. The referenced component drives the value.
+
+```lua
+local provider = {
+  id = "wl.provider",
+  context = function(self, session)
+    return { lines = vim.fn.line("$") }
   end,
 }
 
-```
-
-### 🎣 Hooks to Access Component Data
-
-WitchLine provides some hooks to access data in module `witch-line.core.manager.hook`.
-
-- `use_static(comp)`: Access the static field of the component or from referenced component.
-- `use_context(comp, session_id)`: Access the context field of the component or from referenced component for the given session.
-- `use_event_info(comp, session_id)`: Access the data event that triggered the update for the component in the given session. The result is the argument passed to the event callback in vim.api.nvim_create_autocmd.
-<!-- - `use_style(comp, session_id)`: Access the style of the component after resolving all the references and function calls for the given session. When the returned style is updated, the highlight will be updated automatically. -->
-
-### 🔡 Global Accessible Fields
-
-- **static**:
-
-| **Type** | **Description**                                   |
-| -------- | ------------------------------------------------- |
-| `table`  | A table that holds static data for the component. |
-| `nil`    | No static data for the component.                 |
-
-**Description**: A table that holds static data for the component. It can be used to store configuration or other immutable values of component.
-
-When a component has a `static` field or reference `static` from another component, Then the user can access the static field by using the hook `require("witch-line.core.manager.hook").use_static(comp)`.
-
-Tricks:
-
-- If you ensure that the component has a static field by self not referencing other components, then you can use the `self.static` directly in any function of the component like `init`, `update`, etc for better performance.
-
-**Example**:
-
-```lua
-local component = {
-    static = {
-        config_value = true,
-        another_value = "example",
-        icon = "⚡"
-    },
-    update = function(self, session_id)
-        return self.static.icon .. " updated text" -- Using self.static directly
-    end,
-    init = function(self, session_id)
-      local hook = require("witch-line.core.manager.hook") -- Use hook to access static
-      local static = hook.use_static(self)
-      print(static.config_value) -- true
-    end
+local display = {
+  id = "wl.display",
+  ref = { context = "wl.provider" },
+  update = function(self, session)
+    local ctx = self:with_session(session).context(self, session)
+    return "lines: " .. ctx.lines
+  end,
 }
 ```
 
-- **context**:
+Some ref keys create dependency links so changes propagate automatically:
 
-  | **Type**:                      | **Description**                                    |
-  | ------------------------------ | -------------------------------------------------- |
-  | `table`                        | A table that holds dynamic data for the component. |
-   | `fun(self): table`             | A function that returns a table context            |
+| Key | Dependency |
+|---|---|
+| `events` | ✅ Event |
+| `timing` | ✅ Timer |
+| `hidden` | ✅ Visible |
+| `min_screen_width` | ✅ Visible |
+| `static`, `context`, `style`, `left`, `right`, `left_style`, `right_style` | — |
 
-  **Description**: A table or a function that holds dynamic data for the component. It can be used to store values that can change frequently and are reactive.
+### `with_session` — reaching referenced data
 
-  When a component has a `context` field or reference `context` from another component, Then the user can access the context field by using the hook `require("witch-line.core.manager.hook").use_context(comp, session_id)`.
-
-  Tricks:
-
-  - If you ensure that the context is same for all sessions by self not referencing other components (usually when context is a static table or a string path), then you can use the `self.context` directly in any function of the component like `init`, `update`, etc for better performance.
-
-  **Example**:
-
-  - Type: `table`
-
-  ```lua
-  local component = {
-    context = {
-        dynamic_value = 42,
-        another_dynamic_value = "dynamic"
-    },
-    update = function(self, session_id)
-        local hook = require("witch-line.core.manager.hook") -- Use hook to access context
-        local ctx = hook.use_context(self, session_id)
-
-        -- You can also use self.context directly if you ensure that context is same for all sessions
-        -- local ctx = self.context
-
-        return "Dynamic Value: " .. ctx.dynamic_value
-    end
-  }
-  ```
-
-  - Type: `fun(self) -> table`
-
-  ```lua
-  local component = {
-    context = function(self)
-        return {
-            dynamic_value = math.random(1, 100), -- Random value between 1 and 100
-            another_dynamic_value = os.date("%Y-%m-%d %H:%M:%S") -- Current date and time
-        }
-    end,
-    update = function(self, session_id)
-        local hook = require("witch-line.core.manager.hook") -- Use hook to access context
-        local ctx = hook.use_context(self, session_id)
-        return "Dynamic Value: " .. ctx.dynamic_value
-    end
-  }
-  ```
-
-### 🧰 Basic Fields
-
-- **id**: (Very Important)
-
-  **Type**: `string`
-
-  **Description**: A unique identifier for the component. It's allow an component to be referenced by other components. The id must be different from default components provided by WitchLine. You can see the list of default ids in the [Default Components](./../README.md#-default-components) section.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      id = "my_component"
-  }
-  ```
-
-- **lazy**:
-
-  | **Type** | **Description**                                      |
-  | -------- | ---------------------------------------------------- |
-  | `true`   | The component will be loaded lazily.                 |
-  | `false`  | The component will be loaded immediately.            |
-  | `nil`    | The component will be loaded lazily (default value). |
-
-  **Description**: A flag that indicates whether the component should be loaded lazily. If set to `true`, the component will only be loaded when it is needed, which can help improve performance. If not provided, the component will be loaded lazily.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      lazy = true
-  }
-  ```
-
-- **version**:
-
-  **Type**: `number | string | nil`
-
-  **Description**: The version of the component. This can be used to manage cache manually. If the version is changed, the component will be reloaded even if it is cached. This is useful when you want to manually invalidate the cache for a component. If not provided, the cache will use all the fields of the component to determine if it needs to be reloaded (This will be slower).
-
-  **Example**:
-
-  ```lua
-  local component = {
-      version = 2
-  }
-  ```
-
-- **events**:
-
-  - Alias: Component.SpecialEvent
-
-| **Field**      | **Type**              | **Description**                                                                                |
-| -------------- | --------------------- | ---------------------------------------------------------------------------------------------- |
-| `[integer]`    | `string`              | Event name (e.g., `"BufEnter"`, `"InsertLeave"`). Each entry in the array represents an event. |
-| `once?`        | `boolean`             | _(Optional)_ If `true`, the event triggers only once.                                          |
-| `pattern?`     | `string  \| string[]` | (Optional) A pattern or list of patterns the event should match (e.g., `"*.lua"`).             |
-| `remove_when?` | `function ` | (Optional) Remove this special event if `remove_when` return true.                            |
-
-- events type
-
-| **Type**                   | **Description**                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------- |
-| `string[]`                 | A list of events that the component listens to.                                              |
-| `string`                   | A single event that the component listens to.                                                |
-| `Component.SpecialEvent[]` | A list of detailed special event definitions with extra options such as `pattern` or `once`. |
-| `nil`                      | The component will not listen to any events (default value).                                 |
-
-**Description**: A list of events that the component listens to. When any of these events are triggered, the component will be updated. If not provided, the component will not listen to any events. Type `:h autocmd-events` in Neovim to see the list of available events.
-
-**Combine with reference**: This field can be combine with ref.events. The component will be updated if events is triggered or the reference component's events triggered.
-
-**Syntax**: "EventName pattern1,pattern2" or {"EventName", ...}
-
-**Example**:
-
-- Type: `string[]`, `Component.SpecialEvent[]`
+Use `self:with_session(session)` to resolve a field from a referenced component. This follows the `ref` chain and returns the resolved value.
 
 ```lua
-local component = {
-    events = {
-        "BufEnter",
-        "User VeryLazy,LazyLoad",
-        "BufEnter *lua,*js",
-        {
-            "User",
-            pattern = { "VeryLazy", "LazyLoad" },
-        },
-        {
-            "CursorHold", "CursorHoldI",
-            once = true,
-        }
-    }
-}
+-- Field on this component directly:
+self.static
+self.context
+
+-- Field from a referenced component:
+self:with_session(session).static
+self:with_session(session).context(self, session)
 ```
 
-- Type: `string`
+Without the proxy, `self.context` on a component with `ref.context` gives you the raw component ID string, not the resolved context table.
+
+### Resolution order
+
+```
+Local → Inherit → Reference
+```
+
+1. Check the component's own field.
+2. If absent, walk the `inherit` chain.
+3. If still absent, walk the `ref` chain.
+
+### Nested components
+
+Children inherit fields from the parent (as if each had `inherit = parent.id`):
 
 ```lua
-local component = {
-    events = "BufEnter"
+local parent = {
+  id = "wl.parent",
+  style = { fg = "#fff" },
+  { id = "wl.child1", update = function() return "a" end },
+  { id = "wl.child2", update = function() return "b" end },
 }
 ```
-
-- **timing**:
-
-  | **Type** | **Description**                                                                |
-  | -------- | ------------------------------------------------------------------------------ |
-  | `true`   | The component will be updated every 1000 milliseconds (default debounce time). |
-  | `number` | The component will be updated every specified number of milliseconds.          |
-  | `nil`    | The component will not rely on timer-based updates (default value).            |
-
-  **Description**: The time in milliseconds to debounce updates for the component. If set to `true`, it will use a default debounce time of 1000 milliseconds. If not provided, the component will not rely on timer-based updates.
-
-  **Combine with reference**: This field can be combine with ref.timing field. The component will be triggered update if on time or the reference component on time.
-
-  **Example**:
-
-  - Type: `true`
-
-  ```lua
-  local component = {
-      timing = true -- Default debounce time of 1000ms
-  }
-  ```
-
-  - Type: `number`
-
-  ```lua
-  local component = {
-      timing = 500 -- Debounce time of 500ms
-  }
-  ```
-
-- **win_individual**:
-
-  **Type**: `boolean`
-
-  **Description**: If set to `true`, the component will be updated for each window individually. If not provided, the component will not be updated for each window individually.
-
-  **Example**:
-
-  ```lua
-  local component = {
-  	id = "test",
-  	win_individual = true,
-  	lazy = false,
-  	update = function(self, sid)
-        -- When the component in the window with filetype NvimTree
-        -- The result will be "nvim_tree"
-        -- Else the result will be "test"
-        -- Each window has individual value
-  		local filetype = vim.bo.filetype
-  		if filetype == "NvimTree" then
-  			return "nvim_tree"
-  		end
-  		return "test"
-  	end,
-  ```
-
-- **temp**:
-
-  **Type**: `any`
-
-  **Description**: Any temporary data that you want to store in the component instance. The data inside this field will not be cached, so you need to set them in any function like `init`, `update`, etc. This is useful for storing state or other information that should not persist across Neovim restarts. If the value is not a table, the `temp` field will be removed when restarting Neovim. If is a `table`, then the table will be emptied when restarting Neovim.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      -- Empty table to hold temporary datas. The datas inside this table will not be cached so you need to set them in any function like init or update.
-      temp = {},
-      -- If a temp is not a table, the temp field will be removed when restarting neovim.
-      -- or temp = "",
-      init = function(self, session_id)
-        -- If temp is a table, and you set temp as a component field then you can do something like this to initialize the temp.current_state values because the temp field is still be a empty table when restarting neovim.
-        self.temp.current_state = "initial"
-
-        -- But if temp is not a table, then you need to set it like this.
-        -- The temp field will be removed when restarting neovim, so you need to set it in init or any function that is called when the component is created.
-        -- self.temp = "initial"
-      end,
-      update = function(self, session_id)
-          -- You can use self.temp.current_state here
-          return "Current State: " .. (self.temp.current_state or "unknown")
-      end}
-  ```
-
-- **auto_theme**:
-
-  **Type**: `boolean | fun(self, session_id): boolean`
-
-  **Description**: If set to `true`, the style of the component will be automatically updated based on the current theme.
-  This will not work if user set `auto_theme` to false in `setup` function.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      auto_theme = true -- The style of the component will be automatically updated based on the current theme
-  }
-  ```
-
-- **flexible**:
-
-  **Type**: `number | nil`
-
-  **Description**: A priority value that determines how the component behaves when there is limited space in the status line. If the total width of all components exceeds the available space, components with higher `flexible` values will be truncated or hidden first. If not provided, the component will not be flexible and will always be displayed in full.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      flexible = 2 -- Higher priority for truncation or hiding
-  }
-  ```
-
-- **padding**:
-
-  **Alias**: `PaddingFunc` : `fun(self, session_id): number | nil`
-
-  | **Type**                                                                      | **Description**                                                                            |
-  | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-  | `number`                                                                      | The padding applied to both sides of the component                                         |
-  | `PaddingFunc`                                                                 | A function that returns the padding for both sides, or a table with left and right fields. |
-  | `{ left: number \| PaddingFunc \| nil, right: number \| PaddingFunc \| nil }` | A table with `left` and `right` fields to specify different padding for each side.         |
-
-  **Description**: The padding to be applied to the component. It can be a number, a function, or a table with `left` and `right` fields. If not provided, a default padding of 1 space will be applied to both sides of the component.
-
-  - Note: Padding is applied inside the separator if separator is provided. For example, if padding = 1 and separator = "|", the output will be "| text |".
-
-  **Example**:
-
-  - Type: `number`
-
-  ```lua
-  local component = {
-      padding = 2 -- Adds 2 spaces on both sides
-  }
-  ```
-
-  - Type: `PaddingFunc`
-
-  ```lua
-  local component = {
-      padding = function(self, session_id)
-          return 3 -- Adds 3 spaces on both sides
-      end
-  }
-  ```
-
-  - Type: `{ left: number, right: number }`
-
-  ```lua
-  local component = {
-      padding = { left = 1, right = 2 } -- Adds 1 space on the left and 2 spaces on the right
-  }
-  ```
-
-  - Type: `{ left: PaddingFunc, right: PaddingFunc }`
-
-  ```lua
-  local component = {
-      padding = {
-          left = function(self, session_id) return 1 end,
-          right = function(self, session_id) return 2 end
-      } -- Adds 1 space on the left and 2 spaces on the right
-  }
-  ```
-
-  - Type: `nil`
-
-  ```lua
-  local component = {
-      padding = nil -- Adds 1 space on both sides (default behavior)
-  }
-  ```
-
-- **init**:
-
-  | **Type**                     | **Description**                                                                             |
-  | ---------------------------- | ------------------------------------------------------------------------------------------- |
-  | `fun(self, session_id): nil` | A function that initializes the component. It is called once when the component is created. |
-
-  **Description**: A function that initializes the component. It is called once when the component is created right after the component is managed by WitchLine.
-  This is usually use for create custom update logic for the component when `events` or `timing` is not enough.
-
-  **Example**:
-
-  - Type: `fun(self): nil`
-
-  ```lua
-  local parent = {
-      id = "parent",
-      init = function(self)
-      end
-  }
-
-  ```
-
-  - Some tricks:
-
-  ```lua
-    local component = {
-        id = "parent",
-        init = function(self, session_id)
-            local hook = require("witch-line.core.manager.hook")
-            local static = hook.use_static(self) -- Use hook to access static
-            local ctx = hook.use_context(self, session_id) -- Use hook to access context
-
-              -- You can set static values here
-            static.icon = "⚡"
-
-              -- You can also set ctx values here if ctx is a static value and not a function like a table
-            ctx.some_value = 42
-
-            -- You can also add autocmds here
-            vim.api.nvim_create_autocmd("BufWritePost", {
-                pattern = "*",
-                callback = function()
-                    -- This will trigger an update for the component when the event is fired
-                    require("witch-line.core.handler").request_update_comp_graph(self, true)
-                end
-            })
-          end,
-          update = function(self, session_id)
-            local hook = require("witch-line.core.manager.hook")
-            local static = hook.use_static(self) -- Use hook to access static
-            return static.icon .. " updated text"
-          end
-
-    }
-
-    -- Then when you want to create a child component and update at the same time with parent then you
-    -- can use ref like this.
-    -- Just ensure that the parent is call `require("witch-line.core.handler").request_update_comp_graph`
-    local child = {
-        id = "child",
-        ref = {
-            events = "parent"
-        },
-        update = function()
-            return "child"
-        end
-    }
-  ```
-
-- **style**:
-
-  **Alias**: `ThemeAwareStyle`: This is inherited from `vim.api.keyset.highlight` with new field:
-
-  **Type**:
-  | **Type** | **Description** |
-  | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-  | `string` | A highlight group name to be applied to the component. |
-  | `ThemeAwareStyle` | A static highlight group to be applied to the component. |
-  | `nil` | No specific highlight group will be applied (default behavior). |
-  | `fun(self, session_id): string \| ThemeAwareStyle` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
-
-  **Description**: The highlight style to be applied to the component.
-
-  **Example**:
-
-  - Type: `ThemeAwareStyle`
-
-  ```lua
-  local component = {
-      style = {
-          fg = "#ffffff",
-          bg = "#000000",
-          auto_theme = false -- disabled auto theme only for style
-      }
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> ThemeAwareStyle`
-
-  ```lua
-  local component = {
-      style = function(self, session_id)
-        local static = require("witch-line.core.manager.hook").use_static(self) -- Use hook to access static
-        if static.config_value then
-            return { fg = "#00ff00" } -- Green text if config_value is true
-        else
-            return { fg = "#ff0000" } -- Red text if config_value is false
-        end
-      end
-  }
-  ```
-
-- **pre_update**:
-
-  **Type**: `fun(self, session_id) -> nil`
-
-  **Description**: A function that is called before the component is updated. It is called every time the component needs to be rerendered, right before the `update` function is called. This can be used to perform any necessary actions or calculations before the component is updated.
-
-  **Example**:
-
-  ```lua
-  local component = {
-    pre_update = function(self, session_id)
-            -- Pre-update code here
-    end
-  }
-  ```
-
-- **update**:
-  **Type**: `string|nil|fun(self, session): string|nil , CompStyle|nil`
-
-  **Description**: A string or a function that updates the component. It is called every time the component needs to be rerendered. It should return the text to be displayed and the highlight properties to be applied. `session` is a Session object (`session.id` gives the numeric session id).
-
-  The reason for the second return value is to allow dynamic highlights based on the current state of the component. Although we have the `style` field to define
-  style, but sometimes the style needs to change based on the value, and this allows for that flexibility.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      update = function(self, session_id)
-          -- Update code here
-          return "updated text", { fg = "#ffffff", bg = "#000000" } -- Return text and highlight
-      end
-  }
-  ```
-
-- **post_update**:
-
-  **Type**: `fun(self, session_id) -> nil`
-
-  **Description**: A function that is called after the component is updated. It is called every time the component is rerendered, right after the `update` function is called. This can be used to perform any necessary actions or calculations after the component is updated.
-
-  **Example**:
-
-  ```lua
-  local component = {
-      post_update = function(self, session_id)
-          -- Post-update code here
-      end
-  }
-  ```
-
-- **min_screen_width**:
-
-  | **Type**                        | **Description**                                                                              |
-  | ------------------------------- | -------------------------------------------------------------------------------------------- |
-  | `number`                        | The minimum screen width required for the component to be displayed.                         |
-  | `fun(self, session_id): number` | A function that returns the minimum screen width required for the component to be displayed. |
-  | `nil`                           | No minimum screen width requirement (default behavior).                                      |
-
-  **Description**: The minimum screen width required for the component to be displayed. If the screen width is less than this value, the component will not be rendered. This can be used to hide components on smaller screens or when there is not enough space to display them properly.
-
-  **Combine with reference**: This field can be combine with ref.min_screen_width. After combination, the component will be hide when screen zoom in below min_screen_width or the same behavior from reference component
-
-  **Example**:
-
-  - Type: `number`
-
-  ```lua
-  local component = {
-      min_screen_width = 80 -- Component will only be displayed if screen width is at least 80
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> number`
-
-  ```lua
-  local component = {
-      min_screen_width = function(self, session_id)
-          return session_id and 100 or 50 -- Dynamic minimum screen width based on session_id
-      end
-  }
-  ```
-
-- **hidden**:
-
-  | **Type**                         | **Description**                                                                        |
-  | -------------------------------- | -------------------------------------------------------------------------------------- |
-  | `boolean`                        | A flag that determines whether the component is hidden or not.                         |
-  | `fun(self, session_id): boolean` | A function that returns a boolean to determine whether the component is hidden or not. |
-  | `nil`                            | The component will not be hidden (default behavior).                                   |
-
-  **Description**: A flag that determines whether the component is hidden or not. If set to `true`, the component will not be rendered. This can be used to conditionally hide components based on certain criteria.
-
-  **Combine with reference**: This field can be combine with ref.hidden field. The component will be hide when the component.hidden return true or the reference component's hidden field return true
-
-- **Example**:
-
-  - Type: `boolean`
-
-  ```lua
-  local component = {
-    hidden = true -- Component will always be hidden
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> boolean`
-
-  ```lua
-  local component = {
-      hidden = function(self, session_id)
-          local static = require("witch-line.core.manager.hook").use_static(self) -- Use hook to access static
-          return static.config_value -- Dynamic hiding based on config_value
-      end
-  }
-  ```
-
-- **left**:
-
-  | **Type**                        | **Description**                                                                     |
-  | ------------------------------- | ----------------------------------------------------------------------------------- |
-  | `nil`                           | No left separator will be used (default behavior).                                   |
-  | `string`                        | A static string to be used as the left separator of the component.                  |
-  | `fun(self, session_id): string` | A function that returns a string to be used as the left separator of the component. |
-
-  **Description**: The left separator of the component.
-
-  **Example**:
-
-  - Type: `string`
-
-  ```lua
-  local component = {
-    -- semi circle separator
-    left = "⦅" -- Static left part
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> string`
-
-  ```lua
-  local component = {
-    left = function(self, session_id)
-        local static = require("witch-line.core.manager.hook").use_static(self) -- Use hook to access static
-        return static.icon .. " ⦅" -- Dynamic left part based on static values
-    end
-  }
-  ```
-
-- **right**:
-  | **Type** | **Description** |
-  | ------------------------------- | ------------------------------------------------------------------------------------ |
-  | `string` | A static string to be used as the right separator of the component. |
-  | `fun(self, session_id): string \| nil` | A function that returns a string to be used as the right separator of the component. |
-  | `nil` | No right separator will be used (default behavior). |
-
-**Description**: The right separator of the component.
-
-**Example**:
-
-- Type: `string`
-
-```lua
-local component = {
-    -- right semi circle separator
-    right = "⦆" -- Static right part
-}
-```
-
-- Type: `fun(self, session_id) -> string`
-
-```lua
-local component = {
-    right = function(self, session_id)
-        local static = require("witch-line.core.manager.hook").use_static(self) -- Use hook to access static
-        return static.icon .. " ⦆" -- Dynamic right part based on static values
-    end
-}
-```
-
-- **left_style**:
-
-  **Alias**:
-
-  - `SepStyle` : `0 | 1 | 2 | 3`
-
-  | **Values**: | **Description**                                                                                                                                                     |
-  | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | 0           | Inherit from component style                                                                                                                                        |
-  | 1           | The foreground color of the separator is the foreground color of the component, and the background color of the separator is `NONE`.                                |
-  | 2           | The foreground color of the separator is the background color of the component, and the background color of the separator is `NONE`.                                |
-  | 3           | The foreground color of the separator is the background color of the component, and the background color of the separator is the foreground color of the component. |
-
-  - `ThemeAwareStyle`: This is inherited from `vim.api.keyset.highlight` with new field:
-
-  **Type**:
-
-  | **Type**                                                              | **Description**                                                                                                                   |
-  | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-  | `SepStyle`                                                            | A predefined style based on the component's style.                                                                                |
-  | `ThemeAwareStyle`                                                     | A static highlight group to be applied to the left part of the component.                                                         |
-  | `nil`                                                                 | Defaults to SepStyle.SepBg (uses the component's background color as the separator's foreground).                                |
-  | `fun(self, session_id): ThemeAwareStyle \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
-  | `string`                                                              | A highlight group name to be applied to the left part of the component.                                                           |
-
-  **Description**: The highlight style to be applied to the left part of the component.
-
-  **Example**:
-
-  - Type: `SepStyle`
-
-  ```lua
-  local component = {
-      left_style = 1
-  }
-  ```
-
-  - Type: `ThemeAwareStyle`
-
-  ```lua
-  local component = {
-      left_style = {
-          fg = "#ffffff",
-          bg = "#000000",
-          auto_theme = false -- disabled auto theme only for left_style
-      }
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> ThemeAwareStyle`
-
-  ```lua
-  local component = {
-      left_style = function(self, session_id)
-          if static.config_value then
-              return { fg = "#00ff00" } -- Green text if config_value is true
-          else
-              return { fg = "#ff0000" } -- Red text if config_value is false
-          end
-      end
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> SepStyle`
-
-  ```lua
-  local component = {
-      left_style = function(self, session_id)
-          if self.config_value then
-              return 1 -- Use SepStyle 1 if config_value is true
-          else
-              return 2 -- Use SepStyle 2 if config_value is false
-          end
-      end
-  }
-  ```
-
-  - Type: `string`
-
-  ```lua
-    local component = {
-        left_style = "MyHighlightGroup" -- Use a custom highlight group
-    }
-  ```
-
-- **right_style**:
-
-  **Alias**:
-
-  - `SepStyle` : `0 | 1 | 2 | 3`
-
-  | **Values**: | **Description**                                                                                                                                                     |
-  | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | 0           | Inherit from component style                                                                                                                                        |
-  | 1           | The foreground color of the separator is the foreground color of the component, and the background color of the separator is `NONE`.                                |
-  | 2           | The foreground color of the separator is the background color of the component, and the background color of the separator is `NONE`.                                |
-  | 3           | The foreground color of the separator is the background color of the component, and the background color of the separator is the foreground color of the component. |
-
-  - `ThemeAwareStyle`: This is inherited from `vim.api.keyset.highlight` with new field:
-
-  **Type**:
-
-  | **Type**                                                              | **Description**                                                                                                                   |
-  | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-  | `SepStyle`                                                            | A predefined style based on the component's style.                                                                                |
-  | `ThemeAwareStyle`                                                     | A static highlight group to be applied to the right part of the component.                                                        |
-  | `nil`                                                                 | No specific highlight group will be applied to the right part (default behavior).                                                 |
-  | `fun(self, session_id): ThemeAwareStyle \| SepStyle \| string \| nil` | A function that returns a highlight group. This can be used to create dynamic styles based on the current state of the component. |
-  | `string`                                                              | A highlight group name to be applied to the right part of the component.                                                          |
-
-  **Description**: The highlight style to be applied to the right part of the component. It can be a static highlight group or a function that returns a highlight group. If not provided, the default highlight group will be used.
-
-  **Example**:
-
-  - Type: `SepStyle`
-
-  ```lua
-  local component = {
-      right_style = 1
-  }
-  ```
-
-  - Type: `ThemeAwareStyle`
-
-  ```lua
-  local component = {
-      right_style = {
-          fg = "#ffffff",
-          bg = "#000000",
-          auto_theme = false -- disabled auto theme only for right_style
-      }
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> ThemeAwareStyle`
-
-  ```lua
-  local component = {
-      right_style = function(self, session_id)
-          if static.config_value then
-              return { fg = "#00ff00" } -- Green text if config_value is true
-          else
-              return { fg = "#ff0000" } -- Red text if config_value is false
-          end
-      end
-  }
-  ```
-
-  - Type: `fun(self, session_id) -> SepStyle`
-
-  ```lua
-      local component = {
-          right_style = function(self, session_id)
-              if static.config_value then
-                  return 1 -- Use SepStyle 1 if config_value is true
-              else
-                  return 2 -- Use SepStyle 2 if config_value is false
-              end
-          end
-      }
-  ```
-
-- **on_click**:
-
-  **Alias**: `OnClickFunc` : `fun(self: ManagedComponent,  minwid: 0, click_times: number, mouse_button: "l"|"r"|"m", modifier_pressed: "s"|"c"|"a"|"m"): nil`
-
-  | **Type**                                | **Description**                                                            |
-  | --------------------------------------- | -------------------------------------------------------------------------- |
-  | `nil`                                   | The component will not have any click handler (default behavior).          |
-  | `string`                                | The name of a global function to be called when the component is clicked.  |
-  | `OnClickFunc`                           | A function that will be called when the component is clicked.              |
-  | `{name: string, callback: OnClickFunc}` | A table with `name` and `callback` fields to define a named click handler. |
-
-  **Description**: A function name or a function that is called when the component is clicked. It can be a string representing the name of a global function, a function itself, or a table with `name` and `callback` fields. If it's a table, the `name` field is used to identify the click handler, and the `callback` field is the function that will be called when the component is clicked.
-
-  The function accepts the following parameters:
-  | **Parameter** | **Type** | **Description** |
-  | -------------------- | ---------------------------- | ---------------------------------------------------- |
-  | `self` | `ManagedComponent` | The component instance. |
-  | `minwid` | `number` | The window number where the component was clicked. |
-  | `click_times` | `number` | The number of clicks (1 for single click, 2 for double click, etc.). |
-  | `mouse_button` | `"l" \| "r" \| "m"` | The mouse button that was clicked (`"l"` for left, `"r"` for right, `"m"` for middle). |
-  | `modifier_pressed` | `"s" \| "c" \| "a" \| "m"` | The modifier key that was pressed (`"s"` for Shift, `"c"` for Control, `"a"` for Alt, `"m"` for Meta). |
-
-  **Example**:
-
-  ```lua
-  local component = {
-      on_click = function(self, minwid, click_times, mouse_button, modifier_pressed)
-          -- Click handling code here
-          print("Component clicked with button: " .. mouse_button .. ", clicks: " .. click_times)
-      end
-  }
-  ```
-
-### 🔗 Referencing Fields
-
-An component can reference other components for some of its fields. This allows for reusing common configurations and creating more complex components by combining simpler ones. The following fields can reference other components:
-
-- **inherit**:
-
-  **Type**: `CompId | nil`
-
-  **Description**: The id of another component to inherit fields from. The fields of the inherited component will be merged with the fields of the current component. If a field is defined in both components, the value from the current component will take precedence. This allows for creating base components that can be extended by other components.
-
-  The component inherited from another component will be updated when the parent component is updated. This means that if the parent component changes, the child component will also reflect those changes. If the parent is hidden, the child component will also be hidden.
-
-  **Example**:
-
-  ```lua
-  local base_component = {
-      id = "base_component",
-      events = {"BufEnter"},
-      timing = true,
-      style = { fg = "#ffffff", bg = "#000000" },
-      padding = 1,
-      update = function(self, session_id)
-          return "Base Component"
-      end
-  }
-
-  local child_component = {
-      -- So the child will update on BufEnter event, update every 1000ms (default timing for true),
-      -- and have the same style and padding as the base component.
-      id = "child_component",
-      inherit = "base_component",
-      update = function(self, session_id)
-          return "Child Component"
-      end
-  }
-
-  ```
-
-- **ref**:
-
-  **Type**: `table`
-
-  **Description**: A table that maps field names to component IDs. When a field is not found locally or via `inherit`, the `ref[key]` is checked as a fallback. Any field name can be used as a key — the entries below are the most common.
-
-  Some ref keys also create **dependency graph links** (see the **Dependency** column), meaning the current component is re-rendered whenever the referenced component updates.
-
-  | Field              | Type                 | Value Behavior                                                         | Dependency              |
-  | ------------------ | -------------------- | ---------------------------------------------------------------------- | ----------------------- |
-  | `events`           | `CompId \| CompId[]` | — (no value fallback)                                                   | Linked as Event dep     |
-  | `timing`           | `CompId \| CompId[]` | — (no value fallback)                                                   | Linked as Timer dep     |
-  | `style`            | `CompId`             | Fallback for the `style` field                                         | —                       |
-  | `left_style`       | `CompId`             | Fallback for the `left_style` field                                    | —                       |
-  | `right_style`      | `CompId`             | Fallback for the `right_style` field                                   | —                       |
-  | `left`             | `CompId`             | Fallback for the `left` field                                          | —                       |
-  | `right`            | `CompId`             | Fallback for the `right` field                                         | —                       |
-  | `static`           | `CompId`             | Fallback for the `static` field                                        | —                       |
-  | `context`          | `CompId`             | Fallback for the `context` field                                       | —                       |
-  | `hidden`           | `CompId \| CompId[]` | Fallback for the `hidden` field                                        | Linked as Visible dep   |
-  | `min_screen_width` | `CompId \| CompId[]` | Fallback for the `min_screen_width` field                              | Linked as Visible dep   |
-
-  **Example**:
-
-  ```lua
-  local event_component = {
-      id = "event_component",
-      events = {"BufEnter", "CursorHold"},
-      static = { event_info = "Event Info" },
-      update = function(self, session_id)
-          return "Event Component"
-      end
-  }
-  local style_component = {
-      id = "style_component",
-      style = { fg = "#00ff00", bg = "#000000" },
-      update = function(self, session_id)
-          return "Style Component"
-      end
-  }
-  local main_component = {
-      id = "main_component",
-      ref = {
-          static = "event_component", -- The main component will have static values from event_component, In this case static = { event_info = "Event Info" }
-          events = "event_component", -- The main component will update on BufEnter and CursorHold events. In this case, the main component will update when event_component updates.
-          style = "style_component"    -- The main component will have the style defined in style_component, In this case fg = "#00ff00", bg = "#000000"
-      },
-      update = function(self, session_id)
-          -- static.event_info is available here because we referenced static from event_component
-          return "Main Component"
-      end
-  }
-  ```
-
-#### ⚙️ Pipeline Overview
-
-When designing a component in **Witch-Line**, the resolution of a field or behavior follows a strict **pipeline**:
-
-> **Local → Inherit → Reference**
-
-1. **Local** — The value or method defined directly on the current component instance.
-2. **Inherit** — If no local value exists, the component’s parent class (or ancestor chain) is checked.
-   - If the value is a function, it is executed with `self` pointing to the **current component**.
-3. **Reference** — If neither local nor inherited value exists, the reference component (another instance that the current component points to) is checked.
-   - If the value is a function, it is executed with `self` pointing to the **referenced component**.
-
-This pipeline is **recursive**, and Witch-Line ensures correct `self` binding during each step:
-
-- Inheritance calls → `self = current component`
-- Reference calls → `self = referenced component`
 
 ---
 
-#### 🔍 Differences Between Reference and Inheritance
+## Session
 
-Most developers are already familiar with **inheritance**:
+During an event-triggered update, the raw autocmd args are stored on the session:
 
-> A child component inherits logic and values from its ancestors.
-
-But **reference** works differently — it’s not ownership, it’s _delegation_.
-Let’s illustrate it with a simple analogy 👇
-
-##### 🧠 Analogy
-
-1. You and your friend are preparing for an exam.
-2. You can’t solve a math problem, so you ask your friend for help.
-3. Your friend says: “I’ll share my solution in a **Google Document** and send you a **link**.”
-4. You open the link, see the solution, but you **can’t edit it** — it’s read-only.
-
-That’s how **reference** works:
-
-> A component can _use_ another component’s computed result, but cannot modify or override it.
-
-The shared component executes its logic by itself; the referencing component just receives and uses the result.
+```lua
+local event_info = session:get("EventInfo")
+```
 
 ---
 
-#### 🧩 Example
+## Field Summary
 
-```lua
-local Shared = {
-    id = "A",
-    static = {
-        A = "A",
-        B = "B"
-    },
-    style = function(self, sid)
-        -- self here is Shared, not Comp
-        local static = require("witch-line.core.manager.hook").use_static(self)
-        if static.A == "A" then
-            return { fg = "#ffffff" }
-        else
-            return { fg = "#000000" }
-        end
-    end
-}
-
-local Comp = {
-    id = "B",
-    static = {
-        A = "B",
-    },
-    ref = {
-        style = "A"
-    }
-}
-
-```
-
-- You guess what's happen when style of Comp is called.
-- Answer is: Comp will not call any `style` function. It's just read the result from shared component and use it directly.
-  The style function called with the self passed is the `Shared` component instead of `Comp`
-- If it's inherit `Shared` it's a new story. The `Comp` will call `style` with self is `Comp`
-
-#### Tips
-
-- Use `ref` as much as possible instead of `inherit` for performance
-- Don't combine `ref` and `inherit` unless you ensure how it's really executed
-- Try to create less than 2 level of ancestor for manipulation.
-- Remember lookup pipeline : Local > Inherit > Ref
-
-### 🚀 Advanced Fields
-
-- **{...}**:
-
-  **Type**: `Component[]`
-
-  **Description**: A list of child components that will be rendered inside the current component. This allows for creating nested components and more complex layouts. The child components will be set `inherit` by the id of the parent component, so they will inherit fields from the parent component unless they override them. This is useful for creating groups of components that share common configurations.
-
-  **Example**:
-
-  ```lua
-  local parent = {
-      id = "parent_component",
-      timing = true,
-      style = { fg = "#ffffff", bg = "#000000" },
-      padding = 1,
-
-
-      {
-          id = "child_component_1",
-          -- So the child will have the same style and padding as the parent component.
-          -- The child will also update every 1000ms (default timing for true).
-          update = function(self, session_id)
-              return "Child 2"
-          end
-      },
-      {
-          id = "child_component_2",
-          -- This child will also have the same style as the parent component, but will override the padding.
-          -- The child will also update every 1000ms (default timing for true).
-          padding = 2, -- This child will override the padding of the parent component.
-          update = function(self, session_id)
-              return "Child 3"
-          end
-      }
-
-  }
-  ```
-
-### 🧪 Component Function Lifecycle
-
-- `init` : Called once when the component is created. After `WitchLine` manages the component. (Such as setting up autocmds, etc.)
-- `pre_update` : Called every time the component needs to be update, right before calling `min_screen_width` -> `hidden` -> `update` functions.
-- `min_screen_width` : Called every time the component needs to be update, right after calling `pre_update` function, right before calling `hidden` function.
-- `hidden` : Called every time the component needs to be update, right after calling `min_screen_width` function, right before calling `update` function.
-- `update` : Called every time the component needs to be update, right after calling `hidden` function, to get the content of the component. Padding is applied right after this.
-- `padding` : Called every time the component needs to be update, right after calling `update` function, to get the padding of the component.
-- `style` : Called every time the component updated successfully, after calling `update` function, right before setting the value in the statusline, to get the style of the component.
-- `left` : Called after the style is resolved, to get the left side decoration of the component.
-- `right` : Called after `left`, to get the right side decoration of the component.
-- `left_style` : Called after `left`, to get the style of the left decoration.
-- `right_style` : Called after `right`, to get the style of the right decoration.
-- `on_click` : The click handler is registered in the statusline after all decorations are resolved.
-- `post_update` : Called at the very end of the update cycle, after all values and styles are set.
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `id` | `string` | — | Unique identifier. Required for `ref` and `inherit`. |
+| `update` | `fun(self, session): string[, table]` | — | Returns display text and optional highlight. |
+| `static` | `table` | `nil` | Fixed config values. |
+| `context` | `table\|fun(self, session): table` | `nil` | Dynamic data shared via `ref`. |
+| `events` | `string\|string[]\|SpecialEvent[]` | `nil` | Autocmd events that trigger re-render. |
+| `timing` | `boolean\|number` | `nil` | Timer interval in ms (`true` = 1000). |
+| `win_individual` | `boolean` | `false` | Re-render per window. |
+| `style` | `table\|string\|fun(self, session): table\|nil` | `nil` | Highlight: inline table, named group, or function. |
+| `padding` | `number\|table\|fun(self, session): number` | `1` | Spaces around text. |
+| `left` / `right` | `string\|fun(self, session): string` | `nil` | Decorative separators. |
+| `left_style` / `right_style` | `SepStyle\|table` | `SepStyle.SepBg` | Separator highlight. |
+| `hidden` | `boolean\|fun(self, session): boolean` | `false` | Conditionally hide. |
+| `min_screen_width` | `number\|fun(self, session): number` | `nil` | Hide below column count. |
+| `init` | `fun(self)` | `nil` | Called once at load. |
+| `pre_update` | `fun(self, session)` | `nil` | Before each render. |
+| `post_update` | `fun(self, session)` | `nil` | After each render. |
+| `on_click` | `string\|fun\|table` | `nil` | Click callback. |
+| `flexible` | `number` | `nil` | Hiding priority (higher = hidden first). |
+| `lazy` | `boolean` | `true` | Load only when needed. |
+| `inherit` | `string` | `nil` | Parent component ID to copy fields from. |
+| `ref` | `table` | `nil` | Read-only field delegation. |

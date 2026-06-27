@@ -13,7 +13,7 @@ M.SepStyle = SepStyle
 
 
 --- Read `comp[key]` and resolve it:
----   - function → invoke via `session.memo` (cached for the session)
+---   - function → invoke with `(comp, session)`
 ---   - literal  → return as-is
 --- For components with an inherit/ref metatable, `comp[key]` walks the
 --- inherit/ref chain, so this automatically resolves inherited fields.
@@ -29,33 +29,21 @@ local function resolve_value(comp, key, session)
     return value
 end
 
---- Invoke `comp[field](comp)` when the field is a function.
---- @param field string  Component field name (e.g. `"init"`, `"pre_update"`).
---- @param comp ManagedComponent  Passed as `self` to the callback.
-local function call_lifecycle(field, comp)
-    local value = comp[field]
-    if type(value) == "function" then
-        value(comp)
-    end
+
+--- Run `pre_update(comp, session)` if present.
+--- @param comp ManagedComponent
+--- @param session Session
+M.pre_update = function(comp, session)
+    resolve_value(comp, "pre_update", session)
 end
 
---- Run `pre_update(comp)` if present.
+--- Run `post_update(comp, session)` if present.
 --- @param comp ManagedComponent
-M.emit_pre_update = function(comp)
-    call_lifecycle("pre_update", comp)
+--- @param session Session
+M.post_update = function(comp, session)
+    resolve_value(comp, "post_update", session)
 end
 
---- Run `post_update(comp)` if present.
---- @param comp ManagedComponent
-M.emit_post_update = function(comp)
-    call_lifecycle("post_update", comp)
-end
-
---- Run `init(comp)` if present.
---- @param comp ManagedComponent
-M.emit_init = function(comp)
-    call_lifecycle("init", comp)
-end
 
 --- Return the internal hl_name storage field for a given side.
 --- @param "left"|"right" side
