@@ -80,7 +80,7 @@ local Warn = {
 local Info = {
     id = "wl.diagnostic.info",
     _plug_provided = true,
-    inherit = InterfaceId,
+    ref = SHARED_REF,
     style = { fg = "DiagnosticInfo" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
@@ -94,7 +94,7 @@ local Info = {
 local Hint = {
     id = "wl.diagnostic.hint",
     _plug_provided = true,
-    inherit = InterfaceId,
+    ref = SHARED_REF,
     style = { fg = "DiagnosticHint" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)

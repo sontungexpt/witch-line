@@ -297,6 +297,11 @@ flexible = 2   -- hidden before flexible = 1
 
 ### `inherit` — copy fields from another component
 
+> **Prefer `ref` over `inherit`** in most cases. `ref` is read-only, avoids
+> coupling, and creates explicit dependency links so changes propagate
+> automatically. Use `inherit` only when you genuinely need to *copy and
+> override* fields (e.g. extending a base style with overrides).
+
 Child values override parent. Functions from the parent run with `self = child`.
 
 ```lua

@@ -469,9 +469,9 @@ register_dependency_source = function(comp)
     -- Use rawget to avoid triggering __index, which would recurse
     -- through lookup_plain_value → find_raw_value and crash when
     -- the component lacks a raw `id` field.
-    -- local init_fn = rawget(managed_comp, "init")
-    if type(managed_comp.init) == "function" then
-        managed_comp.init(managed_comp)
+    local init_fn = rawget(managed_comp, "init")
+    if type(init_fn) == "function" then
+        init_fn(managed_comp)
     end
 
     local ref = rawget(managed_comp, "ref")
