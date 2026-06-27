@@ -362,8 +362,12 @@ local function register_tbl_event(e, comp_id)
     register_special_event_entry(SpecialEvents, entry, comp_id)
 end
 
-M.register_events = function(comp)
-    local cid, events = comp.id, comp.events
+--- Register component events.
+--- Accepts a single event name (string), or an array of strings and/or
+--- SpecialEvent tables.
+---@param cid CompId
+---@param events string|string[]|SpecialEvent[]
+M.register_events = function(cid, events)
     local t = type(events)
     if t == "string" then
         register_string_event(events, cid)
@@ -374,19 +378,24 @@ M.register_events = function(comp)
             if etype == "string" then
                 register_string_event(e, cid)
             elseif etype == "table" then
-                --- @cast e Component.SpecialEvent
                 register_tbl_event(e, cid)
             end
         end
     end
 end
 
-M.register_vim_resized = function(comp)
-    register_normal_event(Events, "VimResized", comp.id)
+--- Register a VimResized autocmd for the component.
+--- Used to re-evaluate min_screen_width conditions on window resize.
+---@param cid CompId
+M.register_vim_resized = function(cid)
+    register_normal_event(Events, "VimResized", cid)
 end
 
-M.register_win_enter = function(comp)
-    register_normal_event(Events, "WinEnter", comp.id)
+--- Register a WinEnter autocmd for the component.
+--- Used to trigger per-window updates.
+---@param cid CompId
+M.register_win_enter = function(cid)
+    register_normal_event(Events, "WinEnter", cid)
 end
 
 --- Initialize autocmds for events, user events, and special events.

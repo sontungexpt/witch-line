@@ -45,7 +45,7 @@ local ManagedComps = {}
 local EmergencyIds = {}
 
 --- Forwards definition functions
-local require_by_id
+local require_comp_by_id
 local get_managed
 local find_raw_value
 local lookup_plain_value
@@ -56,7 +56,7 @@ local inherit
 --- prefixed with `"witch-line.components."`.
 --- @param path string[]  Segments, e.g. `{"statusline", "mode"}`.
 --- @return table|nil  The resolved module table, or nil if not found.
-local require = function(path)
+local require_comp_by_path = function(path)
     local component = require(COMP_MODULE_PATH .. path[1])
     for i = 2, #path do
         component = component[path[i]]
@@ -71,9 +71,9 @@ end
 --- Falls back to Component.require internally.
 --- @param id CompId
 --- @return DefaultComponent|nil
-require_by_id = function(id)
+require_comp_by_id = function(id)
     local path = IdModule.path(id)
-    return path and require(path) or nil
+    return path and require_comp_by_path(path) or nil
 end
 
 --- Ensure a component is registered before use.
@@ -90,36 +90,30 @@ end
 get_managed = function(id, visiting)
     visiting = visiting or {}
 
-    -- Prevent infinite recursion caused by cyclic inheritance.
+    if ManagedComps[id] then
+        return ManagedComps[id]
+    end
+
     if visiting[id] then
         return ManagedComps[id]
     end
 
-    -- Already registered.
-    local comp = ManagedComps[id]
-    if comp then
-        return comp
-    end
-
-    -- Load the raw component definition.
-    local raw_comp = require_by_id(id)
-
+    local raw_comp = require_comp_by_id(id)
     if not raw_comp then
         return nil
     end
 
     visiting[id] = true
 
-    -- Parents must always be registered first.
-    local inherit = rawget(raw_comp, "inherit")
-    if inherit then
-        get_managed(inherit, visiting)
+    -- 1. resolve parent FIRST (but NOT register child yet)
+    local inherit_id = rawget(raw_comp, "inherit")
+    if inherit_id then
+        get_managed(inherit_id, visiting)
     end
 
-    visiting[id] = nil
-
-    -- Register and return the managed component.
-    return register(raw_comp)
+    -- 2. now register child
+    local _, comp_managed = register(raw_comp)
+    return comp_managed
 end
 
 --- @class RawValueResult
@@ -290,6 +284,34 @@ M.deepest_reference_component = function(comp, key, seen)
     return r ~= NIL and r[3] or nil
 end
 
+--- Resolve a key by walking the inheritance chain and merging values.
+---
+--- Lookup order:
+---   1. The component's own value (or `self_val` if provided).
+---   2. Each parent in the `inherit` chain, resolved and merged in order.
+---
+--- Function-type values encountered during the walk are evaluated via
+--- `session.memo` when a session is active, marking the result dynamic.
+---
+--- Results are cached per `(key, component.id)` to avoid redundant traversal.
+--- Dynamic results are cached per-session; static results are cached globally.
+---
+--- @param comp ManagedComponent     The component to start from.
+--- @param key string                The field name to resolve.
+--- @param merge fun(current: any, parent: any, n: integer): any
+---         Merge function: combines the current value with each parent value.
+---         `current` starts as the component's own value or `self_val`.
+---         `n` is the depth (1-based) of the parent being merged.
+--- @param self_val? any             Skip the component's own lookup and use
+---         this value as the starting point instead.
+--- @param session Session          When set, function values are evaluated
+---         and cached per-session. Dynamic results are stored in session cache.
+--- @param ... any                    Arguments forwarded to function values
+---         during evaluation via `session.memo(fn, ...)`.
+---
+--- @return any value    The merged result.
+--- @return boolean dynamic  True if any function value was evaluated.
+--- @return integer n       Number of parent values merged.
 inherit = function(comp, key, merge, self_val, session, ...)
     local cid = comp.id
 
@@ -449,10 +471,20 @@ local resolve_comp_id = function(comp)
     return id
 end
 
+
+local skip_inheritance_meta
 local shared_comp_meta = {
     __index = function(comp, key)
         if key == "with_session" then
             return create_session_comp
+        end
+
+        if skip_inheritance_meta == nil then
+            skip_inheritance_meta = require("witch-line.core.component.skip_inheritance_meta")
+        end
+
+        if skip_inheritance_meta[key] then
+            return rawget(comp, key)
         end
 
         return lookup_plain_value(comp, key)
@@ -540,7 +572,7 @@ M.inspect = function(target)
     end
 end
 
-M.require_by_id = require_by_id
+M.require_by_id = require_comp_by_id
 M.create_session_comp = create_session_comp
 M.register = register
 M.lookup_plain_value = lookup_plain_value

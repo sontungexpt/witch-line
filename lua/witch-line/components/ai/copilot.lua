@@ -1,5 +1,3 @@
----@type integer|nil
-local fps
 ---@type string
 local status = ""
 
@@ -9,6 +7,16 @@ local progress_idx = 0
 local timer
 ---@type fun(): boolean|nil
 local is_enabled
+
+local function lazy_require(path)
+    return setmetatable({}, {
+        __index = function(proxy, k)
+            local m = require(path)
+            proxy[k] = m[k]
+            return m[k]
+        end
+    })
+end
 
 ---@type DefaultComponent
 local Copilot = {
@@ -28,8 +36,8 @@ local Copilot = {
         },
     },
     init = function(self, _)
-        local lazy_require = require("witch-line.utils.lazy_require")
         local request_update_comp_graph = require("witch-line.core.handler").request_update_comp_graph
+
         local cp_api = lazy_require("copilot.api")
         local cp_client = lazy_require("copilot.client")
 

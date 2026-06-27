@@ -1,4 +1,3 @@
-
 local colors = require("witch-line.constant.color")
 
 local INTERFACE_ID = "wl.file.interface"

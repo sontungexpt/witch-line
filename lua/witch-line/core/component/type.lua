@@ -1,7 +1,9 @@
---- @class ThemeAwareStyle : vim.api.keyset.highlight
---- @field auto_theme? boolean  If true, the style automatically adapts to the current theme
+--- @alias NotNil string | number | table | boolean | function | userdata | thread
 
 --- @class CompId : string
+
+--- @class ThemeAwareStyle : vim.api.keyset.highlight
+--- @field auto_theme? boolean  If true, the style automatically adapts to the current theme
 
 --- @class Reference : table
 --- @field events? CompId|CompId[] A table of ids of components that this component references
@@ -57,6 +59,7 @@
 --- @field remove_when? fun():boolean The event will be removed when `remove_when` returns true
 ---
 --- @class Component
+--- @field [NotNil] any Any additional fields are treated as custom data
 --- @field id? CompId The unique identifier for the component, can be a string or a number
 ---
 --- The id of the component to inherit from, can be used to extend a component.
@@ -230,5 +233,5 @@
 
 --- @class ManagedComponent : DefaultComponent | Component
 --- @field id CompId the id of component
---- @field with_session fun(session: Session): ManagedComponent Takes a session and returns a managed component
+--- @field with_session fun(self: ManagedComponent, session: Session): ManagedComponent Takes a session and returns a managed component
 --- @field _loaded true Always true; marks the component as loaded and managed.

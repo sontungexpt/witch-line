@@ -22,7 +22,7 @@ M.SepStyle = SepStyle
 --- @param session Session  Session context.
 --- @return any  Resolved value(s).  `update` fields may return a second style value.
 local function resolve_value(comp, key, session)
-    local value = comp[key]
+    local value = rawget(comp, key)
     if type(value) == "function" then
         return session.memo(value, comp, session)
     end

@@ -1,4 +1,4 @@
-local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
+local vim, type, ipairs, rawset, rawget, require = vim, type, ipairs, rawset, rawget, require
 local api = vim.api
 
 local Statusline = require("witch-line.core.statusline")
@@ -47,7 +47,7 @@ local update_comp_graph_by_ids
 --- Hide a component's segment. Skips if not renderable.
 ---@param comp ManagedComponent
 hide_component = function(comp)
-    if comp._renderable then
+    if rawget(comp, "_renderable") then
         Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
         rawset(comp, "_hidden", true)
     end
@@ -164,7 +164,7 @@ local function update_comp_side_style(comp, session, side, main_style_updated, m
 
     local t = type(side_style)
     local hl_name_field = ComponentEvaluator.hl_name_field(side)
-    local hl_name = comp[hl_name_field]
+    local hl_name = rawget(comp, hl_name_field)
     local dynamic = t == "function"
 
     local SepStyle = ComponentEvaluator.SepStyle
@@ -189,7 +189,7 @@ local function update_comp_side_style(comp, session, side, main_style_updated, m
     end
 
     if t == "function" then
-        side_style = side_style(comp, sid)
+        side_style = side_style(comp, session)
         t = type(side_style)
     end
 
@@ -250,7 +250,7 @@ update_comp = function(comp, session)
         -- A abstract component will not have indices
         -- It's just call the update function for other purpose and we not affect to the statusline
         -- So we just ignore it even the value is empty string
-        if comp._renderable then
+        if rawget(comp, "_renderable") then
             if value == "" then
                 hide_component(comp)
                 hidden = true
@@ -312,6 +312,7 @@ update_comp = function(comp, session)
                     end
                 end
 
+                -- Allow to inherit on_click field
                 if comp.on_click then
                     local click_manager = require("witch-line.core.manager.click")
                     Statusline.set_click_handler(cid, click_manager.register(comp), nil, winid)
@@ -421,19 +422,27 @@ local function register_dependency_links(kind, ids, dependent_id)
 end
 
 --- Bind timers, events, screen-width, and win-individual triggers.
+--- @param cid CompId
 ---@param comp ManagedComponent
-local function bind_update_conditions(comp)
-    if comp.timing then
-        Timer.register_timer(comp)
+local function bind_update_conditions(cid, comp)
+    local cid = rawget(comp, "id")
+
+    local timing = rawget(comp, "timing")
+    if timing then
+        Timer.register_timer(cid, timing)
     end
-    if comp.events then
-        Event.register_events(comp)
+
+    local events = rawget(comp, "events")
+    if events then
+        Event.register_events(cid, events)
     end
-    if comp.min_screen_width then
-        Event.register_vim_resized(comp)
+
+    if rawget(comp, "min_screen_width") then
+        Event.register_vim_resized(cid)
     end
-    if comp.win_individual then
-        Event.register_win_resized(comp)
+
+    if rawget(comp, "win_individual") then
+        Event.register_win_resized(cid)
     end
 end
 
@@ -457,6 +466,10 @@ register_dependency_source = function(comp)
     local cid, managed_comp = Registry.register(comp)
     rawset(managed_comp, "_loaded", true)
 
+    -- Use rawget to avoid triggering __index, which would recurse
+    -- through lookup_plain_value → find_raw_value and crash when
+    -- the component lacks a raw `id` field.
+    -- local init_fn = rawget(managed_comp, "init")
     if type(managed_comp.init) == "function" then
         managed_comp.init(managed_comp)
     end
@@ -476,9 +489,9 @@ register_dependency_source = function(comp)
         register_dependency_links(DepGraphKind.Visible, inherit, cid)
     end
 
-    bind_update_conditions(managed_comp)
+    bind_update_conditions(cid, managed_comp)
 
-    if managed_comp.lazy == false then
+    if rawget(managed_comp, "lazy") == false then
         Registry.mark_emergency(cid)
     end
 
@@ -490,15 +503,16 @@ end
 ---@param comp ManagedComponent
 ---@param winid integer|nil  Window-local list when set.
 local build_indices = function(comp, winid)
-    local update = comp.update
+    local update = rawget(comp, "update")
     if not update then
         return
     end
+
     local cid = comp.id
 
     Statusline.push(cid, "", winid)
 
-    local flexible = comp.flexible
+    local flexible = rawget(comp, "flexible")
     if flexible then
         Statusline.track_flexible(cid, flexible)
     end

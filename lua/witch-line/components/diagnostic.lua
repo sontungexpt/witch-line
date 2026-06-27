@@ -1,16 +1,19 @@
-local DiagnosticSevrity = vim.diagnostic.severity
+local DiagnosticSeverity = vim.diagnostic.severity
+
+--- @type DefaultId
+local InterfaceId = "wl.diagnostic.interface"
 
 --- @type DefaultComponent
 local Interface = {
-    id = "wl.diagnostic.interface",
+    id = InterfaceId,
     _plug_provided = true,
     events = "DiagnosticChanged",
     static = {
         icons = {
-            [DiagnosticSevrity.ERROR] = "",
-            [DiagnosticSevrity.WARN] = "",
-            [DiagnosticSevrity.INFO] = "",
-            [DiagnosticSevrity.HINT] = "",
+            [DiagnosticSeverity.ERROR] = "",
+            [DiagnosticSeverity.WARN] = "",
+            [DiagnosticSeverity.INFO] = "",
+            [DiagnosticSeverity.HINT] = "",
         },
     },
     hidden = function(self, _)
@@ -27,9 +30,8 @@ local Interface = {
         if type(signs) == "table" then
             local text = signs.text
             if type(text) == "table" then
-                local severity = vim.diagnostic.severity
                 for id, value in pairs(icons) do
-                    icons[id] = text[id] or text[severity[id]] or value
+                    icons[id] = text[id] or text[DiagnosticSeverity[id]] or value
                 end
             end
         end
@@ -39,21 +41,22 @@ local Interface = {
         }
     end,
 }
+
 local SHARED_REF = {
-    events = "wl.diagnostic.interface",
-    context = "wl.diagnostic.interface",
-    hidden = "wl.diagnostic.interface",
+    events = InterfaceId,
+    hidden = InterfaceId,
+    context = InterfaceId
 }
 
 --- @type DefaultComponent
 local Error = {
     id = "wl.diagnostic.error",
     _plug_provided = true,
-    style = { fg = "DiagnosticError" },
     ref = SHARED_REF,
+    style = { fg = "DiagnosticError" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
-        local id = vim.diagnostic.severity.ERROR
+        local id = DiagnosticSeverity.ERROR
         local count = ctx.count[id] or 0
         return count > 0 and ctx.icon[id] .. " " .. count or ""
     end,
@@ -67,7 +70,7 @@ local Warn = {
     style = { fg = "DiagnosticWarn" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
-        local id = vim.diagnostic.severity.WARN
+        local id = DiagnosticSeverity.WARN
         local count = ctx.count[id] or 0
         return count > 0 and ctx.icon[id] .. " " .. count or ""
     end,
@@ -77,11 +80,11 @@ local Warn = {
 local Info = {
     id = "wl.diagnostic.info",
     _plug_provided = true,
-    ref = SHARED_REF,
+    inherit = InterfaceId,
     style = { fg = "DiagnosticInfo" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
-        local id = vim.diagnostic.severity.INFO
+        local id = DiagnosticSeverity.INFO
         local count = ctx.count[id] or 0
         return count > 0 and ctx.icon[id] .. " " .. count or ""
     end,
@@ -91,11 +94,11 @@ local Info = {
 local Hint = {
     id = "wl.diagnostic.hint",
     _plug_provided = true,
-    ref = SHARED_REF,
+    inherit = InterfaceId,
     style = { fg = "DiagnosticHint" },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
-        local id = vim.diagnostic.severity.HINT
+        local id = DiagnosticSeverity.HINT
         local count = ctx.count[id] or 0
         return count > 0 and ctx.icon[id] .. " " .. count or ""
     end,

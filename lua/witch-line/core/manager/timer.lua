@@ -37,14 +37,14 @@ end
 
 
 --- Register a timer for a component.
---- @param comp ManagedComponent The component to register the timer for.
-M.register_timer = function(comp)
-    local interval = comp.timing == true and ONE_SECOND or comp.timing
+--- @param cid CompId
+--- @param timing boolean|number
+M.register_timer = function(cid, timing)
+    local interval = timing == true and ONE_SECOND or timing
     if type(interval) ~= "number" or interval <= 0 then
         return
     end
 
-    local cid = comp.id
     for base, group in pairs(TimerStore) do
         if interval % base == 0 then
             local list = group[interval] or {}

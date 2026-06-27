@@ -37,7 +37,7 @@ M.register = function(comp)
         return ""
     end
 
-    comp._click_handler = cached
+    rawset(comp, "_click_handler", cached)
     return cached
 end
 
@@ -48,7 +48,7 @@ M.unregister = function(comp)
     local name = comp._click_handler
     if name then
         _G[name] = nil
-        comp._click_handler = nil
+        rawset(comp, "_click_handler", nil)
     end
 end
 

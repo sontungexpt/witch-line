@@ -1,4 +1,3 @@
-
 local colors = require("witch-line.constant.color")
 local uv = vim.uv or vim.loop
 
@@ -166,7 +165,7 @@ Diff.Interface = {
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
     },
-    init = function(self, _)
+    init = function(self)
         local vim = vim
         local api = vim.api
 
