@@ -3,36 +3,20 @@ local nvim_create_autocmd = vim.api.nvim_create_autocmd
 
 local M = {}
 
-
 local AUGROUP = vim.api.nvim_create_augroup("WitchLineEvent", { clear = true })
 
---- Options used for configuring a special event.
---- These fields control event behavior but do not include identifiers.
---- @class SpecialEventOpts
---- @field once? boolean  Optional flag. If true, the event is triggered only once.
---- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
----
---- Optional file/buffer pattern(s).
---- Can be:
----   - string: a single pattern
----   - string[]: list of patterns
----   - nil: no pattern filtering
---- Empty strings or "*" are treated as no pattern.
---- @field pattern? string|string[]|nil
 
 --- Represents a fully registered special event entry stored in the event registry.
 --- This type includes resolved event names and the list of component IDs bound to it.
---- @class SpecialEvent : SpecialEventOpts
----
+--- @class SpecialEventManaged : SpecialEventOpts
 --- One or more event names.
---- After normalization, this is **always** a list-of-strings.
 --- @field name string|string[]
---- @field ids? CompId[] Array of component IDs associated with this event.
+--- @field ids CompId[] Array of component IDs associated with this event.
 
 --- Input shape for incoming special events before being stored.
 --- This type is used when registering new events.
 --- It omits `ids` because the store is responsible for managing and appending them.
---- @class SpecialEventInput : SpecialEvent
+--- @class SpecialEventInput : SpecialEventManaged
 --- @field ids nil `ids` must be nil. The system will create and populate this field.
 
 --- Stores component dependencies for nvim events
@@ -61,7 +45,7 @@ local UserEvents = {}
 ---       ids = { comp1, comp2 }
 ---     }
 ---   }
---- @type SpecialEvent[]
+--- @type SpecialEventManaged[]
 local SpecialEvents = {}
 
 
@@ -161,8 +145,8 @@ end
 
 --- Register a component for a special event entry.
 --- Merges with existing entries when options match, appending the component id.
----@param store SpecialEvent[]
----@param event SpecialEvent
+---@param store SpecialEventManaged[]
+---@param event SpecialEventInput
 ---@param comp_id CompId
 local function register_special_event_entry(store, event, comp_id)
     -- Normalize incoming_names into either string or list-of-strings
@@ -325,7 +309,7 @@ end
 ---   once = true,
 --- }
 ---
---- @param e Component.SpecialEvent The raw event definition supplied by user. May contain:
+--- @param e SpecialEvent The raw event definition supplied by user. May contain:
 ---   - numeric keys → event names
 ---   - "pattern" (string|string[]|nil)
 ---   - "once" (boolean|nil)

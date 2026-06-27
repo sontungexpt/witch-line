@@ -21,10 +21,13 @@ local use_default_config = function(user_configs)
     user_configs = type(user_configs) == "table" and user_configs or {}
     local statusline = user_configs.statusline
     statusline = type(statusline) == "table" and statusline or {}
-    statusline.global =
-        type(statusline.global) ~= "table"
-        and require("witch-line.constant.default")
-        or statusline.global
+    local default_comps = require("witch-line.constant.default")
+    if type(statusline.global) ~= "table" then
+        statusline.global = {}
+        for _, v in ipairs(default_comps) do
+            statusline.global[#statusline.global + 1] = v
+        end
+    end
     user_configs.statusline = statusline
     return user_configs
 end

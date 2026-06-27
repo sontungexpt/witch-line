@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 
 ---@type DefaultComponent
 local Encoding = {
-    id = "encoding",
+    id = "wl.encoding",
     events = { "InsertEnter" },
     _plug_provided = true,
     style = { fg = colors.yellow },

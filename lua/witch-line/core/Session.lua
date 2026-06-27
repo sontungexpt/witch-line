@@ -1,64 +1,68 @@
-
 local M = {}
 
 --- @class SessionId : integer
 
-
 --- @class Session
 --- @field id SessionId
---- @field get fun(self: Session, k: any): any|nil
---- @field set fun(self: Session, k: any, v: any): any
---- @field get_cache fun(self: Session, k: any): any|nil
---- @field set_cache fun(self: Session, k: any, v: any): any
---- @field memo fun(self: Session, fn: fun(...):any, ...: any): any, any|nil
+--- Get the value of a key in the session data.
+--- @field get fun(k: any): any|nil
+--- Get the value of a key in the session data.
+--- @field set fun(k: any, v: any): any
+--- Get the value of a key in the memo cache.
+--- @field get_cache fun(k: any): any|nil
+--- Set the value of a key in the memo cache.
+--- @field set_cache fun(k: any, v: any): any
+--- The memo cache is used to cache the results of memoized functions.
+--- @field memo fun(fn: fun(...):any, ...: any): any, ...
 
-local next_sid = 0
+local lastest_sid = 0
+
+--- @type table<SessionId, Session>
 local Sessions = {}
-
 
 --- Allocate a new session id.
 --- The backing store and memo cache are created lazily on first `set`/`memo` access.
 ---@return Session
 local function new()
-    local sid = next_sid
-    next_sid = next_sid + 1
+    lastest_sid = lastest_sid + 1
+
+    local data = {}
     local cache = {}
-    Sessions[sid] = { cache = cache }
-    return {
-        id = sid,
-        get = function(k)
-            local data = Sessions[sid].data
-            return data and data[k]
-        end,
+
+    local session = {
+        id = lastest_sid,
         set = function(k, v)
-            local data = Sessions[sid].data or {}
+            data = data or {}
             data[k] = v
-            Sessions[sid].data = data
             return v
         end,
-        set_cache = function(key, value)
-            cache[key] = value
-            return value
+        get = function(k)
+            return data[k]
         end,
-        get_cache = function(key)
-            return cache[key]
+        set_cache = function(k, v)
+            cache[k] = v
+            return v
+        end,
+        get_cache = function(k)
+            return cache[k]
         end,
         memo = function(fn, ...)
-            local cached = cache[fn]
-            if cached ~= nil then
-                return cached[1], cached[2]
-            end
-
             if type(fn) ~= "function" then
-                error("memo: fn must be a function, got " .. type(fn))
-                return
+                return fn
             end
 
-            local a, b = fn(...)
-            cache[fn] = { a, b }
-            return a, b
+            local result = cache[fn]
+            if result ~= nil then
+                return unpack(result)
+            end
+
+            result = { fn(...) }
+            cache[fn] = result
+            return unpack(result)
         end
     }
+    Sessions[lastest_sid] = session
+    return session
 end
 
 --- Destroy a session and free its backing store.
@@ -67,7 +71,7 @@ end
 local function remove(sid)
     Sessions[sid] = nil
     if next(Sessions) == nil then
-        next_sid = 0
+        lastest_sid = 0
     end
 end
 

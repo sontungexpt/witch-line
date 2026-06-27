@@ -1,5 +1,60 @@
 
 local colors = require("witch-line.constant.color")
+local uv = vim.uv or vim.loop
+
+local function get_root_by_git(dir_path)
+    local prev = ""
+    local dir = dir_path or uv.cwd()
+    while dir ~= prev do
+        local git_path = dir .. "/.git"
+        local stat = uv.fs_stat(git_path)
+        if stat then
+            if stat.type == "directory" then
+                return dir
+            elseif stat.type == "file" then
+                local fd = io.open(git_path, "r")
+                if fd then
+                    local line = fd:read("*l")
+                    fd:close()
+                    local gitdir = line:match("^gitdir:%s*(.-)%s*$")
+                    if gitdir then
+                        if not gitdir:match("^/") and not gitdir:match("^%a:[/\\]") then
+                            gitdir = dir .. "/" .. gitdir
+                        end
+                        return uv.fs_realpath(gitdir)
+                    end
+                end
+            end
+        end
+
+        prev = dir
+        dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
+    end
+    return nil
+end
+
+--- @alias DiffResult { added: uinteger, modified: uinteger, removed: uinteger }
+local function process_diff(stdout)
+    local added, removed, modified = 0, 0, 0
+    for old_start, old_count, new_start, new_count in
+    string.gmatch(stdout, "@@%s*%-(%d+),?(%d*)%s*%+(%d+),?(%d*)%s*@@")
+    do
+        old_count = (old_count == nil and 0) or (old_count == "" and 1) or tonumber(old_count) or 0
+        new_count = (new_count == nil and 0) or (new_count == "" and 1) or tonumber(new_count) or 0
+
+        if old_count == 0 and new_count > 0 then
+            added = added + new_count
+        elseif old_count > 0 and new_count == 0 then
+            removed = removed + old_count
+        else
+            local minv = old_count < new_count and old_count or new_count
+            modified = modified + minv
+            added = added + (new_count - minv)
+            removed = removed + (old_count - minv)
+        end
+    end
+    return { added = added, modified = modified, removed = removed }
+end
 
 ---@class BranchCtx
 ---@field root_dir string|nil
@@ -16,7 +71,7 @@ local DISABLED_FILETYPES = {
 
 ---@type DefaultComponent
 local Branch = {
-    id = "git.branch",
+    id = "wl.git.branch",
     _plug_provided = true,
     static = {
         branch_icon = "",
@@ -68,7 +123,7 @@ local Branch = {
                 end
 
                 local new_root_dir =
-                    require("witch-line.components.git.utils").get_root_by_git(file:match("^(.*)/[^/]*$"))
+                    get_root_by_git(file:match("^(.*)/[^/]*$"))
 
                 if new_root_dir ~= nil and last_root_dir == nil then
                     update_repo(new_root_dir)
@@ -106,7 +161,7 @@ local Diff = {}
 
 --- @type DefaultComponent
 Diff.Interface = {
-    id = "git.diff.interface",
+    id = "wl.git.diff.interface",
     _plug_provided = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
@@ -176,7 +231,7 @@ Diff.Interface = {
                         elseif stdout and #stdout > 0 then
                             vim.schedule(function()
                                 if api.nvim_buf_is_valid(bufnr) then
-                                    self._diff_cache[bufnr] = require("witch-line.components.git.utils").process_diff(
+                                    self._diff_cache[bufnr] = process_diff(
                                         stdout)
                                     require("witch-line.core.handler").request_update_comp_graph(self)
                                 end
@@ -210,15 +265,15 @@ end
 
 --- @type DefaultComponent
 Diff.Added = {
-    id = "git.diff.added",
+    id = "wl.git.diff.added",
     _plug_provided = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
     ref = {
-        events = "git.diff.interface",
-        context = "git.diff.interface",
+        events = "wl.git.diff.interface",
+        context = "wl.git.diff.interface",
     },
     style = { fg = colors.green },
     hidden = diff_hidden,
@@ -236,15 +291,15 @@ Diff.Added = {
 
 ---@type DefaultComponent
 Diff.Modified = {
-    id = "git.diff.modified",
+    id = "wl.git.diff.modified",
     _plug_provided = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
     ref = {
-        events = "git.diff.interface",
-        context = "git.diff.interface",
+        events = "wl.git.diff.interface",
+        context = "wl.git.diff.interface",
     },
     style = { fg = colors.cyan },
     hidden = diff_hidden,
@@ -262,15 +317,15 @@ Diff.Modified = {
 
 ---@type DefaultComponent
 Diff.Removed = {
-    id = "git.diff.removed",
+    id = "wl.git.diff.removed",
     _plug_provided = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "-",
     },
     ref = {
-        events = "git.diff.interface",
-        context = "git.diff.interface",
+        events = "wl.git.diff.interface",
+        context = "wl.git.diff.interface",
     },
     style = { fg = colors.red },
     hidden = diff_hidden,

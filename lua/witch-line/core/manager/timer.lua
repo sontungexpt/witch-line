@@ -1,4 +1,3 @@
-
 local pairs, type = pairs, type
 
 local M = {}

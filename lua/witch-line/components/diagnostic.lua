@@ -2,7 +2,7 @@ local DiagnosticSevrity = vim.diagnostic.severity
 
 --- @type DefaultComponent
 local Interface = {
-    id = "diagnostic.interface",
+    id = "wl.diagnostic.interface",
     _plug_provided = true,
     events = "DiagnosticChanged",
     static = {
@@ -42,13 +42,13 @@ local Interface = {
 
 --- @type DefaultComponent
 local Error = {
-    id = "diagnostic.error",
+    id = "wl.diagnostic.error",
     _plug_provided = true,
     style = { fg = "DiagnosticError" },
     ref = {
-        events = "diagnostic.interface",
-        context = "diagnostic.interface",
-        hidden = "diagnostic.interface",
+        events = "wl.diagnostic.interface",
+        context = "wl.diagnostic.interface",
+        hidden = "wl.diagnostic.interface",
     },
     update = function(self, session)
         local ctx = self:with_session(session).context(self, session)
@@ -60,12 +60,12 @@ local Error = {
 
 --- @type DefaultComponent
 local Warn = {
-    id = "diagnostic.warn",
+    id = "wl.diagnostic.warn",
     _plug_provided = true,
     ref = {
-        events = "diagnostic.interface",
-        context = "diagnostic.interface",
-        hidden = "diagnostic.interface",
+        events = "wl.diagnostic.interface",
+        context = "wl.diagnostic.interface",
+        hidden = "wl.diagnostic.interface",
     },
     style = { fg = "DiagnosticWarn" },
     update = function(self, session)
@@ -78,12 +78,12 @@ local Warn = {
 
 --- @type DefaultComponent
 local Info = {
-    id = "diagnostic.info",
+    id = "wl.diagnostic.info",
     _plug_provided = true,
     ref = {
-        events = "diagnostic.interface",
-        context = "diagnostic.interface",
-        hidden = "diagnostic.interface",
+        events = "wl.diagnostic.interface",
+        context = "wl.diagnostic.interface",
+        hidden = "wl.diagnostic.interface",
     },
     style = { fg = "DiagnosticInfo" },
     update = function(self, session)
@@ -96,12 +96,12 @@ local Info = {
 
 --- @type DefaultComponent
 local Hint = {
-    id = "diagnostic.hint",
+    id = "wl.diagnostic.hint",
     _plug_provided = true,
     ref = {
-        events = "diagnostic.interface",
-        context = "diagnostic.interface",
-        hidden = "diagnostic.interface",
+        events = "wl.diagnostic.interface",
+        context = "wl.diagnostic.interface",
+        hidden = "wl.diagnostic.interface",
     },
     style = { fg = "DiagnosticHint" },
     update = function(self, session)

@@ -20,12 +20,12 @@ M.DepGraphKind = DepGraphKind
 --- One such table per DepGraphKind, pre-allocated at load.
 ---
 --- EventGraph example:
----   { ["diagnostic"] = { ["my_diag"] = true },   -- my_diag inherits diagnostic
----     ["git.branch"] = { ["ext"] = true },        -- ext ref.events = "git.branch"
+---   { ["wl.diagnostic"] = { ["my_diag"] = true },   -- my_diag inherits diagnostic
+---     ["wl.git.branch"] = { ["ext"] = true },        -- ext ref.events = "wl.git.branch"
 ---   }
 --- TimerGraph example:
----   { ["diagnostic"] = { ["my_diag"] = true },   -- my_diag inherits diagnostic
----     ["battery"] = { ["ext"] = true },           -- ext ref.timing = "battery"
+---   { ["wl.diagnostic"] = { ["my_diag"] = true },   -- my_diag inherits diagnostic
+---     ["wl.battery"] = { ["ext"] = true },           -- ext ref.timing = "wl.battery"
 ---   }
 --- VisibleGraph example:
 ---   { ["hidden_base"] = { ["child"] = true },     -- child ref.hidden = "hidden_base"
@@ -70,13 +70,12 @@ end
 
 --- Load a component by its module path id (derived from a DefaultId).
 --- Falls back to Component.require internally.
---- @param id DefaultId
---- @return Component|nil
+--- @param id CompId
+--- @return DefaultComponent|nil
 require_by_id = function(id)
     local path = IdModule.path(id)
     return path and require(path) or nil
 end
-
 
 --- Ensure a component is registered before use.
 ---
@@ -104,7 +103,7 @@ get_managed = function(id, visiting)
     end
 
     -- Load the raw component definition.
-    local raw_comp = Component.require_by_id(id)
+    local raw_comp = require_by_id(id)
 
     if not raw_comp then
         return nil
@@ -412,15 +411,16 @@ inherit = function(comp, key, merge, self_val, session, ...)
     return val, dynamic, n
 end
 
+local COMP_KEY = {}
+local SESSION_KEY = {}
 local session_proxy_meta = {
     __index = function(proxy, key)
-        local comp = proxy._comp
+        local comp = proxy[COMP_KEY]
         local value = lookup_plain_value(comp, key)
 
         if type(value) == "function" then
-            local session = proxy._session
             return function(...)
-                return session.memo(value, ...)
+                return proxy[SESSION_KEY].memo(value, ...)
             end
         end
 
@@ -430,8 +430,8 @@ local session_proxy_meta = {
 
 with_session = function(comp, session)
     return setmetatable({
-        _comp = comp,
-        _session = session,
+        [COMP_KEY] = comp,
+        [SESSION_KEY] = session,
     }, session_proxy_meta)
 end
 

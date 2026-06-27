@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 
 --- @type DefaultComponent
 local SelectionCount = {
-    id = "selection.count",
+    id = "wl.selection.count",
     _plug_provided = true,
     style = { fg = colors.cyan },
     events = { "ModeChanged", "CursorMoved" },

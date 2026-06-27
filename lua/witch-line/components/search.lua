@@ -1,6 +1,6 @@
 --- @type DefaultComponent
 local SearchCount = {
-    id = "search.count",
+    id = "wl.search.count",
     _plug_provided = true,
     events = { "CmdlineLeave /" },
     hidden = function(self, _)

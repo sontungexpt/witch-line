@@ -1,51 +1,49 @@
 ---@alias DefaultId
---- | CompId
+--- | "wl.mode"
 ---
---- | "mode"
+--- | "wl.file.interface"
+--- | "wl.file.name"
+--- | "wl.file.icon"
+--- | "wl.file.modifier"
+--- | "wl.file.size"
 ---
---- | "file.interface"
---- | "file.name"
---- | "file.icon"
---- | "file.modifier"
---- | "file.size"
+--- | "wl.copilot"
+--- | "wl.windsurf"
+--- | "wl.windsurf.neocodeium"
 ---
---- | "copilot"
---- | "windsurf"
---- | "windsurf.neocodeium"
+--- | "wl.diagnostic.interface"
+--- | "wl.diagnostic.error"
+--- | "wl.diagnostic.warn"
+--- | "wl.diagnostic.info"
+--- | "wl.diagnostic.hint"
 ---
---- | "diagnostic.interface"
---- | "diagnostic.error"
---- | "diagnostic.warn"
---- | "diagnostic.info"
---- | "diagnostic.hint"
+--- | "wl.cursor.pos"
+--- | "wl.cursor.progress"
 ---
---- | "cursor.pos"
---- | "cursor.progress"
+--- | "wl.encoding"
+--- | "wl.lsp.clients"
+--- | "wl.indent"
 ---
---- | "encoding"
---- | "lsp.clients"
---- | "indent"
+--- | "wl.git.branch"
+--- | "wl.git.diff.interface"
+--- | "wl.git.diff.added"
+--- | "wl.git.diff.removed"
+--- | "wl.git.diff.modified"
 ---
---- | "git.branch"
---- | "git.diff.interface"
---- | "git.diff.added"
---- | "git.diff.removed"
---- | "git.diff.modified"
+--- | "wl.battery"
+--- | "wl.datetime"
+--- | "wl.os_uname"
+--- | "wl.nvim_dap"
 ---
---- | "battery"
---- | "datetime"
---- | "os_uname"
---- | "nvim_dap"
+--- | "wl.search.count"
+--- | "wl.selection.count"
 ---
---- | "search.count"
---- | "selection.count"
----
---- | "weather.location"
---- | "weather.data"
---- | "weather.icon"
---- | "weather.temp"
---- | "weather.text"
---- | "weather"
+--- | "wl.weather.location"
+--- | "wl.weather.data"
+--- | "wl.weather.icon"
+--- | "wl.weather.temp"
+--- | "wl.weather.text"
+--- | "wl.weather"
 
 --- Identity map for default component IDs.
 --- @type table<DefaultId, DefaultId>
@@ -53,65 +51,60 @@ local Id = {}
 
 --- @type table<DefaultId, string[]>
 local PathMap = {
-    mode                     = { "mode" },
+    ["wl.mode"]                 = { "mode" },
 
-    ["file.interface"]       = { "file", "interface" },
-    ["file.name"]            = { "file", "name" },
-    ["file.icon"]            = { "file", "icon" },
-    ["file.modifier"]        = { "file", "modifier" },
-    ["file.size"]            = { "file", "size" },
+    ["wl.file.interface"]       = { "file", "interface" },
+    ["wl.file.name"]            = { "file", "name" },
+    ["wl.file.icon"]            = { "file", "icon" },
+    ["wl.file.modifier"]        = { "file", "modifier" },
+    ["wl.file.size"]            = { "file", "size" },
 
-    ["copilot"]              = { "ai.copilot" },
-    ["windsurf"]             = { "ai.windsurf", "windsurf" },
-    ["windsurf.neocodeium"]  = { "ai.windsurf", "neocodeium" },
+    ["wl.copilot"]              = { "ai.copilot" },
+    ["wl.windsurf"]             = { "ai.windsurf", "windsurf" },
+    ["wl.windsurf.neocodeium"]  = { "ai.windsurf", "neocodeium" },
 
-    ["diagnostic.interface"] = { "diagnostic", "interface" },
-    ["diagnostic.error"]     = { "diagnostic", "error" },
-    ["diagnostic.warn"]      = { "diagnostic", "warn" },
-    ["diagnostic.info"]      = { "diagnostic", "info" },
-    ["diagnostic.hint"]      = { "diagnostic", "hint" },
+    ["wl.diagnostic.interface"] = { "diagnostic", "interface" },
+    ["wl.diagnostic.error"]     = { "diagnostic", "error" },
+    ["wl.diagnostic.warn"]      = { "diagnostic", "warn" },
+    ["wl.diagnostic.info"]      = { "diagnostic", "info" },
+    ["wl.diagnostic.hint"]      = { "diagnostic", "hint" },
 
-    ["cursor.pos"]           = { "cursor", "pos" },
-    ["cursor.progress"]      = { "cursor", "progress" },
+    ["wl.cursor.pos"]           = { "cursor", "pos" },
+    ["wl.cursor.progress"]      = { "cursor", "progress" },
 
-    encoding                 = { "encoding" },
-    ["lsp.clients"]          = { "lsp", "clients" },
-    indent                   = { "indent" },
+    ["wl.encoding"]             = { "encoding" },
+    ["wl.lsp.clients"]          = { "lsp", "clients" },
+    ["wl.indent"]               = { "indent" },
 
-    ["git.branch"]           = { "git", "branch" },
-    ["git.diff.interface"]   = { "git", "diff", "interface" },
-    ["git.diff.added"]       = { "git", "diff", "added" },
-    ["git.diff.removed"]     = { "git", "diff", "removed" },
-    ["git.diff.modified"]    = { "git", "diff", "modified" },
+    ["wl.git.branch"]           = { "git", "branch" },
+    ["wl.git.diff.interface"]   = { "git", "diff", "interface" },
+    ["wl.git.diff.added"]       = { "git", "diff", "added" },
+    ["wl.git.diff.removed"]     = { "git", "diff", "removed" },
+    ["wl.git.diff.modified"]    = { "git", "diff", "modified" },
 
-    battery                  = { "battery" },
-    datetime                 = { "datetime" },
-    os_uname                 = { "os_uname" },
-    nvim_dap                 = { "nvim_dap" },
+    ["wl.battery"]              = { "battery" },
+    ["wl.datetime"]             = { "datetime" },
+    ["wl.os_uname"]             = { "os_uname" },
+    ["wl.nvim_dap"]             = { "nvim_dap" },
 
-    ["search.count"]         = { "search", "count" },
-    ["selection.count"]      = { "selection", "count" },
+    ["wl.search.count"]         = { "search", "count" },
+    ["wl.selection.count"]      = { "selection", "count" },
 
-    ["weather.location"]     = { "weather", "location" },
-    ["weather.data"]         = { "weather", "data" },
-    ["weather.icon"]         = { "weather", "icon" },
-    ["weather.temp"]         = { "weather", "temp" },
-    ["weather.text"]         = { "weather", "text" },
-    weather                  = { "weather" },
+    ["wl.weather.location"]     = { "weather", "location" },
+    ["wl.weather.data"]         = { "weather", "data" },
+    ["wl.weather.icon"]         = { "weather", "icon" },
+    ["wl.weather.temp"]         = { "weather", "temp" },
+    ["wl.weather.text"]         = { "weather", "text" },
+    ["wl.weather"]              = { "weather" },
 }
 
-for k in pairs(PathMap) do
-    Id[k] = k
-end
 
 return {
-    Id = Id,
-
-    ---@param id DefaultId
+    ---@param id CompId
     ---@return string[]|nil
     path = function(id) return PathMap[id] end,
 
-    ---@param id DefaultId
+    ---@param id CompId
     ---@return boolean
     existed = function(id) return PathMap[id] ~= nil end,
 

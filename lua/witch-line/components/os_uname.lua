@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 
 --- @type DefaultComponent
 return {
-    id = "os_uname",
+    id = "wl.os_uname",
     _plug_provided = true,
     events = "UIEnter",
     static = {

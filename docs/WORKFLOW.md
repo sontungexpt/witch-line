@@ -38,14 +38,15 @@ witch-line (init.lua)          ← entry point
 ```
 
 ```
-Public API wrappers (witch-line.*, non-core):
-  witch-line.hook        → delegates to witch-line.core.manager.hook
-  witch-line.handler     → delegates to witch-line.core.handler
-  witch-line.statusline  → delegates to witch-line.core.statusline
-  witch-line.session     → provides recycled session cache
-  witch-line.highlight   → delegates to witch-line.core.highlight
-  witch-line.resolver    → value resolution (used internally)
-  witch-line.registry    → component registry
+Public API (core modules only — no separate public wrapper layer):
+  witch-line.init             → require("witch-line").setup(user_config)
+  witch-line.core.handler     → import via "witch-line.core.handler"
+  witch-line.core.statusline  → import via "witch-line.core.statusline"
+  witch-line.core.Session     → import via "witch-line.core.Session"
+  witch-line.core.highlight   → import via "witch-line.core.highlight"
+  witch-line.core.manager.registry → component registry
+  witch-line.core.manager.event    → event management
+  witch-line.core.manager.timer    → timer management
 ```
 
 ---
@@ -341,7 +342,7 @@ CompState: {
 
 ## 13. Component Override System
 
-When a user defines a component using `[0] = "file.name"` or `builtin.comp("file.name", override)`:
+When a user defines a component using `[0] = "wl.file.name"` syntax:
 
 ```
 override.override(base_comp, override)
@@ -360,37 +361,23 @@ override.override(base_comp, override)
 ```
 lua/witch-line/
   ├── init.lua                     # Entry point: setup()
-  ├── builtin.lua                  # comp() helper
-  ├── handler.lua                  # Public handler API
-  ├── hook.lua                     # Public hook API
-  ├── statusline.lua               # Public statusline API
-  ├── session.lua                  # Recycled session cache (public)
-  ├── highlight.lua                # Public highlight API
-  ├── cache.lua                    # Cache persistence
   ├── command.lua                  # :WitchLine command
-  ├── config.lua                   # Config normalization
-  ├── registry.lua                 # Component registry
-  ├── resolver.lua                 # Value resolution
-  ├── override.lua                 # Component override
-  ├── component.lua                # Component utilities
-  ├── events.lua                   # Event management
-  ├── timers.lua                   # Timer management
   │
-  ├── core/                        # Core implementation (used internally)
-  │   ├── handler/init.lua         #   Handler orchestration
+  ├── core/                        # Core implementation
+  │   ├── handler/init.lua         #   Handler orchestration (setup, update_comp, request_update_comp_graph, ...)
   │   ├── statusline.lua           #   Rendering engine
   │   ├── highlight.lua            #   Highlight management
   │   ├── Session.lua              #   Session lifecycle (create/remove)
   │   ├── types.lua                #   Type definitions
-  │   ├── Component/
-  │   │   ├── init.lua             #   Component class
-  │   │   ├── initial_state.lua    #   Context save/restore for caching
+  │   ├── component/
+  │   │   ├── type.lua             #   Type definitions (SepStyle, CompStyle, etc.)
+  │   │   ├── evaluator.lua        #   Component evaluation (update, padding, hidden, ...)
   │   │   └── override.lua         #   Component override logic
   │   └── manager/
-  │       ├── init.lua             #   Manager (registry + resolver + inherit)
+  │       ├── registry.lua         #   Component registry + dependency graph
   │       ├── event.lua            #   Event store + autocmd dispatch
   │       ├── timer.lua            #   Timer store + dispatch
-  │       └── hook.lua             #   Hook implementation
+  │       └── click.lua            #   Click handler registration
   │
   ├── components/                  # Built-in components
   │   ├── mode.lua, file.lua, git/
@@ -407,12 +394,8 @@ lua/witch-line/
   │
   └── utils/
       ├── init.lua                 # resolve(), debounce()
-      ├── persist.lua              # Serialization (bytecode)
-      ├── bitmask.lua              # Bitmask operations
-      ├── hash/init.lua            # Hashing (xxhash, fvn1a)
       ├── lazy_require.lua         # Lazy loading
       ├── notifier.lua             # Notifications
       ├── tbl.lua                  # Table utilities
-      ├── benchmark.lua            # Benchmarking
-      └── debounce.lua             # Debounce utility
+      └── benchmark.lua            # Benchmarking
 ```

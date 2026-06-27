@@ -1,7 +1,7 @@
 
 local colors = require("witch-line.constant.color")
 
-local INTERFACE_ID = "file.interface"
+local INTERFACE_ID = "wl.file.interface"
 
 ---@type DefaultComponent
 local Interface = {
@@ -72,7 +72,7 @@ local Interface = {
 
 ---@type DefaultComponent
 local Name = {
-    id = "file.name",
+    id = "wl.file.name",
     _plug_provided = true,
 
     ref = {
@@ -91,7 +91,7 @@ local Name = {
 
 ---@type DefaultComponent
 local Icon = {
-    id = "file.icon",
+    id = "wl.file.icon",
     _plug_provided = true,
 
     ref = {
@@ -109,7 +109,7 @@ local Icon = {
 
 ---@type DefaultComponent
 local Modifier = {
-    id = "file.modifier",
+    id = "wl.file.modifier",
     _plug_provided = true,
 
     events = {
@@ -140,7 +140,7 @@ local Modifier = {
 
 ---@type DefaultComponent
 local Size = {
-    id = "file.size",
+    id = "wl.file.size",
     _plug_provided = true,
 
     events = "BufWritePost",

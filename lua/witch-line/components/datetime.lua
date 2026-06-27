@@ -1,7 +1,7 @@
 
 ---@type DefaultComponent
 return {
-    id = "datetime",
+    id = "wl.datetime",
     _plug_provided = true,
     timing = true,
     static = {

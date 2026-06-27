@@ -28,14 +28,9 @@ Important about function fields to make the cache work properly:
 Example of a pure function:
 
 ```lua
-local api = vim.api -- Not allowed, as it's an up-value you need to move it inside the function like below
-local builtin = require("witch-line.builtin") -- Not allowed, as it's an up-value you need to move it inside the function like below
-
-
 local component = {
   id = "identifier",
-  update = function(self, session_id)
-    local builtin = require("witch-line.builtin") -- Allowed, as it's inside the function
+  update = function(self, session)
     local api = vim.api -- Allowed, as it's a global API call
     return api.nvim_buf_get_name(0) -- Depends only on the current buffer
   end,
@@ -433,12 +428,12 @@ local component = {
 
   **Example**:
 
-  - Type: `fun(self, session_id): nil`
+  - Type: `fun(self): nil`
 
   ```lua
   local parent = {
       id = "parent",
-      init = function(self, session_id)
+      init = function(self)
       end
   }
 
@@ -465,7 +460,7 @@ local component = {
                 pattern = "*",
                 callback = function()
                     -- This will trigger an update for the component when the event is fired
-                    require("witch-line.core.handler").refresh_comp_graph(self)
+                    require("witch-line.core.handler").request_update_comp_graph(self, true)
                 end
             })
           end,
@@ -479,7 +474,7 @@ local component = {
 
     -- Then when you want to create a child component and update at the same time with parent then you
     -- can use ref like this.
-    -- Just ensure that the parent is call `require("witch-line.core.handler").refresh_component_graph`
+    -- Just ensure that the parent is call `require("witch-line.core.handler").request_update_comp_graph`
     local child = {
         id = "child",
         ref = {
@@ -551,9 +546,9 @@ local component = {
   ```
 
 - **update**:
-  **Type**: `string|nil|fun(self, session_id): string|nil , CompStyle|nil`
+  **Type**: `string|nil|fun(self, session): string|nil , CompStyle|nil`
 
-  **Description**: A string or a function that updates the component. It is called every time the component needs to be rerendered. It should return the text to be displayed and the highlight properties to be applied.
+  **Description**: A string or a function that updates the component. It is called every time the component needs to be rerendered. It should return the text to be displayed and the highlight properties to be applied. `session` is a Session object (`session.id` gives the numeric session id).
 
   The reason for the second return value is to allow dynamic highlights based on the current state of the component. Although we have the `style` field to define
   style, but sometimes the style needs to change based on the value, and this allows for that flexibility.

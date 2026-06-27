@@ -219,22 +219,17 @@ This plugin is ideal for developers who want full control over the look and feel
 
 ### Benchmarks
 
-The benchmarks of 30 runs:
+Cold startup time measured with the plugin's default config in a headless Neovim session.
+Each plugin is loaded in a separate process (`nvim --headless -u bench.lua`) to ensure a clean cold-start measurement.
 
-This is just an example because I don't have much time to make each statusline with the same ui.
-And i'm not sure is it the best config for each statusline.
+| Plugin     | Cold Startup (ms) |
+| ---------- | ----------------- |
+| witch-line | ~3.3              |
+| lualine    | ~6.3              |
+| heirline   | n/a (unavailable) |
 
-I just run with the default config of each plugin.
-
-If some one remake your current statusline with "witch-line", could you send me the config of each statusline to make it properly?
-
-The benchmarks is run with `nvim -u` with only the statusline plugin loaded.
-
-| Plugin     | Load Time (ms)        | Avg Update Time (ms) |
-| ---------- | --------------------- | -------------------- |
-| witch-line | 3.4137 (cached: 2.22) |
-| lualine    | 4.4964                |                      |
-| heirline   | 6.3693                |                      |
+> **Environment**: Neovim nightly, Linux, 5 runs per plugin with cache disabled for witch-line.
+> Heirline was not installed in the test environment, so no data is available.
 
 ---
 
@@ -270,7 +265,7 @@ You can setup the plugin by calling the `setup` function and passing in a table 
 require("witch-line").setup({
   --- @type CombinedComponent[]
   abstracts = {
-    "file.name",
+    "wl.file.name",
     {
       id = "file", -- Abstract component for file-related info
       padding = { left = 1, right = 1 }, -- Padding around the component
@@ -285,9 +280,9 @@ require("witch-line").setup({
     --- The global statusline components
     --- Set it to `nil` if you want to use default components in example
     global = {
-        "mode",
-        "file.name",
-        "git.branch",
+        "wl.mode",
+        "wl.file.name",
+        "wl.git.branch",
         {
           id = "component_id",               -- Unique identifier
           padding = { left = 1, right = 1 }, -- Padding around the component
@@ -304,9 +299,9 @@ require("witch-line").setup({
             return vim.fn.expand("%:t")
           end,
           ref = {                       -- References to other components
-            events = { "file.name" },
-            style = "file.name",
-            static = "file.name",
+            events = { "wl.file.name" },
+            style = "wl.file.name",
+            static = "wl.file.name",
           },
         },
     },
@@ -362,13 +357,13 @@ Example config using `win` option
 ```lua
 require("witch-line").setup({
     abstracts = {
-        "battery", -- pre register battery to use in win option
+        "wl.battery", -- pre register battery to use in win option
         -- require("your custom component")
     }
     statusline = {
         global = {
-            "file.name",
-            "git.branch",
+            "wl.file.name",
+            "wl.git.branch",
             --- require("your custom component")
             --- Other components
         }
@@ -377,7 +372,7 @@ require("witch-line").setup({
           local filetype = vim.bo[vim.api.nvim_win_get_buf(winid)].filetype
           if filetype == "NvimTree" then
             return {
-                "battery",
+                "wl.battery",
                 -- require("your custom component")
             }
           end
@@ -477,7 +472,7 @@ You can use the `require("witch-line.builtin").comp` builtin function to create 
 
 ```lua
 
-local my_component = require("witch-line.builtin").comp("file.name", {
+local my_component = require("witch-line.builtin").comp("wl.file.name", {
   padding = { left = 2 },
   min_screen_width = 60,
   hidden = function()
@@ -491,7 +486,7 @@ Or you can also use the [0] field to override the default component.
 
 ```lua
 local my_component = {
-  [0] = "file.name",  -- Inherit from the default file.name component
+  [0] = "wl.file.name",  -- Inherit from the default file.name component
   padding = { left = 2 },
   min_screen_width = 60,
   hidden = function()

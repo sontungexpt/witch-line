@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 
 ---@type DefaultComponent
 return {
-    id = "mode",
+    id = "wl.mode",
     _plug_provided = true,
     events = "ModeChanged",
     flexible = 90,

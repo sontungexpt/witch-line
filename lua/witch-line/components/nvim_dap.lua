@@ -1,6 +1,6 @@
 --- @type DefaultComponent
 return {
-    id = "nvim_dap",
+    id = "wl.nvim_dap",
     _plug_provided = true,
     events = { "CursorHold", "CursorMoved", "BufEnter" },
     update = function()

@@ -99,7 +99,7 @@ measure(function()
 	-- 		global = {
 	-- 			-- File
 	-- 			{
-	-- 				[0] = "file.icon",
+	-- 				[0] = "wl.file.icon",
 	-- 				padding = { left = 2, right = 1 },
 	-- 				style = function(self, sid)
 	-- 					local ctx = require("witch-line.core.manager.hook").use_context(self, sid)

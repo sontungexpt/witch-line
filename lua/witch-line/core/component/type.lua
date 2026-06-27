@@ -14,11 +14,7 @@
 --- @field left_style? CompId A id of a component that this component references for its left_style
 --- @field right? CompId A id of a component that this components references for right separator
 --- @field right_style? CompId A id of a component that this component references for its right_style
-
---- @class LiteralComponent : string
-
---- @class CombinedComponent : Component, LiteralComponent
---- @field [integer] CombinedComponent A table of child components, can be used to create a list of components
+--- @field [string] CompId A id of a component that this component references for its
 
 
 --- @alias PaddingFunc fun(self: ManagedComponent, session: Session): number|PaddingTable
@@ -29,16 +25,27 @@
 --- @alias CompStyle ThemeAwareStyle|string
 --- @alias StyleFunc fun(self: ManagedComponent, session: Session): CompStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, session: Session): CompStyle|SepStyle
-
-
+---
 --- @alias OnClickMouseButton "l"|"r"|"m"
 --- @alias OnClickModifier "s"|"c"|"a"|"m"
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: OnClickMouseButton, modifier_pressed: OnClickModifier)
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 
---- @class SpecialEvent
+--- Options used for configuring a special event.
+--- These fields control event behavior but do not include identifiers.
+--- @class SpecialEventOpts
+--- @field once? boolean  Optional flag. If true, the event is triggered only once.
+--- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
+--- Optional file/buffer pattern(s).
+--- Can be:
+---   - string: a single pattern
+---   - string[]: list of patterns
+---   - nil: no pattern filtering
+--- Empty strings or "*" are treated as no pattern.
+--- @field pattern? string|string[]|nil
+
+--- @class SpecialEvent : SpecialEventOpts
 --- @field [integer] string event name
---- @field once? boolean Optional flag. If true, the event is triggered only once.
 ---
 --- Optional file/buffer pattern(s).
 --- Can be:
@@ -212,11 +219,16 @@
 --- @field _right_hl_name? string The highlight group name for the right part of the component
 --- @field _click_handler? string The name of the click handler function for the component
 
+--- @class LiteralComponent : string
+
+--- @class CombinedComponent : string | DefaultId | DefaultComponent | LiteralComponent | Component | ManagedComponent
+--- @field [integer] CombinedComponent A table of child components, can be used to create a list of components
+
 --- @class DefaultComponent : Component The default components provided by witch-line
 --- @field id DefaultId the id of default component
 --- @field _plug_provided true Mark as created by witch-line
 
---- @class ManagedComponent : Component, DefaultComponent
+--- @class ManagedComponent : DefaultComponent | Component
 --- @field id CompId the id of component
---- @field [integer] CompId Child components by their IDs
+--- @field with_session fun(session: Session): ManagedComponent Takes a session and returns a managed component
 --- @field _loaded true Always true; marks the component as loaded and managed.

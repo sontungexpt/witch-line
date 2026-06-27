@@ -1,8 +1,8 @@
-
 ---@type integer|nil
 local fps
 ---@type string
 local status = ""
+
 ---@type integer
 local progress_idx = 0
 ---@type uv.uv_timer_t|nil
@@ -12,7 +12,7 @@ local is_enabled
 
 ---@type DefaultComponent
 local Copilot = {
-    id = "copilot",
+    id = "wl.copilot",
     _plug_provided = true,
     static = {
         fps = 3,
@@ -29,7 +29,7 @@ local Copilot = {
     },
     init = function(self, _)
         local lazy_require = require("witch-line.utils.lazy_require")
-        local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
+        local request_update_comp_graph = require("witch-line.core.handler").request_update_comp_graph
         local cp_api = lazy_require("copilot.api")
         local cp_client = lazy_require("copilot.client")
 
@@ -68,7 +68,7 @@ local Copilot = {
                         timer = timer or (vim.uv or vim.loop).new_timer()
                         if timer then
                             timer:start(0, math.floor(1000 / self.static.fps), vim.schedule_wrap(function()
-                                refresh_component_graph(self, true)
+                                request_update_comp_graph(self, true)
                             end))
                         end
                         return
@@ -78,7 +78,7 @@ local Copilot = {
                     status = new_status
 
                     if timer then timer:stop() end
-                    refresh_component_graph(self)
+                    request_update_comp_graph(self)
                 end)
             end,
         })

@@ -1,0 +1,13 @@
+witch-line                        3.215ms
+lualine                           5.220ms
+heirline                       ERROR
+witch-line                        2.924ms
+witch-line                        3.029ms
+witch-line                        3.532ms
+witch-line                        3.338ms
+witch-line                        3.643ms
+lualine                           6.578ms
+lualine                           6.147ms
+lualine                           7.752ms
+lualine                           6.284ms
+lualine                           5.832ms

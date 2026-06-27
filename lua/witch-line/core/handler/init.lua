@@ -6,6 +6,7 @@ local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
 
 local Registry = require("witch-line.core.manager.registry")
+local is_existed = Registry.is_existed
 local DepGraphKind = Registry.DepGraphKind
 local require_by_id = Registry.require_by_id
 local link_dependency = Registry.link_dependency
@@ -401,7 +402,7 @@ local function register_dependency_links(kind, ids, dependent_id)
         for _, id in ipairs(ids) do
             link_dependency(kind, id, dependent_id)
 
-            if not Registry.is_existed(id) then
+            if not is_existed(id) then
                 local dep = require_by_id(id)
                 if dep then
                     register_dependency_source(dep)
@@ -410,7 +411,7 @@ local function register_dependency_links(kind, ids, dependent_id)
         end
     elseif ids_type == "string" then
         link_dependency(kind, ids, dependent_id)
-        if not Registry.is_existed(ids) then
+        if not is_existed(ids) then
             local dep = require_by_id(ids)
             if dep then
                 register_dependency_source(dep)
@@ -504,15 +505,18 @@ local build_indices = function(comp, winid)
     rawset(comp, "_renderable", true)
 end
 
+--- @class UnprocessedRecursiveManagedComponent : ManagedComponent
+--- @field [integer] CombinedComponent
+
 --- Register a component: resolve, override, initialize, index.
 --- Skips list-like tables (combined parent — children handled by caller).
 ---@param comp Component
 ---@param parent_id CompId|nil
 ---@param winid integer|nil  When set, marks window-local and pushes to the win-specific index.
----@return ManagedComponent
+---@return UnprocessedRecursiveManagedComponent
 register_component = function(comp, parent_id, winid)
     if comp._loaded then
-        --- @cast comp ManagedComponent
+        --- @cast comp UnprocessedRecursiveManagedComponent
         build_indices(comp, winid)
         return comp
     end
@@ -527,7 +531,7 @@ register_component = function(comp, parent_id, winid)
         build_indices(comp, winid)
     end
 
-    --- @cast comp ManagedComponent
+    --- @cast comp UnprocessedRecursiveManagedComponent
     return comp
 end
 
@@ -545,33 +549,31 @@ end
 
 --- Register a combined component tree: parent first, then children recursively.
 --- Strings resolve via `Component.require_by_id` or pushed as literal text.
----@param comp CombinedComponent|DefaultId|string
+---@param comp CombinedComponent
 ---@param parent_id CompId|nil
 ---@param winid integer|nil  Window-local statusline window id.  Pass nil for global.
----@return ManagedComponent|string  The registered component or literal string.
+---@return ManagedComponent|string|nil  The registered component or literal string.
 register_combined_component = function(comp, parent_id, winid)
     local kind = type(comp)
+    local managed_comp
     if kind == "string" then
-        --- @cast comp DefaultId
         local c = require_by_id(comp)
         if not c then
-            --- @cast comp string
             return register_literal_comp(comp, winid)
         end
-        comp = register_component(c, parent_id, winid)
+        managed_comp = register_component(c, parent_id, winid)
     elseif kind == "table" and next(comp) then
-        comp = register_component(comp, parent_id, winid)
+        managed_comp = register_component(comp, parent_id, winid)
     else
         error("Invalid component type: " .. kind)
         return nil
     end
 
-    for i, child in ipairs(comp) do
-        --- @cast child CombinedComponent
-        register_combined_component(child, comp.id, winid)
-        rawset(comp, i, nil)
+    for i, child in ipairs(managed_comp) do
+        register_combined_component(child, managed_comp.id, winid)
+        rawset(managed_comp, i, nil)
     end
-    return comp
+    return managed_comp
 end
 
 --- Initialise global components, per-window components, event/timer handlers,
@@ -636,10 +638,10 @@ end
 
 --- Update a component and its deps in a new session, then debounce render.
 ---@param comp ManagedComponent The component to update.
+---@param eager? boolean Whether to render immediately instead of debouncing.
 ---@param dep_graph_kind? DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
 ---@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
----@param eager? boolean Whether to render immediately instead of debouncing.
-M.request_update_comp_graph = function(comp, dep_graph_kind, seen, eager)
+M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
     require("witch-line.core.Session").with_session(function(session)
         update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
         if eager then

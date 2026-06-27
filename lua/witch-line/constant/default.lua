@@ -1,29 +1,29 @@
 ---@type CombinedComponent
 return {
-    "mode",
-    "file.name",
-    "file.icon",
-    "file.modifier",
+    "wl.mode",
+    "wl.file.name",
+    "wl.file.icon",
+    "wl.file.modifier",
 
-    "git.branch",
-    "git.diff.added",
-    "git.diff.removed",
-    "git.diff.modified",
+    "wl.git.branch",
+    "wl.git.diff.added",
+    "wl.git.diff.removed",
+    "wl.git.diff.modified",
 
     "%=",
 
-    "diagnostic.error",
-    "diagnostic.warn",
-    "diagnostic.info",
-    "diagnostic.hint",
+    "wl.diagnostic.error",
+    "wl.diagnostic.warn",
+    "wl.diagnostic.info",
+    "wl.diagnostic.hint",
 
-    "lsp.clients",
+    "wl.lsp.clients",
 
-    "windsurf.neocodeium",
-    -- "windsurf",
+    "wl.windsurf.neocodeium",
+    -- "wl.windsurf",
 
-    "indent",
-    -- "encoding",
-    "cursor.pos",
-    "cursor.progress",
+    "wl.indent",
+    -- "wl.encoding",
+    "wl.cursor.pos",
+    "wl.cursor.progress",
 }

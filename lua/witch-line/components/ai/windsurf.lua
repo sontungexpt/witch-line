@@ -3,7 +3,7 @@ local progress_idx = 0
 
 ---@type DefaultComponent
 local WindSurf = {
-    id = "windsurf",
+    id = "wl.windsurf",
     _plug_provided = true,
     static = {
         fps = 3,
@@ -25,7 +25,7 @@ local WindSurf = {
                     return true
                 end
                 local timer
-                local refresh_component_graph = require("witch-line.core.handler").refresh_component_graph
+                local request_update_comp_graph = require("witch-line.core.handler").request_update_comp_graph
                 virtual_text.set_statusbar_refresh(function()
                     if
                         vim.bo.buftype ~= "prompt" and require("codeium.virtual_text").status().state == "waiting"
@@ -36,7 +36,7 @@ local WindSurf = {
                                 0,
                                 math.floor(1000 / self.static.fps),
                                 vim.schedule_wrap(function()
-                                    refresh_component_graph(self, true)
+                                    request_update_comp_graph(self, true)
                                 end)
                             )
                         end
@@ -44,10 +44,10 @@ local WindSurf = {
                     elseif timer then
                         timer:stop()
                     end
-                    refresh_component_graph(self)
+                    request_update_comp_graph(self)
                 end)
 
-                refresh_component_graph(self)
+                request_update_comp_graph(self)
             end,
         })
     end,
@@ -85,7 +85,7 @@ local neocodeium_timer_running = false
 
 ---@type DefaultComponent
 local Neocodeium = {
-    id = "windsurf.neocodeium",
+    id = "wl.windsurf.neocodeium",
     _plug_provided = true,
     events =
     "User NeoCodeiumDisabled, NeoCodeiumBufDisabled, NeoCodeiumEnabled, NeoCodeiumBufEnabled, NeoCodeiumServerConnected, NeoCodeiumServerStopped, NeoCodeiumLabelUpdated",
@@ -119,7 +119,7 @@ local Neocodeium = {
                             0,
                             math.floor(1000 / self.static.fps),
                             vim.schedule_wrap(function()
-                                require("witch-line.core.handler").refresh_component_graph(self, true)
+                                require("witch-line.core.handler").request_update_comp_graph(self, true)
                             end)
                         )
                         neocodeium_timer_running = true

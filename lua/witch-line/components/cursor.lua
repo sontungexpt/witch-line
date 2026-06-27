@@ -2,7 +2,7 @@ local colors = require("witch-line.constant.color")
 
 ---@type DefaultComponent
 local Position = {
-    id = "cursor.pos",
+    id = "wl.cursor.pos",
     _plug_provided = true,
     style = { fg = colors.fg },
     events = { "CursorMoved", "CursorMovedI" },
@@ -15,10 +15,10 @@ local Position = {
 
 ---@type DefaultComponent
 local Progress = {
-    id = "cursor.progress",
+    id = "wl.cursor.progress",
     _plug_provided = true,
     ref = {
-        events = "cursor.pos",
+        events = "wl.cursor.pos",
     },
     static = {
         chars = { "_", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" },
