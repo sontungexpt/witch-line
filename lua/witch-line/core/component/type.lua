@@ -18,7 +18,7 @@
 --- @class LiteralComponent : string
 
 --- @class CombinedComponent : Component, LiteralComponent
---- @field [integer] CombinedComponent a table of childs, can be used to create a list of components
+--- @field [integer] CombinedComponent A table of child components, can be used to create a list of components
 
 
 --- @alias PaddingFunc fun(self: ManagedComponent, session: Session): number|PaddingTable
@@ -47,17 +47,12 @@
 ---   - nil: no pattern filtering
 --- Empty strings or "*" are treated as no pattern.
 --- @field pattern? string|string[]
---- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
+--- @field remove_when? fun():boolean The event will be removed when `remove_when` returns true
 ---
 --- @class Component
 --- @field id? CompId The unique identifier for the component, can be a string or a number
 ---
---- The version of the component, can be used to force reload the component when it changes
---- - If provided, the component will be reloaded on start if the version changes manually when update component configurations by user. It's help the cache system work faster if speed is more important because the user manage the version manually.
---- - If nil, the component will automatically reload when the component changes by search for the changes by Cache system.
---- @field version? integer|string
----
---- The id of the component to inherit from, can be used to extend a component
+--- The id of the component to inherit from, can be used to extend a component.
 --- @field inherit? CompId
 ---
 --- A timing configuration that determines how often the component is updated.
@@ -75,16 +70,16 @@
 --- Overridable via the component config — values are deep-merged with the built-in defaults.
 --- @field static? table
 ---
---- The priority of the component when the status line is too long, higher numbers are more likely to be truncated
+--- The priority of the component when the status line is too long, higher numbers are more likely to be truncated.
 --- @field flexible? number
 ---
---- A function to determine whether the component should be automatically adjusted to suit the theme
+--- A function to determine whether the component should be automatically adjusted to suit the theme.
 --- @field auto_theme? boolean|fun(self: ManagedComponent, session: Session): boolean
 ---
 --- A flag indicating whether the component should show individual value for each window.
 --- @field win_individual? boolean
 ---
---- A table of events that the component will listen to
+--- A table of events that the component will listen to.
 ---
 --- @field events? string|string[]|SpecialEvent[]
 ---
@@ -100,7 +95,7 @@
 --- A table of styles that will be applied to the left separator of the component
 --- - If string: used as a highlight group name.
 --- - If table: used as highlight table properties.
---- - If nil: inherits from `style` field..
+--- - If nil: inherits from `style` field.
 --- - If SepStyle enum value: special handling based on the enum value.
 --- 	- SepFg: uses the foreground color of the main style for the separator.
 --- 	- SepBg: uses the background color of the main style for the separator.
@@ -120,7 +115,7 @@
 --- A table of styles that will be applied to the right part of the component
 --- - If string: used as a highlight group name.
 --- - If table: used as highlight table properties.
---- - If nil: inherits from `style` field..
+--- - If nil: inherits from `style` field.
 --- - If SepStyle enum value: special handling based on the enum value.
 --- 	- SepFg: uses the foreground color of the main style for the separator.
 --- 	- SepBg: uses the background color of the main style for the separator.
@@ -167,7 +162,7 @@
 --- - Example of style function: `function(self, session) return {fg = "#ffffff", bg = "#000000", bold = true} end`
 --- @field style? CompStyle|StyleFunc
 ---
---- A function that will be called before the component is updated
+--- A function that will be called before the component is updated.
 --- @field pre_update? fun(self: ManagedComponent, session: Session)
 ---
 --- The update function that will be called to get the value of the component
@@ -179,12 +174,12 @@
 --- - Example sharing state between components via `session.state`: see git/init.lua
 --- @field update? string|UpdateFunc
 ---
---- A function that will be called after the component is updated
+--- A function that will be called after the component is updated.
 --- @field post_update? fun(self: ManagedComponent, session: Session)
 ---
 --- Called to check if the component should be displayed, should return true or false
 --- - If nil: the component is always shown.
---- - If function: called and its return value is used to determine if the component should be visible
+--- - If function: called and its return value is used to determine if the component should be visible.
 --- @field hidden? fun(self: ManagedComponent, session: Session): boolean|nil
 ---
 ---
@@ -223,5 +218,5 @@
 
 --- @class ManagedComponent : Component, DefaultComponent
 --- @field id CompId the id of component
---- @field [integer] CompId -- Child components by their IDs
---- @field _loaded true Always true, indicates that the component is abstract and should not be rendered directly
+--- @field [integer] CompId Child components by their IDs
+--- @field _loaded true Always true; marks the component as loaded and managed.

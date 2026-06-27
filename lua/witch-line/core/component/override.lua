@@ -1,6 +1,7 @@
 local vim, type, rawset, pairs = vim, type, rawset, pairs
 
 -- Shared type-set tables (defined once to avoid per-entry allocation).
+-- Each maps a set of acceptable Lua types for a given override key.
 -- Note: "function" is a reserved word in Lua, so it must be quoted as a key.
 local FN_TABLE                 = { ["function"] = true, table = true }
 local BOOL_FN                  = { boolean = true, ["function"] = true }
@@ -10,6 +11,9 @@ local NUM_TABLE                = { number = true, table = true }
 local BOOL_NUM                 = { boolean = true, number = true }
 local ANY                      = { number = true, string = true, boolean = true, table = true, ["function"] = true }
 
+-- Field-level type constraints for override values.
+-- Each entry maps a component field name to the set of accepted Lua types.
+-- The type check prevents users from setting fields to incompatible types.
 local OVERRIDEABLE_TYPE_MAP    = {
     padding          = NUM_TABLE,
     static           = ANY,
@@ -26,7 +30,14 @@ local OVERRIDEABLE_TYPE_MAP    = {
     auto_theme       = BOOL_FN,
 }
 
---- Recursively merge a value, keeping the original when types differ.
+--- Recursively merge `from` into `to` for table values.
+--- Non-table values from `from` replace `to` directly.
+--- When `skip_type_check` is false (or omitted), type mismatches keep the original.
+--- Lists (integer-indexed tables) are replaced entirely rather than merged.
+--- @param to any  Original value (may be nil).
+--- @param from any  Override value to merge in.
+--- @param skip_type_check? boolean  When true, skip the type-compatibility guard.
+--- @return any  Merged result.
 local function merge_override_value(to, from, skip_type_check)
     if to == nil then
         return from
@@ -51,9 +62,12 @@ local function merge_override_value(to, from, skip_type_check)
 end
 
 --- Apply user overrides to a built-in component.
+--- Side effects:
+---   - Sets `_use_returned_style = false` when `style` is overridden.
+---   - Disables `auto_theme` when `style`, `left_style`, or `right_style` is overridden.
 --- @param comp DefaultComponent
---- @param override table
---- @return Component
+--- @param override table  User-provided override table.
+--- @return Component  The same `comp` table, modified in-place.
 local function apply_override(comp, override)
     if type(override) ~= "table" then
         return comp

@@ -12,11 +12,15 @@ local SepStyle = {
 M.SepStyle = SepStyle
 
 
---- Resolve a field value: call functions with session memo, pass through others.
+--- Read `comp[key]` and resolve it:
+---   - function → invoke via `session.memo` (cached for the session)
+---   - literal  → return as-is
+--- For components with an inherit/ref metatable, `comp[key]` walks the
+--- inherit/ref chain, so this automatically resolves inherited fields.
 --- @param comp ManagedComponent  Owner component, passed to function calls.
 --- @param key string  The field key to resolve.
---- @param session Session  Session context; nil means no memoization.
---- @return any  Resolved value (function return or literal).
+--- @param session Session  Session context.
+--- @return any  Resolved value(s).  `update` fields may return a second style value.
 local function resolve_value(comp, key, session)
     local value = comp[key]
     if type(value) == "function" then
@@ -25,7 +29,7 @@ local function resolve_value(comp, key, session)
     return value
 end
 
---- Call a lifecycle field if it is a function.
+--- Invoke `comp[field](comp)` when the field is a function.
 --- @param field string  Component field name (e.g. `"init"`, `"pre_update"`).
 --- @param comp ManagedComponent  Passed as `self` to the callback.
 local function call_lifecycle(field, comp)
@@ -35,19 +39,19 @@ local function call_lifecycle(field, comp)
     end
 end
 
---- Emit the pre_update lifecycle hook.
+--- Run `pre_update(comp)` if present.
 --- @param comp ManagedComponent
 M.emit_pre_update = function(comp)
     call_lifecycle("pre_update", comp)
 end
 
---- Emit the post_update lifecycle hook.
+--- Run `post_update(comp)` if present.
 --- @param comp ManagedComponent
 M.emit_post_update = function(comp)
     call_lifecycle("post_update", comp)
 end
 
---- Emit the init lifecycle hook.
+--- Run `init(comp)` if present.
 --- @param comp ManagedComponent
 M.emit_init = function(comp)
     call_lifecycle("init", comp)
@@ -61,7 +65,7 @@ M.hl_name_field = function(side)
 end
 
 --- Resolve the separator style for a side of a component.
---- Defaults to SepStyle.SepBg.
+--- Defaults to SepStyle.SepBg when the side style field is nil.
 --- @param comp ManagedComponent
 --- @param "left"|"right" side
 --- @return SepStyle|CompStyle
@@ -107,6 +111,7 @@ end
 
 
 --- Resolve the minimum screen width constraint for a component.
+--- Returns nil when the field is absent or resolves to a non-number.
 --- @param comp ManagedComponent
 --- @param session Session
 --- @return integer|nil
@@ -128,6 +133,7 @@ M.auto_theme = function(comp, session)
 end
 
 --- Determine whether a component should be hidden in the current context.
+--- Returns true only when `hidden` resolves to exactly `true`.
 --- @param comp ManagedComponent
 --- @param session Session
 --- @return boolean
