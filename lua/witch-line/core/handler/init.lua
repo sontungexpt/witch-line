@@ -1,14 +1,14 @@
 local vim, type, ipairs, rawset, require = vim, type, ipairs, rawset, require
 local api = vim.api
 
-local Component = require("witch-line.core.Component")
 local Statusline = require("witch-line.core.statusline")
 local Event = require("witch-line.core.manager.event")
 local Timer = require("witch-line.core.manager.timer")
 
-local Manager = require("witch-line.core.manager")
-local DepGraphKind = Manager.DepGraphKind
-local link_dependency = Manager.link_dependency
+local Registry = require("witch-line.core.manager.registry")
+local DepGraphKind = Registry.DepGraphKind
+local require_by_id = Registry.require_by_id
+local link_dependency = Registry.link_dependency
 
 -- Lazy-loaded modules
 local Highlight
@@ -19,11 +19,33 @@ Highlight = setmetatable({}, {
     end
 })
 
+local ComponentEvaluator
+ComponentEvaluator = setmetatable({}, {
+    __index = function(tbl, k)
+        ComponentEvaluator = require("witch-line.core.component.evaluator")
+        return ComponentEvaluator[k]
+    end
+})
+
 local M = {}
+
+
+--- Forwards definition functions
+
+local register_dependency_source
+local register_combined_component
+local register_component
+local register_literal_comp
+
+local hide_component
+local update_comp
+local update_comp_graph
+local update_comp_graph_by_ids
+
 
 --- Hide a component's segment. Skips if not renderable.
 ---@param comp ManagedComponent
-local hide_component = function(comp)
+hide_component = function(comp)
     if comp._renderable then
         Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
         rawset(comp, "_hidden", true)
@@ -75,7 +97,7 @@ end
 --- @return CompStyle style  The resolved style.
 local function update_comp_style(comp, session, auto_theme, override_style)
     local override_style_t = type(override_style)
-    local style, force, pcount = Manager.inherit(
+    local style, force, pcount = Registry.inherit(
         comp,
         "style",
         Highlight.merge_hl,
@@ -93,7 +115,7 @@ local function update_comp_style(comp, session, auto_theme, override_style)
         if pcount > 0 then
             hl_name = Highlight.make_hl_name_from_id(comp.id)
         else
-            local ref_comp = Manager.deepest_reference_component(comp, "style")
+            local ref_comp = Registry.deepest_reference_component(comp, "style")
             if ref_comp then
                 hl_name = ref_comp._hl_name or Highlight.make_hl_name_from_id(ref_comp.id)
                 rawset(ref_comp, "_hl_name", hl_name)
@@ -136,15 +158,15 @@ end
 --- @return boolean updated Whether the side highlight was changed.
 --- @return string|nil hl_name The dynamic highlight name as side.
 local function update_comp_side_style(comp, session, side, main_style_updated, main_style, auto_theme)
-    local side_style = Component.side_style(comp, side)
+    local side_style = ComponentEvaluator.side_style(comp, side)
     ---@cast side_style CompStyle|nil|SideStyleFunc|SepStyle
 
     local t = type(side_style)
-    local hl_name_field = Component.hl_name_field(side)
+    local hl_name_field = ComponentEvaluator.hl_name_field(side)
     local hl_name = comp[hl_name_field]
     local dynamic = t == "function"
 
-    local SepStyle = Component.SepStyle
+    local SepStyle = ComponentEvaluator.SepStyle
     -- Return early if no need to update
     if
         not (
@@ -209,20 +231,20 @@ end
 --- @param comp ManagedComponent The component to update.
 --- @param session Session The session to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
-local function update_comp(comp, session)
+update_comp = function(comp, session)
     local cid = comp.id
-    Component.emit_pre_update(comp)
+    ComponentEvaluator.emit_pre_update(comp)
 
     --- This part is manage by DepStoreKey.Display so we don't need to reference to the field of other component
-    local min_screen_width = Component.min_screen_width(comp, session)
+    local min_screen_width = ComponentEvaluator.min_screen_width(comp, session)
 
     local hidden = min_screen_width and api.nvim_get_option_value("columns", {}) < min_screen_width
-        or Component.hidden(comp, session)
+        or ComponentEvaluator.hidden(comp, session)
 
     if hidden then
         hide_component(comp)
     else
-        local value, override_style = Component.evaluate(comp, session)
+        local value, override_style = ComponentEvaluator.evaluate(comp, session)
 
         -- A abstract component will not have indices
         -- It's just call the update function for other purpose and we not affect to the statusline
@@ -233,7 +255,7 @@ local function update_comp(comp, session)
                 hidden = true
             else
                 local winid = comp.win_individual and api.nvim_get_current_win() or nil
-                local auto_theme = Component.auto_theme(comp, session)
+                local auto_theme = ComponentEvaluator.auto_theme(comp, session)
                 -- Main part
                 -- Update style first to make sure comp._hl_name is not nil
                 local style_updated, style = update_comp_style(
@@ -246,7 +268,7 @@ local function update_comp(comp, session)
                 Statusline.set_value(cid, value, comp._hl_name, winid)
 
                 --- Left part
-                local lval, lforce = Manager.inherit(comp, "left", nil, nil, session)
+                local lval, lforce = Registry.inherit(comp, "left", nil, nil, session)
                 if lval then
                     lval = format_side_value(lval, lforce)
                     if lval then
@@ -268,7 +290,7 @@ local function update_comp(comp, session)
                 end
 
                 --- Right part
-                local rval, rforce = Manager.inherit(comp, "right", nil, nil, session)
+                local rval, rforce = Registry.inherit(comp, "right", nil, nil, session)
                 if rval then
                     rval = format_side_value(rval, rforce)
                     if rval then
@@ -299,31 +321,29 @@ local function update_comp(comp, session)
         end
     end
 
-    Component.emit_post_update(comp)
+    ComponentEvaluator.emit_post_update(comp)
     return hidden
 end
-M.update_comp = update_comp
-
 
 
 --- Update a component and its dependencies recursively.
 --- Hides Visible dependents when the component becomes hidden.
----@param comp ManagedComponent
----@param session Session
----@param dep_graph_kind DepGraphKind|DepGraphKind[]
----@param seen? table<CompId, true>
-M.update_comp_graph = function(comp, session, dep_graph_kind, seen)
+---@param comp ManagedComponent The component to update.
+---@param session Session The session to update in.
+---@param dep_graph_kind DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
+---@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
+update_comp_graph = function(comp, session, dep_graph_kind, seen)
     seen = seen or {}
-    local id = comp.id
-    if seen[id] then return end
-    seen[id] = true
+    local cid = comp.id
+    if seen[cid] then return end
+    seen[cid] = true
 
     local hidden = update_comp(comp, session)
 
     if hidden then
-        for dep_id in Manager.iterate_dependents(DepGraphKind.Visible, id) do
+        for dep_id in Registry.iterate_dependents(DepGraphKind.Visible, cid) do
             seen[dep_id] = true
-            local dep = Manager.get_comp(dep_id)
+            local dep = Registry.get_comp(dep_id)
             if dep then hide_component(dep) end
         end
     end
@@ -331,66 +351,64 @@ M.update_comp_graph = function(comp, session, dep_graph_kind, seen)
 
     if type(dep_graph_kind) == "table" then
         for _, kind in ipairs(dep_graph_kind) do
-            for dep_id in Manager.iterate_dependents(kind, id) do
+            for dep_id in Registry.iterate_dependents(kind, cid) do
                 if not seen[dep_id] then
-                    local dep = Manager.get_comp(dep_id)
+                    local dep = Registry.get_comp(dep_id)
                     if dep then
-                        M.update_comp_graph(dep, session, kind, seen)
+                        update_comp_graph(dep, session, kind, seen)
                     end
                 end
             end
         end
-    else
-        for dep_id in Manager.iterate_dependents(dep_graph_kind, id) do
+    elseif dep_graph_kind then
+        for dep_id in Registry.iterate_dependents(dep_graph_kind, cid) do
             if not seen[dep_id] then
-                local dep = Manager.get_comp(dep_id)
+                local dep = Registry.get_comp(dep_id)
                 if dep then
-                    M.update_comp_graph(dep, session, dep_graph_kind, seen)
+                    update_comp_graph(dep, session, dep_graph_kind, seen)
                 end
             end
         end
     end
 end
 
---- Update a component and its deps in a new session, then debounce render.
----@param comp ManagedComponent
----@param dep_graph_kind? DepGraphKind|DepGraphKind[]
----@param seen? table<CompId, true>
-M.request_update_comp_graph = function(comp, dep_graph_kind, seen)
-    require("witch-line.core.Session").with_session(function(session)
-        M.update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
-        Statusline.render_debounce()
-    end)
-end
-
---- Update a component and its deps immediately, optionally skip debounce.
----@param comp ManagedComponent
----@param eager? boolean
----@param dep_graph_kind? DepGraphKind|DepGraphKind[]
----@param seen? table<CompId, true>
-M.refresh_component_graph = function(comp, eager, dep_graph_kind, seen)
-    require("witch-line.core.Session").with_session(function(session)
-        M.update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
-        if eager then
-            Statusline.render()
-        else
-            Statusline.render_debounce()
-        end
-    end)
-end
 
 --- Update multiple components by IDs through the dep graph.
----@param ids CompId[]
----@param session Session
----@param dep_graph_kind DepGraphKind|DepGraphKind[]|nil
----@param seen table<CompId, true>|nil
-function M.update_comp_graph_by_ids(ids, session, dep_graph_kind, seen)
+---@param ids CompId[] The IDs of the components to update.
+---@param session Session The session to update in.
+---@param dep_graph_kind DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
+---@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
+update_comp_graph_by_ids = function(ids, session, dep_graph_kind, seen)
     seen = seen or {}
     for _, id in ipairs(ids) do
         if not seen[id] then
-            local comp = Manager.get_comp(id)
+            local comp = Registry.get_comp(id)
             if comp then
-                M.update_comp_graph(comp, session, dep_graph_kind, seen)
+                update_comp_graph(comp, session, dep_graph_kind, seen)
+            end
+        end
+    end
+end
+
+local function register_dependency_links(kind, ids, dependent_id)
+    local ids_type = type(ids)
+    if ids_type == "table" then
+        for _, id in ipairs(ids) do
+            link_dependency(kind, id, dependent_id)
+
+            if not Registry.is_existed(id) then
+                local dep = require_by_id(id)
+                if dep then
+                    register_dependency_source(dep)
+                end
+            end
+        end
+    elseif ids_type == "string" then
+        link_dependency(kind, ids, dependent_id)
+        if not Registry.is_existed(ids) then
+            local dep = require_by_id(ids)
+            if dep then
+                register_dependency_source(dep)
             end
         end
     end
@@ -413,35 +431,10 @@ local function bind_update_conditions(comp)
     end
 end
 
-local function register_dependency_links(kind, ids, dependent_id)
-    local ids_type = type(ids)
-    if ids_type == "table" then
-        for _, id in ipairs(ids) do
-            link_dependency(kind, id, dependent_id)
-
-            if not Manager.is_existed(id) then
-                local dep = Component.require_by_id(id)
-                if dep then
-                    M.register_dependency_source(dep)
-                end
-            end
-        end
-    elseif ids_type == "string" then
-        link_dependency(kind, ids, dependent_id)
-        if not Manager.is_existed(ids) then
-            local dep = Component.require_by_id(ids)
-            if dep then
-                M.register_dependency_source(dep)
-            end
-        end
-    end
-end
-
-
 --- Register a component: wire triggers, inherit/ref meta, dep links.
 ---@param comp Component|table
 ---@return ManagedComponent
-M.register_dependency_source = function(comp)
+register_dependency_source = function(comp)
     if comp._loaded then
         --- @cast comp ManagedComponent
         return comp
@@ -449,48 +442,48 @@ M.register_dependency_source = function(comp)
 
     local path = comp[0]
     if type(path) == "string" then
-        local c = Component.require_by_id(path)
+        local c = require_by_id(path)
         if c then
-            comp = require("witch-line.core.Component.override")(c, comp)
+            comp = require("witch-line.core.component.override")(c, comp)
         end
     end
 
-    comp = Manager.register(comp)
-    rawset(comp, "_loaded", true)
+    local cid, managed_comp = Registry.register(comp)
+    rawset(managed_comp, "_loaded", true)
 
-    if comp.init then
-        Component.emit_init(comp)
+    if managed_comp.init then
+        ComponentEvaluator.emit_init(managed_comp)
     end
 
-    bind_update_conditions(comp)
-
-    local ref = rawget(comp, "ref")
+    local ref = rawget(managed_comp, "ref")
     if type(ref) == "table" then
-        register_dependency_links(DepGraphKind.Event, ref.events, comp.id)
-        register_dependency_links(DepGraphKind.Timer, ref.timing, comp.id)
-        register_dependency_links(DepGraphKind.Visible, ref.hidden, comp.id)
-        register_dependency_links(DepGraphKind.Visible, ref.min_screen_width, comp.id)
+        register_dependency_links(DepGraphKind.Event, ref.events, cid)
+        register_dependency_links(DepGraphKind.Timer, ref.timing, cid)
+        register_dependency_links(DepGraphKind.Visible, ref.hidden, cid)
+        register_dependency_links(DepGraphKind.Visible, ref.min_screen_width, cid)
     end
 
-    local inherit = rawget(comp, "inherit")
+    local inherit = rawget(managed_comp, "inherit")
     if inherit then
-        register_dependency_links(DepGraphKind.Event, inherit, comp.id)
-        register_dependency_links(DepGraphKind.Timer, inherit, comp.id)
-        register_dependency_links(DepGraphKind.Visible, inherit, comp.id)
+        register_dependency_links(DepGraphKind.Event, inherit, cid)
+        register_dependency_links(DepGraphKind.Timer, inherit, cid)
+        register_dependency_links(DepGraphKind.Visible, inherit, cid)
     end
 
-    if comp.lazy == false then
-        Manager.mark_emergency(comp.id)
+    bind_update_conditions(managed_comp)
+
+    if managed_comp.lazy == false then
+        Registry.mark_emergency(cid)
     end
 
-    return comp
+    return managed_comp
 end
 
 --- Push component to the segment list and mark renderable.
 --- Skips components without an `update` field.
 ---@param comp ManagedComponent
 ---@param winid integer|nil  Window-local list when set.
-local function build_indices(comp, winid)
+local build_indices = function(comp, winid)
     local update = comp.update
     if not update then
         return
@@ -512,20 +505,19 @@ end
 ---@param parent_id CompId|nil
 ---@param winid integer|nil  When set, marks window-local and pushes to the win-specific index.
 ---@return ManagedComponent
-local function register_component(comp, parent_id, winid)
+register_component = function(comp, parent_id, winid)
     if comp._loaded then
         --- @cast comp ManagedComponent
         build_indices(comp, winid)
         return comp
     end
 
-
     if not vim.islist(comp) then
         if winid then
             rawset(comp, "win_individual", true)
         end
 
-        comp = M.register_dependency_source(comp)
+        comp = register_dependency_source(comp)
 
         build_indices(comp, winid)
     end
@@ -539,7 +531,7 @@ end
 ---@param comp string
 ---@param win_id integer|nil  Window-local segment list when set.
 ---@return string  The input string.
-local function register_literal_comp(comp, win_id)
+register_literal_comp = function(comp, win_id)
     if comp ~= "" then
         Statusline.push(nil, comp, win_id)
     end
@@ -552,11 +544,11 @@ end
 ---@param parent_id CompId|nil
 ---@param winid integer|nil  Window-local statusline window id.  Pass nil for global.
 ---@return ManagedComponent|string  The registered component or literal string.
-function M.register_combined_component(comp, parent_id, winid)
+register_combined_component = function(comp, parent_id, winid)
     local kind = type(comp)
     if kind == "string" then
         --- @cast comp DefaultId
-        local c = Component.require_by_id(comp)
+        local c = require_by_id(comp)
         if not c then
             --- @cast comp string
             return register_literal_comp(comp, winid)
@@ -571,7 +563,7 @@ function M.register_combined_component(comp, parent_id, winid)
 
     for i, child in ipairs(comp) do
         --- @cast child CombinedComponent
-        M.register_combined_component(child, comp.id, winid)
+        register_combined_component(child, comp.id, winid)
         rawset(comp, i, nil)
     end
     return comp
@@ -580,8 +572,8 @@ end
 --- Initialise global components, per-window components, event/timer handlers,
 --- and emergency components.
 ---@param statusline UserConfig.Statusline
-function M.setup(statusline)
-    M.register_combined_component(statusline.global)
+M.setup = function(statusline)
+    register_combined_component(statusline.global)
 
     if statusline.win then
         local seen = {}
@@ -603,7 +595,7 @@ function M.setup(statusline)
                     if not api.nvim_win_is_valid(winid) then return end
                     local components = statusline.win(winid)
                     if type(components) ~= "table" then return end
-                    M.register_combined_component(components, nil, winid)
+                    register_combined_component(components, nil, winid)
                     Statusline.render_debounce(winid)
                 end)
             end,
@@ -615,26 +607,46 @@ function M.setup(statusline)
             if event_info then
                 session.set("EventInfo", event_info)
             end
-            M.update_comp_graph_by_ids(ids, session, DepGraphKind.Event)
+            update_comp_graph_by_ids(ids, session, DepGraphKind.Event)
             Statusline.render_debounce()
         end)
     end)
 
     Timer.on_timer_trigger(function(ids)
         require("witch-line.core.Session").with_session(function(session)
-            M.update_comp_graph_by_ids(ids, session, DepGraphKind.Timer)
+            update_comp_graph_by_ids(ids, session, DepGraphKind.Timer)
             Statusline.render_debounce()
         end)
     end)
 
-    local emergency_ids = Manager.get_emergency_ids()
+    local emergency_ids = Registry.get_emergency_ids()
     if next(emergency_ids) ~= nil then
         require("witch-line.core.Session").with_session(function(session)
-            M.update_comp_graph_by_ids(emergency_ids, session,
+            update_comp_graph_by_ids(emergency_ids, session,
                 { DepGraphKind.Event, DepGraphKind.Timer })
             Statusline.render_debounce()
         end)
     end
 end
+
+--- Update a component and its deps in a new session, then debounce render.
+---@param comp ManagedComponent The component to update.
+---@param dep_graph_kind? DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
+---@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
+---@param eager? boolean Whether to render immediately instead of debouncing.
+M.request_update_comp_graph = function(comp, dep_graph_kind, seen, eager)
+    require("witch-line.core.Session").with_session(function(session)
+        update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
+        if eager then
+            Statusline.render()
+        else
+            Statusline.render_debounce()
+        end
+    end)
+end
+
+M.update_comp = update_comp
+M.update_comp_graph = update_comp_graph
+M.update_comp_graph_by_ids = update_comp_graph_by_ids
 
 return M

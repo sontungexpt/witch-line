@@ -1,5 +1,7 @@
 local colors = require("witch-line.constant.color")
 
+local BRANCH_CTX = { root_dir = nil }
+
 local DISABLED_FILETYPES = {
     "NvimTree",
     "neo-tree",
@@ -7,8 +9,6 @@ local DISABLED_FILETYPES = {
     "dashboard",
     "TelescopePrompt",
 }
-
-local BRANCH_CTX = { root_dir = nil }
 
 ---@type DefaultComponent
 local Branch = {
@@ -107,6 +107,9 @@ local Diff = {}
 Diff.Interface = {
     id = "git.diff.interface",
     _plug_provided = true,
+    static = {
+        disabled_filetypes = DISABLED_FILETYPES,
+    },
     init = function(self, _)
         local vim = vim
         local api = vim.api
@@ -134,7 +137,7 @@ Diff.Interface = {
                 end
 
                 if event ~= "BufDelete" then
-                    if self._diff_cache[bufnr] or vim.list_contains(DISABLED_FILETYPES, vim.bo[bufnr].filetype) then
+                    if self._diff_cache[bufnr] or vim.list_contains(self.static.disabled_filetypes, vim.bo[bufnr].filetype) then
                         require("witch-line.core.handler").request_update_comp_graph(self)
                         return
                     end
@@ -190,36 +193,37 @@ Diff.Interface = {
         })
     end,
     hidden = function(self, _)
-        return vim.list_contains(DISABLED_FILETYPES, vim.bo.filetype)
+        return vim.list_contains(self.static.disabled_filetypes, vim.bo.filetype)
     end,
-    update = function(self, ctx)
-        ctx.state.diff = self._diff_cache[vim.api.nvim_get_current_buf()]
-        return ""
+    context = function(self)
+        return { diff = self._diff_cache[vim.api.nvim_get_current_buf()] }
     end,
 }
 
 local function diff_hidden(self, _)
-    return vim.list_contains(DISABLED_FILETYPES, vim.bo.filetype)
+    return vim.list_contains(self.static.disabled_filetypes, vim.bo.filetype)
 end
-
-local ADDED_ICON = ""
-local MODIFIED_ICON = ""
-local REMOVED_ICON = "-"
 
 --- @type DefaultComponent
 Diff.Added = {
     id = "git.diff.added",
     _plug_provided = true,
-    style = {
-        fg = colors.green,
+    static = {
+        disabled_filetypes = DISABLED_FILETYPES,
+        icon = "",
     },
+    ref = {
+        events = "git.diff.interface",
+        context = "git.diff.interface",
+    },
+    style = { fg = colors.green },
     hidden = diff_hidden,
-    update = function(self, ctx)
-        local diff = ctx.state.diff
-        if diff then
-            local added = diff.added
+    update = function(self, session)
+        local ctx = self:with_session(session).context(self, session)
+        if ctx.diff then
+            local added = ctx.diff.added
             if added then
-                return ADDED_ICON .. " " .. added
+                return self.static.icon .. " " .. added
             end
         end
         return ""
@@ -230,16 +234,22 @@ Diff.Added = {
 Diff.Modified = {
     id = "git.diff.modified",
     _plug_provided = true,
-    style = {
-        fg = colors.cyan,
+    static = {
+        disabled_filetypes = DISABLED_FILETYPES,
+        icon = "",
     },
+    ref = {
+        events = "git.diff.interface",
+        context = "git.diff.interface",
+    },
+    style = { fg = colors.cyan },
     hidden = diff_hidden,
-    update = function(self, ctx)
-        local diff = ctx.state.diff
-        if diff then
-            local modified = diff.modified
+    update = function(self, session)
+        local ctx = self:with_session(session).context(self, session)
+        if ctx.diff then
+            local modified = ctx.diff.modified
             if modified then
-                return MODIFIED_ICON .. " " .. modified
+                return self.static.icon .. " " .. modified
             end
         end
         return ""
@@ -250,16 +260,22 @@ Diff.Modified = {
 Diff.Removed = {
     id = "git.diff.removed",
     _plug_provided = true,
-    style = {
-        fg = colors.red,
+    static = {
+        disabled_filetypes = DISABLED_FILETYPES,
+        icon = "-",
     },
+    ref = {
+        events = "git.diff.interface",
+        context = "git.diff.interface",
+    },
+    style = { fg = colors.red },
     hidden = diff_hidden,
-    update = function(self, ctx)
-        local diff = ctx.state.diff
-        if diff then
-            local removed = diff.removed
+    update = function(self, session)
+        local ctx = self:with_session(session).context(self, session)
+        if ctx.diff then
+            local removed = ctx.diff.removed
             if removed then
-                return REMOVED_ICON .. " " .. removed
+                return self.static.icon .. " " .. removed
             end
         end
         return ""

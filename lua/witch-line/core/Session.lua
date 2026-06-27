@@ -58,9 +58,9 @@ local function new()
             return cache[key]
         end,
         memo = function(fn, ...)
-            local v = cache[fn]
-            if v ~= nil then
-                return v
+            local cached = cache[fn]
+            if cached ~= nil then
+                return cached[1], cached[2]
             end
 
             if type(fn) ~= "function" then
@@ -68,9 +68,9 @@ local function new()
                 return
             end
 
-            v = fn(...)
-            cache[fn] = v
-            return v
+            local a, b = fn(...)
+            cache[fn] = { a, b }
+            return a, b
         end
     }
 end

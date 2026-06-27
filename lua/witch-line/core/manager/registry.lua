@@ -1,5 +1,9 @@
-local next = next
-local Component = require("witch-line.core.Component")
+local next, rawget, rawset, setmetatable = next, rawget, rawset, setmetatable
+local NIL = vim.NIL
+
+local IdModule = require("witch-line.constant.id")
+
+local COMP_MODULE_PATH = "witch-line.components."
 
 local M = {}
 
@@ -9,7 +13,6 @@ local DepGraphKind = {
     Event = 2,
     Timer = 3,
 }
-
 M.DepGraphKind = DepGraphKind
 
 --- Three-way dependency graph.
@@ -35,129 +38,45 @@ local DepGraph = {
     [DepGraphKind.Visible] = {},
 }
 
-
 ---@type table<CompId, ManagedComponent>
 local ManagedComps = {}
 
 --- @type CompId[]
 local EmergencyIds = {}
 
-M.get_emergency_ids = function()
-    return EmergencyIds
-end
+--- Forwards definition functions
+local require_by_id
+local get_managed
+local find_raw_value
+local lookup_plain_value
+local with_session
+local register
+local inherit
 
-M.mark_emergency = function(id)
-    EmergencyIds[#EmergencyIds + 1] = id
-end
-
-M.iterate_comps = function()
-    return pairs(ManagedComps)
-end
-
-local session_proxy_meta = {
-    __index = function(proxy, key)
-        local comp = proxy._comp
-        local session = proxy._session
-
-        local value = M.lookup_plain_value(comp, key)
-
-        if type(value) == "function" then
-            return function(...)
-                return session.memo(value, ...)
-            end
+--- Load a component module by path segments.  First segment is
+--- prefixed with `"witch-line.components."`.
+--- @param path string[]  Segments, e.g. `{"statusline", "mode"}`.
+--- @return table|nil  The resolved module table, or nil if not found.
+local require = function(path)
+    local component = require(COMP_MODULE_PATH .. path[1])
+    for i = 2, #path do
+        component = component[path[i]]
+        if not component then
+            return nil
         end
-
-        return value
-    end,
-}
-
-function M.with_session(comp, session)
-    local cache = session.get_cache("__proxy")
-    if not cache then
-        cache = {}
-        session.set_cache("__proxy", cache)
     end
-
-    local proxy = cache[comp.id]
-    if proxy then
-        return proxy
-    end
-
-    proxy = setmetatable({
-        _comp = comp,
-        _session = session,
-    }, session_proxy_meta)
-
-    cache[comp.id] = proxy
-    return proxy
+    return component
 end
 
-local shared_comp_meta = {
-    __index = function(comp, key)
-        if key == "with_session" then
-            return M.with_session
-        end
-
-        return M.lookup_plain_value(comp, key)
-    end,
-}
-
-M.register = function(comp)
-    local id = Component.setup(comp)
-    ManagedComps[id] = setmetatable(comp, shared_comp_meta)
-    return comp
+--- Load a component by its module path id (derived from a DefaultId).
+--- Falls back to Component.require internally.
+--- @param id DefaultId
+--- @return Component|nil
+require_by_id = function(id)
+    local path = IdModule.path(id)
+    return path and require(path) or nil
 end
 
-M.is_existed = function(id)
-    return ManagedComps[id] ~= nil
-end
-
---- Get the component for the given id, if it exists.
---- @param id CompId The component id to retrieve.
---- @return ManagedComponent|nil The component, or `nil` if not found.
-M.get_comp = function(id)
-    return ManagedComps[id]
-end
-
---- Register a dependency edge: when `source_id` fires, `dependent_id` is also queued.
---- @param kind DepGraphKind The kind of graph to link in.
---- @param source_id CompId The id of the component that depends on `dependent_id`.
---- @param dependent_id CompId The id of the component that is depended on by `source_id`.
-M.link_dependency = function(kind, source_id, dependent_id)
-    local graph = DepGraph[kind]
-    local deps = graph[source_id] or {}
-    deps[dependent_id] = true
-    graph[source_id] = deps
-end
-
---- Iterate over registered dependents of `comp_id` in the given graph kind.
---- @param kind DepGraphKind The kind of graph to iterate over.
---- @param comp_id CompId The id of the component to iterate dependents of.
---- @return fun(): CompId|nil A function that returns the next dependent id, or `nil` when done.
-M.iterate_dependents = function(kind, comp_id)
-    local map = DepGraph[kind][comp_id] or {}
-    local dependent_id = nil
-    return function()
-        dependent_id = next(map, dependent_id)
-        return dependent_id
-    end
-end
-
-
-M.inspect = function(target)
-    local notifier = require("witch-line.utils.notifier")
-    if target == "dep_graph" then
-        notifier.info("DepGraph:\n" .. vim.inspect(DepGraph))
-    elseif target == "comps" then
-        notifier.info("ManagedComps:\n" .. vim.inspect(ManagedComps))
-    else
-        notifier.info(vim.inspect({
-            DepGraph = DepGraph,
-            EmergencyIds = EmergencyIds,
-            Comps = ManagedComps,
-        }))
-    end
-end
 
 --- Ensure a component is registered before use.
 ---
@@ -170,7 +89,7 @@ end
 --- @param id CompId Component id to ensure.
 --- @param visiting? table<CompId, boolean> Tracks components currently being visited.
 --- @return ManagedComponent|nil
-local function get_managed(id, visiting)
+get_managed = function(id, visiting)
     visiting = visiting or {}
 
     -- Prevent infinite recursion caused by cyclic inheritance.
@@ -202,18 +121,22 @@ local function get_managed(id, visiting)
     visiting[id] = nil
 
     -- Register and return the managed component.
-    return M.register(raw_comp)
+    return register(raw_comp)
 end
-
-local VIM_NIL = vim.NIL
---- @type table<string, table<CompId, vim.NIL|{[1]: any, [2]: ManagedComponent, [3]: ManagedComponent|nil}>>
-local raw_cache = {}
 
 --- @class RawValueResult
 --- @field [1] any                     -- Raw value (or proxy function for reference lookups)
 --- @field [2] ManagedComponent        -- Component where the value is originally defined
 --- @field [3] ManagedComponent|nil    -- Deepest reference component in the lookup path
 --- @field [4] ManagedComponent        -- Deepest inherited component in the lookup path
+
+--- The cache of raw component values, used to avoid redundant lookups.
+--- @type table<string, table<CompId, vim.NIL|RawValueResult>>
+local raw_cache = {}
+
+--- The cache of inherited values, used to avoid redundant lookups.
+--- @type table<string, table<CompId, {[1]: any,[2]: integer}>>
+local inherited_cache = {}
 
 --- Internal recursive lookup for a raw (unevaluated) key value.
 ---
@@ -233,10 +156,10 @@ local raw_cache = {}
 --- @param seen table<CompId, boolean> Tracks visited components to prevent recursive cycles.
 ---
 --- @return RawValueResult|vim.NIL result
-local function find_raw_value(comp, key, seen)
+find_raw_value = function(comp, key, seen)
     local cid = comp.id
     if seen[cid] then
-        return VIM_NIL
+        return NIL
     end
     seen[cid] = true
 
@@ -266,7 +189,7 @@ local function find_raw_value(comp, key, seen)
         local parent = get_managed(inherit_id)
         if parent then
             local r = find_raw_value(parent, key, seen)
-            if r ~= VIM_NIL then
+            if r ~= NIL then
                 result = {
                     r[1],           -- value
                     r[2],           -- origin
@@ -293,7 +216,7 @@ local function find_raw_value(comp, key, seen)
             local ref_comp = get_managed(ref[key])
             if ref_comp then
                 local r = find_raw_value(ref_comp, key, seen)
-                if r ~= VIM_NIL then
+                if r ~= NIL then
                     local last_ref = r[3] or ref_comp
                     local value = r[1]
 
@@ -324,12 +247,12 @@ local function find_raw_value(comp, key, seen)
     end
 
     if key_cache then
-        key_cache[cid] = VIM_NIL
+        key_cache[cid] = NIL
     else
-        raw_cache[key] = { [cid] = VIM_NIL }
+        raw_cache[key] = { [cid] = NIL }
     end
 
-    return VIM_NIL
+    return NIL
 end
 
 --- Perform a plain lookup for a key within a component hierarchy.
@@ -347,19 +270,18 @@ end
 --- @return nil|any raw_value The raw value found (static or unevaluated function).
 --- @return nil|ManagedComponent origin The origin component where the value is defined.
 --- @return nil|ManagedComponent drc The deepest reference component, or nil if not found.
-local lookup_plain_value = function(comp, key, seen)
+lookup_plain_value = function(comp, key, seen)
     local result = find_raw_value(comp, key, seen or {})
-    if result == VIM_NIL then
+    if result == NIL then
         return nil, nil, nil
     end
     return result[1], result[2], result[3]
 end
-M.lookup_plain_value = lookup_plain_value
 
 --- Retrieve only the context component for a given key.
 ---
 --- This returns the *final component* in the inheritance or reference chain
---- where the key’s value originated — useful for context-based evaluation.
+--- where the key's value originated — useful for context-based evaluation.
 ---
 --- @param comp ManagedComponent            The component to start lookup from.
 --- @param key string                       The key name to look up.
@@ -367,14 +289,10 @@ M.lookup_plain_value = lookup_plain_value
 --- @return ManagedComponent|nil context    The deepest referencecomponent, or nil if not found.
 M.deepest_reference_component = function(comp, key, seen)
     local r = find_raw_value(comp, key, seen or {})
-    return r ~= VIM_NIL and r[3] or nil
+    return r ~= NIL and r[3] or nil
 end
 
-
---- @type table<string, table<CompId, {[1]: any,[2]: integer}>>
-local inherited_cache = {}
-
-function M.inherit(comp, key, merge, self_val, session, ...)
+inherit = function(comp, key, merge, self_val, session, ...)
     local cid = comp.id
 
     --------------------------------------------------------------------------
@@ -493,5 +411,149 @@ function M.inherit(comp, key, merge, self_val, session, ...)
     --------------------------------------------------------------------------
     return val, dynamic, n
 end
+
+local session_proxy_meta = {
+    __index = function(proxy, key)
+        local comp = proxy._comp
+        local value = lookup_plain_value(comp, key)
+
+        if type(value) == "function" then
+            local session = proxy._session
+            return function(...)
+                return session.memo(value, ...)
+            end
+        end
+
+        return value
+    end,
+}
+
+with_session = function(comp, session)
+    return setmetatable({
+        _comp = comp,
+        _session = session,
+    }, session_proxy_meta)
+end
+
+
+--- Assign and validate a unique id.  Built-ins (`_plug_provided`) skip generation.
+--- @param comp Component  May have `id` pre-set; otherwise one is generated.
+--- @return CompId The component's (validated or generated) identifier.
+local resolve_comp_id = function(comp)
+    local id = comp.id
+
+    --- @cast comp DefaultComponent
+    if comp._plug_provided then
+        --- @cast id DefaultId
+        return id
+    end
+
+    if id then
+        id = IdModule.validate(id)
+    else
+        id = tostring(comp) .. tostring(math.random(1, 1000000))
+        rawset(comp, "id", id)
+    end
+
+    --- @cast id CompId
+    return id
+end
+
+local shared_comp_meta = {
+    __index = function(comp, key)
+        if key == "with_session" then
+            return with_session
+        end
+
+        return lookup_plain_value(comp, key)
+    end,
+}
+
+register = function(comp)
+    local id = resolve_comp_id(comp)
+    ManagedComps[id] = setmetatable(comp, shared_comp_meta)
+    return id, comp
+end
+
+
+--- Get the list of emergency component ids.
+--- @return CompId[] The list of emergency component ids.
+M.get_emergency_ids = function()
+    return EmergencyIds
+end
+
+
+--- Mark the component with the given id as an emergency component.
+--- @param id CompId The component id to mark as emergency.
+M.mark_emergency = function(id)
+    EmergencyIds[#EmergencyIds + 1] = id
+end
+
+
+--- Get the component for the given id, if it exists.
+--- @param id CompId The component id to retrieve.
+--- @return ManagedComponent|nil The component, or `nil` if not found.
+M.get_comp = function(id)
+    return ManagedComps[id]
+end
+
+--- Check if the component with the given id exists.
+--- @param id CompId The component id to check.
+--- @return boolean `true` if the component exists, `false` otherwise.
+M.is_existed = function(id)
+    return ManagedComps[id] ~= nil
+end
+
+--- Register a dependency edge: when `source_id` fires, `dependent_id` is also queued.
+--- @param kind DepGraphKind The kind of graph to link in.
+--- @param source_id CompId The id of the component that depends on `dependent_id`.
+--- @param dependent_id CompId The id of the component that is depended on by `source_id`.
+M.link_dependency = function(kind, source_id, dependent_id)
+    local graph = DepGraph[kind]
+    local deps = graph[source_id]
+    if deps then
+        deps[dependent_id] = true
+    else
+        graph[source_id] = { [dependent_id] = true }
+    end
+end
+
+--- Iterate over registered dependents of `comp_id` in the given graph kind.
+--- @param kind DepGraphKind The kind of graph to iterate over.
+--- @param comp_id CompId The id of the component to iterate dependents of.
+--- @return fun(): CompId|nil A function that returns the next dependent id, or `nil` when done.
+M.iterate_dependents = function(kind, comp_id)
+    local map = DepGraph[kind][comp_id]
+    if map == nil then
+        return function() return nil end
+    end
+
+    local dependent_id = nil
+    return function()
+        dependent_id = next(map, dependent_id)
+        return dependent_id
+    end
+end
+
+M.inspect = function(target)
+    local notifier = require("witch-line.utils.notifier")
+    if target == "dep_graph" then
+        notifier.info("DepGraph:\n" .. vim.inspect(DepGraph))
+    elseif target == "comps" then
+        notifier.info("ManagedComps:\n" .. vim.inspect(ManagedComps))
+    else
+        notifier.info(vim.inspect({
+            DepGraph = DepGraph,
+            EmergencyIds = EmergencyIds,
+            Comps = ManagedComps,
+        }))
+    end
+end
+
+M.require_by_id = require_by_id
+M.with_session = with_session
+M.register = register
+M.lookup_plain_value = lookup_plain_value
+M.inherit = inherit
 
 return M
