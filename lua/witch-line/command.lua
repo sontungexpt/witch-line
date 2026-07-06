@@ -5,33 +5,33 @@ local FALLBACK_KEY = {}
 
 local COMMANDS = {
     toggle_auto_theme = function(...)
-        return require("witch-line.core.highlight").toggle_auto_theme(...)
+        return require("witch-line.engine.highlight").toggle_auto_theme(...)
     end,
     inspect = {
         event_store = function(...)
-            return require("witch-line.core.manager.event").inspect(...)
+            return require("witch-line.event.event").inspect(...)
         end,
         timer_store = function(...)
-            return require("witch-line.core.manager.timer").inspect(...)
+            return require("witch-line.event.timer").inspect(...)
         end,
         comp_manager = {
             comps = function(...)
-                return require("witch-line.core.manager").inspect(...)
+                return require("witch-line.core.registry").inspect(...)
             end,
             dep_store = function(...)
-                return require("witch-line.core.manager").inspect(...)
+                return require("witch-line.core.registry").inspect(...)
             end,
         },
         highlight = {
             rgb24bit = function(...)
-                return require("witch-line.core.highlight").inspect(...)
+                return require("witch-line.engine.highlight").inspect(...)
             end,
             styles = function(...)
-                return require("witch-line.core.highlight").inspect(...)
+                return require("witch-line.engine.highlight").inspect(...)
             end,
         },
         statusline = function(...)
-            return require("witch-line.core.statusline").inspect(...)
+            return require("witch-line.engine.statusline").inspect(...)
         end,
     },
 }
@@ -89,7 +89,7 @@ vim.api.nvim_create_user_command("WitchLine", function(a)
         if type(fallback) == "function" then
             fallback(arg, a)
         else
-            require("witch-line.utils.notifier").error("WitchLine: Incomplete command. Subcommand required.")
+            require("witch-line.util.notifier").error("WitchLine: Incomplete command. Subcommand required.")
         end
     end
 end, {

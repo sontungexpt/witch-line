@@ -318,6 +318,31 @@ local child = {
 }
 ```
 
+### `abstract` — provider-only component
+
+A component with `abstract = true` is never rendered — it exists only to provide data to other components via `ref`. Use this for shared providers that multiple components depend on:
+
+```lua
+local provider = {
+  id = "wl.provider",
+  abstract = true,
+  context = function(self, session)
+    return { value = 42 }
+  end,
+}
+
+local display = {
+  id = "wl.display",
+  ref = { context = "wl.provider" },
+  update = function(self, session)
+    local ctx = self:with_session(session).context(self, session)
+    return "value: " .. ctx.value
+  end,
+}
+```
+
+The provider will never appear in the statusline.
+
 ### `ref` — read-only delegation
 
 Reference another component's field without copying. The referenced component drives the value.
@@ -424,5 +449,6 @@ local event_info = session:get("EventInfo")
 | `on_click` | `string\|fun\|table` | `nil` | Click callback. |
 | `flexible` | `number` | `nil` | Hiding priority (higher = hidden first). |
 | `lazy` | `boolean` | `true` | Load only when needed. |
+| `abstract` | `boolean` | `false` | Provider-only; never rendered. |
 | `inherit` | `string` | `nil` | Parent component ID to copy fields from. |
 | `ref` | `table` | `nil` | Read-only field delegation. |
