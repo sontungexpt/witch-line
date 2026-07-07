@@ -6,7 +6,7 @@ return {
     static = {
         format = "default",
     },
-    update = function(self, session_id)
+    update = function(self, _)
         local static = self.static
         --- @cast  static {format: string}
         local fmt = static.format or "default"
