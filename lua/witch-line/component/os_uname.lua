@@ -1,4 +1,5 @@
 local colors = require("witch-line.config.color")
+local uv = vim.uv or vim.loop
 
 --- @type DefaultComponent
 return {
@@ -19,23 +20,27 @@ return {
             windows = colors.blue,
         },
     },
-    update = function(self, session_id)
-        local os_uname = (vim.uv or vim.loop).os_uname()
-        local static = self.static
-        --- @cast static { icon: { mac: string, arch: string, linux: string, windows: string }, colors: { mac: string, arch: string, linux: string, windows: string } }
-        local uname, static_icon, static_colors = os_uname.sysname, static.icon, static.colors
+    update = function(self, _)
+        local u = uv.os_uname()
+        local sysname = u.sysname
+        local ico = self.static.icon
+        local col = self.static.colors
 
-        if uname == "Darwin" then
-            return static_icon.mac, { fg = static_colors.mac }
-        elseif uname == "Linux" then
-            if os_uname.release:find("arch") then
-                return static_icon.arch, { fg = static_colors.arch }
-            end
-            return static_icon.linux, { fg = static_colors.linux }
-        elseif uname == "Windows_NT" then
-            return static_icon.windows, { fg = static_colors.windows }
+        if sysname == "Darwin" then
+            return ico.mac, { fg = col.mac }
         end
 
-        return uname or "󱚟  Unknown OS", { fg = "#ffffff" }
+        if sysname == "Linux" then
+            if u.release:match("[Aa][Rr][Cc][Hh]") then
+                return ico.arch, { fg = col.arch }
+            end
+            return ico.linux, { fg = col.linux }
+        end
+
+        if sysname == "Windows_NT" then
+            return ico.windows, { fg = col.windows }
+        end
+
+        return "󱚟 " .. (sysname or "Unknown OS"), { fg = "#ffffff" }
     end,
 }

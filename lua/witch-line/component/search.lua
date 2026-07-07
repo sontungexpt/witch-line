@@ -1,16 +1,16 @@
---- @type DefaultComponent
+local fn_searchcount = vim.fn.searchcount
+
 local SearchCount = {
     id = "wl.search.count",
     ___builtin = true,
-    events = { "CmdlineLeave /" },
+    events = { "CmdlineLeave /,?" },
     hidden = function(self, _)
         return vim.v.hlsearch == 0
     end,
     update = function(self, _)
-        local search = vim.fn.searchcount({ maxcount = 999 })
-        if not search then return "" end
-        local current = search.current
-        return current and current .. "/" .. math.min(search.total or 0, search.maxcount or 999)
+        local search = fn_searchcount({ maxcount = 999 })
+        if not search or search.total == 0 then return "" end
+        return search.current .. "/" .. search.total
     end,
 }
 
