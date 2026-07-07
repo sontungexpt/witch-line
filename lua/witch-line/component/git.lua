@@ -77,7 +77,7 @@ local DISABLED_FILETYPES = {
 ---@type DefaultComponent
 local Branch = {
     id = "wl.git.branch",
-    ___plug_provided = true,
+    ___builtin = true,
     static = {
         branch_icon = "",
         disabled_filetypes = DISABLED_FILETYPES,
@@ -167,7 +167,7 @@ local Diff = {}
 --- @type DefaultComponent
 Diff.Interface = {
     id = "wl.git.diff.interface",
-    ___plug_provided = true,
+    ___builtin = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
     },
@@ -271,7 +271,7 @@ end
 --- @type DefaultComponent
 Diff.Added = {
     id = "wl.git.diff.added",
-    ___plug_provided = true,
+    ___builtin = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
@@ -300,7 +300,7 @@ Diff.Added = {
 ---@type DefaultComponent
 Diff.Modified = {
     id = "wl.git.diff.modified",
-    ___plug_provided = true,
+    ___builtin = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
@@ -329,7 +329,7 @@ Diff.Modified = {
 ---@type DefaultComponent
 Diff.Removed = {
     id = "wl.git.diff.removed",
-    ___plug_provided = true,
+    ___builtin = true,
     static = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "-",

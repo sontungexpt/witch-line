@@ -4,7 +4,7 @@ local colors = require("witch-line.config.color")
 local Encoding = {
     id = "wl.encoding",
     events = { "InsertEnter" },
-    ___plug_provided = true,
+    ___builtin = true,
     style = { fg = colors.yellow },
     update = function(self, _)
         local enc = vim.bo.fenc ~= "" and vim.bo.fenc or vim.o.enc

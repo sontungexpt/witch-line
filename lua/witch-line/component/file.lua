@@ -10,7 +10,7 @@ local INTERFACE_ID = "wl.file.interface"
 ---@type DefaultComponent
 local Interface = {
     id = INTERFACE_ID,
-    ___plug_provided = true,
+    ___builtin = true,
 
     events = "BufEnter",
 
@@ -77,7 +77,7 @@ local Interface = {
 ---@type DefaultComponent
 local Name = {
     id = "wl.file.name",
-    ___plug_provided = true,
+    ___builtin = true,
 
     ref = {
         events = INTERFACE_ID,
@@ -99,7 +99,7 @@ local Name = {
 ---@type DefaultComponent
 local Icon = {
     id = "wl.file.icon",
-    ___plug_provided = true,
+    ___builtin = true,
 
     ref = {
         events = INTERFACE_ID,
@@ -120,7 +120,7 @@ local Icon = {
 ---@type DefaultComponent
 local Modifier = {
     id = "wl.file.modifier",
-    ___plug_provided = true,
+    ___builtin = true,
 
     events = {
         "BufEnter",
@@ -151,7 +151,7 @@ local Modifier = {
 ---@type DefaultComponent
 local Size = {
     id = "wl.file.size",
-    ___plug_provided = true,
+    ___builtin = true,
 
     events = "BufWritePost",
 

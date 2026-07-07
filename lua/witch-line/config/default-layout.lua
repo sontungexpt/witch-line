@@ -1,6 +1,6 @@
 ---@type CombinedComponent
 return {
-    -- "wl.mode",
+    "wl.mode",
     -- "wl.file.name",
     -- "wl.file.icon",
     -- "wl.file.modifier",
@@ -17,13 +17,13 @@ return {
     -- "wl.diagnostic.info",
     -- "wl.diagnostic.hint",
 
-    -- "wl.lsp.clients",
+    "wl.lsp.clients",
 
-    -- "wl.windsurf.neocodeium",
-    -- -- "wl.windsurf",
+    "wl.codeium.neocodeium",
+    -- "wl.codeium",
 
-    -- "wl.indent",
-    -- -- "wl.encoding",
-    -- "wl.cursor.pos",
+    "wl.indent",
+    "wl.encoding",
+    "wl.cursor.pos",
     "wl.cursor.progress",
 }

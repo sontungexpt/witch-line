@@ -4,12 +4,11 @@ local api = vim.api
 local Statusline = require("witch-line.engine.statusline")
 local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
-local IdPathMap = require("witch-line.config.ids")
+local DefaultComp = require("witch-line.config.default-comp")
 
 local Registry = require("witch-line.core.registry")
 local is_existed = Registry.is_existed
 local DepGraphKind = Registry.DepGraphKind
-local require_comp_by_id = Registry.require_comp_by_id
 local link_dependency = Registry.link_dependency
 
 local M = {}
@@ -28,25 +27,25 @@ local mount_literal_comp
 --- Link a component's dependency to source IDs.
 --- Auto-loads any source that is not yet registered.
 ---@param kind DepGraphKind
----@param ids CompId|CompId[]
+---@param comp_id CompId|CompId[]
 ---@param dependent_id CompId
-local function register_dependency_links(kind, ids, dependent_id)
-    local ids_type = type(ids)
-    if ids_type == "table" then
-        for _, id in ipairs(ids) do
+local function register_dependency_links(kind, comp_id, dependent_id)
+    local id_type = type(comp_id)
+    if id_type == "table" then
+        for _, id in ipairs(comp_id) do
             link_dependency(kind, id, dependent_id)
 
             if not is_existed(id) then
-                local dep = require_comp_by_id(id)
+                local dep = DefaultComp[id]
                 if dep then
                     load_component(dep)
                 end
             end
         end
-    elseif ids_type == "string" then
-        link_dependency(kind, ids, dependent_id)
-        if not is_existed(ids) then
-            local dep = require_comp_by_id(ids)
+    elseif id_type == "string" then
+        link_dependency(kind, comp_id, dependent_id)
+        if not is_existed(comp_id) then
+            local dep = DefaultComp[comp_id]
             if dep then
                 load_component(dep)
             end
@@ -72,20 +71,20 @@ M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
 end
 
 --- Resolve a component's id.
---- - `___plug_provided` → return DefaultId as-is.
+--- - `___builtin` → return DefaultId as-is.
 --- - id set → `IdModule.validate` (errors if not a string or collides with DefaultId).
 --- - no id → generate a random one and store it via `rawset`.
 --- @param comp Component
 --- @return CompId
 local function resolve_comp_id(comp)
     local id = comp.id
-    if comp.___plug_provided then
+    if comp.___builtin then
         --- @cast id DefaultId
         return id
     elseif id then
         if type(id) ~= "string" then
             require("witch-line.util.notifier").error("Id must be a string")
-        elseif IdPathMap[id] then
+        elseif DefaultComp[id] then
             require("witch-line.util.notifier").error("Id must be different from default id: " .. tostring(id))
         end
         return id
@@ -107,7 +106,7 @@ load_component = function(comp)
 
     local path = comp[0]
     if type(path) == "string" then
-        local c = require_comp_by_id(path)
+        local c = DefaultComp[path]
         if c then
             comp = require("witch-line.core.override")(c, comp)
         end
@@ -215,14 +214,13 @@ mount_literal_comp = function(comp, win_id)
 end
 
 ---Mount a combined component tree.
----Strings resolve via `require_comp_by_id`; unresolved strings become literals.
 ---@param comp CombinedComponent
 ---@param group_id CompId|nil
 ---@param winid integer|nil
 mount_component_tree = function(comp, group_id, winid)
     local kind = type(comp)
     if kind == "string" then
-        local required = require_comp_by_id(comp)
+        local required = DefaultComp[comp]
         if not required then
             return mount_literal_comp(comp, winid)
         end
@@ -234,7 +232,6 @@ mount_component_tree = function(comp, group_id, winid)
     end
 
     ---@cast comp Component
-
     if not vim.islist(comp) then
         rawset(comp, "___container", group_id)
         mount_component(comp, group_id, winid)

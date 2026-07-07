@@ -120,7 +120,7 @@ local charge_anim_index = 0
 ---@type DefaultComponent
 return {
     id = "wl.battery",
-    ___plug_provided = true,
+    ___builtin = true,
     timing = 10000,
     static = {
         icons = {

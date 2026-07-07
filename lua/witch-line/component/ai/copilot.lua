@@ -21,7 +21,7 @@ end
 ---@type DefaultComponent
 local Copilot = {
     id = "wl.copilot",
-    ___plug_provided = true,
+    ___builtin = true,
     static = {
         fps = 3,
         icons = {

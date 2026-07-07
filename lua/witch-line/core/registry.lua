@@ -1,9 +1,7 @@
 local next, rawget, rawset, setmetatable = next, rawget, rawset, setmetatable
 local NIL = vim.NIL
 
-local IdPathMap = require("witch-line.config.ids")
-
-local COMP_MODULE_PATH = "witch-line.component."
+local DefaultComp = require("witch-line.config.default-comp")
 
 local M = {}
 
@@ -46,7 +44,6 @@ local ProxyComps = {}
 
 
 --- Forward declarations
-local require_comp_by_id
 local find_raw_value
 local lookup_plain_value
 local register
@@ -54,20 +51,6 @@ local inherit
 local create_proxy
 local get_proxy
 
---- Load a component by its module path id (derived from a DefaultId).
---- Falls back to Component.require internally.
---- @param id CompId
---- @return DefaultComponent|nil
-require_comp_by_id = function(id)
-    local path = IdPathMap[id]
-    if not path then return nil end
-    local component = require(COMP_MODULE_PATH .. path[1])
-    for i = 2, #path do
-        component = component[path[i]]
-        if not component then return nil end
-    end
-    return component
-end
 
 --- Ensure a raw component is loaded into ManagedComps by id.
 --- Does not create a proxy (lazy).
@@ -78,7 +61,7 @@ local function ensure_loaded(id)
     if loaded then
         return loaded
     end
-    local raw_comp = require_comp_by_id(id)
+    local raw_comp = DefaultComp[id]
     if not raw_comp then
         return nil
     end
@@ -458,8 +441,10 @@ end
 --- Stores the raw component in ManagedComps and creates a proxy.
 ---@param cid CompId
 ---@param comp Component
+---@return ManagedComponent
 register = function(cid, comp)
     ManagedComps[cid] = comp
+    return comp
 end
 
 
@@ -534,7 +519,6 @@ M.inspect = function(target)
     end
 end
 
-M.require_comp_by_id = require_comp_by_id
 M.register = register
 M.lookup_plain_value = lookup_plain_value
 M.inherit = inherit

@@ -1,7 +1,7 @@
 --- @type DefaultComponent
 local SearchCount = {
     id = "wl.search.count",
-    ___plug_provided = true,
+    ___builtin = true,
     events = { "CmdlineLeave /" },
     hidden = function(self, _)
         return vim.v.hlsearch == 0

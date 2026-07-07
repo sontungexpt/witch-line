@@ -8,8 +8,8 @@
 --- | "wl.file.size"
 ---
 --- | "wl.copilot"
---- | "wl.windsurf"
---- | "wl.windsurf.neocodeium"
+--- | "wl.codeium"
+--- | "wl.codeium.neocodeium"
 ---
 --- | "wl.diagnostic.interface"
 --- | "wl.diagnostic.error"
@@ -38,12 +38,6 @@
 --- | "wl.search.count"
 --- | "wl.selection.count"
 ---
---- | "wl.weather.location"
---- | "wl.weather.data"
---- | "wl.weather.icon"
---- | "wl.weather.temp"
---- | "wl.weather.text"
---- | "wl.weather"
 
 
 
@@ -58,8 +52,8 @@ local IdPathMap = {
     ["wl.file.size"]            = { "file", "size" },
 
     ["wl.copilot"]              = { "ai.copilot" },
-    ["wl.windsurf"]             = { "ai.windsurf", "windsurf" },
-    ["wl.windsurf.neocodeium"]  = { "ai.windsurf", "neocodeium" },
+    ["wl.codeium"]             = { "ai.codeium", "codeium" },
+    ["wl.codeium.neocodeium"]  = { "ai.codeium", "neocodeium" },
 
     ["wl.diagnostic.interface"] = { "diagnostic", "interface" },
     ["wl.diagnostic.error"]     = { "diagnostic", "error" },
@@ -87,13 +81,35 @@ local IdPathMap = {
 
     ["wl.search.count"]         = { "search", "count" },
     ["wl.selection.count"]      = { "selection", "count" },
-
-    ["wl.weather.location"]     = { "weather", "location" },
-    ["wl.weather.data"]         = { "weather", "data" },
-    ["wl.weather.icon"]         = { "weather", "icon" },
-    ["wl.weather.temp"]         = { "weather", "temp" },
-    ["wl.weather.text"]         = { "weather", "text" },
-    ["wl.weather"]              = { "weather" },
 }
 
-return IdPathMap
+local COMP_CONTAINER = "witch-line.component."
+
+--- @type table<DefaultId, DefaultComponent>
+local CompMap = {}
+setmetatable(CompMap, {
+    --- Load a component by its module path id (derived from a DefaultId).
+    --- Falls back to Component.require internally.
+    --- @param id CompId
+    --- @return DefaultComponent|nil
+    __index = function(_, id)
+        local paths = IdPathMap[id]
+        if not paths then return nil end
+        local component = require(COMP_CONTAINER .. paths[1])
+
+        local i = 2
+        local key = paths[i]
+        while key do
+            component = component[key]
+            if component == nil then
+                return nil
+            end
+
+            i = i + 1
+            key = paths[i]
+        end
+        return component
+    end,
+})
+
+return CompMap

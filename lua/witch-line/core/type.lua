@@ -226,7 +226,7 @@
 
 --- @class DefaultComponent : Component The default components provided by witch-line
 --- @field id DefaultId the id of default component
---- @field ___plug_provided true Mark as created by witch-line
+--- @field ___builtin true Mark as created by witch-line
 
 --- @class ManagedComponent : DefaultComponent | Component
 --- @field id CompId the id of component

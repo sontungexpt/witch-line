@@ -57,21 +57,23 @@ end
 -- Stub all dependencies of engine/init.lua via package.preload
 -- ====================================================================
 
-package.preload["witch-line.config.id"] = function()
-    return {
-        path = function(id)
-            local map = {
-                ["wl.test.simple"] = { "test", "simple" },
-                ["wl.test.parent"] = { "test", "parent" },
-            }
-            return map[id]
+local COMPONENT_DEFS = {
+    ["wl.test.simple"] = {
+        id = "wl.test.simple", ___builtin = true,
+        update = function() return "resolved" end,
+    },
+    ["wl.test.parent"] = {
+        id = "wl.test.parent", ___builtin = true,
+        update = function() return "parent" end,
+    },
+}
+
+package.preload["witch-line.config.default-comp"] = function()
+    return setmetatable({}, {
+        __index = function(_, id)
+            return COMPONENT_DEFS[id]
         end,
-        existed = function(id) return id == "wl.test.simple" or id == "wl.test.parent" end,
-        validate = function(id)
-            if type(id) ~= "string" then error("Id must be a string") end
-            return id
-        end,
-    }
+    })
 end
 
 package.preload["witch-line.core.registry"] = function()
@@ -90,23 +92,6 @@ package.preload["witch-line.core.registry"] = function()
             return comp
         end,
         get_comp = function(id) return registered[id] end,
-        require_comp_by_id = function(id)
-            local comps = {
-                ["wl.test.simple"] = {
-                    id = "wl.test.simple", ___plug_provided = true,
-                    update = function() return "resolved" end,
-                },
-                ["wl.test.parent"] = {
-                    id = "wl.test.parent", ___plug_provided = true,
-                    update = function() return "parent" end,
-                },
-            }
-            if comps[id] then
-                registered[id] = comps[id]
-                return comps[id]
-            end
-            return nil
-        end,
         iterate_dependent_ids = function() return function() end end,
     }
 end
@@ -220,7 +205,7 @@ local MOCK_MODULES = {
     "witch-line.event.event",
     "witch-line.event.timer",
     "witch-line.core.registry",
-    "witch-line.config.id",
+    "witch-line.config.default-comp",
     "witch-line.core.override",
     "witch-line.core.component_api",
     "witch-line.engine.update",
@@ -258,7 +243,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.test.simple",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "hello" end,
         },
     })
@@ -294,7 +279,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.abstract",
-            ___plug_provided = true,
+            ___builtin = true,
             abstract = true,
         },
     })
@@ -307,7 +292,7 @@ do
         global = {
             {
                 id = "wl.test.simple",
-                ___plug_provided = true,
+                ___builtin = true,
                 update = function() return "a" end,
             },
             "literal two",
@@ -325,7 +310,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.test.simple",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "dep" end,
             ref = { events = "wl.test.parent" },
         },
@@ -344,7 +329,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.test.simple",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "multi" end,
             ref = { events = { "wl.test.parent", "wl.test.simple" } },
         },
@@ -366,7 +351,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.timed",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "tick" end,
             timing = 5000,
         },
@@ -381,7 +366,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.ev",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "boom" end,
             events = { "BufEnter", "BufWritePost" },
         },
@@ -399,7 +384,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.inited",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "hello" end,
             init = function(self)
                 init_called = true
@@ -419,7 +404,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.emergency",
-            ___plug_provided = true,
+            ___builtin = true,
             lazy = false,
             update = function() return "urgent" end,
         },
@@ -435,7 +420,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.test.simple",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "x" end,
         },
     })
@@ -489,7 +474,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.test.simple",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "base" end,
         },
     })
@@ -508,7 +493,7 @@ do
     local eng = run_setup({
         global = {
             id = "wl.test.simple",
-            ___plug_provided = true,
+            ___builtin = true,
             update = function() return "base" end,
         },
     })

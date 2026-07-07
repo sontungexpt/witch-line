@@ -3,7 +3,7 @@ local colors = require("witch-line.config.color")
 ---@type DefaultComponent
 local Position = {
     id = "wl.cursor.pos",
-    ___plug_provided = true,
+    ___builtin = true,
     style = { fg = colors.fg },
     events = { "CursorMoved", "CursorMovedI" },
     update = function(self)
@@ -16,7 +16,7 @@ local Position = {
 ---@type DefaultComponent
 local Progress = {
     id = "wl.cursor.progress",
-    ___plug_provided = true,
+    ___builtin = true,
     ref = {
         events = "wl.cursor.pos",
     },

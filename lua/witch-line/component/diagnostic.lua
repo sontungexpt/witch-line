@@ -11,7 +11,7 @@ local InterfaceId = "wl.diagnostic.interface"
 --- @type DefaultComponent
 local Interface = {
     id = InterfaceId,
-    ___plug_provided = true,
+    ___builtin = true,
     abstract = true,
 
     events = "DiagnosticChanged",
@@ -58,7 +58,7 @@ local SHARED_REF = {
 --- @type DefaultComponent
 local Error = {
     id = "wl.diagnostic.error",
-    ___plug_provided = true,
+    ___builtin = true,
     ref = SHARED_REF,
     style = { fg = "DiagnosticError" },
     update = function(self, session)
@@ -75,7 +75,7 @@ local Error = {
 --- @type DefaultComponent
 local Warn = {
     id = "wl.diagnostic.warn",
-    ___plug_provided = true,
+    ___builtin = true,
     ref = SHARED_REF,
     style = { fg = "DiagnosticWarn" },
     update = function(self, session)
@@ -92,7 +92,7 @@ local Warn = {
 --- @type DefaultComponent
 local Info = {
     id = "wl.diagnostic.info",
-    ___plug_provided = true,
+    ___builtin = true,
     ref = SHARED_REF,
     style = { fg = "DiagnosticInfo" },
     update = function(self, session)
@@ -109,7 +109,7 @@ local Info = {
 --- @type DefaultComponent
 local Hint = {
     id = "wl.diagnostic.hint",
-    ___plug_provided = true,
+    ___builtin = true,
     ref = SHARED_REF,
     style = { fg = "DiagnosticHint" },
     update = function(self, session)

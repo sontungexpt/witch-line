@@ -1,77 +1,75 @@
 local colors = require("witch-line.config.color")
 
+
 ---@type DefaultComponent
 local Clients = {
     id = "wl.lsp.clients",
-    ___plug_provided = true,
+    ___builtin = true,
     events = { "LspAttach", "LspDetach", "BufWritePost" },
     flexible = 100,
     static = {
-        disabled = {
-            filetypes = {
-                "NvimTree",
-            },
+        disabled_filetypes = { "NvimTree" },
+        ignore_servers = {
+            ["null-ls"] = true,
+            ["none-ls"] = true,
+            ["copilot"] = true,
         },
     },
     hidden = function(self, session_id)
-        local disabled = self.static.disabled
-        ---@cast disabled {filetypes: string[]}
-        if type(disabled) ~= "table" then
-            return false
-        end
-
-        return type(disabled.filetypes) == "table" and vim.list_contains(disabled.filetypes, vim.bo.filetype)
+        local disabled = self.static.disabled_filetypes
+        return type(disabled) == "table"
+            and vim.list_contains(disabled, vim.bo.filetype)
     end,
     style = { fg = colors.magenta },
-
     update = function(self, session_id)
         local bufnr = vim.api.nvim_get_current_buf()
-        local server_names = {}
+        if not vim.api.nvim_buf_is_valid(bufnr) then
+            return ""
+        end
 
-        local ignore_lsp_servers = {
-            ["null-ls"] = true,
-            ["copilot"] = true,
-        }
+        local ignore = self.static.ignore_servers
+        local names = {}
+        local seen = {}
 
         for _, client in ipairs(vim.lsp.get_clients { bufnr = bufnr }) do
-            if not ignore_lsp_servers[client.name] then
-                server_names[#server_names + 1] = client.name
+            if not ignore[client.name] then
+                seen[client.name] = true
+                names[#names + 1] = client.name
             end
         end
 
-        local has_null_ls, null_ls = pcall(require, "null-ls")
-        if has_null_ls then
-            local buf_ft = vim.bo[bufnr].filetype
-            local sources = require("null-ls.sources")
-            local available_sources = sources.get_available(buf_ft)
-
-            for _, source in ipairs(available_sources) do
-                local is_lsp_related = source.methods[null_ls.methods.DIAGNOSTICS]
-                    or source.methods[null_ls.methods.DIAGNOSTICS_ON_OPEN]
-                    or source.methods[null_ls.methods.DIAGNOSTICS_ON_SAVE]
-                    or source.methods[null_ls.methods.FORMATTING]
-
-                if is_lsp_related then
-                    server_names[#server_names + 1] = source.name
+        local ls = package.loaded["null-ls"] or package.loaded["none-ls"]
+        if ls then
+            local sources = ls.sources.get_available(vim.bo[bufnr].filetype)
+            local methods = ls.methods
+            for _, source in ipairs(sources) do
+                local m = source.methods
+                if not seen[source.name] and (
+                        m[methods.DIAGNOSTICS]
+                        or m[methods.DIAGNOSTICS_ON_OPEN]
+                        or m[methods.DIAGNOSTICS_ON_SAVE]
+                        or m[methods.FORMATTING]
+                    ) then
+                    seen[source.name] = true
+                    names[#names + 1] = source.name
                 end
             end
         end
 
-        if package.loaded["conform"] then
-            local ok, conform = pcall(require, "conform")
-            if ok then
-                local formatters = conform.list_formatters(bufnr)
-                vim.list_extend(
-                    server_names,
-                    vim.tbl_map(function(formatter)
-                        return formatter.name
-                    end, formatters)
-                )
+        local conform = package.loaded["conform"]
+        if conform then
+            for _, f in ipairs(conform.list_formatters(bufnr)) do
+                if not seen[f.name] then
+                    seen[f.name] = true
+                    names[#names + 1] = f.name
+                end
             end
         end
 
-        server_names = require("witch-line.util.tbl").unique_list(server_names)
-        return #server_names > 0 and table.concat(server_names, ", ") or "No Lsp, Formatters  "
+        if #names == 0 then
+            return "No Lsp, Formatters  "
+        end
+        return table.concat(names, ", ")
     end,
 }
 

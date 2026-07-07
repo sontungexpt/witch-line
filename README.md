@@ -345,8 +345,8 @@ Each component is referenced by name and can be composed to build a flexible and
 | `wl.file.size`             | `file.lua`             | Shows the file size                       |
 | `%=`                       | _(builtin)_            | Separator to align left/right components  |
 | `wl.copilot`               | `ai/copilot.lua`       | Shows Copilot status (if available)       |
-| `wl.windsurf`              | `ai/windsurf.lua`      | Shows Windsurf status (if available)      |
-| `wl.windsurf.neocodeium`   | `ai/windsurf.lua`      | Shows Neocodeium status (if available)    |
+| `wl.codeium`              | `ai/codeium.lua`      | Shows Codeium status (if available)        |
+| `wl.codeium.neocodeium`   | `ai/codeium.lua`      | Shows Neocodeium status (if available)     |
 | `wl.diagnostic.error`      | `diagnostic.lua`       | Shows number of error diagnostics         |
 | `wl.diagnostic.warn`       | `diagnostic.lua`       | Shows number of warning diagnostics       |
 | `wl.diagnostic.info`       | `diagnostic.lua`       | Shows number of info diagnostics          |

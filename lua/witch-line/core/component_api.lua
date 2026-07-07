@@ -104,7 +104,7 @@ M.min_screen_width = function(comp, session)
     return type(m) == "number" and m or nil
 end
 
---- Resolve auto_theme for a component; falls back to `___plug_provided`.
+--- Resolve auto_theme for a component; falls back to `___builtin`.
 --- @param comp ManagedComponent
 --- @param session Session
 --- @return boolean
@@ -113,7 +113,7 @@ M.auto_theme = function(comp, session)
     if auto ~= nil then
         return auto
     end
-    return comp.___plug_provided or false
+    return comp.___builtin or false
 end
 
 --- Determine whether a component should be hidden in the current context.

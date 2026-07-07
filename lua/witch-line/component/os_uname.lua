@@ -3,7 +3,7 @@ local colors = require("witch-line.config.color")
 --- @type DefaultComponent
 return {
     id = "wl.os_uname",
-    ___plug_provided = true,
+    ___builtin = true,
     events = "UIEnter",
     static = {
         icon = {
