@@ -403,7 +403,7 @@ M.on_event = function(work)
 
     local dispatch_debounce
     dispatch_debounce = function(...)
-        dispatch_debounce = require("witch-line.util").debounce(dispatch, 110)
+        dispatch_debounce = require("witch-line.util.debounce")(dispatch, 110)
         dispatch_debounce(...)
     end
 

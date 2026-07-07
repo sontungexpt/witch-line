@@ -1,7 +1,7 @@
 local next, rawget, rawset, setmetatable = next, rawget, rawset, setmetatable
 local NIL = vim.NIL
 
-local IdModule = require("witch-line.config.id")
+local IdPathMap = require("witch-line.config.ids")
 
 local COMP_MODULE_PATH = "witch-line.component."
 
@@ -59,7 +59,7 @@ local get_proxy
 --- @param id CompId
 --- @return DefaultComponent|nil
 require_comp_by_id = function(id)
-    local path = IdModule.path(id)
+    local path = IdPathMap[id]
     if not path then return nil end
     local component = require(COMP_MODULE_PATH .. path[1])
     for i = 2, #path do
@@ -107,7 +107,11 @@ local function debug_log(...)
         args[i] = tostring(v)
     end
     local line = os.date("%H:%M:%S") .. " " .. table.concat(args, " ") .. "\n"
-    vim.fn.writefile({ line }, DEBUG_LOG, "a")
+    local f = io.open(DEBUG_LOG, "a")
+    if f then
+        f:write(line)
+        f:close()
+    end
 end
 
 --- Walk the raw component and its `ref` chain in search of a `key` field.
@@ -186,6 +190,9 @@ create_proxy = function(cid, raw_comp)
     local proxy = setmetatable({
         id = cid,
     }, {
+        __newindex = function(t, k, v)
+            raw_comp[k] = v
+        end,
         __index = function(p, key)
             debug_log("PROXY_INDEX", cid, key)
 
@@ -461,17 +468,18 @@ end
 --- @param id CompId The component id to retrieve.
 --- @return ManagedComponent|nil The component, or `nil` if not found.
 M.get_comp = function(id)
-    local proxy = ProxyComps[id]
-    if proxy then
-        return proxy
-    end
-    local raw = ManagedComps[id]
-    if not raw then
-        return nil
-    end
-    proxy = create_proxy(id, raw)
-    ProxyComps[id] = proxy
-    return proxy
+    return ManagedComps[id]
+    -- local proxy = ProxyComps[id]
+    -- if proxy then
+    --     return proxy
+    -- end
+    -- local raw = ManagedComps[id]
+    -- if not raw then
+    --     return nil
+    -- end
+    -- proxy = create_proxy(id, raw)
+    -- ProxyComps[id] = proxy
+    -- return proxy
 end
 
 --- Check if the component with the given id exists.

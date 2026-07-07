@@ -3,7 +3,8 @@ local uv = vim.uv or vim.loop
 
 local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
 local function debug_log(...)
-    vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") }, DEBUG_LOG, "a")
+    local f = io.open(DEBUG_LOG, "a")
+    if f then f:write(os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") .. "\n") f:close() end
 end
 
 local function get_root_by_git(dir_path)

@@ -1,6 +1,6 @@
 --- 24-bit RGB color palette used as the default color source for components.
 --- Each value is an integer 0xRRGGBB.
-local palette = {
+return {
     yellow = 0xffc021,
     cyan = 0x56b6c2,
     green = 0x47d864,
@@ -12,5 +12,3 @@ local palette = {
     purple = 0xc688eb,
     pink = 0xeb7fdc,
 }
-
-return palette

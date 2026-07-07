@@ -6,11 +6,11 @@ return {
     -- "wl.file.modifier",
 
     -- "wl.git.branch",
-    "wl.git.diff.added",
+    -- "wl.git.diff.added",
     -- "wl.git.diff.removed",
     -- "wl.git.diff.modified",
 
-    -- "%=",
+    "%=",
 
     -- "wl.diagnostic.error",
     -- "wl.diagnostic.warn",
@@ -25,5 +25,5 @@ return {
     -- "wl.indent",
     -- -- "wl.encoding",
     -- "wl.cursor.pos",
-    -- "wl.cursor.progress",
+    "wl.cursor.progress",
 }

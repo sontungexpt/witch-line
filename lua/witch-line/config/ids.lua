@@ -48,7 +48,7 @@
 
 
 --- @type table<DefaultId, string[]>
-local PathMap = {
+local IdPathMap = {
     ["wl.mode"]                 = { "mode" },
 
     ["wl.file.interface"]       = { "file", "interface" },
@@ -96,26 +96,4 @@ local PathMap = {
     ["wl.weather"]              = { "weather" },
 }
 
-
-return {
-    ---@param id CompId
-    ---@return string[]|nil
-    path = function(id) return PathMap[id] end,
-
-    ---@param id CompId
-    ---@return boolean
-    existed = function(id) return PathMap[id] ~= nil end,
-
-    --- Validate a user-provided id string.
-    --- An error is emitted if the id collides with a built-in DefaultId.
-    ---@param id any
-    ---@return CompId
-    validate = function(id)
-        if type(id) ~= "string" then
-            require("witch-line.util.notifier").error("Id must be a string")
-        elseif PathMap[id] then
-            require("witch-line.util.notifier").error("Id must be different from default id: " .. tostring(id))
-        end
-        return id
-    end,
-}
+return IdPathMap

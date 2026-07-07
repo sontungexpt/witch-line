@@ -4,7 +4,7 @@ local api = vim.api
 local Statusline = require("witch-line.engine.statusline")
 local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
-local IdModule = require("witch-line.config.id")
+local IdPathMap = require("witch-line.config.ids")
 
 local Registry = require("witch-line.core.registry")
 local is_existed = Registry.is_existed
@@ -83,7 +83,12 @@ local function resolve_comp_id(comp)
         --- @cast id DefaultId
         return id
     elseif id then
-        return IdModule.validate(id)
+        if type(id) ~= "string" then
+            require("witch-line.util.notifier").error("Id must be a string")
+        elseif IdPathMap[id] then
+            require("witch-line.util.notifier").error("Id must be different from default id: " .. tostring(id))
+        end
+        return id
     else
         id = tostring(comp) .. tostring(math.random(1, 1000000))
         rawset(comp, "id", id)
@@ -215,15 +220,14 @@ end
 ---@param group_id CompId|nil
 ---@param winid integer|nil
 mount_component_tree = function(comp, group_id, winid)
-    if type(comp) == "string" then
+    local kind = type(comp)
+    if kind == "string" then
         local required = require_comp_by_id(comp)
         if not required then
             return mount_literal_comp(comp, winid)
         end
         comp = required
-    end
-
-    if type(comp) ~= "table" or next(comp) == nil then
+    elseif kind ~= "table" or next(comp) == nil then
         error(("Invalid combined component: expected string or non empty table, got %s (%s)")
             :format(type(comp), tostring(comp)))
         return nil

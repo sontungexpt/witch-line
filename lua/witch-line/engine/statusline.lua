@@ -250,7 +250,7 @@ end
 --- Debounced version of `M.render` (80ms delay).
 ---@param ... any  Arguments forwarded to `M.render`.
 M.render_debounce = function(...)
-    M.render_debounce = require("witch-line.util").debounce(M.render, 80)
+    M.render_debounce = require("witch-line.util.debounce")(M.render, 80)
     return M.render_debounce(...)
 end
 

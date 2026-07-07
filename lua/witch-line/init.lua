@@ -17,18 +17,17 @@ local require, type = require, type
 --- Fills in missing `statusline.global` with the built-in default.
 ---@param user_configs? UserConfig
 ---@return UserConfig
-local use_default_config = function(user_configs)
+local resolve_user_config = function(user_configs)
     user_configs = type(user_configs) == "table" and user_configs or {}
+
     local statusline = user_configs.statusline
     statusline = type(statusline) == "table" and statusline or {}
-    local default_comps = require("witch-line.config.default")
-    if type(statusline.global) ~= "table" then
-        statusline.global = {}
-        for _, v in ipairs(default_comps) do
-            statusline.global[#statusline.global + 1] = v
-        end
-    end
     user_configs.statusline = statusline
+
+    if type(statusline.global) ~= "table" then
+        statusline.global = require("witch-line.config.default_layout")
+    end
+
     return user_configs
 end
 
@@ -39,7 +38,7 @@ local M = {}
 --- Setup witch-line with the given user config.
 ---@param user_config? UserConfig
 M.setup = function(user_config)
-    user_config = use_default_config(user_config)
+    user_config = resolve_user_config(user_config)
     M.user_config = user_config
 
     require("witch-line.engine.statusline").setup(user_config.disabled)
