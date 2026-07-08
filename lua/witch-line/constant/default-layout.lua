@@ -1,9 +1,11 @@
 ---@type CombinedComponent
 return {
     "wl.mode",
+
     -- "wl.file.name",
     -- "wl.file.icon",
-    -- "wl.file.modifier",
+    "wl.file.modifier",
+    -- "wl.file.size",
 
     "wl.git.branch",
     -- "wl.git.diff.added",

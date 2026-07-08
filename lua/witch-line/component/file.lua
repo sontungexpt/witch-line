@@ -1,11 +1,13 @@
 local colors = require("witch-line.constant.color")
+local uv, api, bo = vim.uv or vim.loop, vim.api, vim.bo
 
 local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
 local function debug_log(...)
-    vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") }, DEBUG_LOG, "a")
+    vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({ ... }, " ") }, DEBUG_LOG, "a")
 end
 
 local INTERFACE_ID = "wl.file.interface"
+
 
 ---@type DefaultComponent
 local Interface = {
@@ -42,7 +44,7 @@ local Interface = {
     ---@param self ManagedComponent
     ---@return {basename: string, icon: string, color: string}
     context = function(self)
-        local api, fs, bo = vim.api, vim.fs, vim.bo
+        local fs = vim.fs
 
         local fmt = self.config.formatter
         local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
@@ -125,26 +127,20 @@ local Icon = {
 local Modifier = {
     id = "wl.file.modifier",
     ___builtin = true,
-
-    events = {
-        "BufEnter",
-        "BufWritePost",
-        "TextChangedI",
-        "TextChanged",
-    },
-
+    events = "OptionSet",
     style = {
         fg = colors.fg,
     },
-
-    update = function()
-        local bo = vim.bo
-
-        if bo.buftype == "prompt" then
+    update = function(self, session)
+        if bo.buftype ~= "" then
             return ""
-        elseif not bo.modifiable or bo.readonly then
+        end
+
+        if not bo.modifiable or bo.readonly then
             return ""
-        elseif bo.modified then
+        end
+
+        if bo.modified then
             return ""
         end
 
@@ -157,43 +153,37 @@ local Size = {
     id = "wl.file.size",
     ___builtin = true,
 
-    events = "BufWritePost",
-
-    ref = {
-        events = INTERFACE_ID,
+    events = {
+        "BufEnter",
+        "BufWritePost",
+        "FileChangedShellPost"
     },
 
     style = {
         fg = colors.green,
     },
 
-    config = {
-        icon = "",
-    },
-
     update = function(self)
-        local file = vim.api.nvim_buf_get_name(0)
+        local file = api.nvim_buf_get_name(0)
         if file == "" then
             return ""
         end
 
-        local stat = (vim.uv or vim.loop).fs_stat(file)
-        if type(stat) ~= "table" or not stat.size or stat.size == 0 then
+        local stat = uv.fs_stat(file)
+        if type(stat) ~= "table" or stat.type ~= "file" or not stat.size then
             return ""
         end
 
-        local size = stat.size
-        local units = { "B", "KB", "MB", "GB" }
-        local i = 1
+        local s, i = stat.size, 1
 
-        while size > 1024 and i < #units do
-            size = size / 1024
-            i = i + 1
+        local SIZE_UNITS = { "B", "KB", "MB", "GB" }
+        while s > 1024 and i < #SIZE_UNITS do
+            s, i = s / 1024, i + 1
         end
 
-        return ("%s %s"):format(
-            self.config.icon,
-            string.format(i == 1 and "%d%s" or "%.1f%s", size, units[i])
+
+        return ((i == 1 and "%d" or "%.1f") .. "%s"):format(
+            s, SIZE_UNITS[i]
         )
     end,
 }
