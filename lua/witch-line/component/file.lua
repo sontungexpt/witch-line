@@ -1,4 +1,4 @@
-local colors = require("witch-line.config.color")
+local colors = require("witch-line.constant.color")
 
 local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
 local function debug_log(...)

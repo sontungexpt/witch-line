@@ -1,7 +1,7 @@
 local next, rawget, rawset, setmetatable = next, rawget, rawset, setmetatable
 local NIL = vim.NIL
 
-local DefaultComp = require("witch-line.config.roster")
+local DefaultComp = require("witch-line.component")
 
 local M = {}
 

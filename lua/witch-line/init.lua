@@ -25,7 +25,7 @@ local resolve_user_config = function(user_configs)
     user_configs.statusline = statusline
 
     if type(statusline.global) ~= "table" then
-        statusline.global = require("witch-line.config.default-layout")
+        statusline.global = require("witch-line.constant.default-layout")
     end
 
     return user_configs

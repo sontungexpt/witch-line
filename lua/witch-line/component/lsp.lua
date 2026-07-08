@@ -1,4 +1,4 @@
-local colors = require("witch-line.config.color")
+local colors = require("witch-line.constant.color")
 
 ---@type DefaultComponent
 local Clients = {

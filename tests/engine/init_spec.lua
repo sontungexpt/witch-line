@@ -68,7 +68,7 @@ local COMPONENT_DEFS = {
     },
 }
 
-package.preload["witch-line.config.roster"] = function()
+package.preload["witch-line.component"] = function()
     return setmetatable({}, {
         __index = function(_, id)
             return COMPONENT_DEFS[id]
@@ -164,7 +164,7 @@ end
 package.preload["witch-line.util.notifier"] = function()
     return { info = function() end, error = function(msg) error(msg) end }
 end
-package.preload["witch-line.config.color"] = function() return {} end
+package.preload["witch-line.constant.color"] = function() return {} end
 
 -- ====================================================================
 -- Stub Neovim API
@@ -205,14 +205,14 @@ local MOCK_MODULES = {
     "witch-line.event.event",
     "witch-line.event.timer",
     "witch-line.core.registry",
-    "witch-line.config.roster",
+    "witch-line.component",
     "witch-line.core.override",
     "witch-line.core.component_api",
     "witch-line.engine.update",
     "witch-line.engine.highlight",
     "witch-line.util.bitmask",
     "witch-line.util.notifier",
-    "witch-line.config.color",
+    "witch-line.constant.color",
 }
 
 local function fresh_engine()

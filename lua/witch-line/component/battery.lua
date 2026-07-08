@@ -1,4 +1,4 @@
-local colors = require("witch-line.config.color")
+local colors = require("witch-line.constant.color")
 
 local uv = vim.uv or vim.loop
 local sysname = uv.os_uname().sysname

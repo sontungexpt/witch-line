@@ -19,7 +19,7 @@ local update_comp_graph_by_ids
 --- Hide a component's segment. Skips if not renderable.
 ---@param comp ManagedComponent
 hide_component = function(comp)
-    if rawget(comp, "___renderable") then
+    if rawget(comp, "renderable") then
         Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
         rawset(comp, "___hidden", true)
     end
@@ -218,7 +218,7 @@ update_comp = function(comp, session)
         -- A abstract component will not have indices
         -- It's just call the update function for other purpose and we not affect to the statusline
         -- So we just ignore it even the value is empty string
-        if rawget(comp, "___renderable") then
+        if rawget(comp, "renderable") then
             if value == "" then
                 hide_component(comp)
                 hidden = true

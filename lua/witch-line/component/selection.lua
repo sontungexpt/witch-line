@@ -1,4 +1,4 @@
-local colors = require("witch-line.config.color")
+local colors = require("witch-line.constant.color")
 local nvim_get_mode = vim.api.nvim_get_mode
 local fn_line = vim.fn.line
 local fn_col = vim.fn.col

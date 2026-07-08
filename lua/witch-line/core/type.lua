@@ -9,7 +9,6 @@
 --- @field events? CompId|CompId[] A table of ids of components that this component references
 --- @field timing? CompId|CompId[] A table of ids of components that this component references
 --- @field hidden? CompId|CompId[] A table of ids of components that this component references for its hide function
---- @field min_screen_width? CompId|CompId[] A table of ids of components that this component references for its minimum screen width
 ---
 --- @field style? CompId A id of a component that this component references for its style
 --- @field left? CompId A id of a component that this components references for left separator
@@ -74,8 +73,9 @@
 --- A flag indicating whether the component should be lazy loaded or not.
 --- @field lazy? boolean
 ---
---- The construct
---- @field construct? fun(comp: Component)
+---
+--- Called when a component is first loaded/installed into the registry, before `init`.
+--- @field install? fun(comp: Component)
 ---
 --- A table of configurable values that can be overridden by users.
 --- Useful for exposing configurable constants (e.g. `{chars = {"_", "▁", "▂"}}`, `{format = "default"}`).
@@ -206,11 +206,10 @@
 ---  }
 ---  ```
 --- @field on_click? string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
---- @field abstract? boolean The component is a abstract component and never render
+--- @field renderable? boolean If true, the component is renderable
 ---
---- @private The following fields are used internally by witch-line and should not be set manually
+--- @private
 --- @field ___loaded? boolean If true, the component is loaded
---- @field ___renderable? boolean If true, the component is renderable
 --- @field ___hidden? boolean If true, the component is hidden and should not be displayed
 --- @field ___use_returned_style? boolean Whether the component should use the style returned by its `update()` method. Disabled automatically when the user overrides the `style` field.
 ---

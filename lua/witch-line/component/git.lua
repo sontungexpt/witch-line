@@ -1,17 +1,13 @@
-local colors = require("witch-line.config.color")
-local uv = vim.uv or vim.loop
+local vim = vim
+local uv, api, bo, schedule, system, list_contains = vim.uv or vim.loop, vim.api, vim.bo, vim.schedule, vim.system,
+    vim.list_contains
+local engine = require("witch-line.engine")
 
-local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
-local function debug_log(...)
-    if vim.g.witch_line_debug then
-        local f = io.open(DEBUG_LOG, "a")
-        if f then f:write(os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") .. "\n") f:close() end
-    end
-end
+local colors = require("witch-line.constant.color")
 
 local function get_root_by_git(dir_path)
-    local prev = ""
     local dir = dir_path or uv.cwd()
+    local prev = ""
     while dir ~= prev do
         local git_path = dir .. "/.git"
         local stat = uv.fs_stat(git_path)
@@ -33,40 +29,13 @@ local function get_root_by_git(dir_path)
                 end
             end
         end
-
         prev = dir
         dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
     end
     return nil
 end
 
---- @alias DiffResult { added: uinteger, modified: uinteger, removed: uinteger }
-local function process_diff(stdout)
-    local added, removed, modified = 0, 0, 0
-    for old_start, old_count, new_start, new_count in
-    string.gmatch(stdout, "@@%s*%-(%d+),?(%d*)%s*%+(%d+),?(%d*)%s*@@")
-    do
-        old_count = (old_count == nil and 0) or (old_count == "" and 1) or tonumber(old_count) or 0
-        new_count = (new_count == nil and 0) or (new_count == "" and 1) or tonumber(new_count) or 0
 
-        if old_count == 0 and new_count > 0 then
-            added = added + new_count
-        elseif old_count > 0 and new_count == 0 then
-            removed = removed + old_count
-        else
-            local minv = old_count < new_count and old_count or new_count
-            modified = modified + minv
-            added = added + (new_count - minv)
-            removed = removed + (old_count - minv)
-        end
-    end
-    return { added = added, modified = modified, removed = removed }
-end
-
----@class BranchCtx
----@field root_dir string|nil
----@type BranchCtx
-local BRANCH_CTX = { root_dir = nil }
 
 local DISABLED_FILETYPES = {
     "NvimTree",
@@ -75,6 +44,8 @@ local DISABLED_FILETYPES = {
     "dashboard",
     "TelescopePrompt",
 }
+
+local branch_name = ""
 
 ---@type DefaultComponent
 local Branch = {
@@ -85,86 +56,118 @@ local Branch = {
         disabled_filetypes = DISABLED_FILETYPES,
     },
     init = function(self, _)
-        local api = vim.api
-        local ctx = BRANCH_CTX
-        local last_root_dir = nil
+        local git_root = nil
 
-        local file_changed, sec_arg = nil, nil
+        local function refresh_branch()
+            if not git_root then
+                branch_name = ""
+                return
+            end
+            local f = io.open(git_root .. "/.git/HEAD", "r")
+            if f then
+                local content = f:read("*all")
+                f:close()
+                branch_name = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
+            else
+                branch_name = ""
+            end
+        end
+
+        local watcher, watcher_opts = nil, nil
+        local on_head_change = vim.schedule_wrap(function()
+            refresh_branch()
+            engine.request_update_comp_graph(self)
+        end)
+
         local function update_repo(new_dir_path)
-            if not file_changed then
-                local uv = vim.uv or vim.loop
+            if not watcher then
                 if uv.os_uname().sysname == "Windows_NT" then
-                    file_changed = assert(uv.new_fs_poll())
-                    sec_arg = 1000
+                    watcher = assert(uv.new_fs_poll())
+                    watcher_opts = 1000
                 else
-                    file_changed = assert(uv.new_fs_event())
-                    sec_arg = {}
+                    watcher = assert(uv.new_fs_event())
+                    watcher_opts = {}
                 end
             end
-            file_changed:stop()
+            watcher:stop()
 
             if new_dir_path then
-                file_changed:start(
-                    new_dir_path,
-                    ---@cast sec_arg integer|table
-                    sec_arg,
-                    vim.schedule_wrap(function()
-                        require("witch-line.engine").request_update_comp_graph(self)
-                    end)
-                )
+                watcher:start(new_dir_path .. "/.git", watcher_opts, on_head_change)
             end
 
-            last_root_dir = new_dir_path
-            ctx.root_dir = new_dir_path
-            require("witch-line.engine").request_update_comp_graph(self)
+            git_root = new_dir_path
+            on_head_change()
         end
 
         api.nvim_create_autocmd("BufEnter", {
             callback = function(e)
-                if vim.list_contains(self.config.disabled_filetypes, vim.bo[e.buf].filetype) then
+                if list_contains(self.config.disabled_filetypes, bo[e.buf].filetype) then
                     return
                 end
                 local file = e.file:gsub("\\", "/")
-                if last_root_dir and file:sub(1, #last_root_dir) == last_root_dir then
+                if git_root and file:sub(1, #git_root) == git_root then
                     return
                 end
 
-                local new_root_dir =
-                    get_root_by_git(file:match("^(.*)/[^/]*$"))
+                local new_root_dir = get_root_by_git(file:match("^(.*)/[^/]*$"))
 
-                if new_root_dir ~= nil and last_root_dir == nil then
+                if new_root_dir ~= git_root then
                     update_repo(new_root_dir)
-                elseif new_root_dir == last_root_dir then
-                    return
-                elseif new_root_dir ~= nil and new_root_dir ~= last_root_dir then
-                    update_repo(new_root_dir)
-                elseif new_root_dir == nil then
-                    if last_root_dir ~= nil then
-                        update_repo(nil)
-                    end
                 end
             end,
         })
     end,
     style = { fg = colors.green },
     update = function(self, _)
-        if not BRANCH_CTX.root_dir then
-            return ""
-        end
-
-        local branch = ""
-        local head_file_path = BRANCH_CTX.root_dir .. "/.git/HEAD"
-        local head_file = io.open(head_file_path, "r")
-        if head_file then
-            local content = head_file:read("*all")
-            head_file:close()
-            branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
-        end
-        return branch ~= "" and self.config.branch_icon .. " " .. branch or ""
+        return branch_name ~= "" and self.config.branch_icon .. " " .. branch_name or ""
     end,
 }
 
 local Diff = {}
+
+--- @alias DiffResult { added: integer, modified: integer, removed: integer }
+--- Parse `git diff -U0` output into per-hunk counts.
+--- Classifies each hunk independently so unrelated adds/deletes
+--- don't merge into false "modifications" (unlike a file-level min).
+---
+--- Hunk with only `+`:           pure add
+--- Hunk with only `-`:           pure delete
+--- Hunk with both `+` and `-`:   modified = min(add, rem),
+---                               surplus spills to add/rem.
+local function process_diff(stdout)
+    local added, modified, removed = 0, 0, 0
+    local hunk_add, hunk_rem = 0, 0
+    local pos = 1
+    local len = #stdout
+    while pos <= len do
+        local nl = stdout:find("\n", pos)
+        local line_end = nl or (len + 1)
+        if line_end > pos then
+            local c = stdout:byte(pos)
+            if c == 64 and stdout:byte(pos + 1) == 64 then
+                if hunk_add > 0 or hunk_rem > 0 then
+                    local m = hunk_add < hunk_rem and hunk_add or hunk_rem
+                    modified = modified + m
+                    added = added + hunk_add - m
+                    removed = removed + hunk_rem - m
+                end
+                hunk_add, hunk_rem = 0, 0
+            elseif c == 43 then
+                if stdout:byte(pos + 1) ~= 43 then hunk_add = hunk_add + 1 end
+            elseif c == 45 then
+                if stdout:byte(pos + 1) ~= 45 then hunk_rem = hunk_rem + 1 end
+            end
+        end
+        pos = line_end + 1
+    end
+    if hunk_add > 0 or hunk_rem > 0 then
+        local m = hunk_add < hunk_rem and hunk_add or hunk_rem
+        modified = modified + m
+        added = added + hunk_add - m
+        removed = removed + hunk_rem - m
+    end
+    return { added = added, modified = modified, removed = removed }
+end
 
 --- @type DefaultComponent
 Diff.Interface = {
@@ -174,92 +177,65 @@ Diff.Interface = {
         disabled_filetypes = DISABLED_FILETYPES,
     },
     init = function(self)
-        local vim = vim
-        local api = vim.api
-
         self.___processes = self.___processes or {}
         self.___diff_cache = self.___diff_cache or {}
+
+        local function kill_process(bufnr)
+            local proc = self.___processes[bufnr]
+            if proc and not proc:is_closing() then
+                proc:kill(15)
+            end
+            self.___processes[bufnr] = nil
+            self.___diff_cache[bufnr] = nil
+        end
+
+        local function spawn_diff(bufnr, parent_dir, filename)
+            if self.___processes[bufnr] then return end
+            self.___processes[bufnr] = system({
+                "git", "-C", parent_dir, "diff",
+                "--no-color", "--no-ext-diff", "-U0", "--", filename,
+            }, { text = true }, function(out)
+                self.___processes[bufnr] = nil
+                if out.code == 15 then return end
+                schedule(function()
+                    if not api.nvim_buf_is_valid(bufnr) then return end
+                    if out.stdout and #out.stdout > 0 then
+                        self.___diff_cache[bufnr] = process_diff(out.stdout)
+                    end
+                    engine.request_update_comp_graph(self)
+                end)
+            end)
+        end
 
         api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
             callback = function(e)
                 local event, bufnr = e.event, e.buf
 
                 if event ~= "BufEnter" then
-                    self.___diff_cache[bufnr] = nil
-
-                    local process = self.___processes[bufnr]
-                    if process and not process:is_closing() then
-                        process:kill(15)
-                        vim.defer_fn(function()
-                            if process and not process:is_closing() then
-                                process:kill(9)
-                            end
-                        end, 1500)
-                        self.___processes[bufnr] = nil
-                    end
+                    kill_process(bufnr)
+                    if event == "BufDelete" then return end
                 end
 
-                if event ~= "BufDelete" then
-                    if self.___diff_cache[bufnr] or vim.list_contains(self.config.disabled_filetypes, vim.bo[bufnr].filetype) then
-                        require("witch-line.engine").request_update_comp_graph(self)
-                        return
-                    end
-                    local file = e.file
-                    local parent_dir = file:match("^(.*)[/\\][^/\\]*$")
-                    if not parent_dir then
-                        return
-                    end
-                    local filename = file:match("[^/\\]*$")
-                    if not filename then
-                        return
-                    end
+                local file = e.file
+                if not file then return end
 
-                    if self.___processes[bufnr] then
-                        return
+                if not list_contains(self.config.disabled_filetypes, bo[bufnr].filetype)
+                    and not self.___diff_cache[bufnr] then
+                    local parent_dir, filename = file:match("^(.*)[/\\]([^/\\]+)$")
+                    if parent_dir then
+                        spawn_diff(bufnr, parent_dir, filename)
                     end
-
-                    self.___processes[bufnr] = vim.system({
-                        "git",
-                        "-C",
-                        parent_dir,
-                        "--no-pager",
-                        "diff",
-                        "--no-color",
-                        "--no-ext-diff",
-                        "-U0",
-                        "--",
-                        filename,
-                    }, { text = true }, function(out)
-                        self.___processes[bufnr] = nil
-                        local code, stdout = out.code, out.stdout
-                        if code == 15 or code == 9 then
-                            require("witch-line.util.notifier").info("Killed git diff process" .. code)
-                            return
-                        elseif stdout and #stdout > 0 then
-                            vim.schedule(function()
-                                if api.nvim_buf_is_valid(bufnr) then
-                                    self.___diff_cache[bufnr] = process_diff(
-                                        stdout)
-                                    require("witch-line.engine").request_update_comp_graph(self)
-                                end
-                            end)
-                            return
-                        end
-                        vim.schedule(function()
-                            if api.nvim_buf_is_valid(bufnr) then
-                                require("witch-line.engine").request_update_comp_graph(self)
-                            end
-                        end)
-                    end)
+                else
+                    engine.request_update_comp_graph(self)
                 end
             end,
         })
     end,
     hidden = function(self, _)
-        return vim.list_contains(self.config.disabled_filetypes, vim.bo.filetype)
+        return list_contains(self.config.disabled_filetypes, bo.filetype)
     end,
-    context = function(self, session)
-        return { diff = self.___diff_cache[vim.api.nvim_get_current_buf()] }
+    context = function(self, _)
+        return { diff = self.___diff_cache[api.nvim_get_current_buf()] }
     end,
 }
 
@@ -267,7 +243,18 @@ Diff.Interface = {
 ---@param self ManagedComponent
 ---@return boolean
 local function diff_hidden(self, _)
-    return vim.list_contains(self.config.disabled_filetypes, vim.bo.filetype)
+    return list_contains(self.config.disabled_filetypes, bo.filetype)
+end
+
+local function diff_update(self, session, field)
+    local ctx = self.context(self, session)
+    if ctx.diff then
+        local v = ctx.diff[field]
+        if v then
+            return self.config.icon .. " " .. v
+        end
+    end
+    return ""
 end
 
 --- @type DefaultComponent
@@ -284,19 +271,7 @@ Diff.Added = {
     },
     style = { fg = colors.green },
     hidden = diff_hidden,
-    update = function(self, session)
-        debug_log("GIT_ADDED update", "self.id=" .. tostring(self.id))
-        debug_log("GIT_ADDED context type", type(self.context))
-        local ctx = self.context(self, session)
-        debug_log("GIT_ADDED ctx", type(ctx))
-        if ctx.diff then
-            local added = ctx.diff.added
-            if added then
-                return self.config.icon .. " " .. added
-            end
-        end
-        return ""
-    end,
+    update = function(self, session) return diff_update(self, session, "added") end,
 }
 
 ---@type DefaultComponent
@@ -313,19 +288,7 @@ Diff.Modified = {
     },
     style = { fg = colors.cyan },
     hidden = diff_hidden,
-    update = function(self, session)
-        debug_log("GIT_MODIFIED update", "self.id=" .. tostring(self.id))
-        debug_log("GIT_MODIFIED context type", type(self.context))
-        local ctx = self.context(self, session)
-        debug_log("GIT_MODIFIED ctx", type(ctx))
-        if ctx.diff then
-            local modified = ctx.diff.modified
-            if modified then
-                return self.config.icon .. " " .. modified
-            end
-        end
-        return ""
-    end,
+    update = function(self, session) return diff_update(self, session, "modified") end,
 }
 
 ---@type DefaultComponent
@@ -342,19 +305,7 @@ Diff.Removed = {
     },
     style = { fg = colors.red },
     hidden = diff_hidden,
-    update = function(self, session)
-        debug_log("GIT_REMOVED update", "self.id=" .. tostring(self.id))
-        debug_log("GIT_REMOVED context type", type(self.context))
-        local ctx = self.context(self, session)
-        debug_log("GIT_REMOVED ctx", type(ctx))
-        if ctx.diff then
-            local removed = ctx.diff.removed
-            if removed then
-                return self.config.icon .. " " .. removed
-            end
-        end
-        return ""
-    end,
+    update = function(self, session) return diff_update(self, session, "removed") end,
 }
 
 return {

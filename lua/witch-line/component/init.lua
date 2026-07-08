@@ -1,3 +1,5 @@
+local require = require
+
 ---@alias DefaultId
 --- | "wl.mode"
 ---
@@ -83,11 +85,12 @@ local Loaders = {
 --- @type table<DefaultId, DefaultComponent>
 local Components = {}
 
-setmetatable(Components, {
-    __index = function(self, id)
-        local loader = Loaders[id]
-        return loader and loader()
-    end,
-})
+setmetatable(
+    Components, {
+        __index = function(self, id)
+            local loader = Loaders[id]
+            return loader and loader()
+        end,
+    })
 
 return Components

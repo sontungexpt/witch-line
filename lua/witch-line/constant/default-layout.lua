@@ -5,7 +5,7 @@ return {
     -- "wl.file.icon",
     -- "wl.file.modifier",
 
-    -- "wl.git.branch",
+    "wl.git.branch",
     -- "wl.git.diff.added",
     -- "wl.git.diff.removed",
     -- "wl.git.diff.modified",

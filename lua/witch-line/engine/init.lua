@@ -4,7 +4,7 @@ local api = vim.api
 local Statusline = require("witch-line.engine.statusline")
 local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
-local DefaultComp = require("witch-line.config.roster")
+local DefaultComp = require("witch-line.component")
 
 local Registry = require("witch-line.core.registry")
 local is_existed = Registry.is_existed
@@ -89,7 +89,7 @@ local function resolve_comp_id(comp)
         end
         return id
     else
-        id = tostring(comp) .. tostring(math.random(1, 1000000))
+        id = tostring(comp) .. "\0"
         rawset(comp, "id", id)
         return id
     end
@@ -113,9 +113,8 @@ load_component = function(comp)
     end
     rawset(comp, "___loaded", true)
 
-    local construct = comp.construct
-    if type(construct) == "function" then
-        construct(comp)
+    if type(comp.install) == "function" then
+        comp.install(comp)
     end
 
     local cid = resolve_comp_id(comp)
@@ -181,7 +180,10 @@ mount_component = function(comp, parent_id, winid)
 
     load_component(comp)
 
-    if comp.abstract then return end
+    -- respect renderable flag
+    if comp.renderable == false then
+        return
+    end
 
     local update = comp.update
     if not update then
@@ -193,12 +195,12 @@ mount_component = function(comp, parent_id, winid)
 
     Statusline.push(cid, "", winid)
 
-    local flexible = rawget(comp, "flexible")
+    local flexible = comp.flexible
     if flexible then
         Statusline.track_flexible(cid, flexible)
     end
 
-    rawset(comp, "___renderable", true)
+    rawset(comp, "renderable", true)
 end
 
 --- Push a literal string onto the statusline segment list.
