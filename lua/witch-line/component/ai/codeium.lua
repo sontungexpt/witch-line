@@ -98,15 +98,8 @@ local neo_running = false
 local Neocodeium = {
     id = "wl.codeium.neocodeium",
     ___builtin = true,
-    events = {
-        "User NeoCodeiumDisabled",
-        "User NeoCodeiumBufDisabled",
-        "User NeoCodeiumEnabled",
-        "User NeoCodeiumBufEnabled",
-        "User NeoCodeiumServerConnected",
-        "User NeoCodeiumServerStopped",
-        "User NeoCodeiumLabelUpdated",
-    },
+    events =
+    "User NeoCodeiumLabelUpdated,NeoCodeiumServerStopped,NeoCodeiumServerConnected,NeoCodeiumBufEnabled,NeoCodeiumEnabled,NeoCodeiumBufDisabled,NeoCodeiumDisabled",
     config = {
         fps = 4,
         icon = ICON,
