@@ -4,7 +4,7 @@ local api = vim.api
 local Statusline = require("witch-line.engine.statusline")
 local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
-local DefaultComp = require("witch-line.config.default-comp")
+local DefaultComp = require("witch-line.config.roster")
 
 local Registry = require("witch-line.core.registry")
 local is_existed = Registry.is_existed

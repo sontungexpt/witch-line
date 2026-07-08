@@ -68,7 +68,7 @@ local COMPONENT_DEFS = {
     },
 }
 
-package.preload["witch-line.config.default-comp"] = function()
+package.preload["witch-line.config.roster"] = function()
     return setmetatable({}, {
         __index = function(_, id)
             return COMPONENT_DEFS[id]
@@ -205,7 +205,7 @@ local MOCK_MODULES = {
     "witch-line.event.event",
     "witch-line.event.timer",
     "witch-line.core.registry",
-    "witch-line.config.default-comp",
+    "witch-line.config.roster",
     "witch-line.core.override",
     "witch-line.core.component_api",
     "witch-line.engine.update",

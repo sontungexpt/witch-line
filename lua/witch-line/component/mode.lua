@@ -1,7 +1,7 @@
 local colors = require("witch-line.config.color")
 
 ---@type DefaultComponent
-return {
+local Mode = {
     id = "wl.mode",
     ___builtin = true,
     events = "ModeChanged",
@@ -79,3 +79,5 @@ return {
         return mode_config[1], color
     end,
 }
+
+return Mode

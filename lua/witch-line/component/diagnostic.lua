@@ -3,7 +3,7 @@ local DiagnosticSeverity = vim.diagnostic.severity
 local function debug_log(...)
     if vim.g.witch_line_debug then
         local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
-        vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") }, DEBUG_LOG, "a")
+        vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({ ... }, " ") }, DEBUG_LOG, "a")
     end
 end
 
@@ -15,7 +15,6 @@ local Interface = {
     id = InterfaceId,
     ___builtin = true,
     abstract = true,
-
     events = "DiagnosticChanged",
     config = {
         icons = {
