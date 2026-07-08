@@ -3,14 +3,11 @@ return {
     id = "wl.datetime",
     ___builtin = true,
     timing = true,
-    static = {
+    config = {
         format = "default",
     },
     update = function(self, _)
-        local static = self.static
-        --- @cast  static {format: string}
-        local fmt = static.format or "default"
-        --- @cast fmt string
+        local fmt = self.config.format
         if fmt == "default" then
             fmt = "%A, %B %d | %H.%M"
         elseif fmt == "us" then
@@ -20,6 +17,6 @@ return {
         elseif fmt == "iso" then
             fmt = "%Y-%m-%d"
         end
-        return tostring(os.date(fmt))
+        return os.date(fmt)
     end,
 }

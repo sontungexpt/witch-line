@@ -1,8 +1,10 @@
 local DiagnosticSeverity = vim.diagnostic.severity
 
-local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
 local function debug_log(...)
-    vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") }, DEBUG_LOG, "a")
+    if vim.g.witch_line_debug then
+        local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
+        vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") }, DEBUG_LOG, "a")
+    end
 end
 
 --- @type DefaultId
@@ -15,7 +17,7 @@ local Interface = {
     abstract = true,
 
     events = "DiagnosticChanged",
-    static = {
+    config = {
         icons = {
             [DiagnosticSeverity.ERROR] = "",
             [DiagnosticSeverity.WARN] = "",
@@ -30,7 +32,7 @@ local Interface = {
     ---@return {count: table, icon: table}
     context = function(self)
         local icons = {}
-        for id, value in pairs(self.static.icons) do
+        for id, value in pairs(self.config.icons) do
             icons[id] = value
         end
         local signs = vim.diagnostic.config().signs

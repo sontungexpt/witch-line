@@ -6,7 +6,7 @@ return {
     ___builtin = true,
     events = "ModeChanged",
     flexible = 90,
-    static = {
+    config = {
         colors = {
             [1] = { fg = colors.blue },    -- NORMAL
             [2] = { fg = colors.gray },    -- O-PENDING
@@ -66,14 +66,14 @@ return {
     update = function(self, _)
         local mode_code = vim.api.nvim_get_mode().mode
 
-        local mode_config = self.static.modes[mode_code]
+        local mode_config = self.config.modes[mode_code]
         if not mode_config then
             return mode_code, nil
         end
 
         local color = mode_config[2]
         if type(color) == "number" then
-            color = self.static.colors[color]
+            color = self.config.colors[color]
         end
 
         return mode_config[1], color

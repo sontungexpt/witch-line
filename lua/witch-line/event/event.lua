@@ -251,25 +251,22 @@ local function register_string_event(e, comp_id)
     --   "*.lua, *.py"    → {"*.lua","*.py"}, 2
     --   ",   *.lua ,"    → {"*.lua"}, 1
     --   ""               → {}, 0
-    local tokens, nt = {}, 0
-    do
-        local cp = 1
-        while cp <= sn do
-            while cp <= sn and s:byte(cp) == 32 do cp = cp + 1 end
-            if cp > sn then break end
-            local comma = s:find(",", cp, true)
-            local te = (comma or sn + 1) - 1
-            while te >= cp and s:byte(te) == 32 do te = te - 1 end
-            if te >= cp then
-                local token = s:sub(cp, te)
-                if token ~= "*" then
-                    nt = nt + 1
-                    tokens[nt] = token
-                end
+    local tokens, nt, cp = {}, 0, 1
+    while cp <= sn do
+        while cp <= sn and s:byte(cp) == 32 do cp = cp + 1 end
+        if cp > sn then break end
+        local comma = s:find(",", cp, true)
+        local te = (comma or sn + 1) - 1
+        while te >= cp and s:byte(te) == 32 do te = te - 1 end
+        if te >= cp then
+            local token = s:sub(cp, te)
+            if token ~= "*" then
+                nt = nt + 1
+                tokens[nt] = token
             end
-            if not comma then break end
-            cp = comma + 1
         end
+        if not comma then break end
+        cp = comma + 1
     end
 
     if event_name == "User" then

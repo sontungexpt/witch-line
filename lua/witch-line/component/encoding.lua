@@ -3,7 +3,7 @@ local colors = require("witch-line.config.color")
 ---@type DefaultComponent
 local Encoding = {
     id = "wl.encoding",
-    events = { "InsertEnter" },
+    events = "InsertEnter",
     ___builtin = true,
     style = { fg = colors.yellow },
     update = function(self, _)

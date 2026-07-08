@@ -3,7 +3,7 @@ local fn_searchcount = vim.fn.searchcount
 local SearchCount = {
     id = "wl.search.count",
     ___builtin = true,
-    events = { "CmdlineLeave /,?" },
+    events = "CmdlineLeave /,?",
     hidden = function(self, _)
         return vim.v.hlsearch == 0
     end,

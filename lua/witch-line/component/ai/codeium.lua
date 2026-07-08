@@ -1,4 +1,8 @@
-local FPS = 4
+local request_update = function(comp, eager)
+    local eng = package.loaded["witch-line.engine"]
+    if eng then eng.request_update_comp_graph(comp, eager) end
+end
+
 local ICON = {
     idle = "󰚩",
     error = "󱚡",
@@ -17,42 +21,45 @@ local ICON = {
 local Codeium = {
     id = "wl.codeium",
     ___builtin = true,
-    static = {
-        fps = FPS,
+    config = {
+        fps = 4,
         icon = ICON,
     },
     init = function(self, _)
+        local interval = math.floor(1000 / self.config.fps)
+
         vim.api.nvim_create_autocmd("InsertEnter", {
             callback = function()
                 vim.schedule(function()
                     local vt = package.loaded["codeium.virtual_text"]
                     if vt then
                         local timer
+                        local anim_cb = vim.schedule_wrap(function()
+                            request_update(self, true)
+                        end)
                         vt.set_statusbar_refresh(function()
                             local s = vt.status()
                             if vim.bo.buftype ~= "prompt" and s and s.state == "waiting" then
                                 timer = timer or vim.uv.new_timer()
                                 if timer then
-                                    timer:start(0, math.floor(1000 / self.static.fps), vim.schedule_wrap(function()
-                                        require("witch-line.engine").request_update_comp_graph(self, true)
-                                    end))
+                                    timer:start(0, interval, anim_cb)
                                 end
                                 return
                             elseif timer then
                                 timer:stop()
                             end
-                            require("witch-line.engine").request_update_comp_graph(self)
+                            request_update(self)
                         end)
                         return true
                     end
-                    require("witch-line.engine").request_update_comp_graph(self)
+                    request_update(self)
                 end)
             end,
         })
     end,
 
     update = function(self, _)
-        local icon = self.static.icon
+        local icon = self.config.icon
         local api = require("codeium.api")
         if api then
             local err = api.check_status().api_key_error
@@ -71,7 +78,7 @@ local Codeium = {
         end
 
         if status.state == "waiting" then
-            local frame = math.floor(vim.uv.now() * self.static.fps / 1000) % #icon.waiting + 1
+            local frame = math.floor(vim.uv.now() * self.config.fps / 1000) % #icon.waiting + 1
             return icon.waiting[frame]
         end
 
@@ -100,12 +107,12 @@ local Neocodeium = {
         "User NeoCodeiumServerStopped",
         "User NeoCodeiumLabelUpdated",
     },
-    static = {
-        fps = FPS,
+    config = {
+        fps = 4,
         icon = ICON,
     },
     update = function(self, session)
-        local icon = self.static.icon
+        local icon = self.config.icon
         local event = session.get("EventInfo")
         event = event and event[self.id]
 
@@ -114,8 +121,8 @@ local Neocodeium = {
                 if not neo_running then
                     neo_timer = neo_timer or vim.uv.new_timer()
                     if neo_timer then
-                        neo_timer:start(0, math.floor(1000 / self.static.fps), vim.schedule_wrap(function()
-                            require("witch-line.engine").request_update_comp_graph(self, true)
+                        neo_timer:start(0, math.floor(1000 / self.config.fps), vim.schedule_wrap(function()
+                            request_update(self, true)
                         end))
                         neo_running = true
                     end
@@ -132,7 +139,7 @@ local Neocodeium = {
         end
 
         if neo_running then
-            local frame = math.floor(vim.uv.now() * self.static.fps / 1000) % #icon.waiting + 1
+            local frame = math.floor(vim.uv.now() * self.config.fps / 1000) % #icon.waiting + 1
             return icon.waiting[frame]
         end
 

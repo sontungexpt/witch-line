@@ -16,7 +16,7 @@ local ANY                      = { number = true, string = true, boolean = true,
 -- The type check prevents users from setting fields to incompatible types.
 local OVERRIDEABLE_TYPE_MAP    = {
     padding          = NUM_TABLE,
-    static           = ANY,
+    config           = ANY,
     timing           = BOOL_NUM,
     lazy             = "boolean",
     style            = FN_TABLE,

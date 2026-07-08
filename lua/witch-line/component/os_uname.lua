@@ -6,7 +6,7 @@ return {
     id = "wl.os_uname",
     ___builtin = true,
     events = "UIEnter",
-    static = {
+    config = {
         icon = {
             mac = "",
             arch = "",
@@ -23,8 +23,8 @@ return {
     update = function(self, _)
         local u = uv.os_uname()
         local sysname = u.sysname
-        local ico = self.static.icon
-        local col = self.static.colors
+        local ico = self.config.icon
+        local col = self.config.colors
 
         if sysname == "Darwin" then
             return ico.mac, { fg = col.mac }

@@ -3,8 +3,10 @@ local uv = vim.uv or vim.loop
 
 local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
 local function debug_log(...)
-    local f = io.open(DEBUG_LOG, "a")
-    if f then f:write(os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") .. "\n") f:close() end
+    if vim.g.witch_line_debug then
+        local f = io.open(DEBUG_LOG, "a")
+        if f then f:write(os.date("%H:%M:%S") .. " " .. table.concat({...}, " ") .. "\n") f:close() end
+    end
 end
 
 local function get_root_by_git(dir_path)
@@ -78,7 +80,7 @@ local DISABLED_FILETYPES = {
 local Branch = {
     id = "wl.git.branch",
     ___builtin = true,
-    static = {
+    config = {
         branch_icon = "",
         disabled_filetypes = DISABLED_FILETYPES,
     },
@@ -119,7 +121,7 @@ local Branch = {
 
         api.nvim_create_autocmd("BufEnter", {
             callback = function(e)
-                if vim.list_contains(self.static.disabled_filetypes, vim.bo[e.buf].filetype) then
+                if vim.list_contains(self.config.disabled_filetypes, vim.bo[e.buf].filetype) then
                     return
                 end
                 local file = e.file:gsub("\\", "/")
@@ -158,7 +160,7 @@ local Branch = {
             head_file:close()
             branch = content:match("ref: refs/heads/(.-)%s*$") or content:sub(1, 7) or ""
         end
-        return branch ~= "" and self.static.branch_icon .. " " .. branch or ""
+        return branch ~= "" and self.config.branch_icon .. " " .. branch or ""
     end,
 }
 
@@ -168,7 +170,7 @@ local Diff = {}
 Diff.Interface = {
     id = "wl.git.diff.interface",
     ___builtin = true,
-    static = {
+    config = {
         disabled_filetypes = DISABLED_FILETYPES,
     },
     init = function(self)
@@ -198,7 +200,7 @@ Diff.Interface = {
                 end
 
                 if event ~= "BufDelete" then
-                    if self.___diff_cache[bufnr] or vim.list_contains(self.static.disabled_filetypes, vim.bo[bufnr].filetype) then
+                    if self.___diff_cache[bufnr] or vim.list_contains(self.config.disabled_filetypes, vim.bo[bufnr].filetype) then
                         require("witch-line.engine").request_update_comp_graph(self)
                         return
                     end
@@ -254,7 +256,7 @@ Diff.Interface = {
         })
     end,
     hidden = function(self, _)
-        return vim.list_contains(self.static.disabled_filetypes, vim.bo.filetype)
+        return vim.list_contains(self.config.disabled_filetypes, vim.bo.filetype)
     end,
     context = function(self, session)
         return { diff = self.___diff_cache[vim.api.nvim_get_current_buf()] }
@@ -265,14 +267,14 @@ Diff.Interface = {
 ---@param self ManagedComponent
 ---@return boolean
 local function diff_hidden(self, _)
-    return vim.list_contains(self.static.disabled_filetypes, vim.bo.filetype)
+    return vim.list_contains(self.config.disabled_filetypes, vim.bo.filetype)
 end
 
 --- @type DefaultComponent
 Diff.Added = {
     id = "wl.git.diff.added",
     ___builtin = true,
-    static = {
+    config = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
@@ -290,7 +292,7 @@ Diff.Added = {
         if ctx.diff then
             local added = ctx.diff.added
             if added then
-                return self.static.icon .. " " .. added
+                return self.config.icon .. " " .. added
             end
         end
         return ""
@@ -301,7 +303,7 @@ Diff.Added = {
 Diff.Modified = {
     id = "wl.git.diff.modified",
     ___builtin = true,
-    static = {
+    config = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
@@ -319,7 +321,7 @@ Diff.Modified = {
         if ctx.diff then
             local modified = ctx.diff.modified
             if modified then
-                return self.static.icon .. " " .. modified
+                return self.config.icon .. " " .. modified
             end
         end
         return ""
@@ -330,7 +332,7 @@ Diff.Modified = {
 Diff.Removed = {
     id = "wl.git.diff.removed",
     ___builtin = true,
-    static = {
+    config = {
         disabled_filetypes = DISABLED_FILETYPES,
         icon = "-",
     },
@@ -348,7 +350,7 @@ Diff.Removed = {
         if ctx.diff then
             local removed = ctx.diff.removed
             if removed then
-                return self.static.icon .. " " .. removed
+                return self.config.icon .. " " .. removed
             end
         end
         return ""

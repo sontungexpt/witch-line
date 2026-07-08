@@ -14,7 +14,7 @@ local Interface = {
 
     events = "BufEnter",
 
-    static = {
+    config = {
         formatter = {
             filetype = {
                 ["NvimTree"] = { "NvimTree", "", colors.red },
@@ -44,7 +44,7 @@ local Interface = {
     context = function(self)
         local api, fs, bo = vim.api, vim.fs, vim.bo
 
-        local fmt = self.static.formatter
+        local fmt = self.config.formatter
         local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
 
         if formatter then
@@ -60,8 +60,12 @@ local Interface = {
         local basename = fs.basename(api.nvim_buf_get_name(0))
         local icon, color
 
-        local ok, devicons = pcall(require, "nvim-web-devicons")
-        if ok then
+        local devicons = package.loaded["nvim-web-devicons"]
+        if not devicons then
+            local ok
+            ok, devicons = pcall(require, "nvim-web-devicons")
+        end
+        if devicons then
             local ext = basename:match("%.([^%.]+)$")
             icon, color = devicons.get_icon_color(basename, ext)
         end
@@ -163,7 +167,7 @@ local Size = {
         fg = colors.green,
     },
 
-    static = {
+    config = {
         icon = "",
     },
 
@@ -188,7 +192,7 @@ local Size = {
         end
 
         return ("%s %s"):format(
-            self.static.icon,
+            self.config.icon,
             string.format(i == 1 and "%d%s" or "%.1f%s", size, units[i])
         )
     end,

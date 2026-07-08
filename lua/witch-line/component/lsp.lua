@@ -1,13 +1,12 @@
 local colors = require("witch-line.config.color")
 
-
 ---@type DefaultComponent
 local Clients = {
     id = "wl.lsp.clients",
     ___builtin = true,
     events = { "LspAttach", "LspDetach", "BufWritePost" },
     flexible = 100,
-    static = {
+    config = {
         disabled_filetypes = { "NvimTree" },
         ignore_servers = {
             ["null-ls"] = true,
@@ -16,7 +15,7 @@ local Clients = {
         },
     },
     hidden = function(self, session_id)
-        local disabled = self.static.disabled_filetypes
+        local disabled = self.config.disabled_filetypes
         return type(disabled) == "table"
             and vim.list_contains(disabled, vim.bo.filetype)
     end,
@@ -27,7 +26,7 @@ local Clients = {
             return ""
         end
 
-        local ignore = self.static.ignore_servers
+        local ignore = self.config.ignore_servers
         local names = {}
         local seen = {}
 

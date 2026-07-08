@@ -17,9 +17,16 @@ M.unique_list = function(list)
 end
 
 M.array_equal = function(a, b)
-    if a == b then return true end
+    if a == b then
+        return true
+    end
+
     local len = #a
-    if len ~= #b then return false end
+    if len ~= #b then
+        return false
+    end
+
+    -- Count element occurrences in array `a`
     local count = {}
     for i = 1, len do
         local v = a[i]
@@ -28,9 +35,16 @@ M.array_equal = function(a, b)
     for i = 1, len do
         local v = b[i]
         local c = count[v]
-        if not c then return false end
-        count[v] = c - 1
-        if count[v] == 0 then count[v] = nil end
+        if not c then
+            -- Element in `b` not found in `a`
+            return false
+        end
+        if c == 1 then
+            -- Remove entry when count reaches zero to keep table small
+            count[v] = nil
+        else
+            count[v] = c - 1
+        end
     end
     return next(count) == nil
 end
@@ -48,11 +62,14 @@ M.is_superset = function(a, b)
         return false
     end
     local map = {}
-    for i = 1, #a do
-        map[a[i]] = true
+    for _, v in ipairs(a) do
+        map[v] = true
     end
-    for i = 1, #b do
-        if not map[b[i]] then return false end
+
+    for _, v in ipairs(b) do
+        if not map[v] then
+            return false
+        end
     end
     return true
 end

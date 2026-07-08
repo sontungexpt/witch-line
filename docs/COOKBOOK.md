@@ -25,19 +25,19 @@ require("witch-line").setup({
 
 ### Static values
 
-Use `static` for fixed config that doesn't change per cycle:
+Use `config` for fixed config that doesn't change per cycle:
 
 ```lua
 local indicator = {
   id = "wl.indicator",
-  static = { icon = "⚡", max_count = 5 },
+  config = { icon = "⚡", max_count = 5 },
   update = function(self, session)
-    return self.static.icon .. " ready"
+    return self.config.icon .. " ready"
   end,
 }
 ```
 
-Access via `self.static` anywhere in your component functions.
+Access via `self.config` anywhere in your component functions.
 
 ### Dynamic context
 
@@ -230,7 +230,7 @@ Called once when the component is first loaded. No `session` available.
 
 ```lua
 init = function(self)
-  self.static.icon = "⚡"
+  self.config.icon = "⚡"
   vim.api.nvim_create_autocmd("BufWritePost", {
     callback = function()
       require("witch-line.core.handler").request_update_comp_graph(self, true)
@@ -373,7 +373,7 @@ Some ref keys create dependency links so changes propagate automatically:
 | `timing` | ✅ Timer |
 | `hidden` | ✅ Visible |
 | `min_screen_width` | ✅ Visible |
-| `static`, `context`, `style`, `left`, `right`, `left_style`, `right_style` | — |
+| `config`, `context`, `style`, `left`, `right`, `left_style`, `right_style` | — |
 
 ### `with_session` — reaching referenced data
 
@@ -381,11 +381,11 @@ Use `self:with_session(session)` to resolve a field from a referenced component.
 
 ```lua
 -- Field on this component directly:
-self.static
+self.config
 self.context
 
 -- Field from a referenced component:
-self:with_session(session).static
+self:with_session(session).config
 self:with_session(session).context(self, session)
 ```
 
@@ -432,7 +432,7 @@ local event_info = session:get("EventInfo")
 |---|---|---|---|
 | `id` | `string` | — | Unique identifier. Required for `ref` and `inherit`. |
 | `update` | `fun(self, session): string[, table]` | — | Returns display text and optional highlight. |
-| `static` | `table` | `nil` | Fixed config values. |
+| `config` | `table` | `nil` | Fixed config values. |
 | `context` | `table\|fun(self, session): table` | `nil` | Dynamic data shared via `ref`. |
 | `events` | `string\|string[]\|SpecialEvent[]` | `nil` | Autocmd events that trigger re-render. |
 | `timing` | `boolean\|number` | `nil` | Timer interval in ms (`true` = 1000). |

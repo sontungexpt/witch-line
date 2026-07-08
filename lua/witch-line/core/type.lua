@@ -77,11 +77,11 @@
 --- The construct
 --- @field construct? fun(comp: Component)
 ---
---- A table of static values that can be overridden by users.
+--- A table of configurable values that can be overridden by users.
 --- Useful for exposing configurable constants (e.g. `{chars = {"_", "▁", "▂"}}`, `{format = "default"}`).
---- Access via `self.static` within component lifecycle functions.
+--- Access via `self.config` within component lifecycle functions.
 --- Overridable via the component config — values are deep-merged with the built-in defaults.
---- @field static? table
+--- @field config? table
 ---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated.
 --- @field flexible? number

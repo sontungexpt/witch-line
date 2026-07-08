@@ -101,7 +101,7 @@ return {
     id = "wl.battery",
     ___builtin = true,
     timing = 1000,
-    static = {
+    config = {
         poll_interval = 10000,
         icon = {
             charging = { "󰢟", "󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅" },
@@ -112,12 +112,12 @@ return {
         if not read_battery then return "" end
 
         local now = uv.now()
-        if now - last_read >= self.static.poll_interval then
+        if now - last_read >= self.config.poll_interval then
             cached_status, cached_capacity = read_battery()
             last_read = now
         end
         local status, capacity = cached_status, cached_capacity
-        local icon = self.static.icon
+        local icon = self.config.icon
         local level = math.floor(capacity / 10) + 1
         local color = level > 8 and colors.green or level > 3 and colors.yellow or colors.red
         local value
