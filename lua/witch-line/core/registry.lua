@@ -1,7 +1,7 @@
 local next, rawget, rawset, setmetatable = next, rawget, rawset, setmetatable
 local NIL = vim.NIL
 
-local DefaultComp = require("witch-line.component")
+local BuiltinComp = require("witch-line.component")
 
 local M = {}
 
@@ -39,8 +39,6 @@ local DepGraph = {
 ---@type table<CompId, Component>
 local ManagedComps = {}
 
----@type table<CompId, ManagedComponent>
-local ProxyComps = {}
 
 
 --- Forward declarations
@@ -48,8 +46,6 @@ local find_raw_value
 local lookup_plain_value
 local register
 local inherit
-local create_proxy
-local get_proxy
 
 
 --- Ensure a raw component is loaded into ManagedComps by id.
@@ -61,18 +57,12 @@ local function ensure_loaded(id)
     if loaded then
         return loaded
     end
-    local raw_comp = DefaultComp[id]
-    if not raw_comp then
-        return nil
-    end
-    ManagedComps[id] = raw_comp
-    return raw_comp
+    return BuiltinComp[id]
 end
 
 --- @class RawValueResult
 --- @field [1] any             -- Raw value
 --- @field [2] Component       -- Raw component where the value is originally defined
---- @field [3] Component|nil   -- Raw deepest reference component in the lookup path
 
 --- The cache of raw component values, used to avoid redundant lookups.
 --- @type table<string, table<CompId, vim.NIL|RawValueResult>>
@@ -81,21 +71,6 @@ local raw_cache = {}
 --- The cache of inherited values, used to avoid redundant lookups.
 --- @type table<string, table<CompId, {[1]: any,[2]: integer}>>
 local inherited_cache = {}
-
-local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
-
-local function debug_log(...)
-    local args = { ... }
-    for i, v in ipairs(args) do
-        args[i] = tostring(v)
-    end
-    local line = os.date("%H:%M:%S") .. " " .. table.concat(args, " ") .. "\n"
-    local f = io.open(DEBUG_LOG, "a")
-    if f then
-        f:write(line)
-        f:close()
-    end
-end
 
 --- Walk the raw component and its `ref` chain in search of a `key` field.
 --- Results (including misses) are cached per `(key, cid)`.
@@ -109,13 +84,11 @@ find_raw_value = function(raw_comp, key, seen)
         return NIL
     end
     seen[cid] = true
-    debug_log("find_raw_value ENTER", cid, key, type(raw_comp))
 
     --- Cache check (only populated by ref lookups)
     local key_cache = raw_cache[key]
     local result = key_cache and key_cache[cid]
     if result then
-        debug_log("find_raw_value CACHE HIT", cid, key)
         return result
     end
 
@@ -123,8 +96,7 @@ find_raw_value = function(raw_comp, key, seen)
     --- Results are NOT cached — O(1) lookup, no benefit.
     local value = raw_comp[key]
     if value ~= nil then
-        debug_log("find_raw_value LOCAL HIT", cid, key, type(value))
-        return { value, raw_comp, nil }
+        return { value, raw_comp }
     end
 
     --- Reference chain (results are cached to avoid recursive traversal)
@@ -132,14 +104,10 @@ find_raw_value = function(raw_comp, key, seen)
     if type(ref) == "table" then
         local ref_id = ref[key]
         if ref_id then
-            debug_log("find_raw_value REF", cid, key, ref_id)
             local ref_raw = ensure_loaded(ref_id)
             if ref_raw then
-                debug_log("find_raw_value REF_COMP", ref_id, "exists=" .. tostring(ref_raw ~= nil))
                 result = find_raw_value(ref_raw, key, seen)
-                debug_log("find_raw_value REF_RESULT", ref_id, key, result == NIL and "NIL" or "FOUND")
                 if result ~= NIL then
-                    result[3] = result[3] or ref_raw
                     if key_cache then
                         key_cache[cid] = result
                     else
@@ -148,7 +116,13 @@ find_raw_value = function(raw_comp, key, seen)
                     return result
                 end
             else
-                debug_log("find_raw_value REF_FAIL", ref_id, "not found")
+                --- Cache NIL for ref misses (ref_id resolved but nothing found)
+                if key_cache then
+                    key_cache[cid] = NIL
+                else
+                    raw_cache[key] = { [cid] = NIL }
+                end
+                return NIL
             end
             --- Cache NIL for ref misses (ref_id resolved but nothing found)
             if key_cache then
@@ -160,88 +134,9 @@ find_raw_value = function(raw_comp, key, seen)
         end
     end
 
-    debug_log("find_raw_value NOT FOUND", cid, key)
     return NIL
 end
 
-
---- Create a managed proxy for a raw component.
---- @param cid CompId
---- @param raw_comp Component
---- @return ManagedComponent
-create_proxy = function(cid, raw_comp)
-    local proxy = setmetatable({
-        id = cid,
-    }, {
-        __newindex = function(t, k, v)
-            raw_comp[k] = v
-        end,
-        __index = function(p, key)
-            debug_log("PROXY_INDEX", cid, key)
-
-            local raw = find_raw_value(raw_comp, key, {})
-            if raw == NIL then
-                debug_log("PROXY_INDEX NIL", cid, key)
-                return nil
-            end
-
-            local value = raw[1]
-            debug_log("PROXY_INDEX FOUND", cid, key, type(value),
-                "provider=" .. tostring(raw[3] and raw[3].id or raw_comp.id))
-
-            if type(value) == "function" then
-                local raw_value = value
-
-                local last_ref = raw[3]
-                local cache_key = "result:" .. key
-                local ref_id = last_ref and last_ref.id
-
-                value = function(self, session, ...)
-                    local raw_self = last_ref or self
-                    debug_log("PROXY_WRAPPER CALL", cid, key, "session=" .. tostring(session ~= nil),
-                        "provider=" .. tostring(raw_self.id))
-                    if not session then
-                        return raw_value(raw_self, nil, ...)
-                    end
-
-                    --- Fast path: hit in last_ref's cache (common when a ref'd
-                    --- component evaluated earlier this cycle).
-                    local cache = ref_id and session.get_cache(ref_id)
-                    local result = cache and cache[cache_key]
-                    if result ~= nil then
-                        debug_log("PROXY_WRAPPER CACHE FAST", cid, key, ref_id)
-                        return unpack(result)
-                    end
-
-                    --- Fallback: hit in this component's own cache.
-                    cache = session.get_cache(cid)
-                    result = cache and cache[cache_key]
-                    if result ~= nil then
-                        debug_log("PROXY_WRAPPER CACHE FALLBACK", cid, key)
-                        return unpack(result)
-                    end
-
-                    --- Miss: evaluate and store in both caches so future
-                    --- lookups (from either id) hit the fast path.
-                    debug_log("PROXY_WRAPPER EVAL", cid, key, "provider=" .. tostring(raw_self.id),
-                        "provider_type=" .. type(raw_self))
-                    result = { raw_value(raw_self, session, ...) }
-                    debug_log("PROXY_WRAPPER EVAL DONE", cid, key, "result_type=" .. type(result[1]))
-                    if cache then
-                        cache[cache_key] = result
-                    else
-                        session.set_cache(cid, { [cache_key] = result })
-                    end
-                    if ref_id then
-                        session.set_cache(ref_id, { [cache_key] = result })
-                    end
-                end
-            end
-            return value
-        end,
-    })
-    return proxy
-end
 
 
 --- Perform a plain lookup for a key within a component hierarchy.
@@ -256,36 +151,31 @@ end
 --- @param seen table<CompId, boolean>|nil  Optional recursion guard
 --- @return nil|any raw_value The raw value found (static or unevaluated function).
 --- @return nil|ManagedComponent origin The origin component where the value is defined.
---- @return nil|ManagedComponent drc The deepest reference component, or nil if not found.
 lookup_plain_value = function(comp, key, seen)
     local raw_comp = ManagedComps[comp.id] or comp
     local result = find_raw_value(raw_comp, key, seen or {})
     if result == NIL then
-        return nil, nil, nil
+        return nil, nil
     end
-    return result[1], result[2], result[3]
+    return result[1], result[2]
 end
 
---- Retrieve only the context component for a given key.
+--- Retrieve the origin component for a given key.
 ---
---- This returns the *final component* in the reference chain
---- where the key's value originated — useful for context-based evaluation.
+--- Returns the component that actually defines the value for `key`
+--- in the reference chain — useful for context-based evaluation.
 ---
---- @param comp ManagedComponent            The component to start lookup from.
---- @param key string                       The key name to look up.
---- @param seen table<CompId, boolean>|nil  Optional recursion guard.
---- @return ManagedComponent|nil context    The deepest reference component, or nil if not found.
-M.deepest_reference_component = function(comp, key, seen)
+--- @param comp ManagedComponent  Component to start lookup from.
+--- @param key string             The key name to look up.
+--- @param seen? table<CompId, boolean>  Optional recursion guard.
+--- @return ManagedComponent|nil  The origin component, or nil.
+M.origin_component = function(comp, key, seen)
     local raw_comp = ManagedComps[comp.id] or comp
     local r = find_raw_value(raw_comp, key, seen or {})
     if r == NIL then
         return nil
     end
-    local drc_raw = r[3]
-    if drc_raw then
-        return get_proxy(drc_raw.id)
-    end
-    return nil
+    return r[2]
 end
 
 --- Resolve a field by walking the inheritance chain and merging values.
@@ -454,18 +344,48 @@ end
 --- @return ManagedComponent|nil The component, or `nil` if not found.
 M.get_comp = function(id)
     return ManagedComps[id]
-    -- local proxy = ProxyComps[id]
-    -- if proxy then
-    --     return proxy
-    -- end
-    -- local raw = ManagedComps[id]
-    -- if not raw then
-    --     return nil
-    -- end
-    -- proxy = create_proxy(id, raw)
-    -- ProxyComps[id] = proxy
-    -- return proxy
 end
+
+---comment
+---@param comp ManagedComponent
+---@param session Session
+---@return ManagedComponent
+M.bind_sesion = function(comp, session)
+    return setmetatable({ id = comp.id }, {
+        __newindex = comp,
+        __index = function(proxy, key)
+            local res = find_raw_value(comp, key, {})
+            if res == NIL then
+                return nil
+            end
+
+            local value = res[1]
+            if type(value) ~= "function" then
+                return value
+            end
+
+            local origin = res[2]
+            local cached_key = origin.id .. tostring(key)
+            if origin == comp then
+                return function(...)
+                    return session.memo(cached_key, value, ...)
+                end
+            else
+                return function(...)
+                    local args = { ... }
+                    local self = M.bind_sesion(origin, session)
+                    for index, arg in ipairs(args) do
+                        if arg == comp or proxy == arg then
+                            args[index] = self
+                        end
+                    end
+                    return session.memo(cached_key, value, unpack(args))
+                end
+            end
+        end
+    })
+end
+
 
 --- Check if the component with the given id exists.
 --- @param id CompId The component id to check.

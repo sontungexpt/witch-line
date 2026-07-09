@@ -1,4 +1,4 @@
-local vim, type, ipairs, rawset, rawget, require = vim, type, ipairs, rawset, rawget, require
+local vim, type, ipairs, require = vim, type, ipairs, require
 local api = vim.api
 
 local Statusline = require("witch-line.engine.statusline")
@@ -19,9 +19,9 @@ local update_comp_graph_by_ids
 --- Hide a component's segment. Skips if not renderable.
 ---@param comp ManagedComponent
 hide_component = function(comp)
-    if rawget(comp, "renderable") then
+    if comp.renderable then
         Statusline.hide_segment(comp.id, comp.win_individual and api.nvim_get_current_win() or nil)
-        rawset(comp, "___hidden", true)
+        comp.___hidden = true
     end
 end
 
@@ -88,15 +88,15 @@ local function update_comp_style(comp, session, auto_theme, override_style)
         if pcount > 0 then
             hl_name = Highlight.make_hl_name_from_id(comp.id)
         else
-            local ref_comp = Registry.deepest_reference_component(comp, "style")
-            if ref_comp then
-                hl_name = ref_comp.___hl_name or Highlight.make_hl_name_from_id(ref_comp.id)
-                rawset(ref_comp, "___hl_name", hl_name)
+            local origin = Registry.origin_component(comp, "style")
+            if origin then
+                hl_name = origin.___hl_name or Highlight.make_hl_name_from_id(origin.id)
+                origin.___hl_name = hl_name
             else
                 hl_name = Highlight.make_hl_name_from_id(comp.id)
             end
         end
-        rawset(comp, "___hl_name", hl_name)
+        comp.___hl_name = hl_name
         return Highlight.highlight(hl_name, style), style
     end
     return false, style
@@ -136,7 +136,7 @@ local function update_comp_side_style(comp, session, side, main_style_updated, m
 
     local t = type(side_style)
     local hl_name_field = ComponentApi.hl_name_field(side)
-    local hl_name = rawget(comp, hl_name_field)
+    local hl_name = comp[hl_name_field]
     local dynamic = t == "function"
 
     local SepStyle = ComponentApi.SepStyle
@@ -183,7 +183,7 @@ local function update_comp_side_style(comp, session, side, main_style_updated, m
             }
         elseif side_style == SepStyle.Inherited then
             if not dynamic then
-                rawset(comp, hl_name_field, comp.___hl_name)
+                comp[hl_name_field] = comp.___hl_name
                 return true, nil
             end
             -- dynamic hl name it's change between comp.___left_hl_name or comp.___hl_name continually
@@ -195,7 +195,7 @@ local function update_comp_side_style(comp, session, side, main_style_updated, m
     end
     -- Ensure highlight name exists and apply the new highlight
     hl_name = hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
-    rawset(comp, hl_name_field, hl_name)
+    comp[hl_name_field] = hl_name
     ---@diagnostic disable-next-line: param-type-mismatch
     return Highlight.highlight(hl_name, apply_auto_theme(side_style, auto_theme)), nil
 end
@@ -205,11 +205,11 @@ end
 --- @param session Session The session to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 update_comp = function(comp, session)
+    comp = Registry.bind_sesion(comp, session)
     local cid = comp.id
     ComponentApi.pre_update(comp, session)
 
     local hidden = ComponentApi.hidden(comp, session)
-
     if hidden then
         hide_component(comp)
     else
@@ -218,7 +218,7 @@ update_comp = function(comp, session)
         -- A abstract component will not have indices
         -- It's just call the update function for other purpose and we not affect to the statusline
         -- So we just ignore it even the value is empty string
-        if rawget(comp, "renderable") then
+        if comp.renderable then
             if value == "" then
                 hide_component(comp)
                 hidden = true
@@ -286,7 +286,7 @@ update_comp = function(comp, session)
                     Statusline.set_click_handler(cid, click_manager.register(comp), nil, winid)
                 end
 
-                rawset(comp, "___hidden", false) -- Reset hidden state
+                comp.___hidden = false -- Reset hidden state
             end
         end
     end
@@ -307,7 +307,6 @@ update_comp_graph = function(comp, session, dep_graph_kind, seen)
     local cid = comp.id
     if seen[cid] then return end
     seen[cid] = true
-
     local hidden = update_comp(comp, session)
 
     if hidden then
@@ -353,27 +352,12 @@ update_comp_graph_by_ids = function(ids, session, dep_graph_kind, seen)
     for _, id in ipairs(ids) do
         if not seen[id] then
             local comp = Registry.get_comp(id)
+
             if comp then
                 update_comp_graph(comp, session, dep_graph_kind, seen)
             end
         end
     end
-end
-
---- Update a component and its deps in a new session, then debounce render.
----@param comp ManagedComponent The component to update.
----@param eager? boolean Whether to render immediately instead of debouncing.
----@param dep_graph_kind? DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
----@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
-M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
-    require("witch-line.core.session").with_session(function(session)
-        update_comp_graph(comp, session, dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
-        if eager then
-            Statusline.render()
-        else
-            Statusline.render_debounce()
-        end
-    end)
 end
 
 --- Update a component and its deps in a new session, then debounce render.

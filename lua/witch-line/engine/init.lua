@@ -4,7 +4,7 @@ local api = vim.api
 local Statusline = require("witch-line.engine.statusline")
 local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
-local DefaultComp = require("witch-line.component")
+local BuiltinComp = require("witch-line.component")
 
 local Registry = require("witch-line.core.registry")
 local is_existed = Registry.is_existed
@@ -36,7 +36,7 @@ local function register_dependency_links(kind, comp_id, dependent_id)
             link_dependency(kind, id, dependent_id)
 
             if not is_existed(id) then
-                local dep = DefaultComp[id]
+                local dep = BuiltinComp[id]
                 if dep then
                     load_component(dep)
                 end
@@ -45,7 +45,7 @@ local function register_dependency_links(kind, comp_id, dependent_id)
     elseif id_type == "string" then
         link_dependency(kind, comp_id, dependent_id)
         if not is_existed(comp_id) then
-            local dep = DefaultComp[comp_id]
+            local dep = BuiltinComp[comp_id]
             if dep then
                 load_component(dep)
             end
@@ -84,13 +84,13 @@ local function resolve_comp_id(comp)
     elseif id then
         if type(id) ~= "string" then
             require("witch-line.util.notifier").error("Id must be a string")
-        elseif DefaultComp[id] then
+        elseif BuiltinComp[id] then
             require("witch-line.util.notifier").error("Id must be different from default id: " .. tostring(id))
         end
         return id
     else
         id = tostring(comp) .. "\0"
-        rawset(comp, "id", id)
+        comp.id = id
         return id
     end
 end
@@ -106,12 +106,12 @@ load_component = function(comp)
 
     local path = comp[0]
     if type(path) == "string" then
-        local c = DefaultComp[path]
+        local c = BuiltinComp[path]
         if c then
             comp = require("witch-line.core.override")(c, comp)
         end
     end
-    rawset(comp, "___loaded", true)
+    comp.___loaded = true
 
     if type(comp.install) == "function" then
         comp.install(comp)
@@ -175,7 +175,7 @@ end
 ---@param winid integer|nil
 mount_component = function(comp, parent_id, winid)
     if winid then
-        rawset(comp, "win_individual", true)
+        comp.win_individual = true
     end
 
     load_component(comp)
@@ -200,7 +200,7 @@ mount_component = function(comp, parent_id, winid)
         Statusline.track_flexible(cid, flexible)
     end
 
-    rawset(comp, "renderable", true)
+    comp.renderable = true
 end
 
 --- Push a literal string onto the statusline segment list.
@@ -222,7 +222,7 @@ end
 mount_component_tree = function(comp, group_id, winid)
     local kind = type(comp)
     if kind == "string" then
-        local required = DefaultComp[comp]
+        local required = BuiltinComp[comp]
         if not required then
             return mount_literal_comp(comp, winid)
         end
@@ -235,7 +235,7 @@ mount_component_tree = function(comp, group_id, winid)
 
     ---@cast comp Component
     if not vim.islist(comp) then
-        rawset(comp, "___container", group_id)
+        comp.___container = group_id
         mount_component(comp, group_id, winid)
         group_id = comp.id
     end

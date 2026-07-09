@@ -1,11 +1,6 @@
 local colors = require("witch-line.constant.color")
 local uv, api, bo = vim.uv or vim.loop, vim.api, vim.bo
 
-local DEBUG_LOG = ("/tmp/witch-line-debug-%s.log"):format(vim.fn.getpid())
-local function debug_log(...)
-    vim.fn.writefile({ os.date("%H:%M:%S") .. " " .. table.concat({ ... }, " ") }, DEBUG_LOG, "a")
-end
-
 local INTERFACE_ID = "wl.file.interface"
 
 
@@ -94,10 +89,7 @@ local Name = {
         fg = colors.orange,
     },
     update = function(self, session)
-        debug_log("FILE_NAME update", "self.id=" .. tostring(self.id))
-        debug_log("FILE_NAME context type", type(self.context))
         local ctx = self.context(self, session)
-        debug_log("FILE_NAME ctx", type(ctx))
         return ctx.basename
     end,
 }
@@ -113,10 +105,7 @@ local Icon = {
     },
 
     update = function(self, session)
-        debug_log("FILE_ICON update", "self.id=" .. tostring(self.id))
-        debug_log("FILE_ICON context type", type(self.context))
         local ctx = self.context(self, session)
-        debug_log("FILE_ICON ctx", type(ctx))
         return ctx.icon, {
             fg = ctx.color,
         }

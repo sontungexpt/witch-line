@@ -207,7 +207,7 @@ Diff.Interface = {
             end)
         end
 
-        api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
+        api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufReadPost", "BufEnter", "FileChangedShellPost" }, {
             callback = function(e)
                 local event, bufnr = e.event, e.buf
 

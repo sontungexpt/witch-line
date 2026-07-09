@@ -52,24 +52,25 @@ local function new()
         get_cache = function(k)
             return cache[k]
         end,
+
         --- Memoize a function call, caching the result in the memo cache.
-        --- @param fn any The function to memoize.
+        --- @param fn_or_key any
+        --- @param fn_or_arg any
         --- @param ... any The arguments to pass to the function.
         --- @return any The result of the function call or the cached result or the original value if not a function.
-        memo = function(fn, ...)
-            if type(fn) ~= "function" then
-                return fn
+        memo = function(fn_or_key, fn_or_arg, ...)
+            local result = cache[fn_or_key]
+            if result == nil then
+                if type(fn_or_key) == "function" then
+                    result = { fn_or_key(fn_or_arg, ...) }
+                else
+                    result = { fn_or_arg(...) }
+                end
+                cache[fn_or_key] = result
             end
-
-            local result = cache[fn]
-            if result ~= nil then
-                return unpack(result)
-            end
-
-            result = { fn(...) }
-            cache[fn] = result
             return unpack(result)
-        end
+        end,
+
     }
     Sessions[lastest_sid] = session
     return session
