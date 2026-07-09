@@ -296,7 +296,7 @@ M.setup = function(statusline)
     Event.on_event(function(ids, event_info)
         require("witch-line.core.session").with_session(function(session)
             if event_info then
-                session.set("EventInfo", event_info)
+                session:set("EventInfo", event_info)
             end
             require("witch-line.engine.update").update_comp_graph_by_ids(ids, session, DepGraphKind.Event)
             Statusline.render_debounce()

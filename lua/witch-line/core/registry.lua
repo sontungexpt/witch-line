@@ -242,7 +242,7 @@ inherit = function(comp, key, merge, self_val, session, ...)
 
         if session and type(val) == "function" then
             dynamic = true
-            val = session.memo(val, ...)
+            val = session:cache(comp, key):memo(val, ...)
         end
     end
 
@@ -268,7 +268,7 @@ inherit = function(comp, key, merge, self_val, session, ...)
         ----------------------------------------------------------------------
         if session and type(value) == "function" then
             dynamic = true
-            value = session.memo(value, ...)
+            value = session:cache(parent, key):memo(value, ...)
         end
 
         ----------------------------------------------------------------------
@@ -294,15 +294,7 @@ inherit = function(comp, key, merge, self_val, session, ...)
             -- Dynamic values are session-specific.
             ------------------------------------------------------------------
             local session_key = "inherit:" .. key
-            local session_cache = session.get_cache(session_key)
-
-            if session_cache then
-                session_cache[cid] = cache
-            else
-                session.set_cache(session_key, {
-                    [cid] = cache,
-                })
-            end
+            session:cache(session_key):set(cid, cache)
         else
             ------------------------------------------------------------------
             -- Static values are globally reusable.
@@ -365,10 +357,10 @@ M.bind_sesion = function(comp, session)
             end
 
             local origin = res[2]
-            local cached_key = origin.id .. tostring(key)
+            local cache = session:cache(origin, key)
             if origin == comp then
                 return function(...)
-                    return session.memo(cached_key, value, ...)
+                    return cache:memo(value, ...)
                 end
             else
                 return function(...)
@@ -379,7 +371,7 @@ M.bind_sesion = function(comp, session)
                             args[index] = self
                         end
                     end
-                    return session.memo(cached_key, value, unpack(args))
+                    return cache:memo(value, unpack(args))
                 end
             end
         end
