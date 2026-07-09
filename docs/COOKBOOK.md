@@ -74,6 +74,8 @@ local comp = {
 
 ### Events
 
+The event string mirrors Vim's `:autocmd` syntax: `autocmd {event} {pattern} [++once]`.
+
 Re-render on Neovim autocmd events:
 
 ```lua
@@ -86,27 +88,27 @@ local mode_indicator = {
 }
 ```
 
-Multiple events, patterns, and options:
+Multiple events, patterns, and `++once`:
 
 ```lua
 events = {
   "BufEnter",
   "User VeryLazy,LazyLoad",
-  "BufEnter *.lua, *.py",
-  { "CursorHold", once = true },
+  "BufEnter *.lua,*.py ++once",
 }
 ```
 
-Special event fields:
+String syntax supports inline patterns (comma-separated) and a `++once` modifier:
 
-| Field | Type | Description |
-|---|---|---|
-| `[1]` | `string` | Event name(s). |
-| `pattern?` | `string\|string[]` | Autocmd pattern. |
-| `once?` | `boolean` | Fire once then remove. |
-| `remove_when?` | `fun(): boolean` | Remove when returns true. |
-
-String syntax supports inline patterns: `"BufEnter *.lua,*.py"`, `"User LazyLoad"`.
+| Syntax | Meaning |
+|---|---|
+| `"EventName"` | Event with no pattern (wildcard). |
+| `"EventName *.lua"` | Event scoped to `*.lua` files. |
+| `"EventName *.lua,*.py"` | Multiple comma-separated patterns. |
+| `"EventName ++once"` | Fire once then auto-remove. |
+| `"EventName *.lua ++once"` | Pattern + once. `++once` must be last. |
+| `"User LazyLoad"` | User event name passed as pattern. |
+| `"User A,B ++once"` | Two User events, each firing once. |
 
 ### Timer
 
@@ -434,7 +436,7 @@ local event_info = session:get("EventInfo")
 | `update` | `fun(self, session): string[, table]` | — | Returns display text and optional highlight. |
 | `config` | `table` | `nil` | Fixed config values. |
 | `context` | `table\|fun(self, session): table` | `nil` | Dynamic data shared via `ref`. |
-| `events` | `string\|string[]\|SpecialEvent[]` | `nil` | Autocmd events that trigger re-render. |
+| `events` | `string\|string[]` | `nil` | Autocmd events that trigger re-render. Inline syntax: `"Event [Pat,Pat] [++once]"`. |
 | `timing` | `boolean\|number` | `nil` | Timer interval in ms (`true` = 1000). |
 | `win_individual` | `boolean` | `false` | Re-render per window. |
 | `style` | `table\|string\|fun(self, session): table\|nil` | `nil` | Highlight: inline table, named group, or function. |

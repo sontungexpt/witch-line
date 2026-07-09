@@ -203,42 +203,12 @@ do
 end
 
 -- ---------------------------------------------------------------
-print("=== register_events: table format ===")
+print("=== register_events: array of strings ===")
 
 do
     setup({ "BufEnter", "BufLeave" })
     eq(#mock.autocmd.calls, 1, "single autocmd for both events")
     check_autocmd_events(1, { "BufEnter", "BufLeave" })
-end
-
-do
-    setup({ { "BufEnter", pattern = "*.lua" } })
-    eq(#mock.autocmd.calls, 1)
-    local c = mock.autocmd.calls[1]
-    eq(c.events, "BufEnter")
-    eq(c.opts.pattern, "*.lua")
-    is_nil(c.opts.once)
-end
-
-do
-    setup({ { "BufEnter", "BufLeave", pattern = "*.lua", once = true } })
-    eq(#mock.autocmd.calls, 1)
-    local c = mock.autocmd.calls[1]
-    eq(c.opts.pattern, "*.lua")
-    eq(c.opts.once, true, "once propagated")
-end
-
-do
-    setup({ { "" } })
-    eq(#mock.autocmd.calls, 0, "empty event name produces no autocmd")
-end
-
-do
-    setup({ { "BufEnter", pattern = { "*.lua", "", "*.py", "*" } } })
-    local c = mock.autocmd.calls[1]
-    eq(#c.opts.pattern, 2, "two valid patterns remain")
-    eq(c.opts.pattern[1], "*.lua")
-    eq(c.opts.pattern[2], "*.py")
 end
 
 -- ---------------------------------------------------------------
@@ -249,25 +219,6 @@ do
     local c = mock.autocmd.calls[1]
     eq(type(c.opts.group), "number", "group is set")
     not_nil(c.opts.callback, "callback registered")
-end
-
-do
-    setup({ { "BufEnter", pattern = "*.lua", once = true } })
-    local c = mock.autocmd.calls[1]
-    eq(c.opts.once, true, "once=true in autocmd opts")
-end
-
-do
-    local removed = false
-    local ev = fresh_event()
-    ev.register_events("cid1", {
-        { "BufEnter", pattern = "*.lua", remove_when = function() removed = true end },
-    })
-    ev.on_event(function() end)
-    local c = mock.autocmd.calls[1]
-    not_nil(c.opts.callback, "callback with remove_when")
-    c.opts.callback({ event = "BufEnter" })
-    is_true(removed, "remove_when called")
 end
 
 -- ---------------------------------------------------------------
@@ -306,7 +257,7 @@ end
 
 do
     local ev = fresh_event()
-    ev.register_events("cid1", { { "InsertEnter", pattern = "*.lua" } })
+    ev.register_events("cid1", "InsertEnter *.lua")
     ev.on_event(function(ids, _)
         mock.work_calls[#mock.work_calls + 1] = { ids = ids }
     end)
@@ -354,6 +305,53 @@ do
     ev.on_event(function() end)
 
     eq(#mock.autocmd.calls, 2, "two autocmds for different patterns")
+end
+
+-- ---------------------------------------------------------------
+print("=== register_events: ++once modifier ===")
+
+do
+    setup("BufEnter ++once")
+    local c = mock.autocmd.calls[1]
+    eq(c.events, "BufEnter")
+    eq(c.opts.once, true, "once=true for ++once")
+    is_nil(c.opts.pattern, "no pattern")
+end
+
+do
+    setup("BufEnter *.lua ++once")
+    local c = mock.autocmd.calls[1]
+    eq(c.events, "BufEnter")
+    eq(c.opts.pattern, "*.lua")
+    eq(c.opts.once, true, "once=true with pattern")
+end
+
+do
+    -- ++once before pattern is NOT a modifier (must be behind patterns).
+    -- Pattern area is comma-split only, so "++once *.lua" is one combined pattern.
+    setup("BufEnter ++once *.lua")
+    local c = mock.autocmd.calls[1]
+    eq(c.events, "BufEnter")
+    eq(c.opts.pattern, "++once *.lua", "space-separated tokens become single pattern")
+    is_nil(c.opts.once, "once not set when ++once is before patterns")
+end
+
+do
+    setup("User LazyLoad ++once")
+    local c = mock.autocmd.calls[1]
+    eq(c.events, "User")
+    eq(c.opts.pattern, "LazyLoad")
+    eq(c.opts.once, true, "once=true for user event")
+end
+
+do
+    local ev = fresh_event()
+    ev.register_events("cid1", "BufEnter *.lua ++once")
+    ev.register_events("cid2", "BufEnter *.lua")
+    ev.on_event(function() end)
+    eq(#mock.autocmd.calls, 1, "++once and plain merge into one autocmd")
+    local c = mock.autocmd.calls[1]
+    eq(c.opts.once, true, "once propagates when any registration has it")
 end
 
 -- ---------------------------------------------------------------

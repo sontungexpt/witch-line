@@ -32,31 +32,7 @@
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: OnClickMouseButton, modifier_pressed: OnClickModifier)
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 
---- Options used for configuring a special event.
---- These fields control event behavior but do not include identifiers.
---- @class SpecialEventOpts
---- @field once? boolean  Optional flag. If true, the event is triggered only once.
---- @field remove_when? fun():boolean The event will be remove when `remove_when` return true
---- Optional file/buffer pattern(s).
---- Can be:
----   - string: a single pattern
----   - string[]: list of patterns
----   - nil: no pattern filtering
---- Empty strings or "*" are treated as no pattern.
---- @field pattern? string|string[]|nil
 
---- @class SpecialEvent : SpecialEventOpts
---- @field [integer] string event name
----
---- Optional file/buffer pattern(s).
---- Can be:
----   - string: a single pattern
----   - string[]: list of patterns
----   - nil: no pattern filtering
---- Empty strings or "*" are treated as no pattern.
---- @field pattern? string|string[]
---- @field remove_when? fun():boolean The event will be removed when `remove_when` returns true
----
 --- @class Component :table
 --- @field [NotNil] any Any additional fields are treated as custom data
 --- @field id? CompId The unique identifier for the component, can be a string or a number
@@ -94,7 +70,18 @@
 ---
 --- A table of events that the component will listen to.
 ---
---- @field events? string|string[]|SpecialEvent[]
+--- Inline syntax (strings only): `<Event> [<Pat>[,<Pat>...]] [++once]`
+---
+---   `"ModeChanged"`                             — event only
+---   `"BufEnter *.lua"`                          — event + pattern
+---   `"BufEnter *.lua,*.py"`                     — event + multiple patterns
+---   `"BufEnter ++once"`                         — event + fire once
+---   `"BufEnter *.lua ++once"`                   — event + pattern + once
+---   `"User VeryLazy"`                           — User event name as pattern
+---   `"User VeryLazy ++once"`                    — User event + once
+---   `{ "BufEnter", "BufEnter *.lua ++once" }`   — array of event strings
+---
+--- @field events? string|string[]
 ---
 --- @field ref? Reference A table of references to other components that this component depends on
 ---
