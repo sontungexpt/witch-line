@@ -1,3 +1,4 @@
+local bo = vim.bo
 local request_update = function(comp, eager)
     local eng = package.loaded["witch-line.engine"]
     if eng then eng.request_update_comp_graph(comp, eager) end
@@ -34,7 +35,7 @@ local Neocodeium = {
         event = event and event[self.id]
 
         if event and event.match == "NeoCodeiumLabelUpdated" then
-            if vim.bo.buftype ~= "prompt" and event.data == " * " then
+            if bo.buftype ~= "prompt" and event.data == " * " then
                 if not neo_running then
                     neo_timer = neo_timer or vim.uv.new_timer()
                     if neo_timer then

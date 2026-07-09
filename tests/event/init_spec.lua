@@ -155,17 +155,20 @@ end
 do
     setup("BufEnter *.lua")
     local c = mock.autocmd.calls[1]
-    eq(c.events, "BufEnter", "event name is a string for special event")
+    check_autocmd_events(1, { "BufEnter" })
     eq(c.opts.pattern, "*.lua", "pattern passed to autocmd")
 end
 
 do
     setup("BufEnter *.lua, *.py")
-    local c = mock.autocmd.calls[1]
-    eq(c.events, "BufEnter", "event name is string")
-    eq(#c.opts.pattern, 2, "two patterns")
-    eq(c.opts.pattern[1], "*.lua")
-    eq(c.opts.pattern[2], "*.py")
+    eq(#mock.autocmd.calls, 2, "two autocmds, one per pattern")
+    local patterns_found = {}
+    for i = 1, 2 do
+        check_autocmd_events(i, { "BufEnter" })
+        patterns_found[mock.autocmd.calls[i].opts.pattern] = true
+    end
+    is_true(patterns_found["*.lua"], "contains *.lua pattern")
+    is_true(patterns_found["*.py"], "contains *.py pattern")
 end
 
 do
@@ -262,7 +265,7 @@ do
         mock.work_calls[#mock.work_calls + 1] = { ids = ids }
     end)
 
-    fire_autocmd(1, {})
+    fire_autocmd(1, { event = "InsertEnter" })
     eq(#mock.work_calls, 1, "special event dispatched")
     eq(mock.work_calls[1].ids[1], "cid1")
 end
@@ -290,10 +293,8 @@ do
     ev.on_event(function() end)
 
     eq(#mock.autocmd.calls, 1, "merged into single autocmd")
+    check_autocmd_events(1, { "BufEnter" })
     local c = mock.autocmd.calls[1]
-    -- merging normalizes name to a list; just check it contains the name
-    local names = type(c.events) == "string" and { c.events } or c.events
-    is_true(names[1] == "BufEnter", "event name correct")
     eq(c.opts.pattern, "*.lua", "pattern preserved")
     not_nil(c.opts.callback)
 end
@@ -313,17 +314,15 @@ print("=== register_events: ++once modifier ===")
 do
     setup("BufEnter ++once")
     local c = mock.autocmd.calls[1]
-    eq(c.events, "BufEnter")
-    eq(c.opts.once, true, "once=true for ++once")
+    check_autocmd_events(1, { "BufEnter" })
     is_nil(c.opts.pattern, "no pattern")
 end
 
 do
     setup("BufEnter *.lua ++once")
     local c = mock.autocmd.calls[1]
-    eq(c.events, "BufEnter")
+    check_autocmd_events(1, { "BufEnter" })
     eq(c.opts.pattern, "*.lua")
-    eq(c.opts.once, true, "once=true with pattern")
 end
 
 do
@@ -331,17 +330,16 @@ do
     -- Pattern area is comma-split only, so "++once *.lua" is one combined pattern.
     setup("BufEnter ++once *.lua")
     local c = mock.autocmd.calls[1]
-    eq(c.events, "BufEnter")
+    check_autocmd_events(1, { "BufEnter" })
     eq(c.opts.pattern, "++once *.lua", "space-separated tokens become single pattern")
-    is_nil(c.opts.once, "once not set when ++once is before patterns")
 end
 
 do
     setup("User LazyLoad ++once")
     local c = mock.autocmd.calls[1]
     eq(c.events, "User")
-    eq(c.opts.pattern, "LazyLoad")
-    eq(c.opts.once, true, "once=true for user event")
+    eq(#c.opts.pattern, 1, "one user pattern")
+    eq(c.opts.pattern[1], "LazyLoad")
 end
 
 do
@@ -351,7 +349,8 @@ do
     ev.on_event(function() end)
     eq(#mock.autocmd.calls, 1, "++once and plain merge into one autocmd")
     local c = mock.autocmd.calls[1]
-    eq(c.opts.once, true, "once propagates when any registration has it")
+    check_autocmd_events(1, { "BufEnter" })
+    eq(c.opts.pattern, "*.lua", "pattern preserved")
 end
 
 -- ---------------------------------------------------------------

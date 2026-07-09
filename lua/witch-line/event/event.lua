@@ -1,113 +1,145 @@
-local next, type, pairs, vim = next, type, pairs, vim
-local byte, find = string.byte, string.find
-local nvim_create_autocmd = vim.api.nvim_create_autocmd
+local next, type = next, type
+local str_byte, str_find, str_sub = string.byte, string.find, string.sub
 
 local M = {}
 
+--- Sentinel key for once-only ids (unique table ref, can't collide with numeric keys).
+local ONCE = 0
 
---- @type table<string, CompId[]>
-local Events = {}
+--- @alias EventBucket table<table|integer,CompId|CompId[]>
+--- { [1] = comp1, [2] = comp2, [ONCE] = { comp_once1, comp_once2 } }
 
---- @type table<string, CompId[]>
+--- @type table<string, EventBucket>
+--- Patternless events, combined into one autocmd at compile time.
+---
+--- After registering "BufEnter" and "BufLeave ++once":
+---   SimpleEvents = {
+---     ["BufEnter"] = {
+---         [1] = cid1
+---     },
+---     ["BufLeave"] = {
+---         [ONCE] = { cid2 }
+---     }
+---   }
+local VimEvents = {}
+
+--- @type table<string, EventBucket>
+--- User events keyed by name (autocmd pattern). One autocmd covers all.
+---
+--- After registering "User LazyLoad ++once" and "User ColorScheme":
+---   UserEvents = {
+---     ["LazyLoad"] = {
+---         [ONCE] = { cid1 }
+---     },
+---     ["ColorScheme"] = {
+---         [1] = cid2
+---     }
+---   }
 local UserEvents = {}
 
---- SpecialEvents[event_name][pattern_or_true] = { ids = CompId[], once = boolean }
---- @type table<string, table<string|true, {ids:CompId[], once:boolean}>>
-local SpecialEvents = {}
+--- @type table<string, table<string, EventBucket>>
+--- Pattern events: PatternEvents[pattern][event] = bucket.
+--- Groups by pattern so one autocmd covers all events sharing that pattern.
+---
+--- After registering "BufEnter *.lua ++once" and "BufWritePost *.lua":
+---   PatternEvents = {
+---     ["*.lua"] = {
+---         ["BufEnter"] = {
+---             [ONCE] = { cid1 }
+---         },
+---         ["BufWritePost"] = {
+---              [1] = cid2
+---         }
+---     }
+---   }
+local PatternEvents = {}
 
-local function register_normal_event(store, key, comp_id)
-    local list = store[key]
-    if list then
-        list[#list + 1] = comp_id
-        return list
-    end
-    list = { comp_id }
-    store[key] = list
-    return list
-end
-
-local function register_special_event(name, pattern, once, comp_id)
-    local bucket = SpecialEvents[name]
-    if not bucket then
-        bucket = {}
-        SpecialEvents[name] = bucket
-    end
-
-    -- normalize key: string stays as-is, table is serialized, nil becomes true
-    local key = pattern or true
-    local entry = bucket[key]
-    if entry then
-        entry.ids[#entry.ids + 1] = comp_id
-        entry.once = entry.once or once
+--- Add comp_id to a bucket. Normal → numeric index, once → bucket[ONCE].
+---@param bucket  EventBucket
+---@param comp_id CompId
+---@param once?    boolean
+local function add_to_bucket(bucket, comp_id, once)
+    if once then
+        local once_list = bucket[ONCE]
+        if not once_list then
+            once_list = {}
+            bucket[ONCE] = once_list
+        end
+        once_list[#once_list + 1] = comp_id
     else
-        bucket[key] = { ids = { comp_id }, once = once, pattern = pattern }
+        bucket[#bucket + 1] = comp_id
     end
 end
 
---- Grammar: `<Event> [<Pat>[,<Pat>...]] [++once]`
+--- Parse and route an event string.
 ---
---- `Event` = first whitespace-delimited word. `Pat` = comma-separated list
---- (space does NOT split — only `,`). `++once` must be the **last** token.
---- `*` as sole pattern = wildcard (stripped). `"User"` events store each
---- pattern independently. Multiple registrations for the same event+pattern
---- merge their `CompId` lists (once = OR'd).
+--- ```
+---   "BufEnter"                          → SimpleEvents["BufEnter"]
+---   " BufEnter "                        → SimpleEvents["BufEnter"]  (trimmed)
+---   "BufEnter *.lua"                    → PatternEvents["*.lua"]["BufEnter"]
+---   "BufEnter *.lua,*.md"              → PatternEvents["*.lua"]["BufEnter"]
+---                                       + PatternEvents["*.md"]["BufEnter"]
+---   "BufEnter *.lua , *.md"            → same, commas+spaces tolerated
+---   "BufEnter *.lua ++once"            → PatternEvents["*.lua"]["BufEnter"] [ONCE]
+---   "BufEnter *.lua,*.md ++once"       → same with ONCE on both patterns
+---   "User LazyLoad"                     → UserEvents["LazyLoad"]
+---   "User LazyLoad ++once"             → UserEvents["LazyLoad"] [ONCE]
+---   "User MyEvent,OtherEvent"          → UserEvents["MyEvent"]
+---                                       + UserEvents["OtherEvent"]
+---   "BufWritePost *"                    → SimpleEvents["BufWritePost"]  (* = wildcard)
+--- ```
+--- Syntax: `<Event> [<Pat>[,<Pat>...]] [++once]`
+--- Routing: patterns → PatternEvents, `User` → UserEvents, bare → SimpleEvents.
 ---
---- Examples:
----   `"BufEnter"`               → BufEnter, normal
----   `"BufEnter ++once"`        → BufEnter, once
----   `"BufEnter *.lua"`         → BufEnter, pat=*.lua, normal
----   `"BufEnter *.lua ++once"`  → BufEnter, pat=*.lua, once
----   `"BufEnter *.lua,*.py ++once"` → BufEnter, pats={*.lua,*.py}, once
----   `"User FormatEnabled"`     → User FormatEnabled, normal
----   `"User FormatEnabled ++once"` → User FormatEnabled, once
----   `"User A,B ++once"`        → User A *and* B, each once
----   `"BufEnter ++once *.lua"`  → ++once treated as literal pattern
----
---- @param e       string  The event definition string.
---- @param comp_id any     Component identifier to register.
+--- @param e       string
+--- @param comp_id CompId
 local function register_string_event(e, comp_id)
     local slen = #e
     local pos = 1
 
-    -- skip leading whitespace before the event name
-    while pos <= slen and byte(e, pos) == 32 do pos = pos + 1 end -- skip space (byte 32)
+    while pos <= slen and str_byte(e, pos) == 32 do
+        pos = pos + 1
+    end
     if pos > slen then return end
 
-    -- extract event name: the first whitespace-delimited word
-    local s_at = find(e, " ", pos, true)
+    local s_at = str_find(e, " ", pos, true)
     if not s_at then
-        register_normal_event(Events, e:sub(pos), comp_id)
+        local name = str_sub(e, pos)
+        local bucket = VimEvents[name]
+        if not bucket then
+            bucket = {};
+            VimEvents[name] = bucket
+        end
+        add_to_bucket(bucket, comp_id, false)
         return
     end
-    local event_name = e:sub(pos, s_at - 1)
+    local event_name = str_sub(e, pos, s_at - 1)
 
-    -- advance past whitespace between event name and patterns
     pos = s_at + 1
-    while pos <= slen and byte(e, pos) == 32 do pos = pos + 1 end
+    while pos <= slen and str_byte(e, pos) == 32 do
+        pos = pos + 1
+    end
     if pos > slen then
-        register_normal_event(Events, event_name, comp_id)
+        local bucket = VimEvents[event_name]
+        if not bucket then
+            bucket = {}; VimEvents[event_name] = bucket
+        end
+        add_to_bucket(bucket, comp_id, false)
         return
     end
 
-    -- detect ++once: scan backward from end, skipping trailing whitespace
-    -- then check if the last 6 non-whitespace bytes are "++once"
     local once = false
-    local pend = slen -- effective end of pattern area (truncated if ++once found)
+    local pend = slen
     if slen >= pos + 5 then
         local scan = slen
-        while scan >= pos and byte(e, scan) == 32 do
+        while scan >= pos and str_byte(e, scan) == 32 do
             scan = scan - 1
         end
         if scan >= pos + 5 then
             local o_at = scan - 5
-            local b1, b2, b3, b4, b5, b6 = byte(e, o_at, o_at + 5)
-            -- "++once" = 43,43,111,110,99,101
-            if b1 == 43
-                and b2 == 43
-                and b3 == 111
-                and b4 == 110
-                and b5 == 99
-                and b6 == 101
+            local b1, b2, b3, b4, b5, b6 = str_byte(e, o_at, o_at + 5)
+            if b1 == 43 and b2 == 43 and b3 == 111
+                and b4 == 110 and b5 == 99 and b6 == 101
             then
                 once = true
                 pend = o_at - 1
@@ -115,39 +147,29 @@ local function register_string_event(e, comp_id)
         end
     end
 
-    -- split pattern area by comma, trim leading/trailing whitespace per segment
     local patterns, npat = {}, 0
     while pos <= pend do
-        -- skip leading whitespace within each segment
-        while pos <= pend and byte(e, pos) == 32 do
+        while pos <= pend and str_byte(e, pos) == 32 do
             pos = pos + 1
         end
         if pos > pend then
             break
         end
 
-        -- find the end of this segment (comma or end of pattern area)
-        local comma = find(e, ",", pos, true)
-        local seg_end
-        if comma and comma <= pend then
-            seg_end = comma - 1
-        else
-            seg_end = pend
-        end
-        -- trim trailing whitespace from the segment
-        while seg_end >= pos and byte(e, seg_end) == 32 do
+        local comma = str_find(e, ",", pos, true)
+        local seg_end = (comma and comma <= pend) and comma - 1 or pend
+        while seg_end >= pos and str_byte(e, seg_end) == 32 do
             seg_end = seg_end - 1
         end
 
         if seg_end >= pos then
-            local t = e:sub(pos, seg_end)
-
+            local t = str_sub(e, pos, seg_end)
             if t == "*" then
-                -- "*" matches everything → clear patterns, register without pattern
                 npat = 0
                 break
             end
-            npat = npat + 1; patterns[npat] = t
+            npat = npat + 1
+            patterns[npat] = t
         end
 
         if not comma or comma > pend then
@@ -156,26 +178,48 @@ local function register_string_event(e, comp_id)
         pos = comma + 1
     end
 
-    -- route: User events go to UserEvents, ++once or pattern-bearing events to SpecialEvents
     if event_name == "User" then
-        if once then
-            for i = 1, npat do
-                register_special_event("User", patterns[i], once, comp_id)
-            end
-        else
-            for i = 1, npat do
-                register_normal_event(UserEvents, patterns[i], comp_id)
-            end
-        end
-    elseif once or npat > 0 then
         for i = 1, npat do
-            register_special_event(event_name, patterns[i], once, comp_id)
+            local bucket = UserEvents[patterns[i]]
+            if not bucket then
+                bucket = {}
+                UserEvents[patterns[i]] = bucket
+            end
+            add_to_bucket(bucket, comp_id, once)
+        end
+    elseif npat > 0 then
+        for i = 1, npat do
+            local pat = patterns[i]
+            local pat_bucket = PatternEvents[pat]
+            if not pat_bucket then
+                pat_bucket = {}
+                PatternEvents[pat] = pat_bucket
+            end
+            local bucket = pat_bucket[event_name]
+            if not bucket then
+                bucket = {}
+                pat_bucket[event_name] = bucket
+            end
+            add_to_bucket(bucket, comp_id, once)
         end
     else
-        register_normal_event(Events, event_name, comp_id)
+        local bucket = VimEvents[event_name]
+        if not bucket then
+            bucket = {}
+            VimEvents[event_name] = bucket
+        end
+        add_to_bucket(bucket, comp_id, once)
     end
 end
 
+--- Register a component for one or more event strings.
+---
+--- Accepts a single string or an array of strings. Each string is parsed by
+--- `register_string_event` which routes into SimpleEvents, UserEvents, or
+--- PatternEvents depending on the presence of patterns and the event name.
+---
+--- @param cid    CompId            Component identifier.
+--- @param events string|string[] Event definition(s).
 M.register_events = function(cid, events)
     local t = type(events)
     if t == "string" then
@@ -190,24 +234,41 @@ M.register_events = function(cid, events)
     end
 end
 
+--- Print current registry state for debugging.
 M.inspect = function()
     require("witch-line.util.notifier").info(vim.inspect({
-        Events = Events,
+        SimpleEvents = VimEvents,
         UserEvents = UserEvents,
-        SpecialEvents = SpecialEvents,
+        PatternEvents = PatternEvents,
     }))
 end
 
+--- Get a table's keys as a list.
+--- @param t table
+--- @return any[]
+local tbl_keys = function(t)
+    local keys, i = {}, 0
+    --- Use next to reduce overhead
+    for k in next, t do
+        i = i + 1
+        keys[i] = k
+    end
+    return keys
+end
+
+--- Compile registries into Neovim autocmds (call once after all register_events).
+---
+--- Autocmds created: 1 for SimpleEvents + 1 for UserEvents + 1 per PatternEvents key.
+--- ONCE is managed in-callback (dispatch bucket[ONCE] then nil it) instead of
+--- Neovim's `once=true`, avoiding one autocmd per (event, pattern, once) triple.
+---
+--- @param work fun(ids: CompId[], event_queue: table<CompId, vim.api.keyset.create_autocmd.callback_args>)
 M.on_event = function(work)
     --- @type table<CompId, vim.api.keyset.create_autocmd.callback_args>
     local event_queue = {}
 
     local dispatch = function()
-        local ids, i = {}, 0
-        for id in pairs(event_queue) do
-            i = i + 1
-            ids[i] = id
-        end
+        local ids = tbl_keys(event_queue)
         work(ids, event_queue)
         event_queue = {}
     end
@@ -218,48 +279,52 @@ M.on_event = function(work)
         dispatch_debounce(...)
     end
 
-    local AUGROUP = vim.api.nvim_create_augroup("WitchLineEvent", { clear = true })
-    if next(Events) then
-        nvim_create_autocmd(vim.tbl_keys(Events), {
+    local enqueue = function(bucket, e)
+        if not bucket then return end
+        for i = 1, #bucket do
+            event_queue[bucket[i]] = e
+        end
+        local once_list = bucket[ONCE]
+        if once_list then
+            for i = 1, #once_list do
+                event_queue[once_list[i]] = e
+            end
+            bucket[ONCE] = nil
+        end
+        dispatch_debounce()
+    end
+
+    local nvim_create_autocmd = vim.api.nvim_create_autocmd
+    local AUGROUP = vim.api.nvim_create_augroup("WitchLineAutocmd", { clear = true })
+
+    if next(VimEvents) then
+        nvim_create_autocmd(tbl_keys(VimEvents), {
             group = AUGROUP,
             callback = function(e)
-                for _, id in ipairs(Events[e.event]) do
-                    event_queue[id] = e
-                end
-                dispatch_debounce()
+                enqueue(VimEvents[e.event], e)
             end,
         })
     end
 
     if next(UserEvents) then
         nvim_create_autocmd("User", {
-            pattern = vim.tbl_keys(UserEvents),
+            pattern = tbl_keys(UserEvents),
             group = AUGROUP,
             callback = function(e)
-                for _, id in ipairs(UserEvents[e.match]) do
-                    event_queue[id] = e
-                end
-                dispatch_debounce()
+                enqueue(UserEvents[e.match], e)
             end,
         })
     end
 
-    if next(SpecialEvents) then
-        for name, bucket in pairs(SpecialEvents) do
-            for _, entry in pairs(bucket) do
-                nvim_create_autocmd(name, {
-                    pattern = entry.pattern or nil,
-                    once = entry.once or nil,
-                    group = AUGROUP,
-                    callback = function(e)
-                        for _, id in ipairs(entry.ids) do
-                            event_queue[id] = e
-                        end
-                        dispatch_debounce()
-                    end,
-                })
+    --- Use next to reduce overhead
+    for pattern, event_buckets in next, PatternEvents do
+        nvim_create_autocmd(tbl_keys(event_buckets), {
+            pattern = pattern,
+            group = AUGROUP,
+            callback = function(e)
+                enqueue(event_buckets[e.event], e)
             end
-        end
+        })
     end
 end
 
