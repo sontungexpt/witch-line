@@ -338,44 +338,65 @@ M.get_comp = function(id)
     return ManagedComps[id]
 end
 
----comment
+local PROXY_META_KEY = {}
+local SESSION_KEY = {}
+---Wrap a component in a session-bound proxy.
+---
+---The proxy is cached in the session store so that repeated calls for
+---the same `(comp, session)` pair return the same table.  The metatable
+---(and its `__index` closure) is created **once per component** and
+---reused across all sessions, avoiding per-session closure allocation.
+---The active session is stored on the proxy table itself and read
+---dynamically inside `__index`.
+---
 ---@param comp ManagedComponent
 ---@param session Session
 ---@return ManagedComponent
 M.bind_sesion = function(comp, session)
-    return setmetatable({ id = comp.id }, {
-        __newindex = comp,
-        __index = function(proxy, key)
-            local res = find_raw_value(comp, key, {})
-            if res == NIL then
-                return nil
-            end
-
-            local value = res[1]
-            if type(value) ~= "function" then
-                return value
-            end
-
-            local origin = res[2]
-            local cache = session:cache(origin, key)
-            if origin == comp then
-                return function(...)
-                    return cache:memo(value, ...)
+    local mt = rawget(comp, PROXY_META_KEY)
+    if not mt then
+        mt = {
+            __newindex = comp,
+            __index = function(proxy, key)
+                local proxy_session = proxy[SESSION_KEY]
+                local res = find_raw_value(comp, key, {})
+                if res == NIL then
+                    return nil
                 end
-            else
-                return function(...)
-                    local args = { ... }
-                    local self = M.bind_sesion(origin, session)
-                    for index, arg in ipairs(args) do
-                        if arg == comp or proxy == arg then
-                            args[index] = self
-                        end
+
+                local value = res[1]
+                if type(value) ~= "function" then
+                    return value
+                end
+
+                local origin = res[2]
+                local cache = proxy_session:cache(origin)
+                if origin == comp then
+                    return function(...)
+                        return cache:memo(value, ...)
                     end
-                    return cache:memo(value, unpack(args))
+                else
+                    local self = M.bind_sesion(origin, proxy_session)
+                    return function(...)
+                        local n = select("#", ...)
+                        local args = { ... }
+                        for i = 1, n do
+                            local arg = args[i]
+                            if arg == comp or proxy == arg then
+                                args[i] = self
+                            end
+                        end
+
+                        return cache:memo(value, unpack(args))
+                    end
                 end
             end
-        end
-    })
+        }
+        rawset(comp, PROXY_META_KEY, mt)
+    end
+
+    local proxy = setmetatable({ id = comp.id, [SESSION_KEY] = session }, mt)
+    return proxy
 end
 
 

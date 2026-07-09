@@ -216,5 +216,4 @@
 
 --- @class ManagedComponent : DefaultComponent | Component
 --- @field id CompId the id of component
---- @field with_session fun(self: ManagedComponent, session: Session): ManagedComponent Takes a session and returns a managed component
 --- @field ___loaded true Always true; marks the component as loaded and managed.
