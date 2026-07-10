@@ -5,14 +5,18 @@ local Statusline = require("witch-line.engine.statusline")
 local Highlight = require("witch-line.engine.highlight")
 local ComponentApi = require("witch-line.core.component_api")
 
-local Registry = require("witch-line.core.registry")
+local Registry = require("witch-line.engine.registry")
+local ManagedComps = Registry.ManagedComps
 local DepGraphKind = Registry.DepGraphKind
+
+local Resolver = require("witch-line.engine.resolver")
 
 
 local M = {}
 
 local hide_component
 local update_comp
+local update_comp_in_session
 local update_comp_graph
 local update_comp_graph_by_ids
 
@@ -70,7 +74,7 @@ end
 --- @return CompStyle|nil style  The resolved style, or nil if unresolved.
 local function update_comp_style(comp, session, auto_theme, override_style)
     local override_style_t = type(override_style)
-    local style, force, pcount = Registry.inherit(
+    local style, force, pcount = Resolver.inherit(
         comp,
         "style",
         Highlight.merge_hl,
@@ -88,7 +92,7 @@ local function update_comp_style(comp, session, auto_theme, override_style)
         if pcount > 0 then
             hl_name = Highlight.make_hl_name_from_id(comp.id)
         else
-            local origin = Registry.origin_component(comp, "style")
+            local origin = Resolver.origin_component(comp, "style")
             if origin then
                 hl_name = origin.___hl_name or Highlight.make_hl_name_from_id(origin.id)
                 origin.___hl_name = hl_name
@@ -205,7 +209,6 @@ end
 --- @param session Session The session to use for this update.
 --- @return boolean hidden True if the component is hidden after the update, false otherwise.
 update_comp = function(comp, session)
-    comp = Registry.bind_sesion(comp, session)
     local cid = comp.id
     ComponentApi.pre_update(comp, session)
 
@@ -237,7 +240,7 @@ update_comp = function(comp, session)
                 Statusline.set_value(cid, value, comp.___hl_name, winid)
 
                 --- Left part
-                local lval, lforce = Registry.inherit(comp, "left", nil, nil, session)
+                local lval, lforce = Resolver.inherit(comp, "left", nil, nil, session)
                 if lval then
                     lval = format_side_value(lval, lforce)
                     if lval then
@@ -259,7 +262,7 @@ update_comp = function(comp, session)
                 end
 
                 --- Right part
-                local rval, rforce = Registry.inherit(comp, "right", nil, nil, session)
+                local rval, rforce = Resolver.inherit(comp, "right", nil, nil, session)
                 if rval then
                     rval = format_side_value(rval, rforce)
                     if rval then
@@ -295,6 +298,11 @@ update_comp = function(comp, session)
     return hidden
 end
 
+update_comp_in_session = function(comp, session)
+    return update_comp(Resolver.bind_sesion(comp, session), session)
+end
+
+
 
 --- Update a component and its dependencies recursively.
 --- Hides Visible dependents when the component becomes hidden.
@@ -307,12 +315,12 @@ update_comp_graph = function(comp, session, dep_graph_kind, seen)
     local cid = comp.id
     if seen[cid] then return end
     seen[cid] = true
-    local hidden = update_comp(comp, session)
+    local hidden = update_comp_in_session(comp, session)
 
     if hidden then
         for dep_id in Registry.iterate_dependent_ids(DepGraphKind.Visible, cid) do
             seen[dep_id] = true
-            local dep = Registry.get_comp(dep_id)
+            local dep = ManagedComps[dep_id]
             if dep then hide_component(dep) end
         end
     end
@@ -322,7 +330,7 @@ update_comp_graph = function(comp, session, dep_graph_kind, seen)
         for _, kind in ipairs(dep_graph_kind) do
             for dep_id in Registry.iterate_dependent_ids(kind, cid) do
                 if not seen[dep_id] then
-                    local dep = Registry.get_comp(dep_id)
+                    local dep = ManagedComps[dep_id]
                     if dep then
                         update_comp_graph(dep, session, kind, seen)
                     end
@@ -332,7 +340,7 @@ update_comp_graph = function(comp, session, dep_graph_kind, seen)
     elseif dep_graph_kind then
         for dep_id in Registry.iterate_dependent_ids(dep_graph_kind, cid) do
             if not seen[dep_id] then
-                local dep = Registry.get_comp(dep_id)
+                local dep = ManagedComps[dep_id]
                 if dep then
                     update_comp_graph(dep, session, dep_graph_kind, seen)
                 end
@@ -351,7 +359,7 @@ update_comp_graph_by_ids = function(ids, session, dep_graph_kind, seen)
     seen = seen or {}
     for _, id in ipairs(ids) do
         if not seen[id] then
-            local comp = Registry.get_comp(id)
+            local comp = ManagedComps[id]
 
             if comp then
                 update_comp_graph(comp, session, dep_graph_kind, seen)

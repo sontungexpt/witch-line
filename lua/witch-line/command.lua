@@ -16,10 +16,10 @@ local COMMANDS = {
         end,
         comp_manager = {
             comps = function(...)
-                return require("witch-line.core.registry").inspect(...)
+                return require("witch-line.engine.registry").inspect(...)
             end,
             dep_store = function(...)
-                return require("witch-line.core.registry").inspect(...)
+                return require("witch-line.engine.registry").inspect(...)
             end,
         },
         highlight = {

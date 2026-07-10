@@ -1,6 +1,8 @@
 local colors = require("witch-line.constant.color")
 local uv, api, bo = vim.uv or vim.loop, vim.api, vim.bo
 
+local resolve = function(v) return type(v) == "function" and v() or v end
+
 local INTERFACE_ID = "wl.file.interface"
 
 
@@ -45,8 +47,6 @@ local Interface = {
         local formatter = fmt.filetype[bo.filetype] or fmt.buftype[bo.buftype]
 
         if formatter then
-            local resolve = require("witch-line.util").resolve
-
             return {
                 basename = resolve(formatter[1]) or fs.basename(api.nvim_buf_get_name(0)) or "No File",
                 icon = resolve(formatter[2]) or "",

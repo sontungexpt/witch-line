@@ -6,8 +6,8 @@ local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
 local BuiltinComp = require("witch-line.component")
 
-local Registry = require("witch-line.core.registry")
-local is_existed = Registry.is_existed
+local Registry = require("witch-line.engine.registry")
+local ManagedComps = Registry.ManagedComps
 local DepGraphKind = Registry.DepGraphKind
 local link_dependency = Registry.link_dependency
 
@@ -35,7 +35,7 @@ local function register_dependency_links(kind, comp_id, dependent_id)
         for _, id in ipairs(comp_id) do
             link_dependency(kind, id, dependent_id)
 
-            if not is_existed(id) then
+            if not ManagedComps[id] then
                 local dep = BuiltinComp[id]
                 if dep then
                     load_component(dep)
@@ -44,7 +44,7 @@ local function register_dependency_links(kind, comp_id, dependent_id)
         end
     elseif id_type == "string" then
         link_dependency(kind, comp_id, dependent_id)
-        if not is_existed(comp_id) then
+        if not ManagedComps[comp_id] then
             local dep = BuiltinComp[comp_id]
             if dep then
                 load_component(dep)
@@ -111,7 +111,6 @@ load_component = function(comp)
             comp = require("witch-line.core.override")(c, comp)
         end
     end
-    comp.___loaded = true
 
     if type(comp.install) == "function" then
         comp.install(comp)
@@ -286,7 +285,7 @@ M.setup = function(statusline)
     if next(PendingInitIds) ~= nil then
         for i = 1, #PendingInitIds do
             local id = PendingInitIds[i]
-            local comp = Registry.get_comp(id)
+            local comp = Registry.ManagedComps[id]
             if comp then
                 comp.init(comp)
             end

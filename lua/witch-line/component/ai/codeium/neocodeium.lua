@@ -31,7 +31,7 @@ local Neocodeium = {
     },
     update = function(self, session)
         local icon = self.config.icon
-        local event = session.get("EventInfo")
+        local event = session:get("EventInfo")
         event = event and event[self.id]
 
         if event and event.match == "NeoCodeiumLabelUpdated" then

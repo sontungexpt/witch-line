@@ -1,1 +1,16 @@
-{}
+{
+  "runtime.version": "LuaJIT",
+  "diagnostics.disable": ["unnecessary-local"],
+  "diagnostics.globals": ["vim"],
+  "workspace.checkThirdParty": false,
+  "workspace.library": [
+    "${3rd}/luv/library",
+    "${3rd}/busted/library",
+    "/usr/share/nvim/runtime/lua",
+    "/usr/share/nvim/runtime/lua/vim/lsp",
+    "~/.local/share/nvim/lazy/lazy.nvim/lua/lazy"
+  ],
+  "diagnostics.severity": {
+    "redundant-return-value": "Warning"
+  }
+}
