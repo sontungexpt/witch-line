@@ -126,45 +126,19 @@ local Branch = {
 local Diff = {}
 
 --- @alias DiffResult { added: integer, modified: integer, removed: integer }
---- Parse `git diff -U0` output into per-hunk counts.
---- Classifies each hunk independently so unrelated adds/deletes
---- don't merge into false "modifications" (unlike a file-level min).
+--- Parse `git diff -U0` output into per-hunk counts using hunk headers.
 ---
---- Hunk with only `+`:           pure add
---- Hunk with only `-`:           pure delete
---- Hunk with both `+` and `-`:   modified = min(add, rem),
----                               surplus spills to add/rem.
+--- Matches `@@ -old_start,old_count +new_start,new_count @@` where
+--- old_count = removed lines, new_count = added lines per hunk.
 local function process_diff(stdout)
     local added, modified, removed = 0, 0, 0
-    local hunk_add, hunk_rem = 0, 0
-    local pos = 1
-    local len = #stdout
-    while pos <= len do
-        local nl = stdout:find("\n", pos)
-        local line_end = nl or (len + 1)
-        if line_end > pos then
-            local c = stdout:byte(pos)
-            if c == 64 and stdout:byte(pos + 1) == 64 then
-                if hunk_add > 0 or hunk_rem > 0 then
-                    local m = hunk_add < hunk_rem and hunk_add or hunk_rem
-                    modified = modified + m
-                    added = added + hunk_add - m
-                    removed = removed + hunk_rem - m
-                end
-                hunk_add, hunk_rem = 0, 0
-            elseif c == 43 then
-                if stdout:byte(pos + 1) ~= 43 then hunk_add = hunk_add + 1 end
-            elseif c == 45 then
-                if stdout:byte(pos + 1) ~= 45 then hunk_rem = hunk_rem + 1 end
-            end
-        end
-        pos = line_end + 1
-    end
-    if hunk_add > 0 or hunk_rem > 0 then
-        local m = hunk_add < hunk_rem and hunk_add or hunk_rem
+    for _, old_count, _, new_count in stdout:gmatch("@@%s-%-(%d+),?(%d*)%s+%+(%d+),?(%d*)%s@@") do
+        local remove_count = tonumber(old_count) or 1
+        local add_count = tonumber(new_count) or 1
+        local m = add_count < remove_count and add_count or remove_count
         modified = modified + m
-        added = added + hunk_add - m
-        removed = removed + hunk_rem - m
+        added = added + add_count - m
+        removed = removed + remove_count - m
     end
     return { added = added, modified = modified, removed = removed }
 end
@@ -263,7 +237,7 @@ Diff.Added = {
     ___builtin = true,
     config = {
         disabled_filetypes = DISABLED_FILETYPES,
-        icon = "",
+        icon = "",
     },
     ref = {
         events = "wl.git.diff.interface",
@@ -280,7 +254,7 @@ Diff.Modified = {
     ___builtin = true,
     config = {
         disabled_filetypes = DISABLED_FILETYPES,
-        icon = "",
+        icon = "",
     },
     ref = {
         events = "wl.git.diff.interface",
@@ -297,7 +271,7 @@ Diff.Removed = {
     ___builtin = true,
     config = {
         disabled_filetypes = DISABLED_FILETYPES,
-        icon = "-",
+        icon = "",
     },
     ref = {
         events = "wl.git.diff.interface",

@@ -1,7 +1,9 @@
 local colors = require("witch-line.constant.color")
 local uv, api, bo = vim.uv or vim.loop, vim.api, vim.bo
 
-local resolve = function(v) return type(v) == "function" and v() or v end
+local resolve = function(v)
+    return type(v) == "function" and v() or v
+end
 
 local INTERFACE_ID = "wl.file.interface"
 
@@ -117,9 +119,6 @@ local Modifier = {
     id = "wl.file.modifier",
     ___builtin = true,
     events = "OptionSet",
-    style = {
-        fg = colors.fg,
-    },
     update = function(self, session)
         if bo.buftype ~= "" then
             return ""
@@ -170,10 +169,7 @@ local Size = {
             s, i = s / 1024, i + 1
         end
 
-
-        return ((i == 1 and "%d" or "%.1f") .. "%s"):format(
-            s, SIZE_UNITS[i]
-        )
+        return (i == 1 and "%d%s" or "%.1f%s"):format(s, SIZE_UNITS[i])
     end,
 }
 

@@ -5,14 +5,12 @@ local colors = require("witch-line.constant.color")
 local Position = {
     id = "wl.cursor.pos",
     ___builtin = true,
-    style = { fg = colors.fg },
     events = { "CursorMoved", "CursorMovedI" },
     update = function(self)
-        local pos = vim.api.nvim_win_get_cursor(0)
+        local pos = api.nvim_win_get_cursor(0)
         return pos[1] .. ":" .. pos[2]
     end,
 }
-
 
 ---@type DefaultComponent
 local Progress = {
@@ -26,6 +24,8 @@ local Progress = {
     style = { fg = colors.orange },
     update = function(self)
         local cfg = self.config
+        ---@cast cfg { chars: string[] }
+
         local cursor_line = api.nvim_win_get_cursor(0)[1]
         local total_lines = api.nvim_buf_line_count(0)
 

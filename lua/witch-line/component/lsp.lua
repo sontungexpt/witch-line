@@ -4,7 +4,11 @@ local colors = require("witch-line.constant.color")
 local Clients = {
     id = "wl.lsp.clients",
     ___builtin = true,
-    events = { "LspAttach", "LspDetach", "BufWritePost" },
+    events = {
+        "LspAttach",
+        "LspDetach",
+        "BufWritePost",
+    },
     flexible = 100,
     config = {
         disabled_filetypes = { "NvimTree" },
@@ -14,13 +18,13 @@ local Clients = {
             ["copilot"] = true,
         },
     },
-    hidden = function(self, session_id)
+    hidden = function(self, session)
         local disabled = self.config.disabled_filetypes
         return type(disabled) == "table"
             and vim.list_contains(disabled, vim.bo.filetype)
     end,
     style = { fg = colors.magenta },
-    update = function(self, session_id)
+    update = function(self, session)
         local bufnr = vim.api.nvim_get_current_buf()
         if not vim.api.nvim_buf_is_valid(bufnr) then
             return ""

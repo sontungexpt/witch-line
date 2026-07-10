@@ -1,21 +1,29 @@
 --- @alias NotNil string | number | table | boolean | function | userdata | thread
 
---- @class CompId : string
-
 --- @class ThemeAwareStyle : vim.api.keyset.highlight
 --- @field auto_theme? boolean  If true, the style automatically adapts to the current theme
 
---- @class Reference : table
---- @field events? CompId|CompId[] A table of ids of components that this component references
---- @field timing? CompId|CompId[] A table of ids of components that this component references
---- @field hidden? CompId|CompId[] A table of ids of components that this component references for its hide function
+--- @class CompId : string
+
+
+--- @class Reference
 ---
---- @field style? CompId A id of a component that this component references for its style
---- @field left? CompId A id of a component that this components references for left separator
---- @field left_style? CompId A id of a component that this component references for its left_style
---- @field right? CompId A id of a component that this components references for right separator
---- @field right_style? CompId A id of a component that this component references for its right_style
---- @field [string] CompId A id of a component that this component references for its
+--- References to other components used to resolve dynamic fields.
+---
+--- Any field may reference another component by its id.
+--- Built-in reference keys are listed below, but custom keys are also supported.
+---
+--- @field events? CompId|CompId[] Component(s) providing the `events` field.
+--- @field timing? CompId|CompId[] Component(s) providing the `timing` field.
+--- @field hidden? CompId|CompId[] Component(s) providing the `hidden` function.
+---
+--- @field style? CompId Component providing the main style.
+--- @field left? CompId Component providing the left separator.
+--- @field left_style? CompId Component providing the left separator style.
+--- @field right? CompId Component providing the right separator.
+--- @field right_style? CompId Component providing the right separator style.
+---
+--- @field [string] CompId Component providing the value for a custom field.
 
 
 --- @alias PaddingFunc fun(self: ManagedComponent, session: Session): number|PaddingTable
@@ -33,30 +41,25 @@
 --- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
 
 
---- @class Component :table
---- @field [NotNil] any Any additional fields are treated as custom data
---- @field id? CompId The unique identifier for the component, can be a string or a number
+--- @class Component
 ---
---- The id of the component to inherit from, can be used to extend a component.
---- @field inherit? CompId
+--- @field id? CompId Unique identifier of the component.
 ---
---- A timing configuration that determines how often the component is updated.
---- - If true, the component will be updated on every 1 second.
---- - If a number, the component will be updated every n ticks.
+--- Controls how often the component is updated.
+--- - `true`: update once per second.
+--- - `integer`: update every *n* timer ticks.
 --- @field timing? boolean|integer
 ---
+--- @field lazy? boolean Whether initialization is deferred until the component is first used
 ---
---- A flag indicating whether the component should be lazy loaded or not.
---- @field lazy? boolean
+--- @field renderable? boolean Whether the component can be rendered as a standalone component.
 ---
----
---- Called when a component is first loaded/installed into the registry, before `init`.
+--- Called once when the component is registered, before `init()`.
 --- @field install? fun(comp: Component)
 ---
---- A table of configurable values that can be overridden by users.
---- Useful for exposing configurable constants (e.g. `{chars = {"_", "▁", "▂"}}`, `{format = "default"}`).
---- Access via `self.config` within component lifecycle functions.
---- Overridable via the component config — values are deep-merged with the built-in defaults.
+--- User-configurable values.
+--- These defaults are deep-merged with user configuration and can be accessed
+--- through `self.config` inside lifecycle callbacks.
 --- @field config? table
 ---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated.
@@ -80,7 +83,6 @@
 ---   `"User VeryLazy"`                           — User event name as pattern
 ---   `"User VeryLazy ++once"`                    — User event + once
 ---   `{ "BufEnter", "BufEnter *.lua ++once" }`   — array of event strings
----
 --- @field events? string|string[]
 ---
 --- @field ref? Reference A table of references to other components that this component depends on
@@ -193,27 +195,26 @@
 ---  }
 ---  ```
 --- @field on_click? string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
---- @field renderable? boolean If true, the component is renderable
 ---
 --- @private
---- @field ___loaded? boolean If true, the component is loaded
---- @field ___hidden? boolean If true, the component is hidden and should not be displayed
---- @field ___use_returned_style? boolean Whether the component should use the style returned by its `update()` method. Disabled automatically when the user overrides the `style` field.
+--- @field ___loaded? boolean Component has been initialized.
+--- @field ___hidden? boolean Cached visibility state.
+--- @field ___use_returned_style? boolean Whether the style returned by `update()` should override `style`
 ---
---- @field ___hl_name? string The highlight group name for the component
---- @field ___left_hl_name? string The highlight group name for the left part of the component
---- @field ___right_hl_name? string The highlight group name for the right part of the component
---- @field ___click_handler? string The name of the click handler function for the component
+--- @field ___hl_name? string Highlight group used for the main content.
+--- @field ___left_hl_name? string Highlight group used for the left separator.
+--- @field ___right_hl_name? string Highlight group used for the right separator.
+--- @field ___click_handler? string Registered click handler name.
 
 --- @class LiteralComponent : string
 
 --- @class CombinedComponent : string | DefaultId | DefaultComponent | LiteralComponent | Component | ManagedComponent
 --- @field [integer] CombinedComponent A table of child components, can be used to create a list of components
 
---- @class DefaultComponent : Component The default components provided by witch-line
+--- @class DefaultComponent : Component
 --- @field id DefaultId the id of default component
 --- @field ___builtin true Mark as created by witch-line
 
 --- @class ManagedComponent : DefaultComponent | Component
 --- @field id CompId the id of component
---- @field ___loaded true Always true; marks the component as loaded and managed.
+--- @field ___loaded true Always `true` for managed components.
