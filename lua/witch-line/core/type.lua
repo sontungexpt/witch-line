@@ -1,10 +1,9 @@
 --- @alias NotNil string | number | table | boolean | function | userdata | thread
 
 --- @class ThemeAwareStyle : vim.api.keyset.highlight
---- @field auto_theme? boolean  If true, the style automatically adapts to the current theme
+--- @field theme_aware? boolean  If true, the style automatically adapts to the current theme
 
 --- @class CompId : string
-
 
 --- @class Reference
 ---
@@ -42,6 +41,7 @@
 
 
 --- @class Component
+--- @field [integer] Component A table of child components, can be used to create a list of components
 ---
 --- @field id? CompId Unique identifier of the component.
 ---
@@ -66,7 +66,7 @@
 --- @field flexible? number
 ---
 --- A function to determine whether the component should be automatically adjusted to suit the theme.
---- @field auto_theme? boolean|fun(self: ManagedComponent, session: Session): boolean
+--- @field theme_aware? boolean|fun(self: ManagedComponent, session: Session): boolean
 ---
 --- A flag indicating whether the component should show individual value for each window.
 --- @field win_individual? boolean
@@ -199,6 +199,7 @@
 --- @private
 --- @field ___loaded? boolean Component has been initialized.
 --- @field ___hidden? boolean Cached visibility state.
+--- @field ___container? CompId The id of the container component.
 --- @field ___use_returned_style? boolean Whether the style returned by `update()` should override `style`
 ---
 --- @field ___hl_name? string Highlight group used for the main content.
@@ -206,15 +207,23 @@
 --- @field ___right_hl_name? string Highlight group used for the right separator.
 --- @field ___click_handler? string Registered click handler name.
 
---- @class LiteralComponent : string
-
---- @class CombinedComponent : string | DefaultId | DefaultComponent | LiteralComponent | Component | ManagedComponent
---- @field [integer] CombinedComponent A table of child components, can be used to create a list of components
 
 --- @class DefaultComponent : Component
+--- @field [integer] DefaultComponent A table of child components, can be used to create a list of components
 --- @field id DefaultId the id of default component
 --- @field ___builtin true Mark as created by witch-line
 
 --- @class ManagedComponent : DefaultComponent | Component
+--- @field [integer] ManagedComponent A table of child components, can be used to create a list of components
 --- @field id CompId the id of component
 --- @field ___loaded true Always `true` for managed components.
+--- @field ___container CompId The id of the container component.
+
+
+--- @alias LiteralComponent  string
+--- @alias CombinedComponent
+--- | DefaultId
+--- | DefaultComponent
+--- | LiteralComponent
+--- | Component
+--- | ManagedComponent

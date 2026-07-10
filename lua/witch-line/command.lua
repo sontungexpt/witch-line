@@ -4,8 +4,8 @@ local M = {}
 local FALLBACK_KEY = {}
 
 local COMMANDS = {
-    toggle_auto_theme = function(...)
-        return require("witch-line.engine.highlight").toggle_auto_theme(...)
+    toggle_theme_aware = function(...)
+        return require("witch-line.engine.highlight").toggle_theme_aware(...)
     end,
     inspect = {
         event_store = function(...)

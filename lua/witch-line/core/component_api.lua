@@ -1,4 +1,4 @@
-local type, str_rep = type, string.rep
+local type, select, str_rep = type, select, string.rep
 
 local M = {}
 
@@ -104,15 +104,16 @@ M.min_screen_width = function(comp, session)
     return type(m) == "number" and m or nil
 end
 
---- Resolve auto_theme for a component; falls back to `___builtin`.
+--- Resolve theme_aware for a component; falls back to `___builtin`.
 --- @param comp ManagedComponent
 --- @param session Session
 --- @return boolean
-M.auto_theme = function(comp, session)
-    local auto = resolve_value(comp, "auto_theme", session)
+M.theme_aware = function(comp, session)
+    local auto = resolve_value(comp, "theme_aware", session)
     if auto ~= nil then
         return auto
     end
+    --- Builtin component should be theme_aware
     return comp.___builtin or false
 end
 
@@ -125,6 +126,41 @@ M.hidden = function(comp, session)
     return resolve_value(comp, "hidden", session) == true
 end
 
+--- Normalize a style table by attaching `theme_aware` if not already set.
+---@param style CompStyle|nil
+---@param enable_theme_aware boolean
+---@return CompStyle|nil
+M.normalize_style = function(style, enable_theme_aware)
+    if type(style) == "table" and style.theme_aware == nil then
+        style.theme_aware = enable_theme_aware
+    end
+    return style
+end
 
+
+
+--- Replaces component aliases with the target component.
+---
+--- Every argument equal to one of the provided aliases is replaced with
+--- `target`, preserving all other arguments.
+---
+--- @param args any[] Arguments to update in-place.
+--- @param argc integer Number of valid arguments in `args`.
+--- @param target ManagedComponent Component to substitute for matching aliases.
+--- @param ... Component Aliases representing the current component.
+M.replace_self_aliases = function(args, argc, target, ...)
+    local alias_count = select("#", ...)
+
+    for i = 1, argc do
+        local arg = args[i]
+
+        for j = 1, alias_count do
+            if arg == select(j, ...) then
+                args[i] = target
+                break
+            end
+        end
+    end
+end
 
 return M

@@ -24,7 +24,7 @@ nvim_get_color_by_name =
 
 local M = {}
 
-local auto_theme_enabled = require("witch-line").user_config.auto_theme
+local theme_aware_enabled = require("witch-line").user_config.theme_aware
 
 
 ---@type table<string, integer>
@@ -52,8 +52,8 @@ end
 
 --- Sets the auto theme value.
 ---@param value boolean
-M.set_auto_theme_enabled = function(value)
-    auto_theme_enabled = value
+M.set_theme_aware_enabled = function(value)
+    theme_aware_enabled = value
 end
 
 --- Inspects the current highlight cache.
@@ -74,11 +74,11 @@ end
 
 
 --- Toggles the auto-theme feature.
-M.toggle_auto_theme = function()
-    auto_theme_enabled = not auto_theme_enabled
+M.toggle_theme_aware = function()
+    theme_aware_enabled = not theme_aware_enabled
     restore_highlight_styles()
     require("witch-line.util.notifier").info(
-        "Auto theme is " .. (auto_theme_enabled and "enabled" or "disabled")
+        "Auto theme is " .. (theme_aware_enabled and "enabled" or "disabled")
     )
 end
 
@@ -180,6 +180,12 @@ M.merge_hl = function(child, parent)
         return child
     end
     return child
+end
+
+--- @param style any
+--- @return boolean
+M.allowed_style = function(style)
+    return type(style) == "string" or type(style) == "table"
 end
 
 --- Adjust a 24-bit RGB foreground color for readability on any background.
@@ -293,7 +299,7 @@ do
             return nil
         end
         --- @cast num integer num is number here
-        if auto_theme_enabled and auto_adjust then
+        if theme_aware_enabled and auto_adjust then
             STATUSLINE_HL = STATUSLINE_HL or {
                 id = api.nvim_get_hl_id_by_name("StatusLine"),
             }
@@ -337,13 +343,13 @@ M.highlight = function(group_name, hl_style)
         style[k] = v
     end
 
-    local auto_theme = style.auto_theme
+    local theme_aware = style.theme_aware
 
-    style.fg = resolve_color(style.fg or style.foreground, "fg", auto_theme)
-    style.bg = resolve_color(style.bg or style.background, "bg", auto_theme) or "NONE"
+    style.fg = resolve_color(style.fg or style.foreground, "fg", theme_aware)
+    style.bg = resolve_color(style.bg or style.background, "bg", theme_aware) or "NONE"
 
     --- Removed this before highlight because this is the custom value and not valid in nvim_set_hl
-    style.auto_theme = nil
+    style.theme_aware = nil
 
     nvim_set_hl(0, group_name, style)
     return true

@@ -2,37 +2,47 @@ local next = next
 
 local M = {}
 
---------------------------------------------------------------------------------
--- Dependency graph
---------------------------------------------------------------------------------
 --- @enum DepGraphKind
 local DepGraphKind = {
-    Visible = 1,
-    Event = 2,
-    Timer = 3,
+    All = 1,
+    Visible = 2,
+    Event = 3,
+    Timer = 4,
 }
 M.DepGraphKind = DepGraphKind
 
 ---@type table<DepGraphKind, table<CompId, table<CompId, true>>>
+--- Example:
+--- ```lua
+--- DepGraph = {
+---   [DepGraphKind.Event] = {
+---     git = {
+---       branch = true,
+---       diff = true,
+---     },
+---   },
+--- }
+--- ```
 local DepGraph = {
     [DepGraphKind.Event] = {},
     [DepGraphKind.Timer] = {},
     [DepGraphKind.Visible] = {},
 }
 
----@type table<CompId, Component>
+---@type table<CompId, ManagedComponent>
 local ManagedComps = {}
 
 ---External access is read-only via proxy.
----@type table<CompId, Component>
+---@type table<CompId, ManagedComponent>
 M.ManagedComps = setmetatable({}, { __index = ManagedComps })
 
 ---@param cid CompId
 ---@param comp Component
 ---@return ManagedComponent
 M.register = function(cid, comp)
-    ManagedComps[cid] = comp
     comp.___loaded = true
+    --- @cast comp ManagedComponent
+    ManagedComps[cid] = comp
     return comp
 end
 
@@ -53,13 +63,18 @@ end
 --- Iterates over dependent component IDs for a given kind and comp_id.
 --- @param kind DepGraphKind
 --- @param comp_id CompId
---- @return fun(table, any): CompId|nil
---- @return table|nil
---- @return nil
+--- @return fun(): CompId|nil
 M.iterate_dependent_ids = function(kind, comp_id)
-    local map = DepGraph[kind][comp_id]
-    if map then
-        return next, map, nil
+    local graph = DepGraph[kind]
+    if graph then
+        local map = graph[comp_id]
+        if map then
+            local id = nil
+            return function()
+                id, _ = next(map, id)
+                return id
+            end
+        end
     end
     return function() return nil end
 end

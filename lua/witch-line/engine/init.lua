@@ -1,5 +1,5 @@
 local vim, type, ipairs, rawset, rawget, require = vim, type, ipairs, rawset, rawget, require
-local api = vim.api
+local api, islist = vim.api, vim.islist
 
 local Statusline = require("witch-line.engine.statusline")
 local Event = require("witch-line.event.event")
@@ -60,7 +60,7 @@ end
 ---@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
 M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
     require("witch-line.core.session").with_session(function(session)
-        require("witch-line.engine.update").update_comp_graph(comp, session,
+        require("witch-line.engine.update").update_comp(comp, session,
             dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
         if eager then
             Statusline.render()
@@ -70,12 +70,13 @@ M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
     end)
 end
 
---- Resolve a component's id.
---- - `___builtin` → return DefaultId as-is.
---- - id set → `IdModule.validate` (errors if not a string or collides with DefaultId).
---- - no id → generate a random one and store it via `rawset`.
---- @param comp Component
---- @return CompId
+--- Resolves the component identifier.
+---
+--- Uses the existing id when available, validates user-defined ids, and
+--- generates a unique internal id for anonymous components.
+---
+--- @param comp Component|DefaultComponent
+--- @return CompId id Resolved component identifier.
 local function resolve_comp_id(comp)
     local id = comp.id
     if comp.___builtin then
@@ -98,7 +99,7 @@ end
 --- Loads a component, resolving its path if necessary
 --- @param comp Component|table
 --- @return ManagedComponent
-load_component = function(comp)
+load_component = function(comp, container_id)
     if comp.___loaded then
         --- @cast comp ManagedComponent
         return comp
@@ -121,17 +122,21 @@ load_component = function(comp)
     --- Handle dependencies links
     local ref = comp.ref
     if type(ref) == "table" then
-        register_dependency_links(DepGraphKind.Event, ref.events, cid)
-        register_dependency_links(DepGraphKind.Timer, ref.timing, cid)
-        register_dependency_links(DepGraphKind.Visible, ref.hidden, cid)
+        local ref_events, ref_timming, ref_hidden = ref.events, ref.timing, ref.hidden
+        if ref_events then
+            register_dependency_links(DepGraphKind.Event, ref_events, cid)
+        end
+        if ref_timming then
+            register_dependency_links(DepGraphKind.Timer, ref_timming, cid)
+        end
+        if ref_hidden then
+            register_dependency_links(DepGraphKind.Visible, ref_hidden, cid)
+        end
     end
 
-    -- local container_id = comp.___container
-    -- if container_id then
-    --     register_dependency_links(DepGraphKind.Event, container_id, cid)
-    --     register_dependency_links(DepGraphKind.Timer, container_id, cid)
-    --     register_dependency_links(DepGraphKind.Visible, container_id, cid)
-    -- end
+    if container_id then
+        register_dependency_links(DepGraphKind.All, container_id, cid)
+    end
 
     --- Bind update conditions
     local timing = comp.timing
@@ -170,23 +175,25 @@ end
 --- Mount a single component.
 --- Loads it if needed, then attaches it to the statusline.
 ---@param comp Component
----@param parent_id CompId|nil
----@param winid integer|nil
-mount_component = function(comp, parent_id, winid)
+---@param container_id? CompId
+---@param winid? integer
+---@return ManagedComponent
+mount_component = function(comp, container_id, winid)
+    comp.___container = container_id
     if winid then
         comp.win_individual = true
     end
 
-    load_component(comp)
+    local managed_comp = load_component(comp)
 
     -- respect renderable flag
     if comp.renderable == false then
-        return
+        return managed_comp
     end
 
     local update = comp.update
     if not update then
-        return
+        return managed_comp
     end
 
     local cid = comp.id
@@ -200,6 +207,7 @@ mount_component = function(comp, parent_id, winid)
     end
 
     comp.renderable = true
+    return managed_comp
 end
 
 --- Push a literal string onto the statusline segment list.
@@ -216,9 +224,9 @@ end
 
 ---Mount a combined component tree.
 ---@param comp CombinedComponent
----@param group_id CompId|nil
+---@param container_id CompId|nil
 ---@param winid integer|nil
-mount_component_tree = function(comp, group_id, winid)
+mount_component_tree = function(comp, container_id, winid)
     local kind = type(comp)
     if kind == "string" then
         local required = BuiltinComp[comp]
@@ -232,20 +240,19 @@ mount_component_tree = function(comp, group_id, winid)
         return nil
     end
 
-    ---@cast comp Component
-    if not vim.islist(comp) then
-        comp.___container = group_id
-        mount_component(comp, group_id, winid)
-        group_id = comp.id
+    if not islist(comp) then
+        mount_component(comp, container_id, winid)
+        container_id = comp.id
     end
+
     -- style
     -- left_style
     -- right_style
-    -- auto_theme
+    -- theme_aware
     -- hidden
-    -- padding (tuỳ)
+    -- padding
     for _, child in ipairs(comp) do
-        mount_component_tree(child, group_id, winid)
+        mount_component_tree(child, container_id, winid)
     end
 end
 
@@ -297,21 +304,21 @@ M.setup = function(statusline)
             if event_info then
                 session:set("EventInfo", event_info)
             end
-            require("witch-line.engine.update").update_comp_graph_by_ids(ids, session, DepGraphKind.Event)
+            require("witch-line.engine.update").update_comp_by_ids(ids, session, DepGraphKind.Event)
             Statusline.render_debounce()
         end)
     end)
 
     Timer.on_timer_trigger(function(ids)
         require("witch-line.core.session").with_session(function(session)
-            require("witch-line.engine.update").update_comp_graph_by_ids(ids, session, DepGraphKind.Timer)
+            require("witch-line.engine.update").update_comp_by_ids(ids, session, DepGraphKind.Timer)
             Statusline.render_debounce()
         end)
     end)
 
     if next(EmergencyIds) ~= nil then
         require("witch-line.core.session").with_session(function(session)
-            require("witch-line.engine.update").update_comp_graph_by_ids(EmergencyIds, session,
+            require("witch-line.engine.update").update_comp_by_ids(EmergencyIds, session,
                 { DepGraphKind.Event, DepGraphKind.Timer })
             Statusline.render_debounce()
         end)

@@ -27,7 +27,7 @@ local OVERRIDEABLE_TYPE_MAP = {
     left             = STR_FN,
     right            = STR_FN,
     flexible         = "number",
-    auto_theme       = BOOL_FN,
+    theme_aware       = BOOL_FN,
 }
 
 --- Recursively merge `from` into `to` for table values.
@@ -59,7 +59,7 @@ local function apply_override(comp, override)
         comp.___use_returned_style = false
     end
     if override.style or override.left_style or override.right_style then
-        comp.auto_theme = false
+        comp.theme_aware = false
     end
 
     for k, v in pairs(override) do

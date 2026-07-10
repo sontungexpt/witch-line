@@ -11,7 +11,7 @@ local require, type = require, type
 --- @class UserConfig : table
 --- @field statusline? UserConfig.Statusline
 --- @field disabled? UserConfig.Disabled
---- @field auto_theme? boolean
+--- @field theme_aware? boolean
 
 --- Ensure defaults are applied to the user config table.
 --- Fills in missing `statusline.global` with the built-in default.
