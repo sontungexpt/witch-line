@@ -5,7 +5,7 @@ local get_diag_count = function()
     return diagnostic.count(0)
 end
 
-local get_config_signs_text = function()
+local get_config_signs_icon = function()
     local signs = diagnostic.config().signs
     if type(signs) == "table" then
         local text = signs.text
@@ -27,7 +27,7 @@ local update_value = function(self, severity, session)
 
     local cache = session:cache()
     local config = self.config
-    local icon = config.icon or cache:memo(get_config_signs_text)[severity] or ""
+    local icon = config.icon or cache:memo(get_config_signs_icon)[severity] or ""
     local count = cache:memo(get_diag_count)[severity] or 0
     return count > 0 and (icon ~= "" and icon .. " " or "") .. count or ""
 end
@@ -90,7 +90,6 @@ local Hint = {
 }
 
 return {
-    interface = Interface,
     error = Error,
     warn = Warn,
     info = Info,

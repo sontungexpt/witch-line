@@ -1,7 +1,7 @@
 local bo = vim.bo
 
+-- Spinner timer used while NeoCodeium is generating completions.
 local neo_timer
-local neo_running = false
 
 ---@type DefaultComponent
 local Neocodeium = {
@@ -25,26 +25,32 @@ local Neocodeium = {
             disabled = "󱚧",
         },
     },
+
     update = function(self, session)
         local icon = self.config.icon
+
         local event = session:get("EventInfo")
         event = event and event[self.id]
 
+        -- NeoCodeium emits " * " while it is generating a completion.
+        -- Start a timer that periodically requests updates so the spinner
+        -- animation advances without waiting for new events.
         if event and event.match == "NeoCodeiumLabelUpdated" then
             if bo.buftype ~= "prompt" and event.data == " * " then
-                if not neo_running then
-                    neo_timer = neo_timer or vim.uv.new_timer()
-                    if neo_timer then
-                        local raw = require("witch-line.core.comp.proxy").get_raw_comp(self)
-                        neo_timer:start(0, math.floor(1000 / self.config.fps), vim.schedule_wrap(function()
-                            require("witch-line.engine.request").update_comp(raw, true)
-                        end))
-                        neo_running = true
-                    end
+                neo_timer = neo_timer or assert(vim.uv.new_timer())
+
+                if not neo_timer:is_active() then
+                    neo_timer:start(
+                        0,
+                        math.floor(1000 / self.config.fps),
+                        vim.schedule_wrap(function()
+                            require("witch-line.engine.request").update_comp(self, true)
+                        end)
+                    )
                 end
+                -- Stop animating once NeoCodeium finishes generating.
             elseif neo_timer then
                 neo_timer:stop()
-                neo_running = false
             end
         end
 
@@ -53,11 +59,14 @@ local Neocodeium = {
             return icon.disabled
         end
 
-        if neo_running then
+        -- While the timer is active, display the animated spinner.
+        if neo_timer and neo_timer:is_active() then
             local frame = math.floor(vim.uv.now() * self.config.fps / 1000) % #icon.waiting + 1
             return icon.waiting[frame]
         end
 
+        -- After generation completes, show the number of available
+        -- completions if NeoCodeium reports one.
         if event and event.match == "NeoCodeiumLabelUpdated" then
             local d = event.data
             if d ~= " 0 " and d ~= "   " then

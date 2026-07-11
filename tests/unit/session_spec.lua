@@ -202,6 +202,118 @@ do
 end
 
 -- ============================================================
+print("=== Session: root scope shared across callers ===")
+
+do
+    local s = new_session()
+    local scope1 = s:cache()
+    local scope2 = s:cache()
+    a.eq(scope1, scope2, "cache() with no args returns same scope")
+    scope1:set("x", 10)
+    a.eq(scope2:get("x"), 10, "root scope mutations visible across callers")
+end
+
+-- ============================================================
+print("=== Session: memo returns same table reference (identity) ===")
+
+do
+    local s = new_session()
+    local scope = s:cache()
+    local call_count = 0
+    local function build_table()
+        call_count = call_count + 1
+        return { ERROR = 5, WARN = 3, INFO = 1, HINT = 0 }
+    end
+    local t1 = scope:memo(build_table)
+    local t2 = scope:memo(build_table)
+    a.eq(t1, t2, "memo returns same table reference")
+    a.eq(call_count, 1, "function called only once")
+    a.is_type(t1, "table", "result is a table")
+end
+
+-- ============================================================
+print("=== Session: memo table indexing (diagnostic pattern) ===")
+
+do
+    local s = new_session()
+    local scope = s:cache()
+    local function get_counts()
+        return { [1] = 7, [2] = 3, [3] = 0, [4] = 2 }
+    end
+    local count = scope:memo(get_counts)
+    a.eq(count[1], 7, "severity ERROR indexed correctly")
+    a.eq(count[2], 3, "severity WARN indexed correctly")
+    a.eq(count[3], 0, "severity INFO indexed correctly")
+    a.eq(count[4], 2, "severity HINT indexed correctly")
+end
+
+-- ============================================================
+print("=== Session: memo table indexing across calls ===")
+
+do
+    local s = new_session()
+    local scope = s:cache()
+    local call_count = 0
+    local function get_counts()
+        call_count = call_count + 1
+        return { [1] = 7, [2] = 3 }
+    end
+    -- Simulate two components reading from same cache
+    local e1 = scope:memo(get_counts)[1]
+    local e2 = scope:memo(get_counts)[1]
+    local w1 = scope:memo(get_counts)[2]
+    a.eq(e1, 7, "first read correct")
+    a.eq(e2, 7, "second read same value")
+    a.eq(w1, 3, "different key correct")
+    a.eq(call_count, 1, "function called once across all reads")
+end
+
+-- ============================================================
+print("=== Session: memo table is shared (mutations visible) ===")
+
+do
+    local s = new_session()
+    local scope = s:cache()
+    local function get_tbl()
+        return { value = "original" }
+    end
+    local t1 = scope:memo(get_tbl)
+    t1.value = "mutated"
+    local t2 = scope:memo(get_tbl)
+    a.eq(t2.value, "mutated", "mutation visible through second memo call")
+end
+
+-- ============================================================
+print("=== Session: root scope vs named scope independent ===")
+
+do
+    local s = new_session()
+    local root = s:cache()
+    local named = s:cache("comp1")
+    root:set("k", "root_val")
+    named:set("k", "named_val")
+    a.eq(root:get("k"), "root_val", "root scope has own value")
+    a.eq(named:get("k"), "named_val", "named scope has own value")
+end
+
+-- ============================================================
+print("=== Session: memo on root scope deduplicates across sessions ===")
+
+do
+    local call_count = 0
+    local function build()
+        call_count = call_count + 1
+        return { a = 1 }
+    end
+    local s1 = new_session()
+    local s2 = new_session()
+    s1:cache():memo(build)
+    s1:cache():memo(build)
+    s2:cache():memo(build)
+    a.eq(call_count, 2, "same session deduplicates, different session does not")
+end
+
+-- ============================================================
 -- Summary
 -- ============================================================
 local ok = a.summary()

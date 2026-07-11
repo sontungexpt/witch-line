@@ -13,7 +13,7 @@ local bind
 --- Returns the raw component behind a proxy.
 ---
 --- @param proxy ProxyComponent
---- @return ManagedComponent
+--- @return ManagedComponent|nil
 M.get_raw_comp = function(proxy)
     return proxy[RAW_COMP]
 end
@@ -68,21 +68,35 @@ local mt = {
     end,
 }
 
+--- Returns whether the given component is a proxy.
+---
+--- @param comp Component
+--- @return boolean
+local function isProxy(comp)
+    --- @cast comp ProxyComponent
+    return comp[RAW_COMP] ~= nil
+end
 
 --- Creates a session-bound proxy for a component.
 ---
 --- The proxy transparently resolves referenced fields, memoizes callback
 --- results, and ensures callbacks receive the correct component instance.
 ---
---- @param comp Component
+--- @param comp ManagedComponent
 --- @param session Session
 --- @return ProxyComponent
 bind = function(comp, session)
-    return setmetatable({
-        id = comp.id,
-        [RAW_COMP] = comp,
-        [SESSION] = session,
-    }, mt)
+    if isProxy(comp) then
+        comp[SESSION] = session
+        --- @cast comp ProxyComponent
+        return comp
+    else
+        return setmetatable({
+            id = comp.id,
+            [RAW_COMP] = comp,
+            [SESSION] = session,
+        }, mt)
+    end
 end
 M.bind = bind
 
