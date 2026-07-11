@@ -13,7 +13,6 @@ local require = require
 --- | "wl.codeium"
 --- | "wl.codeium.neocodeium"
 ---
---- | "wl.diagnostic.interface"
 --- | "wl.diagnostic.error"
 --- | "wl.diagnostic.warn"
 --- | "wl.diagnostic.info"
@@ -54,7 +53,6 @@ local Loaders = {
     ["wl.codeium"]              = function() return require("witch-line.component.ai.codeium.codeium") end,
     ["wl.codeium.neocodeium"]   = function() return require("witch-line.component.ai.codeium.neocodeium") end,
 
-    ["wl.diagnostic.interface"] = function() return require("witch-line.component.diagnostic").interface end,
     ["wl.diagnostic.error"]     = function() return require("witch-line.component.diagnostic").error end,
     ["wl.diagnostic.warn"]      = function() return require("witch-line.component.diagnostic").warn end,
     ["wl.diagnostic.info"]      = function() return require("witch-line.component.diagnostic").info end,

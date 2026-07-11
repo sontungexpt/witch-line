@@ -41,7 +41,7 @@ local update_comp_by_ids
 --- @return boolean updated  True if highlight changed, false if skipped.
 --- @return CompStyle|nil style  The resolved style, or nil if unresolved.
 local function update_comp_style(comp, theme_aware, override_style, session)
-    local style, dynamic, inherit_count = CompAPI.style(comp,
+    local style, dynamic, inherit_count = CompAPI.resolved_style(comp,
         function(id)
             local parent = ManagedComps[id]
             return parent and Proxy.bind(parent, session)
@@ -51,9 +51,11 @@ local function update_comp_style(comp, theme_aware, override_style, session)
         theme_aware
     )
 
+
     if not style then
         return false, nil
     end
+
 
     local hl_name = comp.___resolved_hl_name
 
@@ -71,25 +73,22 @@ local function update_comp_style(comp, theme_aware, override_style, session)
         hl_name = Highlight.make_hl_name_from_id(comp.id)
     else
         local origin = Resolver.resolve_field_owner(comp, "style")
-        if origin == nil then
-            return false, nil
-        end
 
-        -- Reference component without local ownership.
-        if origin.id ~= comp.id then
+        -- Reuse the highlight from the component that actually owns the style.
+        -- If no owner exists (e.g. the style comes only from `override_style`),
+        -- allocate a highlight for this component instead.
+        if origin and origin.id ~= comp.id then
             hl_name = origin.___resolved_hl_name
             if hl_name == nil then
                 hl_name = Highlight.make_hl_name_from_id(origin.id)
                 origin.___resolved_hl_name = hl_name
             end
         else
-            -- Normal component.
             hl_name = Highlight.make_hl_name_from_id(comp.id)
         end
     end
 
     comp.___resolved_hl_name = hl_name
-
     return Highlight.highlight(hl_name, style), style
 end
 

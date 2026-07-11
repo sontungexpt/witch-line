@@ -1,8 +1,4 @@
 local bo = vim.bo
-local request_update = function(comp, eager)
-    local Request = package.loaded["witch-line.engine.request"]
-    if Request then Request.update_comp(comp, nil, eager) end
-end
 
 local neo_timer
 local neo_running = false
@@ -39,8 +35,9 @@ local Neocodeium = {
                 if not neo_running then
                     neo_timer = neo_timer or vim.uv.new_timer()
                     if neo_timer then
+                        local raw = require("witch-line.core.comp.proxy").get_raw_comp(self)
                         neo_timer:start(0, math.floor(1000 / self.config.fps), vim.schedule_wrap(function()
-                            request_update(self, true)
+                            require("witch-line.engine.request").update_comp(raw, true)
                         end))
                         neo_running = true
                     end

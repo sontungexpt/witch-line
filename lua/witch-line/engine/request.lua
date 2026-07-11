@@ -36,7 +36,7 @@ function M.update_ids(ids, dep_graph_kind, eager, event_info)
     finish_render(eager)
 end
 
-function M.update_comp(comp, dep_graph_kind, eager, seen)
+function M.update_comp(comp, eager, dep_graph_kind, seen)
     Session.with_session(function(session)
         Update.update_comp(
             comp,

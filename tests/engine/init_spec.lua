@@ -462,7 +462,7 @@ do
 
     Request.update_comp(
         { id = "wl.test.simple" },
-        nil, true
+        true
     )
 
     eq(mock_calls.render, base_render + 1, "eager render incremented")
@@ -481,7 +481,7 @@ do
 
     Request.update_comp(
         { id = "wl.test.simple" },
-        nil, false
+        false
     )
 
     eq(mock_calls.render_debounce, base_debounce + 1, "debounce render incremented")

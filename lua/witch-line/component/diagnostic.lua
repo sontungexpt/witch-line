@@ -1,66 +1,49 @@
 local diagnostic = vim.diagnostic
 local DiagnosticSeverity = diagnostic.severity
 
---- @type DefaultId
-local InterfaceId = "wl.diagnostic.interface"
+local get_diag_count = function()
+    return diagnostic.count(0)
+end
 
---- @type DefaultComponent
-local Interface = {
-    id = InterfaceId,
-    ___builtin = true,
-    abstract = true,
-    events = "DiagnosticChanged",
-    config = {
-        icons = {
-            [DiagnosticSeverity.ERROR] = "",
-            [DiagnosticSeverity.WARN] = "",
-            [DiagnosticSeverity.INFO] = "",
-            [DiagnosticSeverity.HINT] = "",
-        },
-    },
-    hidden = function(self, _)
-        return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
-    end,
-    ---@param self ManagedComponent
-    ---@return {count: table, icon: table}
-    context = function(self)
-        local icons = {}
-        for id, value in pairs(self.config.icons) do
-            icons[id] = value
+local get_config_signs_text = function()
+    local signs = diagnostic.config().signs
+    if type(signs) == "table" then
+        local text = signs.text
+        if type(text) == "table" then
+            return text
         end
-        local signs = diagnostic.config().signs
-        if type(signs) == "table" then
-            local text = signs.text
-            if type(text) == "table" then
-                for id, value in pairs(icons) do
-                    icons[id] = text[id] or text[DiagnosticSeverity[id]] or value
-                end
-            end
-        end
-        return {
-            count = diagnostic.count(0),
-            icon = icons,
-        }
-    end,
-}
+    end
+    return {}
+end
 
-local SHARED_REF = {
-    events = InterfaceId,
-    hidden = InterfaceId,
-    context = InterfaceId
-}
+local hidden = function(self, session)
+    return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
+end
+
+local update_value = function(self, severity, session)
+    if hidden(self, session) then
+        return ""
+    end
+
+    local cache = session:cache()
+    local config = self.config
+    local icon = config.icon or cache:memo(get_config_signs_text)[severity] or ""
+    local count = cache:memo(get_diag_count)[severity] or 0
+    return count > 0 and (icon ~= "" and icon .. " " or "") .. count or ""
+end
+
 
 --- @type DefaultComponent
 local Error = {
     id = "wl.diagnostic.error",
     ___builtin = true,
-    ref = SHARED_REF,
+    events = "DiagnosticChanged",
     style = { fg = "DiagnosticError" },
+    config = {
+        icon = ""
+    },
     update = function(self, session)
-        local ctx = self.context(self, session)
-        local id = DiagnosticSeverity.ERROR
-        local count = ctx.count[id] or 0
-        return count > 0 and ctx.icon[id] .. " " .. count or ""
+        return update_value(self, DiagnosticSeverity.ERROR, session)
     end,
 }
 
@@ -68,13 +51,13 @@ local Error = {
 local Warn = {
     id = "wl.diagnostic.warn",
     ___builtin = true,
-    ref = SHARED_REF,
+    events = "DiagnosticChanged",
     style = { fg = "DiagnosticWarn" },
+    config = {
+        icon = ""
+    },
     update = function(self, session)
-        local ctx = self.context(self, session)
-        local id = DiagnosticSeverity.WARN
-        local count = ctx.count[id] or 0
-        return count > 0 and ctx.icon[id] .. " " .. count or ""
+        return update_value(self, DiagnosticSeverity.WARN, session)
     end,
 }
 
@@ -82,13 +65,13 @@ local Warn = {
 local Info = {
     id = "wl.diagnostic.info",
     ___builtin = true,
-    ref = SHARED_REF,
+    events = "DiagnosticChanged",
     style = { fg = "DiagnosticInfo" },
+    config = {
+        icon = ""
+    },
     update = function(self, session)
-        local ctx = self.context(self, session)
-        local id = DiagnosticSeverity.INFO
-        local count = ctx.count[id] or 0
-        return count > 0 and ctx.icon[id] .. " " .. count or ""
+        return update_value(self, DiagnosticSeverity.INFO, session)
     end,
 }
 
@@ -96,13 +79,13 @@ local Info = {
 local Hint = {
     id = "wl.diagnostic.hint",
     ___builtin = true,
-    ref = SHARED_REF,
+    events = "DiagnosticChanged",
+    config = {
+        icon = ""
+    },
     style = { fg = "DiagnosticHint" },
     update = function(self, session)
-        local ctx = self.context(self, session)
-        local id = DiagnosticSeverity.HINT
-        local count = ctx.count[id] or 0
-        return count > 0 and ctx.icon[id] .. " " .. count or ""
+        return update_value(self, DiagnosticSeverity.HINT, session)
     end,
 }
 

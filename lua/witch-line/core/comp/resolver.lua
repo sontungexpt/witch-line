@@ -246,10 +246,13 @@ M.normalize_style = normalize_style
 --- @return CompStyle
 --- @return boolean
 --- @return integer
-M.style = function(comp, resolve_parent_fn, merge_fn, override_style, theme_aware, ...)
+M.resolved_style = function(comp, resolve_parent_fn, merge_fn, override_style, theme_aware, ...)
     local override_style_type = type(override_style)
     if comp.___accept_returned_style == false
-        or (override_style_type ~= "string" and override_style_type ~= "table")
+        or (
+            override_style_type ~= "string"
+            and override_style_type ~= "table"
+        )
     then
         override_style = nil
     end

@@ -1,6 +1,5 @@
 local request_update = function(comp, eager)
-    local Request = package.loaded["witch-line.engine.request"]
-    if Request then Request.update_comp(comp, nil, eager) end
+    require("witch-line.engine.request").update_comp(comp, eager)
 end
 
 ---@type DefaultComponent

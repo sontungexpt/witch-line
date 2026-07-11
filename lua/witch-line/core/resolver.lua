@@ -76,7 +76,7 @@ end
 
 --- Resolve a field without modifying callable values.
 ---
---- @param comp ManagedComponent Component to resolve from.
+--- @param comp ManagedComponent|DefaultComponent Component to resolve from.
 --- @param key string Field name.
 --- @return any value Resolved value, or `nil`.
 --- @return Component|nil owner Component where the value was found.
@@ -94,7 +94,7 @@ end
 --- This performs a normal ref-chain lookup but only returns the component
 --- in which the field is defined.
 ---
---- @param comp Component Component to resolve from.
+--- @param comp ManagedComponent|DefaultComponent Component to resolve from.
 --- @param key string Field name.
 --- @return Component|nil owner Component defining the field, or `nil`.
 M.resolve_field_owner = function(comp, key)

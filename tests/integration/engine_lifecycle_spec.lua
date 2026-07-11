@@ -344,7 +344,7 @@ do
         update = function() return "base" end,
     }})
     local base_render = mock_calls.render
-    Request.update_comp({ id = "wl.test.simple" }, nil, true)
+    Request.update_comp({ id = "wl.test.simple" }, true)
     a.eq(mock_calls.render, base_render + 1, "eager render")
 end
 
@@ -354,7 +354,7 @@ do
         update = function() return "base" end,
     }})
     local base_debounce = mock_calls.render_debounce
-    Request.update_comp({ id = "wl.test.simple" }, nil, false)
+    Request.update_comp({ id = "wl.test.simple" }, false)
     a.eq(mock_calls.render_debounce, base_debounce + 1, "debounce render")
 end
 

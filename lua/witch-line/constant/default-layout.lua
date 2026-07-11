@@ -21,7 +21,7 @@ return {
 
     "wl.lsp.clients",
 
-    "wl.codeium.neocodeium",
+    -- "wl.codeium.neocodeium",
     -- "wl.codeium",
 
     "wl.indent",
