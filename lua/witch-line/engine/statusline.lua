@@ -12,7 +12,7 @@ nvim_set_option_value =
 local Highlight
 Highlight = setmetatable({}, {
     __index = function(tbl, k)
-        Highlight = require("witch-line.engine.highlight")
+        Highlight = require("witch-line.core.highlight")
         return Highlight[k]
     end
 })

@@ -1,5 +1,5 @@
 ---@type CombinedComponent
-return {
+local layout = {
     "wl.mode",
 
     "wl.file.name",
@@ -29,3 +29,5 @@ return {
     "wl.cursor.pos",
     "wl.cursor.progress",
 }
+
+return layout

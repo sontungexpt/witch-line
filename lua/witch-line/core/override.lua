@@ -4,6 +4,7 @@ local vim, type, pairs      = vim, type, pairs
 -- Each maps a set of acceptable Lua types for a given override key.
 -- Note: "function" is a reserved word in Lua, so it must be quoted as a key.
 local FN_TABLE              = { ["function"] = true, table = true }
+local STR_FN_TABLE          = { string = true, ["function"] = true }
 local BOOL_FN               = { boolean = true, ["function"] = true }
 local STR_FN                = { string = true, ["function"] = true }
 local NUM_TABLE             = { number = true, table = true }
@@ -19,14 +20,18 @@ local OVERRIDEABLE_TYPE_MAP = {
     config      = "table",
     timing      = BOOL_NUM,
     lazy        = "boolean",
-    style       = FN_TABLE,
-    left_style  = FN_TABLE,
-    right_style = FN_TABLE,
-    left        = STR_FN,
-    right       = STR_FN,
-    hidden      = "function",
     flexible    = "number",
     theme_aware = BOOL_FN,
+
+    style       = FN_TABLE,
+    left        = STR_FN,
+    right       = STR_FN,
+    left_style  = FN_TABLE,
+    right_style = FN_TABLE,
+
+    hidden      = "function",
+    update      = STR_FN,
+    on_click    = STR_FN_TABLE,
 }
 
 --- Recursively merge `from` into `to` for table values.
@@ -54,10 +59,12 @@ local function apply_override(comp, override)
         return comp
     end
 
+    -- Respect user override for style
     if override.style then
         comp.___accept_returned_style = false
     end
 
+    -- Respect user override for style
     if override.style or override.left_style or override.right_style then
         comp.theme_aware = false
     end

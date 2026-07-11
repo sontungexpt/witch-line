@@ -41,6 +41,10 @@ M.setup = function(user_config)
     user_config = resolve_user_config(user_config)
     M.user_config = user_config
 
+    if user_config.theme_aware ~= false then
+        require("witch-line.core.highlight").set_theme_aware_enabled(true)
+    end
+
     require("witch-line.engine.statusline").setup(user_config.disabled)
     require("witch-line.engine").setup(user_config.statusline)
 

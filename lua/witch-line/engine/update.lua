@@ -2,7 +2,7 @@ local vim, type, ipairs, require = vim, type, ipairs, require
 local api = vim.api
 
 local Statusline = require("witch-line.engine.statusline")
-local Highlight = require("witch-line.engine.highlight")
+local Highlight = require("witch-line.core.highlight")
 local CompAPI = require("witch-line.core.comp.resolver")
 
 local Registry = require("witch-line.core.registry")

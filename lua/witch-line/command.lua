@@ -5,7 +5,7 @@ local FALLBACK_KEY = {}
 
 local COMMANDS = {
     toggle_theme_aware = function(...)
-        return require("witch-line.engine.highlight").toggle_theme_aware(...)
+        return require("witch-line.core.highlight").toggle_theme_aware(...)
     end,
     inspect = {
         event_store = function(...)
@@ -24,10 +24,10 @@ local COMMANDS = {
         },
         highlight = {
             rgb24bit = function(...)
-                return require("witch-line.engine.highlight").inspect(...)
+                return require("witch-line.core.highlight").inspect(...)
             end,
             styles = function(...)
-                return require("witch-line.engine.highlight").inspect(...)
+                return require("witch-line.core.highlight").inspect(...)
             end,
         },
         statusline = function(...)

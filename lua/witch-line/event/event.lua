@@ -55,13 +55,13 @@ local UserEvents = {}
 local PatternEvents = {}
 
 --- Add comp_id to a bucket. Normal → numeric index, once → bucket[ONCE].
----@param bucket  EventBucket
+---@param bucket EventBucket
 ---@param comp_id CompId
----@param once?    boolean
-local function add_to_bucket(bucket, comp_id, once)
+---@param once? boolean
+local add_to_bucket = function(bucket, comp_id, once)
     if once then
         local once_list = bucket[ONCE]
-        if not once_list then
+        if once_list == nil then
             once_list = {}
             bucket[ONCE] = once_list
         end
@@ -93,7 +93,7 @@ end
 ---
 --- @param e       string
 --- @param comp_id CompId
-local function register_string_event(e, comp_id)
+local register_string_event = function(e, comp_id)
     local slen = #e
     local pos = 1
 
@@ -103,11 +103,11 @@ local function register_string_event(e, comp_id)
     if pos > slen then return end
 
     local s_at = str_find(e, " ", pos, true)
-    if not s_at then
+    if s_at == nil then
         local name = str_sub(e, pos)
         local bucket = VimEvents[name]
-        if not bucket then
-            bucket = {};
+        if bucket == nil then
+            bucket = {}
             VimEvents[name] = bucket
         end
         add_to_bucket(bucket, comp_id, false)
@@ -121,8 +121,9 @@ local function register_string_event(e, comp_id)
     end
     if pos > slen then
         local bucket = VimEvents[event_name]
-        if not bucket then
-            bucket = {}; VimEvents[event_name] = bucket
+        if bucket == nil then
+            bucket = {}
+            VimEvents[event_name] = bucket
         end
         add_to_bucket(bucket, comp_id, false)
         return
@@ -172,7 +173,7 @@ local function register_string_event(e, comp_id)
             patterns[npat] = t
         end
 
-        if not comma or comma > pend then
+        if comma == nil or comma > pend then
             break
         end
         pos = comma + 1
@@ -181,7 +182,7 @@ local function register_string_event(e, comp_id)
     if event_name == "User" then
         for i = 1, npat do
             local bucket = UserEvents[patterns[i]]
-            if not bucket then
+            if bucket == nil then
                 bucket = {}
                 UserEvents[patterns[i]] = bucket
             end
@@ -191,12 +192,12 @@ local function register_string_event(e, comp_id)
         for i = 1, npat do
             local pat = patterns[i]
             local pat_bucket = PatternEvents[pat]
-            if not pat_bucket then
+            if pat_bucket == nil then
                 pat_bucket = {}
                 PatternEvents[pat] = pat_bucket
             end
             local bucket = pat_bucket[event_name]
-            if not bucket then
+            if bucket == nil then
                 bucket = {}
                 pat_bucket[event_name] = bucket
             end
@@ -204,7 +205,7 @@ local function register_string_event(e, comp_id)
         end
     else
         local bucket = VimEvents[event_name]
-        if not bucket then
+        if bucket == nil then
             bucket = {}
             VimEvents[event_name] = bucket
         end
@@ -280,12 +281,12 @@ M.on_event = function(work)
     end
 
     local enqueue = function(bucket, e)
-        if not bucket then return end
+        if bucket == nil then return end
         for i = 1, #bucket do
             event_queue[bucket[i]] = e
         end
         local once_list = bucket[ONCE]
-        if once_list then
+        if once_list ~= nil then
             for i = 1, #once_list do
                 event_queue[once_list[i]] = e
             end

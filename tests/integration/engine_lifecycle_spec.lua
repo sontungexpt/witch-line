@@ -126,7 +126,7 @@ package.loaded["witch-line.engine.update"] = {
     update_comp_graph_by_ids = function() end,
     update_comp_graph = function() end,
 }
-package.loaded["witch-line.engine.highlight"] = {}
+package.loaded["witch-line.core.highlight"] = {}
 package.loaded["witch-line.util.bitmask"] = {
     is_marked = function() return false end, mark_bit = function() end,
 }

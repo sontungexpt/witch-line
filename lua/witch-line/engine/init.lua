@@ -96,8 +96,8 @@ load_component = function(comp, container_id)
         end
     end
 
-    if type(comp.install) == "function" then
-        comp.install(comp)
+    if type(comp.setup) == "function" then
+        comp.setup(comp)
     end
 
     local cid = resolve_comp_id(comp)

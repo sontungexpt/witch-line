@@ -24,8 +24,6 @@ nvim_get_color_by_name =
 
 local M = {}
 
-local theme_aware_enabled = require("witch-line").user_config.theme_aware
-
 
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
@@ -182,19 +180,13 @@ M.merge_hl = function(child, parent)
     return child
 end
 
---- @param style any
---- @return boolean
-M.allowed_style = function(style)
-    return type(style) == "string" or type(style) == "table"
-end
-
+local adjust
 --- Adjust a 24-bit RGB foreground color for readability on any background.
 --- Uses perceptual luminance for accurate brightness targeting:
 --- blue (perceptually dark) gets more boost, green (perceptually bright) gets less.
 --- @param c integer Foreground color (0xRRGGBB)
 --- @param bg integer Background color (0xRRGGBB)
 --- @return integer adjusted 24-bit RGB color
-local adjust
 adjust = function(c, bg)
     local bit = require("bit")
     local rshift, band, lshift, bor = bit.rshift, bit.band, bit.lshift, bit.bor
@@ -253,61 +245,58 @@ adjust = function(c, bg)
     return adjust(c, bg)
 end
 
-local resolve_color
-do
-    --- Cache the id of StatusLine hl group to avoid repeated API calls.
-    local STATUSLINE_HL = nil
+--- Cache the id of StatusLine hl group to avoid repeated API calls.
+local STATUSLINE_HL = nil
 
-    --- Resolve a color into a 24-bit RGB value, a highlight group property, or "NONE".
-    ---
-    --- Supports:
-    --- 1. Numeric RGB (e.g., 0xFFAA00) → returned directly (optionally adjusted).
-    --- 2. Named colors (e.g., "red") → resolved via Neovim API and cached.
-    --- 3. Highlight groups (e.g., "Normal") → fetch `fg` or `bg` field.
-    --- 4. "NONE" → returned as-is.
-    ---
-    --- @param c string|integer|nil  Color name, RGB value, or highlight group.
-    --- @param field "fg"|"bg"   Field to fetch from highlight group.
-    --- @param auto_adjust? boolean  Adjust color based on statusline background if true.
-    --- @return integer|string|nil  Resolved 24-bit RGB, "NONE", or nil if not found.
-    resolve_color = function(c, field, auto_adjust)
-        local t = type(c)
-        local num = c
-        if t == "string" then
-            if c == "NONE" then
-                return "NONE"
-            elseif c == "" then
-                return nil
-            end
-            -- Read cache
-            num = ColorRgb24Bit[c]
-            if not num then
-                num = nvim_get_color_by_name(c)
-                if num ~= -1 then
-                    -- cache color
-                    ColorRgb24Bit[c] = num
-                else
-                    local hlid = hlID(c)
-                    if hlid == 0 then
-                        return nil
-                    end
-                    -- Not cache here because c can be changed by user
-                    num = nvim_get_hl(0, { id = hlid, create = false })[field]
-                end
-            end
-        elseif t ~= "number" then
+--- Resolve a color into a 24-bit RGB value, a highlight group property, or "NONE".
+---
+--- Supports:
+--- 1. Numeric RGB (e.g., 0xFFAA00) → returned directly (optionally adjusted).
+--- 2. Named colors (e.g., "red") → resolved via Neovim API and cached.
+--- 3. Highlight groups (e.g., "Normal") → fetch `fg` or `bg` field.
+--- 4. "NONE" → returned as-is.
+---
+--- @param c string|integer|nil  Color name, RGB value, or highlight group.
+--- @param field "fg"|"bg"   Field to fetch from highlight group.
+--- @param auto_adjust? boolean  Adjust color based on statusline background if true.
+--- @return integer|string|nil  Resolved 24-bit RGB, "NONE", or nil if not found.
+local resolve_color = function(c, field, auto_adjust)
+    local t = type(c)
+    local num = c
+    if t == "string" then
+        if c == "NONE" then
+            return "NONE"
+        elseif c == "" then
             return nil
         end
-        --- @cast num integer num is number here
-        if theme_aware_enabled and auto_adjust then
-            STATUSLINE_HL = STATUSLINE_HL or {
-                id = api.nvim_get_hl_id_by_name("StatusLine"),
-            }
-            local stbg = nvim_get_hl(0, STATUSLINE_HL).bg
-            return stbg and adjust(num, stbg) or num
+        -- Read cache
+        num = ColorRgb24Bit[c]
+        if not num then
+            num = nvim_get_color_by_name(c)
+            if num ~= -1 then
+                -- cache color
+                ColorRgb24Bit[c] = num
+            else
+                local hlid = hlID(c)
+                if hlid == 0 then
+                    return nil
+                end
+                -- Not cache here because c can be changed by user
+                num = nvim_get_hl(0, { id = hlid, create = false })[field]
+            end
         end
-        return num
+    elseif t ~= "number" then
+        return nil
     end
+    --- @cast num integer num is number here
+    if theme_aware_enabled and auto_adjust then
+        STATUSLINE_HL = STATUSLINE_HL or {
+            id = api.nvim_get_hl_id_by_name("StatusLine"),
+        }
+        local stbg = nvim_get_hl(0, STATUSLINE_HL).bg
+        return stbg and adjust(num, stbg) or num
+    end
+    return num
 end
 
 --- Defines or updates a Neovim highlight group with the given style.

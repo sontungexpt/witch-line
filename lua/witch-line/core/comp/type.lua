@@ -1,36 +1,39 @@
---- @alias NotNil string | number | table | boolean | function | userdata | thread
+---@alias NotNil
+---| string
+---| number
+---| table
+---| boolean
+---| function
+---| userdata
+---| thread
 
 --- @class ThemeAwareStyle : vim.api.keyset.highlight
---- @field theme_aware? boolean  If true, the style automatically adapts to the current theme
+--- Whether the style adapts automatically to the current theme.
+--- @field theme_aware? boolean
 
---- @class CompId : string
+--- Unique identifier of a component.
+--- @alias CompId string
 
---- @class Reference
----
---- References to other components used to resolve dynamic fields.
----
---- Any field may reference another component by its id.
---- Built-in reference keys are listed below, but custom keys are also supported.
----
---- @field events? CompId|CompId[] Component(s) providing the `events` field.
---- @field timing? CompId|CompId[] Component(s) providing the `timing` field.
---- @field hidden? CompId|CompId[] Component(s) providing the `hidden` function.
----
---- @field style? CompId Component providing the main style.
---- @field left? CompId Component providing the left separator.
---- @field left_style? CompId Component providing the left separator style.
---- @field right? CompId Component providing the right separator.
---- @field right_style? CompId Component providing the right separator style.
----
---- @field [string] CompId Component providing the value for a custom field.
+--- References other components for resolving dynamic fields.
+---@class Reference
+---@field events? CompId|CompId[]
+---@field timing? CompId|CompId[]
+---@field hidden? CompId|CompId[]
+---@field style? CompId
+---@field left? CompId
+---@field left_style? CompId
+---@field right? CompId
+---@field right_style? CompId
+---@field [string] CompId
 
 
---- @alias PaddingFunc fun(self: ManagedComponent, session: Session): number|PaddingTable
+--- @alias PaddingFunc fun(self: ManagedComponent, session: Session): integer|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
 ---
---- @alias UpdateFunc fun(self: ManagedComponent, session: Session): string|nil, CompStyle|nil
+--- @alias UpdateFunc fun(self: ManagedComponent, session: Session): nil|string, nil|CompStyle
 ---
 --- @alias CompStyle ThemeAwareStyle|string
+---
 --- @alias StyleFunc fun(self: ManagedComponent, session: Session): CompStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, session: Session): CompStyle|SepStyle
 ---
@@ -50,16 +53,17 @@
 --- - `integer`: update every *n* timer ticks.
 --- @field timing? boolean|integer
 ---
---- @field lazy? boolean Whether initialization is deferred until the component is first used
+--- Whether initialization is deferred until the component is first used.
+--- @field lazy? boolean
 ---
---- @field renderable? boolean Whether the component can be rendered as a standalone component.
+--- Whether the component can be rendered as a standalone component.
+--- @field renderable? boolean
 ---
---- Called once when the component is registered, before `init()`.
---- @field install? fun(comp: Component)
+--- Called once when the component is created.
+--- Use this to configure or modify the component before initialization.
+---@field setup? fun(comp: Component)
 ---
 --- User-configurable values.
---- These defaults are deep-merged with user configuration and can be accessed
---- through `self.config` inside lifecycle callbacks.
 --- @field config? table
 ---
 --- The priority of the component when the status line is too long, higher numbers are more likely to be truncated.
@@ -85,88 +89,57 @@
 ---   `{ "BufEnter", "BufEnter *.lua ++once" }`   — array of event strings
 --- @field events? string|string[]
 ---
---- @field ref? Reference A table of references to other components that this component depends on
+--- A table of references to other components that this component depends on
+--- @field ref? Reference
 ---
---- A table of styles that will be applied to the left separator of the component
---- - If string: used as a highlight group name.
---- - If table: used as highlight table properties.
---- - If nil: inherits from `style` field.
---- - If SepStyle enum value: special handling based on the enum value.
---- 	- SepFg: uses the foreground color of the main style for the separator.
---- 	- SepBg: uses the background color of the main style for the separator.
---- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
---- 	- Inherited: inherits the main style directly.
---- - If function: called and its return value is used as above.
---- - Example of left_style function: `function(self, ctx) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- Style for the left separator.
+--- - string: highlight group name.
+--- - table: highlight properties (e.g. `{fg = "#fff", bold = true}`).
+--- - SepStyle: SepFg/SepBg/Reverse/Inherited.
+--- - function(self, ctx): called and return value used as above.
 --- @field left_style? CompStyle|SideStyleFunc|SepStyle
 ---
---- The left separator of the component
---- - If string: used as is.
---- - If nil: no left part.
---- - If function: called and its return value is used as the left part.
---- - Example of left function: `function(self, ctx) return "<" end`
+--- Left separator text.
+--- - string: used as is.
+--- - function(self, ctx): called and return value used.
 --- @field left? string|UpdateFunc
 ---
---- A table of styles that will be applied to the right part of the component
---- - If string: used as a highlight group name.
---- - If table: used as highlight table properties.
---- - If nil: inherits from `style` field.
---- - If SepStyle enum value: special handling based on the enum value.
---- 	- SepFg: uses the foreground color of the main style for the separator.
---- 	- SepBg: uses the background color of the main style for the separator.
---- 	- Reverse: swaps the foreground and background colors of the main style for the separator.
---- 	- Inherited: inherits the main style directly.
---- - If function: called and its return value is used as above.
---- - Example of right_style function: `function(self, ctx) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- Style for the right separator.
+--- - string: highlight group name.
+--- - table: highlight properties.
+--- - SepStyle: SepFg/SepBg/Reverse/Inherited.
+--- - function(self, ctx): called and return value used as above.
 --- @field right_style? CompStyle|SideStyleFunc|SepStyle
 ---
---- The right separator of the component
---- - If string: used as is.
---- - If nil: no right part.
---- - If function: called and its return value is used as the right part.
---- - Example of right function: `function(self, ctx) return ">" end`
+--- Right separator text.
+--- - string: used as is.
+--- - function(self, ctx): called and return value used.
 --- @field right? string|UpdateFunc
 ---
---- The padding of the component
---- - If integer: number of spaces to add to both sides of the component.
---- - If nil: defaults to 1 space on both sides.
---- - If table: a table with `left` and `right` fields specifying the number of spaces for each side.
---- 	- If `left` or `right` is nil, it defaults to 0 for that side.
---- 	- Example: `{left = 2, right = 1}` adds 2 spaces to the left and 1 space to the right.
----  	- Example: `{left = 2}` adds 2 spaces to the left and 0 spaces to the right.
---- 	- Example: `{right = 3}` adds 0 spaces to the left and 3 spaces to the right.
----  	- Example: `{}` adds 0 spaces to both sides.
---- 	- If `left` or `right` is a function, it will be called to get the number of spaces for that side.
----  	- Example: `{left = function() return 2 end, right = 1}` adds 2 spaces to the left and 1 space to the right.
----  	- Example: `{left = 2, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
----  	- Example: `{left = function() return 2 end, right = function() return 3 end}` adds 2 spaces to the left and 3 spaces to the right.
----	- If function: called and its return value is used as above.
---- - Example of padding function: `function(self, session) return {left = 2, right = 1} end`
---- - Example of padding function: `function(self, session) return 2 end` (adds 2 spaces to both sides)
+--- Padding around the component.
+--- - integer: spaces on both sides (default 1 if nil).
+--- - table: `{left = n, right = n}` per side, each defaults to 0 if nil.
+---   - Each field can also be a function(self, session) returning a number.
+--- - function(self, session): return integer or table as above.
 --- @field padding? integer|PaddingTable|PaddingFunc
 ---
 --- An initialization function that will be called when the component is first loaded.
 --- @field init? fun(self: ManagedComponent)
 ---
---- A table of styles that will be applied to the component
---- - If string: used as a highlight group name.
---- - If table: used as is.
---- - If nil: No style will be applied.
---- - If function: called and its return value is used as above.
---- - Example of style table: `{fg = "#ffffff", bg = "#000000", bold = true}`
---- - Example of style function: `function(self, session) return {fg = "#ffffff", bg = "#000000", bold = true} end`
+--- Component style.
+--- - string: highlight group name.
+--- - table: highlight properties (e.g. `{fg = "#fff", bold = true}`).
+--- - nil: no style applied.
+--- - function(self, session): called and return value used as above.
 --- @field style? CompStyle|StyleFunc
 ---
 --- A function that will be called before the component is updated.
 --- @field pre_update? fun(self: ManagedComponent, session: Session)
 ---
---- The update function that will be called to get the value of the component
---- - If string: used as is.
---- - If nil: the component will not be updated.
---- - If function: called and its return value and style are used as the new value and style of the component
---- - Example of update function: `function(self, session) return "Hello World" end`
---- - Example of update function with style: `function(self, session) return "Hello World", {fg = "#ffffff", bg = "#000000", bold = true} end`
---- - Example sharing state between components via `session.state`: see git/init.lua
+--- Update function to get the component value.
+--- - string: used as is.
+--- - nil: component not updated.
+--- - function(self, session): return value is the component text, optionally return a second value for style.
 --- @field update? string|UpdateFunc
 ---
 --- A function that will be called after the component is updated.
@@ -178,23 +151,12 @@
 --- @field hidden? fun(self: ManagedComponent, session: Session): boolean|nil
 ---
 ---
---- A function or the name of a global function to call when the component is clicked
---- - If nil: the component is not clickable.
---- - If string: the name of a global function to call when the component is clicked.
---- - If function: a function to call when the component is clicked.
---- - If table: a table with the following fields:
----  - `callback`: a function or the name of a global function to call when the component is clicked.
----  - `name`: the name of the function to register, if not provided a name will be generated.
----  like:
----  ```lua
----  {
----    name = "MyClickHandler", -- optional
----    callback = function(comp, minwid, click_times, mouse button, modifier_pressed) end
----    -- If callback is a string, don't care about the name field
----    -- or callback = "MyClickHandler" -- the name of a global function
----  }
----  ```
---- @field on_click? string|OnClickFunc|OnClickTable A function or the name of a global function to call when the component is clicked
+--- Click handler for the component.
+--- - nil: not clickable.
+--- - string: name of a global function.
+--- - function(self, minwid, click_times, mouse_button, modifier_pressed).
+--- - table: `{callback = func|string, name = string|nil}`.
+--- @field on_click? string|OnClickFunc|OnClickTable
 ---
 --- @private
 --- @field ___loaded? boolean Component has been initialized.
@@ -220,10 +182,12 @@
 --- @field ___parent_id CompId The id of the container component.
 
 
---- @alias LiteralComponent  string
---- @alias CombinedComponent
---- | DefaultId
---- | DefaultComponent
---- | LiteralComponent
---- | Component
---- | ManagedComponent
+---@alias LiteralComponent string
+
+---@alias CombinedComponent
+---| CombinedComponent[]
+---| DefaultId
+---| LiteralComponent
+---| DefaultComponent
+---| Component
+---| ManagedComponent
