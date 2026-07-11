@@ -213,12 +213,6 @@ Diff.Interface = {
     end,
 }
 
---- Determine if diff should be hidden based on filetype.
----@param self ManagedComponent
----@return boolean
-local function diff_hidden(self, _)
-    return list_contains(self.config.disabled_filetypes, bo.filetype)
-end
 
 local function diff_update(self, session, field)
     local ctx = self.context(self, session)
@@ -242,9 +236,9 @@ Diff.Added = {
     ref = {
         events = "wl.git.diff.interface",
         context = "wl.git.diff.interface",
+        hidden = "wl.git.diff.interface",
     },
     style = { fg = colors.green },
-    hidden = diff_hidden,
     update = function(self, session) return diff_update(self, session, "added") end,
 }
 
@@ -259,9 +253,9 @@ Diff.Modified = {
     ref = {
         events = "wl.git.diff.interface",
         context = "wl.git.diff.interface",
+        hidden = "wl.git.diff.interface",
     },
     style = { fg = colors.cyan },
-    hidden = diff_hidden,
     update = function(self, session) return diff_update(self, session, "modified") end,
 }
 
@@ -276,9 +270,9 @@ Diff.Removed = {
     ref = {
         events = "wl.git.diff.interface",
         context = "wl.git.diff.interface",
+        hidden = "wl.git.diff.interface",
     },
     style = { fg = colors.red },
-    hidden = diff_hidden,
     update = function(self, session) return diff_update(self, session, "removed") end,
 }
 

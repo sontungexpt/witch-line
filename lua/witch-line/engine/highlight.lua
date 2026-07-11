@@ -44,8 +44,8 @@ end
 --- @param comp ManagedComponent The component to retrieve the style for.
 --- @return CompStyle|nil style The style of the component or nil if not found.
 M.get_style = function(comp)
-    if comp.___hl_name then
-        return Styles[comp.___hl_name]
+    if comp.___resolved_hl_name then
+        return Styles[comp.___resolved_hl_name]
     end
     return nil
 end

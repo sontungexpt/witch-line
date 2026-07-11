@@ -200,9 +200,9 @@
 --- @field ___loaded? boolean Component has been initialized.
 --- @field ___hidden? boolean Cached visibility state.
 --- @field ___parent_id? CompId The id of the container component.
---- @field ___use_returned_style? boolean Whether the style returned by `update()` should override `style`
+--- @field ___accept_returned_style? boolean Whether the style returned by `update()` should override `style`
 ---
---- @field ___hl_name? string Highlight group used for the main content.
+--- @field ___resolved_hl_name? string Highlight group used for the main content.
 --- @field ___left_hl_name? string Highlight group used for the left separator.
 --- @field ___right_hl_name? string Highlight group used for the right separator.
 --- @field ___click_handler? string Registered click handler name.

@@ -21,237 +21,191 @@ local update_single_comp
 local update_comp
 local update_comp_by_ids
 
-
---- Normalise a side value. Dynamic non-strings become `""`, static non-strings become `nil`.
----@param val any
----@param is_func boolean
----@return string|nil
-local format_side_value = function(val, is_func)
-    if is_func then
-        return type(val) ~= "string" and "" or val
-    elseif type(val) ~= "string" then
-        return nil
-    end
-    return val
-end
-
----@type table<CompId, {[1]: any,[2]: integer}>
-local inherited_style_cache = {}
-
-local resolve_inherited_style = function(comp, initial_style, ...)
-    local cid = comp.id
-    local requires_recompute = initial_style == nil
-
-    if not requires_recompute then
-        local cache = inherited_style_cache[cid]
-        if cache then
-            return cache[1], false, cache[2]
-        end
-    end
-
-    local merged_style = initial_style
-
-    if merged_style == nil then
-        merged_style = comp.style
-
-        if type(merged_style) == "function" then
-            requires_recompute = true
-            merged_style = merged_style(comp, ...)
-        end
-    end
-
-    local merged_parent_count = 0
-    local seen = { [cid] = true }
-    local parent_id = comp.___parent_id
-
-    while parent_id do
-        if seen[parent_id] then
-            break
-        end
-        seen[parent_id] = true
-
-        local parent = ManagedComps[parent_id]
-        if not parent then
-            break
-        end
-
-        local parent_value = parent.style
-
-        if type(parent_value) == "function" then
-            requires_recompute = true
-            parent_value = parent_value(parent, ...)
-        end
-
-        if parent_value ~= nil then
-            merged_parent_count = merged_parent_count + 1
-            merged_style = Highlight.merge_hl(
-                merged_style,
-                parent_value
-            )
-        end
-
-        parent_id = parent.___parent_id
-    end
-
-    if not requires_recompute then
-        local cache = {
-            merged_style,
-            merged_parent_count,
-        }
-
-        inherited_style_cache[cid] = cache
-    end
-
-    return merged_style, requires_recompute, merged_parent_count
-end
-
 --- Update or apply a component's highlight style.
 ---
 --- Resolves the final `style` (including overrides, inheritance, and references),
---- generates or reuses `___hl_name`, and applies it via `Highlight.highlight()`.
+--- generates or reuses `___resolved_hl_name`, and applies it via `Highlight.highlight()`.
 ---
 --- Logic:
 --- 1. Merge local, inherited, and referenced styles using `Manager.dynamic_inherit()` and `Highlight.merge_hl()`.
---- 2. If `___hl_name` exists, reapply highlight if dynamic (`force`) or overridden (`override_style`).
---- 3. If `___hl_name` is missing, generate via `Highlight.make_hl_name_from_id()`:
+--- 2. If `___resolved_hl_name` exists, reapply highlight if dynamic (`force`) or overridden (`override_style`).
+--- 3. If `___resolved_hl_name` is missing, generate via `Highlight.make_hl_name_from_id()`:
 ---    - Assign own name if component has parents.
----    - Otherwise, reuse deepest referenced `___hl_name` if available.
---- 4. Apply highlight and update `___hl_name` cache.
+---    - Otherwise, reuse deepest referenced `___resolved_hl_name` if available.
+--- 4. Apply highlight and update `___resolved_hl_name` cache.
 ---
 --- @param comp ProxyComponent  Component to update.
---- @param session Session          Session for dynamic style resolution.
 --- @param theme_aware boolean Optional auto-theme flag.
 --- @param override_style? CompStyle  Optional style override.
+--- @param session Session  Session for dynamic style resolution.
 --- @return boolean updated  True if highlight changed, false if skipped.
 --- @return CompStyle|nil style  The resolved style, or nil if unresolved.
-local function update_comp_style(comp, session, theme_aware, override_style)
-    local style, force, pcount = resolve_inherited_style(
-        comp,
-        Highlight.allowed_style(override_style) and override_style or nil
+local function update_comp_style(comp, theme_aware, override_style, session)
+    local style, dynamic, inherit_count = CompAPI.style(comp,
+        function(id)
+            local parent = ManagedComps[id]
+            return parent and Proxy.bind(parent, session)
+        end,
+        Highlight.merge_hl,
+        override_style,
+        theme_aware
     )
 
-    CompAPI.normalize_style(style, theme_aware)
-
-    local hl_name = comp.___hl_name
-    if hl_name then
-        if force or override_style then
-            return Highlight.highlight(hl_name, style), style
-        end
-    else
-        if pcount > 0 then
-            hl_name = Highlight.make_hl_name_from_id(comp.id)
-        else
-            local origin = Resolver.resolve_field_owner(comp, "style")
-            if origin then
-                hl_name = origin.___hl_name or Highlight.make_hl_name_from_id(origin.id)
-                origin.___hl_name = hl_name
-            else
-                hl_name = Highlight.make_hl_name_from_id(comp.id)
-            end
-        end
-        comp.___hl_name = hl_name
-        return Highlight.highlight(hl_name, style), style
-    end
-    return false, style
-end
-
---- Update and apply the highlight style for a component’s side (left or right).
----
---- This function determines and applies a side-specific highlight style
---- (e.g. separators between components in a statusline or UI block).
---- It reuses the main component style if possible or evaluates dynamic styles.
----
---- **Behavior:**
---- 1. If a custom highlight already exists and doesn’t need re-rendering, it returns early.
---- 2. If the side style is a function, it’s dynamically evaluated using `(comp, sid)`.
---- 3. If the side style is a numeric code (`SepStyle`), it derives a new highlight table
----    based on the main style:
----    - `SepFg`:  `{ fg = main_style.fg, bg = "NONE" }`
----    - `SepBg`:  `{ fg = main_style.bg, bg = "NONE" }`
----    - `Reverse`: `{ fg = main_style.bg, bg = main_style.fg }`
----    - `Inherited`: Inherit the component’s `___hl_name` directly.
----
---- **Return values:**
---- - `true`:  Style was updated and applied.
---- - `false`: No change was necessary or style was invalid.
----
---- @param comp ManagedComponent The component whose side style should be updated.
---- @param session Session The session used for dynamic style evaluation.
---- @param side "left"|"right" The side to update.
---- @param main_style_updated boolean Whether the main style was recently updated (forces re-render).
---- @param main_style? CompStyle The component’s main style used as reference.
---- @param theme_aware boolean Flag to enable auto theme.
---- @return boolean updated Whether the side highlight was changed.
---- @return string|nil hl_name The dynamic highlight name as side.
-local function update_comp_side_style(comp, session, side, main_style_updated, main_style, theme_aware)
-    local side_style = CompAPI.side_style(comp, side)
-    ---@cast side_style CompStyle|nil|SideStyleFunc|SepStyle
-
-    local t = type(side_style)
-    local hl_name_field = CompAPI.hl_name_field(side)
-    local hl_name = comp[hl_name_field]
-    local dynamic = t == "function"
-
-    local SepStyle = CompAPI.SepStyle
-    -- Return early if no need to update
-    if
-        not (
-            hl_name == nil
-            or dynamic
-            or (
-                main_style_updated
-                and t == "number"
-                and (
-                    side_style == SepStyle.SepBg -- This is use frequently for separators
-                    or side_style == SepStyle.SepFg
-                    or side_style == SepStyle.Reverse
-                    or side_style == SepStyle.Inherited
-                )
-            )
-        )
-    then
+    if not style then
         return false, nil
     end
 
-    if t == "function" then
-        side_style = side_style(comp, session)
-        t = type(side_style)
+    local hl_name = comp.___resolved_hl_name
+
+    -- Existing highlight name.
+    if hl_name then
+        if dynamic or override_style then
+            return Highlight.highlight(hl_name, style), style
+        end
+
+        return false, style
     end
 
-    if t == "number" and main_style then
-        if side_style == SepStyle.SepFg then
-            side_style = {
-                fg = main_style.fg or main_style.foreground,
-                bg = "NONE",
-            }
-        elseif side_style == SepStyle.SepBg then
-            side_style = {
-                fg = main_style.bg or main_style.background,
-                bg = "NONE",
-            }
-        elseif side_style == SepStyle.Reverse then
-            side_style = {
-                fg = main_style.bg or main_style.background,
-                bg = main_style.fg or main_style.foreground,
-            }
-        elseif side_style == SepStyle.Inherited then
-            if not dynamic then
-                comp[hl_name_field] = comp.___hl_name
-                return true, nil
+    -- Component inherits from parent, so it owns a unique highlight.
+    if inherit_count > 0 then
+        hl_name = Highlight.make_hl_name_from_id(comp.id)
+    else
+        local origin = Resolver.resolve_field_owner(comp, "style")
+        if origin == nil then
+            return false, nil
+        end
+
+        -- Reference component without local ownership.
+        if origin.id ~= comp.id then
+            hl_name = origin.___resolved_hl_name
+            if hl_name == nil then
+                hl_name = Highlight.make_hl_name_from_id(origin.id)
+                origin.___resolved_hl_name = hl_name
             end
-            -- dynamic hl name it's change between comp.___left_hl_name or comp.___hl_name continually
-            return true, comp.___hl_name
         else
-            --- invalid styles
+            -- Normal component.
+            hl_name = Highlight.make_hl_name_from_id(comp.id)
+        end
+    end
+
+    comp.___resolved_hl_name = hl_name
+
+    return Highlight.highlight(hl_name, style), style
+end
+
+--- Update and apply the highlight style for a component side.
+---
+--- The function is intentionally lazy:
+--- - Avoids resolving side style when existing highlight can be reused.
+--- - Evaluates dynamic styles only when required.
+--- - Generates highlight names only on first use.
+---
+---@param comp ManagedComponent Component whose side is updated.
+---@param session Session Runtime context.
+---@param side "left"|"right" Side to update.
+---@param main_hl_applied boolean Whether main highlight changed.
+---@param main_style? CompStyle Main resolved style.
+---@param theme_aware boolean Enable theme adaptation.
+---@return boolean updated Whether highlight changed.
+---@return string|nil dynamic_hl Dynamic inherited highlight.
+local function update_comp_side_style(
+    comp,
+    side,
+    main_hl_applied,
+    main_style,
+    theme_aware,
+    session
+)
+    local hl_name_field = CompAPI.hl_name_field(side)
+    local hl_name = comp[hl_name_field]
+
+
+    ----------------------------------------------------------------------
+    -- Fast path:
+    -- Existing side highlight can be reused.
+    --
+    -- Static side styles only need updating when main highlight changes,
+    -- because separator styles may depend on main fg/bg.
+    ----------------------------------------------------------------------
+    if hl_name and not main_hl_applied then
+        local raw_style = CompAPI.side_style(comp, side)
+
+        -- Most common case:
+        -- static custom highlight already exists.
+        if type(raw_style) ~= "function" then
             return false, nil
         end
     end
-    -- Ensure highlight name exists and apply the new highlight
-    hl_name = hl_name or Highlight.make_hl_name_from_id(comp.id) .. side
-    comp[hl_name_field] = hl_name
-    ---@diagnostic disable-next-line: param-type-mismatch
-    return Highlight.highlight(hl_name, CompAPI.normalize_style(side_style, theme_aware)), nil
+
+
+    ----------------------------------------------------------------------
+    -- Resolve side style lazily.
+    -- Only executed when update is actually required.
+    ----------------------------------------------------------------------
+    local side_style, dynamic, inherited =
+        CompAPI.resolved_side_style(
+            comp,
+            side,
+            main_style,
+            theme_aware,
+            session
+        )
+
+
+    ----------------------------------------------------------------------
+    -- Inherited side:
+    -- Reuse component main highlight directly.
+    ----------------------------------------------------------------------
+    if inherited then
+        -- Dynamic inherited highlight can change every render.
+        if dynamic then
+            return true, comp.___resolved_hl_name
+        end
+
+        if comp[hl_name_field] ~= comp.___resolved_hl_name then
+            comp[hl_name_field] = comp.___resolved_hl_name
+            return true, nil
+        end
+
+        return false, nil
+    end
+
+
+    ----------------------------------------------------------------------
+    -- Invalid / disabled side.
+    ----------------------------------------------------------------------
+    if side_style == nil then
+        return false, nil
+    end
+
+
+    ----------------------------------------------------------------------
+    -- Static highlight reuse.
+    -- After resolving we know whether it is dynamic.
+    ----------------------------------------------------------------------
+    if hl_name and not dynamic and not main_hl_applied then
+        return false, nil
+    end
+
+
+    ----------------------------------------------------------------------
+    -- Allocate highlight name only once.
+    ----------------------------------------------------------------------
+    if hl_name == nil then
+        hl_name = Highlight.make_hl_name_from_id(comp.id) .. side
+        comp[hl_name_field] = hl_name
+    end
+
+
+    ----------------------------------------------------------------------
+    -- Apply highlight.
+    ----------------------------------------------------------------------
+    return Highlight.highlight(
+        hl_name,
+        side_style
+    ), nil
 end
+
 
 --- Hide a component's segment. Skips if not renderable.
 ---@param comp ManagedComponent
@@ -275,7 +229,7 @@ update_single_comp = function(comp, session)
         hide_single_comp(comp)
     else
         --- We still update even the component is not renderable
-        local value, returned_style = CompAPI.evaluate(comp, session)
+        local value, dynamic_style = CompAPI.evaluate(comp, session)
 
         if comp.renderable then
             if value == "" then
@@ -287,59 +241,64 @@ update_single_comp = function(comp, session)
                 local theme_aware = CompAPI.theme_aware(comp, session)
 
                 -- Main part
-                -- Update style first to make sure comp.___hl_name is not nil
-                local style_updated, style = update_comp_style(
+                -- Update style first to make sure comp.___resolved_hl_name is not nil
+                local hl_applied, resolved_style = update_comp_style(
                     comp,
-                    session,
                     theme_aware,
-                    comp.___use_returned_style ~= false and returned_style or nil
+                    dynamic_style,
+                    session
                 )
 
-                Statusline.set_value(cid, value, comp.___hl_name, winid)
+                Statusline.set_value(cid, value, comp.___resolved_hl_name, winid)
 
                 --- Left part
-                -- local lval, lforce = Inherit.resolve_inherited(comp, "left", nil, nil, session)
-                -- if lval then
-                --     lval = format_side_value(lval, lforce)
-                --     if lval then
-                --         local updated, lhl_name =
-                --             update_comp_side_style(comp, session, "left", style_updated, style, theme_aware)
-                --         if not lhl_name then -- never meet dynamic hl_name
-                --             Statusline.set_side_value(cid, -1, lval, comp.___left_hl_name, lforce, winid)
-                --         else
-                --             Statusline.set_side_value(
-                --                 cid,
-                --                 -1,
-                --                 lval,
-                --                 lhl_name or comp.___left_hl_name,
-                --                 lforce or (updated and lhl_name ~= nil),
-                --                 winid
-                --             )
-                --         end
-                --     end
-                -- end
+                local lval, lforce = CompAPI.side(comp, "left",
+                    function(id)
+                        local parent = ManagedComps[id]
+                        return parent and Proxy.bind(parent, session)
+                    end,
+                    session)
 
-                -- --- Right part
-                -- local rval, rforce = Inherit.resolve_inherited(comp, "right", nil, nil, session)
-                -- if rval then
-                --     rval = format_side_value(rval, rforce)
-                --     if rval then
-                --         local updated, rhl_name =
-                --             update_comp_side_style(comp, session, "right", style_updated, style, theme_aware)
-                --         if not rhl_name then -- never meet dynamic hl_name
-                --             Statusline.set_side_value(cid, 1, rval, comp.___right_hl_name, rforce, winid)
-                --         else
-                --             Statusline.set_side_value(
-                --                 cid,
-                --                 1,
-                --                 rval,
-                --                 rhl_name or comp.___right_hl_name,
-                --                 rforce or (updated and rhl_name ~= nil),
-                --                 winid
-                --             )
-                --         end
-                --     end
-                -- end
+                if lval then
+                    local updated, lhl_name =
+                        update_comp_side_style(comp, "left", hl_applied, resolved_style, theme_aware, session)
+                    if not lhl_name then -- never meet dynamic hl_name
+                        Statusline.set_side_value(cid, -1, lval, comp.___left_hl_name, lforce, winid)
+                    else
+                        Statusline.set_side_value(
+                            cid,
+                            -1,
+                            lval,
+                            lhl_name or comp.___left_hl_name,
+                            lforce or (updated and lhl_name ~= nil),
+                            winid
+                        )
+                    end
+                end
+
+                --- Right part
+                local rval, rforce = CompAPI.side(comp, "right",
+                    function(id)
+                        local parent = ManagedComps[id]
+                        return parent and Proxy.bind(parent, session)
+                    end
+                    , session)
+                if rval then
+                    local updated, rhl_name =
+                        update_comp_side_style(comp, "right", hl_applied, resolved_style, theme_aware, session)
+                    if not rhl_name then -- never meet dynamic hl_name
+                        Statusline.set_side_value(cid, 1, rval, comp.___right_hl_name, rforce, winid)
+                    else
+                        Statusline.set_side_value(
+                            cid,
+                            1,
+                            rval,
+                            rhl_name or comp.___right_hl_name,
+                            rforce or (updated and rhl_name ~= nil),
+                            winid
+                        )
+                    end
+                end
 
                 if comp.on_click then
                     local click_manager = require("witch-line.event.click")

@@ -56,7 +56,7 @@ local function apply_override(comp, override)
     end
 
     if override.style then
-        comp.___use_returned_style = false
+        comp.___accept_returned_style = false
     end
     if override.style or override.left_style or override.right_style then
         comp.theme_aware = false

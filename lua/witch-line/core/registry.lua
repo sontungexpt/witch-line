@@ -35,6 +35,13 @@ M.register = function(cid, comp)
     return comp
 end
 
+--- Returns the managed component for the given ID, if one exists.
+--- @param cid CompId
+--- @return ManagedComponent | nil
+M.get_comp_by_id = function(cid)
+    return ManagedComps[cid]
+end
+
 
 ---@param kind DepGraphKind
 ---@param source_id CompId
