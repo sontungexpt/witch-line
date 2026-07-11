@@ -12,17 +12,6 @@ local DepGraphKind = {
 M.DepGraphKind = DepGraphKind
 
 ---@type table<DepGraphKind, table<CompId, table<CompId, true>>>
---- Example:
---- ```lua
---- DepGraph = {
----   [DepGraphKind.Event] = {
----     git = {
----       branch = true,
----       diff = true,
----     },
----   },
---- }
---- ```
 local DepGraph = {
     [DepGraphKind.Event] = {},
     [DepGraphKind.Timer] = {},

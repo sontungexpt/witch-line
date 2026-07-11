@@ -3,15 +3,15 @@ local api = vim.api
 
 local Statusline = require("witch-line.engine.statusline")
 local Highlight = require("witch-line.engine.highlight")
-local CompAPI = require("witch-line.core.component_api")
+local CompAPI = require("witch-line.core.comp.behavior")
 
-local Registry = require("witch-line.engine.registry")
+local Registry = require("witch-line.core.registry")
 local ManagedComps = Registry.ManagedComps
 local DepGraphKind = Registry.DepGraphKind
 local iterate_dependent_ids = Registry.iterate_dependent_ids
 
-local Resolver = require("witch-line.engine.resolver")
-local Proxy = require("witch-line.engine.proxy")
+local Resolver = require("witch-line.core.resolver")
+local Proxy = require("witch-line.core.comp.proxy")
 
 
 local M = {}
@@ -62,7 +62,7 @@ local resolve_inherited_style = function(comp, initial_style, ...)
 
     local merged_parent_count = 0
     local seen = { [cid] = true }
-    local parent_id = comp.___container
+    local parent_id = comp.___parent_id
 
     while parent_id do
         if seen[parent_id] then
@@ -90,7 +90,7 @@ local resolve_inherited_style = function(comp, initial_style, ...)
             )
         end
 
-        parent_id = parent.___container
+        parent_id = parent.___parent_id
     end
 
     if not requires_recompute then
@@ -141,7 +141,7 @@ local function update_comp_style(comp, session, theme_aware, override_style)
         if pcount > 0 then
             hl_name = Highlight.make_hl_name_from_id(comp.id)
         else
-            local origin = Resolver.origin_component(comp, "style")
+            local origin = Resolver.resolve_field_owner(comp, "style")
             if origin then
                 hl_name = origin.___hl_name or Highlight.make_hl_name_from_id(origin.id)
                 origin.___hl_name = hl_name

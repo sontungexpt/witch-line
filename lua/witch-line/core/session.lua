@@ -1,6 +1,28 @@
 local setmetatable, select, rawset, rawget = setmetatable, select, rawset, rawget
 local M = {}
 
+--- Debug log file — set to a path to enable cache tracing, or `false` to disable.
+--- @type false|string
+-- local DEBUG_LOG = false
+
+DEBUG_LOG = "/tmp/witch-cache.log"
+
+--- Atomically append a line to the debug log.
+--- @param msg string
+local function log(msg)
+    if not DEBUG_LOG then return end
+    local f, err = io.open(DEBUG_LOG, "a")
+    if f then
+        f:write(msg, "\n")
+        f:close()
+    else
+        vim.notify("[witch] cache debug error: " .. tostring(err), vim.log.levels.ERROR)
+    end
+end
+
+--- Global tick counter so every call has a unique index.
+local _tick = 0
+
 --- Sentinel key to cache the `CacheScope` instance inside a cache node.
 local CACHE_SCOPE_KEY = {}
 
@@ -34,8 +56,14 @@ end
 function CacheScope:memo(fn, ...)
     local result = rawget(self._node, fn)
     if result == nil then
+        _tick = _tick + 1
+        local id = _tick
+        log(string.format("[%d] MISS  %s", id, tostring(fn)))
         result = { fn(...) }
         rawset(self._node, fn, result)
+        log(string.format("[%d] SET   %s", id, tostring(fn)))
+    else
+        log(string.format("HIT   %s", tostring(fn)))
     end
     return unpack(result)
 end
@@ -89,6 +117,7 @@ function Session:cache(...)
     end
     local scope = rawget(node, CACHE_SCOPE_KEY)
     if scope == nil then
+        log(string.format("SCOPE %s", vim.inspect({ ... })))
         scope = setmetatable({ _node = node }, CacheScope)
         rawset(node, CACHE_SCOPE_KEY, scope)
     end

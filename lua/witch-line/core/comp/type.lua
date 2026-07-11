@@ -199,7 +199,7 @@
 --- @private
 --- @field ___loaded? boolean Component has been initialized.
 --- @field ___hidden? boolean Cached visibility state.
---- @field ___container? CompId The id of the container component.
+--- @field ___parent_id? CompId The id of the container component.
 --- @field ___use_returned_style? boolean Whether the style returned by `update()` should override `style`
 ---
 --- @field ___hl_name? string Highlight group used for the main content.
@@ -217,7 +217,7 @@
 --- @field [integer] ManagedComponent A table of child components, can be used to create a list of components
 --- @field id CompId the id of component
 --- @field ___loaded true Always `true` for managed components.
---- @field ___container CompId The id of the container component.
+--- @field ___parent_id CompId The id of the container component.
 
 
 --- @alias LiteralComponent  string

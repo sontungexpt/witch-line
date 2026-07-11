@@ -6,7 +6,7 @@ local Event = require("witch-line.event.event")
 local Timer = require("witch-line.event.timer")
 local BuiltinComp = require("witch-line.component")
 
-local Registry = require("witch-line.engine.registry")
+local Registry = require("witch-line.core.registry")
 local ManagedComps = Registry.ManagedComps
 local DepGraphKind = Registry.DepGraphKind
 local link_dependency = Registry.link_dependency
@@ -179,7 +179,7 @@ end
 ---@param winid? integer
 ---@return ManagedComponent
 mount_component = function(comp, container_id, winid)
-    comp.___container = container_id
+    comp.___parent_id = container_id
     if winid then
         comp.win_individual = true
     end
