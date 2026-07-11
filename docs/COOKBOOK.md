@@ -257,15 +257,6 @@ end
 
 When hidden, the component occupies no space in the statusline.
 
-**`min_screen_width`** — hide when the terminal is too narrow:
-
-```lua
-min_screen_width = 80   -- hide if fewer than 80 columns
-min_screen_width = function(self, session)
-  return vim.o.columns < 120 and 80 or 120
-end
-```
-
 ### Flexible (hiding priority)
 
 When space is tight, components with higher `flexible` values are hidden first:
@@ -297,11 +288,8 @@ local comp = {
       callback = function()
         self.my_state.count = self.my_state.count + 1
         -- Request a re-render of this component:
-        local engine = package.loaded["witch-line.engine"]
-        if engine then
-          local Request = require("witch-line.engine.request")
-          Request.update_comp(self)
-        end
+        local Request = require("witch-line.engine.request")
+        Request.update_comp(self)
       end,
     })
   end,
@@ -317,7 +305,7 @@ Runs before and after each render cycle:
 
 ```lua
 pre_update = function(self, session)
-  -- Runs before hidden, min_screen_width, and update.
+  -- Runs before hidden and update.
   -- Good for preparing data that update will use.
 end
 
@@ -332,7 +320,6 @@ end
 ```
 init                    (once, at load)
   → pre_update
-  → min_screen_width    (if too narrow → hidden)
   → hidden              (if true → component disappears)
   → update              (returns text + optional inline style)
   → padding
@@ -413,7 +400,6 @@ local line_info = {
 | `events` | Event dependency | Re-renders on the same events. |
 | `timing` | Timer dependency | Re-renders on the same timer. |
 | `hidden` | Visibility dependency | Re-checks visibility. |
-| `min_screen_width` | Visibility dependency | Re-checks visibility. |
 | `config`, `context`, `style`, etc. | None (passive) | Does NOT automatically re-render. Read via `with_session` when the child renders. |
 
 If you need a child to re-render when a parent's `context` changes, also ref the parent's `events`:
@@ -583,7 +569,7 @@ require("witch-line").setup({
 })
 ```
 
-**Overrideable fields:** `padding`, `config`, `timing`, `lazy`, `style`, `min_screen_width`, `hide`, `left_style`, `right_style`, `left`, `right`, `flexible`, `theme_aware`.
+**Overrideable fields:** `padding`, `config`, `timing`, `lazy`, `style`, `left_style`, `right_style`, `left`, `right`, `flexible`, `theme_aware`.
 
 ---
 
@@ -653,7 +639,6 @@ vim.api.nvim_exec_autocmds("User", { data = { name = "MyPluginUpdate" } })
 | `left` / `right` | `string \| function` | `nil` | Separator characters. |
 | `left_style` / `right_style` | `number \| table` | `1` | Separator highlight (0–3 or explicit table). |
 | `hidden` | `boolean \| function` | `false` | Conditionally hide the component. |
-| `min_screen_width` | `number \| function` | `nil` | Hide when terminal has fewer columns. |
 | `flexible` | `number` | `nil` | Hiding priority. Higher = hidden first when space is tight. |
 | `lazy` | `boolean` | `true` | `false` to update at startup before any events fire. |
 | `abstract` | `boolean` | `false` | Provider-only. Never rendered. |
@@ -663,3 +648,152 @@ vim.api.nvim_exec_autocmds("User", { data = { name = "MyPluginUpdate" } })
 | `pre_update` | `function(self, session)` | `nil` | Before each render. |
 | `post_update` | `function(self, session)` | `nil` | After each render. |
 | `on_click` | `string \| function \| table` | `nil` | Click callback. |
+
+---
+
+## API Reference
+
+### Request (`witch-line.engine.request`)
+
+```lua
+local Request = require("witch-line.engine.request")
+```
+
+The Request module is the primary way to trigger re-renders from outside the standard event/timer cycle.
+
+- `Request.update_comp(comp, eager?, dep_graph_kind?, seen?)` — Re-render a single component. `eager = true` skips debounce.
+- `Request.update_ids(ids, dep_graph_kind?, eager?, event_info?)` — Re-render multiple components by ID.
+
+**Example — triggering from an autocmd:**
+
+```lua
+init = function(self)
+  local Request = require("witch-line.engine.request")
+  vim.api.nvim_create_autocmd("User MyPluginUpdate", {
+    callback = function()
+      Request.update_comp(self, true)  -- eager = true, skip debounce
+    end,
+  })
+end
+```
+
+**Example — timer animation (neocodeium pattern):**
+
+```lua
+init = function(self)
+  local timer = assert(vim.uv.new_timer())
+  local fps = 4
+  timer:start(0, math.floor(1000 / fps), vim.schedule_wrap(function()
+    require("witch-line.engine.request").update_comp(self, true)
+  end))
+end
+```
+
+### Resolver (`witch-line.core.resolver`)
+
+```lua
+local Resolver = require("witch-line.core.resolver")
+```
+
+- `Resolver.resolve_plain_field(comp, key)` — Read a value through the `ref` chain. Returns `value, owner` or `nil, nil`.
+- `Resolver.resolve_field_owner(comp, key)` — Return only the owner component of a resolved field.
+
+### Registry (`witch-line.core.registry`)
+
+```lua
+local Registry = require("witch-line.core.registry")
+```
+
+- `Registry.get_comp_by_id(id)` — Get a registered component by ID, or nil.
+- `Registry.is_existed(id)` — Check if a component ID is registered.
+
+### Session
+
+```lua
+-- During an event-triggered update, the raw autocmd args are stored on the session:
+local event_info = session:get("EventInfo")
+```
+
+### Session Cache
+
+```lua
+-- Memoize expensive computations within a cache scope:
+local scope = session:cache("component_id")
+local result = scope:memo(expensive_fn, arg1, arg2)
+```
+
+---
+
+## Writing an AI Component
+
+Components that integrate with external tools (LSP, AI assistants, etc.) follow a common pattern: listen to external events, then request re-renders via `Request.update_comp`.
+
+### Neocodeium example
+
+The simplest approach — use the plugin's native events with a timer for animation:
+
+```lua
+local bo = vim.bo
+local neo_timer
+
+local Neocodeium = {
+  id = "my.neocodeium",
+  events = "User NeoCodeiumLabelUpdated,NeoCodeiumServerStopped,"
+    .. "NeoCodeiumServerConnected,NeoCodeiumBufEnabled,"
+    .. "NeoCodeiumEnabled,NeoCodeiumBufDisabled,NeoCodeiumDisabled",
+  config = {
+    fps = 4,
+    icon = {
+      idle = "󰚩",
+      error = "󱚡",
+      waiting = { "󱇷   ", " 󱇷  ", "  󱇷 ", "   󱇷" },
+      disabled = "󱚧",
+    },
+  },
+
+  update = function(self, session)
+    local event = session:get("EventInfo")
+    event = event and event[self.id]
+
+    if event and event.match == "NeoCodeiumLabelUpdated" then
+      if bo.buftype ~= "prompt" and event.data == " * " then
+        neo_timer = neo_timer or assert(vim.uv.new_timer())
+        if not neo_timer:is_active() then
+          neo_timer:start(0, math.floor(1000 / self.config.fps),
+            vim.schedule_wrap(function()
+              require("witch-line.engine.request").update_comp(self, true)
+            end)
+          )
+        end
+      elseif neo_timer then
+        neo_timer:stop()
+      end
+    end
+
+    local status = require("neocodeium").get_status()
+    if status ~= 0 then return self.config.icon.disabled end
+
+    if neo_timer and neo_timer:is_active() then
+      local frame = math.floor(vim.uv.now() * self.config.fps / 1000)
+        % #self.config.icon.waiting + 1
+      return self.config.icon.waiting[frame]
+    end
+
+    if event and event.match == "NeoCodeiumLabelUpdated" then
+      local d = event.data
+      if d ~= " 0 " and d ~= "   " then
+        return self.config.icon.idle .. " " .. d:match("^%s*(.-)%s*$")
+      end
+    end
+
+    return self.config.icon.idle
+  end,
+}
+```
+
+**Key takeaways:**
+- Use `events` to listen for the plugin's User autocmds.
+- Use `vim.uv.new_timer` + `Request.update_comp(self, true)` for smooth animations.
+- The `session:get("EventInfo")` gives you the raw autocmd data.
+- `self.config` holds user-customizable values (icons, fps).
+- Return the text directly from `update` — no need for `init` unless you need to set up autocmds or timers that persist beyond the component lifecycle.
