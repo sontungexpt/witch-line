@@ -5,29 +5,28 @@ local vim, type, pairs      = vim, type, pairs
 -- Note: "function" is a reserved word in Lua, so it must be quoted as a key.
 local FN_TABLE              = { ["function"] = true, table = true }
 local BOOL_FN               = { boolean = true, ["function"] = true }
-local NUM_FN                = { number = true, ["function"] = true }
 local STR_FN                = { string = true, ["function"] = true }
 local NUM_TABLE             = { number = true, table = true }
 local BOOL_NUM              = { boolean = true, number = true }
-local ANY                   = { number = true, string = true, boolean = true, table = true, ["function"] = true }
+-- local NUM_FN                = { number = true, ["function"] = true }
+-- local ANY                   = { number = true, string = true, boolean = true, table = true, ["function"] = true }
 
 -- Field-level type constraints for override values.
 -- Each entry maps a component field name to the set of accepted Lua types.
 -- The type check prevents users from setting fields to incompatible types.
 local OVERRIDEABLE_TYPE_MAP = {
-    padding          = NUM_TABLE,
-    config           = ANY,
-    timing           = BOOL_NUM,
-    lazy             = "boolean",
-    style            = FN_TABLE,
-    min_screen_width = NUM_FN,
-    hide             = BOOL_FN,
-    left_style       = FN_TABLE,
-    right_style      = FN_TABLE,
-    left             = STR_FN,
-    right            = STR_FN,
-    flexible         = "number",
-    theme_aware       = BOOL_FN,
+    padding     = NUM_TABLE,
+    config      = "table",
+    timing      = BOOL_NUM,
+    lazy        = "boolean",
+    style       = FN_TABLE,
+    left_style  = FN_TABLE,
+    right_style = FN_TABLE,
+    left        = STR_FN,
+    right       = STR_FN,
+    hidden      = "function",
+    flexible    = "number",
+    theme_aware = BOOL_FN,
 }
 
 --- Recursively merge `from` into `to` for table values.
@@ -58,6 +57,7 @@ local function apply_override(comp, override)
     if override.style then
         comp.___accept_returned_style = false
     end
+
     if override.style or override.left_style or override.right_style then
         comp.theme_aware = false
     end

@@ -3,7 +3,7 @@ local api = vim.api
 
 local Statusline = require("witch-line.engine.statusline")
 local Highlight = require("witch-line.engine.highlight")
-local CompAPI = require("witch-line.core.comp.behavior")
+local CompAPI = require("witch-line.core.comp.resolver")
 
 local Registry = require("witch-line.core.registry")
 local ManagedComps = Registry.ManagedComps

@@ -1,4 +1,4 @@
-## Your First Component
+# COOKBOOK
 
 A component is a Lua table with an `id` and an `update` function. The `update` function receives `self` (the component) and `session` (the current render cycle) and returns a string:
 
@@ -25,10 +25,24 @@ require("witch-line").setup({
 
 ### Static values
 
-Use `config` for fixed config that doesn't change per cycle:
+Use `static` for fixed data that doesn't change per cycle:
 
 ```lua
-local indicator = {
+local comp = {
+  id = "wl.indicator",
+  static = { icon = "⚡", max_count = 5 },
+  update = function(self, session)
+    return self.static.icon .. " ready"
+  end,
+}
+```
+
+### Config values
+
+Use `config` for values that may be overridden by the user:
+
+```lua
+local comp = {
   id = "wl.indicator",
   config = { icon = "⚡", max_count = 5 },
   update = function(self, session)
@@ -37,11 +51,11 @@ local indicator = {
 }
 ```
 
-Access via `self.config` anywhere in your component functions.
+The difference: `static` is purely internal. `config` can be overridden via `override` in the setup config (see [Default Component Override](#overriding-default-components)).
 
 ### Dynamic context
 
-Use `context` to compute data that other components consume via `ref` (see [Reuse](#reuse)):
+Use `context` to compute data that other components consume via `ref`:
 
 ```lua
 local provider = {
@@ -74,9 +88,7 @@ local comp = {
 
 ### Events
 
-The event string mirrors Vim's `:autocmd` syntax: `autocmd {event} {pattern} [++once]`.
-
-Re-render on Neovim autocmd events:
+Re-render on Neovim autocmd events. The event string mirrors `:autocmd` syntax:
 
 ```lua
 local mode_indicator = {
@@ -98,17 +110,15 @@ events = {
 }
 ```
 
-String syntax supports inline patterns (comma-separated) and a `++once` modifier:
-
 | Syntax | Meaning |
 |---|---|
-| `"EventName"` | Event with no pattern (wildcard). |
-| `"EventName *.lua"` | Event scoped to `*.lua` files. |
+| `"EventName"` | Event with no pattern. |
+| `"EventName *.lua"` | Scoped to matching files. |
 | `"EventName *.lua,*.py"` | Multiple comma-separated patterns. |
-| `"EventName ++once"` | Fire once then auto-remove. |
-| `"EventName *.lua ++once"` | Pattern + once. `++once` must be last. |
-| `"User LazyLoad"` | User event name passed as pattern. |
-| `"User A,B ++once"` | Two User events, each firing once. |
+| `"EventName ++once"` | Fire once, then auto-remove. |
+| `"EventName *.lua ++once"` | Pattern + once (`++once` must be last). |
+| `"User LazyLoad"` | User event (name passed as pattern). |
+| `"User A,B ++once"` | Two user events, each firing once. |
 
 ### Timer
 
@@ -218,7 +228,7 @@ Hide below a screen width:
 ```lua
 min_screen_width = 80
 min_screen_width = function(self, session)
-  return session and 100 or 50
+  return vim.o.columns < 120 and 80 or 120
 end
 ```
 
@@ -232,7 +242,7 @@ Called once when the component is first loaded. No `session` available.
 
 ```lua
 init = function(self)
-  self.config.icon = "⚡"
+  self.static.icon = "⚡"
   vim.api.nvim_create_autocmd("BufWritePost", {
     callback = function()
       require("witch-line.engine.init").request_update_comp_graph(self, true)
@@ -255,9 +265,16 @@ end
 Full cycle order:
 
 ```
-init → pre_update → min_screen_width → hidden → update
-  → padding → style → left/right → left_style/right_style
-  → on_click → post_update
+init
+  → pre_update
+  → min_screen_width
+  → hidden
+  → update
+  → padding → style
+  → left/right separators
+  → left_style/right_style
+  → on_click
+  → post_update
 ```
 
 ---
@@ -297,57 +314,9 @@ flexible = 2   -- hidden before flexible = 1
 
 ## Reuse
 
-### `inherit` — copy fields from another component
-
-> **Prefer `ref` over `inherit`** in most cases. `ref` is read-only, avoids
-> coupling, and creates explicit dependency links so changes propagate
-> automatically. Use `inherit` only when you genuinely need to *copy and
-> override* fields (e.g. extending a base style with overrides).
-
-Child values override parent. Functions from the parent run with `self = child`.
-
-```lua
-local base = {
-  id = "wl.base",
-  style = { fg = "#fff" },
-  padding = 1,
-}
-
-local child = {
-  id = "wl.child",
-  inherit = "wl.base",
-  update = function(self, session) return "child" end,
-}
-```
-
-### `abstract` — provider-only component
-
-A component with `abstract = true` is never rendered — it exists only to provide data to other components via `ref`. Use this for shared providers that multiple components depend on:
-
-```lua
-local provider = {
-  id = "wl.provider",
-  abstract = true,
-  context = function(self, session)
-    return { value = 42 }
-  end,
-}
-
-local display = {
-  id = "wl.display",
-  ref = { context = "wl.provider" },
-  update = function(self, session)
-    local ctx = self:with_session(session).context(self, session)
-    return "value: " .. ctx.value
-  end,
-}
-```
-
-The provider will never appear in the statusline.
-
 ### `ref` — read-only delegation
 
-Reference another component's field without copying. The referenced component drives the value.
+Reference another component's field without copying. The referenced component drives the value. This is the **preferred** approach.
 
 ```lua
 local provider = {
@@ -371,15 +340,67 @@ Some ref keys create dependency links so changes propagate automatically:
 
 | Key | Dependency |
 |---|---|
-| `events` | ✅ Event |
-| `timing` | ✅ Timer |
-| `hidden` | ✅ Visible |
-| `min_screen_width` | ✅ Visible |
-| `config`, `context`, `style`, `left`, `right`, `left_style`, `right_style` | — |
+| `events` | Event |
+| `timing` | Timer |
+| `hidden` | Visible |
+| `min_screen_width` | Visible |
+| `config`, `context`, `style`, `left`, `right`, `left_style`, `right_style` | None (passive) |
+
+### `inherit` — copy fields from another component
+
+Use `inherit` when you need to **copy and override** fields (e.g. extending a base style):
+
+```lua
+local base = {
+  id = "wl.base",
+  style = { fg = "#fff" },
+  padding = 1,
+}
+
+local child = {
+  id = "wl.child",
+  inherit = "wl.base",
+  update = function(self, session) return "child" end,
+}
+```
+
+Child values override parent. Functions from the parent run with `self = child`.
+
+### `ref` vs `inherit`
+
+| | `ref` | `inherit` |
+|---|---|---|
+| **Mechanism** | Live delegation (read-through) | Copy on mount |
+| **Updates propagate** | Yes — parent changes flow to child | No — child has its own copy |
+| **Coupling** | Loose (child depends on parent ID) | Tight (fields are copied) |
+| **Use when** | Sharing live data (events, styles, context) | Extending a base with custom overrides |
+
+### `abstract` — provider-only component
+
+A component with `abstract = true` is never rendered — it exists only to provide data to other components via `ref`:
+
+```lua
+local provider = {
+  id = "wl.provider",
+  abstract = true,
+  context = function(self, session)
+    return { value = 42 }
+  end,
+}
+
+local display = {
+  id = "wl.display",
+  ref = { context = "wl.provider" },
+  update = function(self, session)
+    local ctx = self:with_session(session).context(self, session)
+    return "value: " .. ctx.value
+  end,
+}
+```
 
 ### `with_session` — reaching referenced data
 
-Use `self:with_session(session)` to resolve a field from a referenced component. This follows the `ref` chain and returns the resolved value.
+Use `self:with_session(session)` to resolve a field from a referenced component. This follows the `ref` chain and returns the resolved value through the proxy:
 
 ```lua
 -- Field on this component directly:
@@ -426,6 +447,41 @@ During an event-triggered update, the raw autocmd args are stored on the session
 local event_info = session:get("EventInfo")
 ```
 
+The session also provides memoization via cache scopes:
+
+```lua
+-- Memoize expensive computations:
+local scope = session:cache("my_component")
+local result = scope:memo(function(x)
+  return expensive_computation(x)
+end, arg1)
+```
+
+The same function reference always returns the cached result within a scope, regardless of arguments.
+
+---
+
+## Overriding Default Components
+
+Pass an `override` table to modify built-in components:
+
+```lua
+require("witch-line").setup({
+  statusline = {
+    global = {
+      {
+        id = "wl.mode",
+        override = {
+          style = { fg = "#ffffff", bg = "#333333" },
+        },
+      },
+    },
+  },
+})
+```
+
+Overrideable fields: `padding`, `config`, `timing`, `lazy`, `style`, `min_screen_width`, `hide`, `left_style`, `right_style`, `left`, `right`, `flexible`, `theme_aware`.
+
 ---
 
 ## Field Summary
@@ -434,12 +490,13 @@ local event_info = session:get("EventInfo")
 |---|---|---|---|
 | `id` | `string` | — | Unique identifier. Required for `ref` and `inherit`. |
 | `update` | `fun(self, session): string[, table]` | — | Returns display text and optional highlight. |
-| `config` | `table` | `nil` | Fixed config values. |
+| `static` | `table` | `nil` | Internal fixed data, not overridable. |
+| `config` | `table` | `nil` | Config values, overridable via `override`. |
 | `context` | `table\|fun(self, session): table` | `nil` | Dynamic data shared via `ref`. |
-| `events` | `string\|string[]` | `nil` | Autocmd events that trigger re-render. Inline syntax: `"Event [Pat,Pat] [++once]"`. |
+| `events` | `string\|string[]` | `nil` | Autocmd events that trigger re-render. |
 | `timing` | `boolean\|number` | `nil` | Timer interval in ms (`true` = 1000). |
 | `win_individual` | `boolean` | `false` | Re-render per window. |
-| `style` | `table\|string\|fun(self, session): table\|nil` | `nil` | Highlight: inline table, named group, or function. |
+| `style` | `table\|string\|fun(self, session): table\|nil` | `nil` | Highlight: table, named group, or function. |
 | `padding` | `number\|table\|fun(self, session): number` | `1` | Spaces around text. |
 | `left` / `right` | `string\|fun(self, session): string` | `nil` | Decorative separators. |
 | `left_style` / `right_style` | `SepStyle\|table` | `SepStyle.SepBg` | Separator highlight. |
