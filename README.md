@@ -186,8 +186,8 @@ This plugin is ideal for developers who want full control over the look and feel
 
 - Testing
 
-  - [ ] Write unit tests for core functionality
-  - [ ] Write performance benchmarks
+  - [x] Write unit tests for core functionality
+  - [x] Write performance benchmarks
 
 - Themes
 
@@ -318,7 +318,7 @@ The plugin provides the `:Witchline` command with subcommands:
 
 | Command | Description |
 | --- | --- |
-| `:Witchline toggle_auto_theme` | Toggle automatic theme adjustment |
+| `:WitchLine toggle_theme_aware` | Toggle automatic theme adjustment |
 | `:Witchline inspect event_store` | Inspect event store |
 | `:Witchline inspect timer_store` | Inspect timer store |
 | `:Witchline inspect comp_manager comps` | Inspect registered components |

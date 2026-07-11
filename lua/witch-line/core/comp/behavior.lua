@@ -2,7 +2,7 @@ local type, str_rep = type, string.rep
 
 local M = {}
 
---- @enum SepStyle
+---@enum SepStyle
 local SepStyle = {
     Inherited = 0,
     SepFg = 1,
@@ -11,18 +11,24 @@ local SepStyle = {
 }
 M.SepStyle = SepStyle
 
----@type table<string, table<CompId, {[1]: any, [2]: integer}>>
+---@type table<string, table<CompId, {[1]: any,[2]:integer}>>
 local inherited_cache = {}
 
----@param comp ManagedComponent
----@param field string Field name to resolve.
----@param resolve_parent_fn fun(id: CompId): ManagedComponent|nil
----@param merge_fn? fun(current: any, parent: any, depth: integer): any
----@param initial? any Initial value before inheritance.
----@param ... any Arguments passed to dynamic fields.
----@return any value Resolved value.
----@return boolean dynamic Whether result depends on runtime evaluation.
----@return integer count Number of inherited values merged.
+---
+--- Resolve a field through component inheritance.
+---
+--- Static results are cached.
+--- Dynamic values are evaluated every call and bypass cache.
+--- Without merge function, the nearest parent value is used.
+--- @param comp ManagedComponent
+--- @param field string
+--- @param resolve_parent_fn fun(id:CompId):ManagedComponent|nil
+--- @param merge_fn? fun(current:any,parent:any,depth:integer):any
+--- @param initial? any
+--- @param ... any Runtime arguments.
+--- @return any value
+--- @return boolean dynamic
+--- @return integer inherited_count
 local resolve_inherited_value = function(
     comp,
     field,
@@ -36,7 +42,6 @@ local resolve_inherited_value = function(
 
     local field_cache
 
-    -- Static inheritance can be cached permanently.
     if not dynamic then
         field_cache = inherited_cache[field]
 
@@ -47,7 +52,6 @@ local resolve_inherited_value = function(
         end
     end
 
-
     local result = initial
     if result == nil then
         result = comp[field]
@@ -57,7 +61,6 @@ local resolve_inherited_value = function(
         dynamic = true
         result = result(comp, ...)
     end
-
 
     local visited = {}
     local inherit_count = 0
@@ -82,22 +85,17 @@ local resolve_inherited_value = function(
         if value ~= nil then
             inherit_count = inherit_count + 1
 
-            -- No merge function, use first parent value as-is.
             if merge_fn == nil then
                 result = value
                 break
             end
 
-            -- Merge function present, apply it to accumulate results.
             result = merge_fn(result, value, inherit_count)
         end
-
 
         parent_id = parent.___parent_id
     end
 
-
-    -- Only cache values that do not depend on runtime arguments.
     if not dynamic then
         local cache = {
             result,
@@ -113,13 +111,13 @@ local resolve_inherited_value = function(
         end
     end
 
-
     return result, dynamic, inherit_count
 end
 M.resolve_inherited_value = resolve_inherited_value
 
---- Run `pre_update(comp, session)` if present.
+--- Execute pre update callback.
 ---@param comp ManagedComponent
+---@param ... any Runtime context.
 M.pre_update = function(comp, ...)
     local callback = comp.pre_update
     if type(callback) == "function" then
@@ -128,8 +126,9 @@ M.pre_update = function(comp, ...)
 end
 
 
---- Run `post_update(comp, session)` if present.
+--- Execute post update callback.
 ---@param comp ManagedComponent
+---@param ... any Runtime context.
 M.post_update = function(comp, ...)
     local callback = comp.post_update
     if type(callback) == "function" then
@@ -137,16 +136,16 @@ M.post_update = function(comp, ...)
     end
 end
 
-
---- Run `update(comp, session)` and apply component padding.
+--- Evaluate component value and optional style override.
 ---
---- Non-string results become an empty string.
---- Numeric padding applies to both sides.
---- Table padding supports `left` and `right`.
----
----@param comp ManagedComponent Component being evaluated.
----@return string Rendered component output.
----@return CompStyle|nil Optional style override.
+--- Supports:
+--- - update callback
+--- - returned style override
+--- - component padding
+---@param comp ManagedComponent
+---@param ... any Runtime context.
+---@return string value
+---@return CompStyle|nil style
 M.evaluate = function(comp, ...)
     local update = comp.update
 
@@ -193,8 +192,9 @@ M.evaluate = function(comp, ...)
 end
 
 
---- Resolve whether component should adapt to current theme.
+--- Resolve theme adaptation.
 ---@param comp ManagedComponent
+---@param ... any Runtime context.
 ---@return boolean
 M.theme_aware = function(comp, ...)
     local value = comp.theme_aware
@@ -209,9 +209,9 @@ M.theme_aware = function(comp, ...)
     return comp.___builtin or false
 end
 
-
---- Resolve whether component should be hidden.
+--- Resolve component visibility.
 ---@param comp ManagedComponent
+---@param ... any Runtime context.
 ---@return boolean
 M.hidden = function(comp, ...)
     local value = comp.hidden
@@ -223,12 +223,14 @@ M.hidden = function(comp, ...)
     return value == true
 end
 
---- Normalize a style table by attaching `theme_aware` if not already set.
---- @param style CompStyle
---- @param enable_theme_aware boolean
---- @return CompStyle
+--- Attach theme metadata to style.
+---@param style CompStyle
+---@param enable_theme_aware boolean
+---@return CompStyle
 local normalize_style = function(style, enable_theme_aware)
-    if type(style) == "table" and style.theme_aware == nil then
+    if type(style) == "table"
+        and style.theme_aware == nil
+    then
         style.theme_aware = enable_theme_aware
     end
     return style
@@ -245,14 +247,10 @@ M.normalize_style = normalize_style
 --- @return boolean
 --- @return integer
 M.style = function(comp, resolve_parent_fn, merge_fn, override_style, theme_aware, ...)
-    if comp.___accept_returned_style ~= false
-        and (
-            type(override_style) == "string"
-            or type(override_style) == "table"
-        )
+    local override_style_type = type(override_style)
+    if comp.___accept_returned_style == false
+        or (override_style_type ~= "string" and override_style_type ~= "table")
     then
-        override_style = override_style
-    else
         override_style = nil
     end
 

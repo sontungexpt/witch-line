@@ -252,12 +252,15 @@ update_single_comp = function(comp, session)
                 Statusline.set_value(cid, value, comp.___resolved_hl_name, winid)
 
                 --- Left part
-                local lval, lforce = CompAPI.side(comp, "left",
+                local lval, lforce = CompAPI.side(
+                    comp,
+                    "left",
                     function(id)
                         local parent = ManagedComps[id]
                         return parent and Proxy.bind(parent, session)
                     end,
-                    session)
+                    session
+                )
 
                 if lval then
                     local updated, lhl_name =
@@ -277,12 +280,15 @@ update_single_comp = function(comp, session)
                 end
 
                 --- Right part
-                local rval, rforce = CompAPI.side(comp, "right",
+                local rval, rforce = CompAPI.side(
+                    comp,
+                    "right",
                     function(id)
                         local parent = ManagedComps[id]
                         return parent and Proxy.bind(parent, session)
-                    end
-                    , session)
+                    end,
+                    session
+                )
                 if rval then
                     local updated, rhl_name =
                         update_comp_side_style(comp, "right", hl_applied, resolved_style, theme_aware, session)

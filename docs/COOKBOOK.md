@@ -235,7 +235,7 @@ init = function(self)
   self.config.icon = "⚡"
   vim.api.nvim_create_autocmd("BufWritePost", {
     callback = function()
-      require("witch-line.core.handler").request_update_comp_graph(self, true)
+      require("witch-line.engine.init").request_update_comp_graph(self, true)
     end,
   })
 end

@@ -15,8 +15,8 @@ local not_nil = helper.not_nil
 -- Mock infrastructure
 -- ====================================================================
 --- Clear a table in-place without reassigning the variable.
---- Closures captured in package.preload hold references to the original
---- table objects; reassigning (registered = {}) breaks those references.
+--- Mock closures capture mock_calls/registered by reference;
+--- clearing in-place preserves those references.
 local function clear_table(t)
     for k in pairs(t) do t[k] = nil end
 end
@@ -54,7 +54,8 @@ local function reset_mocks()
 end
 
 -- ====================================================================
--- Stub all dependencies of engine/init.lua via package.preload
+-- Stub all dependencies of engine/init.lua via package.loaded
+-- (package.preload is not used by Neovim's require).
 -- ====================================================================
 
 local COMPONENT_DEFS = {
@@ -68,103 +69,90 @@ local COMPONENT_DEFS = {
     },
 }
 
-package.preload["witch-line.component"] = function()
-    return setmetatable({}, {
-        __index = function(_, id)
-            return COMPONENT_DEFS[id]
-        end,
-    })
+package.loaded["witch-line.component"] = setmetatable({}, {
+    __index = function(_, id)
+        return COMPONENT_DEFS[id]
+    end,
+})
+
+local DepGraphKind = { Visible = 1, Event = 2, Timer = 3 }
+package.loaded["witch-line.core.registry"] = {
+    DepGraphKind = DepGraphKind,
+    ManagedComps = setmetatable({}, { __index = registered }),
+    is_existed = function(id) return registered[id] ~= nil end,
+    link_dependency = function(kind, source, dep)
+        mock_calls.link_dependency[#mock_calls.link_dependency + 1] = {
+            kind = kind, source = source, dep = dep,
+        }
+    end,
+    register = function(cid, comp)
+        registered[cid] = comp
+        mock_calls.register_cid[#mock_calls.register_cid + 1] = cid
+        return comp
+    end,
+    get_comp = function(id) return registered[id] end,
+    iterate_dependent_ids = function() return function() end end,
+}
+
+package.loaded["witch-line.engine.statusline"] = {
+    push = function(cid, text, winid)
+        mock_calls.push[#mock_calls.push + 1] = { cid = cid, text = text, winid = winid }
+    end,
+    render = function() mock_calls.render = mock_calls.render + 1 end,
+    render_debounce = function() mock_calls.render_debounce = mock_calls.render_debounce + 1 end,
+    hide_segment = function() end,
+    track_flexible = function() end,
+}
+
+package.loaded["witch-line.core.override"] = function(base, overrides)
+    return vim.tbl_deep_extend("force", base, overrides)
 end
 
-package.preload["witch-line.core.registry"] = function()
-    local DepGraphKind = { Visible = 1, Event = 2, Timer = 3 }
-    return {
-        DepGraphKind = DepGraphKind,
-        is_existed = function(id) return registered[id] ~= nil end,
-        link_dependency = function(kind, source, dep)
-            mock_calls.link_dependency[#mock_calls.link_dependency + 1] = {
-                kind = kind, source = source, dep = dep,
-            }
-        end,
-        register = function(cid, comp)
-            registered[cid] = comp
-            mock_calls.register_cid[#mock_calls.register_cid + 1] = cid
-            return comp
-        end,
-        get_comp = function(id) return registered[id] end,
-        iterate_dependent_ids = function() return function() end end,
-    }
-end
+package.loaded["witch-line.core.component_api"] = {
+    pre_update = function() end,
+    hidden = function() return false end,
+    evaluate = function() return "", nil end,
+}
 
-package.preload["witch-line.engine.statusline"] = function()
-    return {
-        push = function(cid, text, winid)
-            mock_calls.push[#mock_calls.push + 1] = { cid = cid, text = text, winid = winid }
-        end,
-        render = function() mock_calls.render = mock_calls.render + 1 end,
-        render_debounce = function() mock_calls.render_debounce = mock_calls.render_debounce + 1 end,
-        hide_segment = function() end,
-        track_flexible = function() end,
-    }
-end
+package.loaded["witch-line.core.session"] = {
+    with_session = function(fn)
+        fn({
+            get_cache = function() return nil end,
+            set_cache = function() end,
+            set = function() end,
+        })
+    end,
+}
 
-package.preload["witch-line.core.override"] = function()
-    return function(base, overrides) return vim.tbl_deep_extend("force", base, overrides) end
-end
+package.loaded["witch-line.event.event"] = {
+    register_events = function(cid, events)
+        mock_calls.register_events[#mock_calls.register_events + 1] = { cid = cid, events = events }
+    end,
+    on_event = function(cb) mock_calls.on_event_cb = cb end,
+}
 
-package.preload["witch-line.core.component_api"] = function()
-    return {
-        pre_update = function() end,
-        hidden = function() return false end,
-        evaluate = function() return "", nil end,
-    }
-end
-
-package.preload["witch-line.core.session"] = function()
-    return {
-        with_session = function(fn)
-            fn({
-                get_cache = function() return nil end,
-                set_cache = function() end,
-                set = function() end,
-            })
-        end,
-    }
-end
-
-package.preload["witch-line.event.event"] = function()
-    return {
-        register_events = function(cid, events)
-            mock_calls.register_events[#mock_calls.register_events + 1] = { cid = cid, events = events }
-        end,
-        on_event = function(cb) mock_calls.on_event_cb = cb end,
-    }
-end
-
-package.preload["witch-line.event.timer"] = function()
-    return {
-        register_timer = function(cid, timing)
-            mock_calls.register_timer[#mock_calls.register_timer + 1] = { cid = cid, timing = timing }
-        end,
-        on_timer_trigger = function(cb) mock_calls.on_timer_cb = cb end,
-    }
-end
+package.loaded["witch-line.event.timer"] = {
+    register_timer = function(cid, timing)
+        mock_calls.register_timer[#mock_calls.register_timer + 1] = { cid = cid, timing = timing }
+    end,
+    on_timer_trigger = function(cb) mock_calls.on_timer_cb = cb end,
+}
 
 --- Transitive deps needed by module loading
-package.preload["witch-line.engine.update"] = function()
-    return {
-        update_comp_graph_by_ids = function() end,
-        update_comp_graph = function() end,
-    }
-end
-package.preload["witch-line.engine.highlight"] = function() return {} end
-package.preload["witch-line.util.bitmask"] = function()
-    return { is_marked = function() return false end, mark_bit = function() end }
-end
-package.preload["witch-line.util.notifier"] = function()
-    return { info = function() end, error = function(msg) error(msg) end }
-end
-package.preload["witch-line.constant.color"] = function() return {} end
+package.loaded["witch-line.engine.update"] = {
+    update_comp_by_ids = function() end,
+    update_comp = function() end,
+    update_comp_graph_by_ids = function() end,
+    update_comp_graph = function() end,
+}
+package.loaded["witch-line.engine.highlight"] = {}
+package.loaded["witch-line.util.bitmask"] = {
+    is_marked = function() return false end, mark_bit = function() end,
+}
+package.loaded["witch-line.util.notifier"] = {
+    info = function() end, error = function(msg) error(msg) end,
+}
+package.loaded["witch-line.constant.color"] = {}
 
 -- ====================================================================
 -- Stub Neovim API
@@ -196,23 +184,11 @@ stub_vim_api()
 -- ====================================================================
 -- Helper: fresh module + fresh mocks per sub-test
 -- ====================================================================
---- All mock module names — force re-creation so closures capture
---- the current `mock_calls` / `registered` tables.
+--- Only the module under test needs re-loading. Mocks are set via
+--- package.loaded (not preload) and reference mock_calls/registered
+--- which are cleared in-place by reset_mocks().
 local MOCK_MODULES = {
     "witch-line.engine.init",
-    "witch-line.engine.statusline",
-    "witch-line.core.session",
-    "witch-line.event.event",
-    "witch-line.event.timer",
-    "witch-line.core.registry",
-    "witch-line.component",
-    "witch-line.core.override",
-    "witch-line.core.component_api",
-    "witch-line.engine.update",
-    "witch-line.engine.highlight",
-    "witch-line.util.bitmask",
-    "witch-line.util.notifier",
-    "witch-line.constant.color",
 }
 
 local function fresh_engine()
