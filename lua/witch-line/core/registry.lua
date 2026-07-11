@@ -1,13 +1,14 @@
+local noop = function() end
 local next = next
 
 local M = {}
 
 --- @enum DepGraphKind
 local DepGraphKind = {
-    All = 1,
+    Event = 1,
     Visible = 2,
-    Event = 3,
-    Timer = 4,
+    Timer = 3,
+    All = 4,
 }
 M.DepGraphKind = DepGraphKind
 
@@ -16,6 +17,7 @@ local DepGraph = {
     [DepGraphKind.Event] = {},
     [DepGraphKind.Timer] = {},
     [DepGraphKind.Visible] = {},
+    [DepGraphKind.All] = {},
 }
 
 ---@type table<CompId, ManagedComponent>
@@ -35,13 +37,6 @@ M.register = function(cid, comp)
     return comp
 end
 
---- Returns the managed component for the given ID, if one exists.
---- @param cid CompId
---- @return ManagedComponent | nil
-M.get_comp_by_id = function(cid)
-    return ManagedComps[cid]
-end
-
 
 ---@param kind DepGraphKind
 ---@param source_id CompId
@@ -49,10 +44,10 @@ end
 M.link_dependency = function(kind, source_id, dependent_id)
     local graph = DepGraph[kind]
     local deps = graph[source_id]
-    if deps then
-        deps[dependent_id] = true
-    else
+    if deps == nil then
         graph[source_id] = { [dependent_id] = true }
+    else
+        deps[dependent_id] = true
     end
 end
 
@@ -72,7 +67,7 @@ M.iterate_dependent_ids = function(kind, comp_id)
             end
         end
     end
-    return function() return nil end
+    return noop
 end
 
 M.inspect = function(target)
@@ -88,4 +83,5 @@ M.inspect = function(target)
         }))
     end
 end
+
 return M

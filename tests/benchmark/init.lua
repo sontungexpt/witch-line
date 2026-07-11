@@ -51,7 +51,22 @@ if plugin == "witch-line" then
 elseif plugin == "lualine" then
   bench("lualine", function()
     vim.o.statusline = " "
-    require("lualine").setup()
+    require("lualine").setup({
+      options = {
+        theme = "auto",
+        section_separators = { left = "", right = "" },
+        component_separators = { left = "", right = "" },
+        globalstatus = true,
+      },
+      sections = {
+        lualine_a = { "mode" },
+        lualine_b = { "filename", "branch" },
+        lualine_c = { "diff" },
+        lualine_x = { "diagnostics", "lsp", "encoding", "filetype" },
+        lualine_y = { "progress" },
+        lualine_z = { "location" },
+      },
+    })
   end)
 elseif plugin == "heirline" then
   bench("heirline", function()
