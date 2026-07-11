@@ -53,23 +53,6 @@ local function register_dependency_links(kind, comp_id, dependent_id)
     end
 end
 
---- Update a component and its deps in a new session, then debounce render.
----@param comp ManagedComponent The component to update.
----@param eager? boolean Whether to render immediately instead of debouncing.
----@param dep_graph_kind? DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
----@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
-M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
-    require("witch-line.core.session").with_session(function(session)
-        require("witch-line.engine.update").update_comp(comp, session,
-            dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
-        if eager then
-            Statusline.render()
-        else
-            Statusline.render_debounce()
-        end
-    end)
-end
-
 --- Resolves the component identifier.
 ---
 --- Uses the existing id when available, validates user-defined ids, and
@@ -300,28 +283,25 @@ M.setup = function(statusline)
     end
 
     Event.on_event(function(ids, event_info)
-        require("witch-line.core.session").with_session(function(session)
-            if event_info then
-                session:set("EventInfo", event_info)
-            end
-            require("witch-line.engine.update").update_comp_by_ids(ids, session, DepGraphKind.Event)
-            Statusline.render_debounce()
-        end)
+        require("witch-line.engine.request").update_ids(
+            ids,
+            DepGraphKind.Event,
+            false,
+            event_info)
     end)
 
     Timer.on_timer_trigger(function(ids)
-        require("witch-line.core.session").with_session(function(session)
-            require("witch-line.engine.update").update_comp_by_ids(ids, session, DepGraphKind.Timer)
-            Statusline.render_debounce()
-        end)
+        require("witch-line.engine.request").update_ids(
+            ids,
+            DepGraphKind.Timer,
+            false)
     end)
 
     if next(EmergencyIds) ~= nil then
-        require("witch-line.core.session").with_session(function(session)
-            require("witch-line.engine.update").update_comp_by_ids(EmergencyIds, session,
-                { DepGraphKind.Event, DepGraphKind.Timer })
-            Statusline.render_debounce()
-        end)
+        require("witch-line.engine.request").update_ids(
+            EmergencyIds,
+            DepGraphKind.Event,
+            false)
     end
 end
 

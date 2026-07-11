@@ -165,14 +165,19 @@ stub_vim_api()
 -- ====================================================================
 -- Fresh module helper
 -- ====================================================================
+local Request
+
 local MOCK_MODULES = {
     "witch-line.engine.init",
+    "witch-line.engine.request",
 }
 
 local function fresh_engine()
     reset_mocks()
     for _, name in ipairs(MOCK_MODULES) do package.loaded[name] = nil end
-    return require("witch-line.engine.init")
+    local eng = require("witch-line.engine.init")
+    Request = require("witch-line.engine.request")
+    return eng
 end
 
 local function run_setup(cfg)
@@ -331,7 +336,7 @@ do
 end
 
 -- ====================================================================
-print("=== request_update_comp_graph ===")
+print("=== Request.update_comp ===")
 
 do
     local eng = run_setup({ global = {
@@ -339,7 +344,7 @@ do
         update = function() return "base" end,
     }})
     local base_render = mock_calls.render
-    eng.request_update_comp_graph({ id = "wl.test.simple" }, true)
+    Request.update_comp({ id = "wl.test.simple" }, nil, true)
     a.eq(mock_calls.render, base_render + 1, "eager render")
 end
 
@@ -349,7 +354,7 @@ do
         update = function() return "base" end,
     }})
     local base_debounce = mock_calls.render_debounce
-    eng.request_update_comp_graph({ id = "wl.test.simple" }, false)
+    Request.update_comp({ id = "wl.test.simple" }, nil, false)
     a.eq(mock_calls.render_debounce, base_debounce + 1, "debounce render")
 end
 

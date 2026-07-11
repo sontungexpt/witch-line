@@ -1,8 +1,5 @@
 local vim = vim
-local uv, api, bo, schedule, system, list_contains = vim.uv or vim.loop, vim.api, vim.bo, vim.schedule, vim.system,
-    vim.list_contains
-local engine = require("witch-line.engine")
-
+local uv, api, bo = vim.uv or vim.loop, vim.api, vim.bo
 local colors = require("witch-line.constant.color")
 
 local function get_root_by_git(dir_path)
@@ -34,8 +31,6 @@ local function get_root_by_git(dir_path)
     end
     return nil
 end
-
-
 
 local DISABLED_FILETYPES = {
     "NvimTree",
@@ -76,7 +71,7 @@ local Branch = {
         local watcher, watcher_opts = nil, nil
         local on_head_change = vim.schedule_wrap(function()
             refresh_branch()
-            engine.request_update_comp_graph(self)
+            require("witch-line.engine.request").update_comp(self)
         end)
 
         local function update_repo(new_dir_path)
@@ -101,7 +96,7 @@ local Branch = {
 
         api.nvim_create_autocmd("BufEnter", {
             callback = function(e)
-                if list_contains(self.config.disabled_filetypes, bo[e.buf].filetype) then
+                if vim.list_contains(self.config.disabled_filetypes, bo[e.buf].filetype) then
                     return
                 end
                 local file = e.file:gsub("\\", "/")
@@ -151,37 +146,37 @@ Diff.Interface = {
         disabled_filetypes = DISABLED_FILETYPES,
     },
     init = function(self)
-        self.___processes = self.___processes or {}
-        self.___diff_cache = self.___diff_cache or {}
+        self._processes = self._processes or {}
+        self._diff_cache = self._diff_cache or {}
 
-        local function kill_process(bufnr)
-            local proc = self.___processes[bufnr]
+        local kill_process = function(bufnr)
+            local proc = self._processes[bufnr]
             if proc and not proc:is_closing() then
                 proc:kill(15)
             end
-            self.___processes[bufnr] = nil
-            self.___diff_cache[bufnr] = nil
+            self._processes[bufnr] = nil
+            self._diff_cache[bufnr] = nil
         end
 
-        local function spawn_diff(bufnr, parent_dir, filename)
-            if self.___processes[bufnr] then return end
-            self.___processes[bufnr] = system({
+        local spawn_diff = function(bufnr, parent_dir, filename)
+            if self._processes[bufnr] then return end
+            self._processes[bufnr] = vim.system({
                 "git", "-C", parent_dir, "diff",
                 "--no-color", "--no-ext-diff", "-U0", "--", filename,
             }, { text = true }, function(out)
-                self.___processes[bufnr] = nil
+                self._processes[bufnr] = nil
                 if out.code == 15 then return end
-                schedule(function()
+                vim.schedule(function()
                     if not api.nvim_buf_is_valid(bufnr) then return end
                     if out.stdout and #out.stdout > 0 then
-                        self.___diff_cache[bufnr] = process_diff(out.stdout)
+                        self._diff_cache[bufnr] = process_diff(out.stdout)
                     end
-                    engine.request_update_comp_graph(self)
+                    require("witch-line.engine.request").update_comp(self)
                 end)
             end)
         end
 
-        api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufReadPost", "BufEnter", "FileChangedShellPost" }, {
+        api.nvim_create_autocmd({ "BufDelete", "BufWritePost", "BufEnter", "FileChangedShellPost" }, {
             callback = function(e)
                 local event, bufnr = e.event, e.buf
 
@@ -193,23 +188,24 @@ Diff.Interface = {
                 local file = e.file
                 if not file then return end
 
-                if not list_contains(self.config.disabled_filetypes, bo[bufnr].filetype)
-                    and not self.___diff_cache[bufnr] then
+                if not vim.list_contains(self.config.disabled_filetypes, bo[bufnr].filetype)
+                    and not self._diff_cache[bufnr]
+                then
                     local parent_dir, filename = file:match("^(.*)[/\\]([^/\\]+)$")
                     if parent_dir then
                         spawn_diff(bufnr, parent_dir, filename)
                     end
                 else
-                    engine.request_update_comp_graph(self)
+                    require("witch-line.engine.request").update_comp(self)
                 end
             end,
         })
     end,
     hidden = function(self, _)
-        return list_contains(self.config.disabled_filetypes, bo.filetype)
+        return vim.list_contains(self.config.disabled_filetypes, bo.filetype)
     end,
     context = function(self, _)
-        return { diff = self.___diff_cache[api.nvim_get_current_buf()] }
+        return { diff = self._diff_cache[api.nvim_get_current_buf()] }
     end,
 }
 
@@ -225,21 +221,24 @@ local function diff_update(self, session, field)
     return ""
 end
 
+local DIFF_SHARED_REF = {
+    events = "wl.git.diff.interface",
+    context = "wl.git.diff.interface",
+    hidden = "wl.git.diff.interface",
+}
+
 --- @type DefaultComponent
 Diff.Added = {
     id = "wl.git.diff.added",
     ___builtin = true,
     config = {
-        disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
-    ref = {
-        events = "wl.git.diff.interface",
-        context = "wl.git.diff.interface",
-        hidden = "wl.git.diff.interface",
-    },
+    ref = DIFF_SHARED_REF,
     style = { fg = colors.green },
-    update = function(self, session) return diff_update(self, session, "added") end,
+    update = function(self, session)
+        return diff_update(self, session, "added")
+    end,
 }
 
 ---@type DefaultComponent
@@ -247,16 +246,13 @@ Diff.Modified = {
     id = "wl.git.diff.modified",
     ___builtin = true,
     config = {
-        disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
-    ref = {
-        events = "wl.git.diff.interface",
-        context = "wl.git.diff.interface",
-        hidden = "wl.git.diff.interface",
-    },
+    ref = DIFF_SHARED_REF,
     style = { fg = colors.cyan },
-    update = function(self, session) return diff_update(self, session, "modified") end,
+    update = function(self, session)
+        return diff_update(self, session, "modified")
+    end,
 }
 
 ---@type DefaultComponent
@@ -264,16 +260,13 @@ Diff.Removed = {
     id = "wl.git.diff.removed",
     ___builtin = true,
     config = {
-        disabled_filetypes = DISABLED_FILETYPES,
         icon = "",
     },
-    ref = {
-        events = "wl.git.diff.interface",
-        context = "wl.git.diff.interface",
-        hidden = "wl.git.diff.interface",
-    },
+    ref = DIFF_SHARED_REF,
     style = { fg = colors.red },
-    update = function(self, session) return diff_update(self, session, "removed") end,
+    update = function(self, session)
+        return diff_update(self, session, "removed")
+    end,
 }
 
 return {

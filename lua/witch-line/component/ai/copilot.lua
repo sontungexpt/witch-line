@@ -5,8 +5,8 @@ local is_enabled
 local uv = vim.uv or vim.loop
 
 local request_update = function(comp, eager)
-    local eng = package.loaded["witch-line.engine"]
-    if eng then eng.request_update_comp_graph(comp, eager) end
+    local Request = package.loaded["witch-line.engine.request"]
+    if Request then Request.update_comp(comp, nil, eager) end
 end
 
 local Copilot = {

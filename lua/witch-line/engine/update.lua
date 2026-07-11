@@ -394,23 +394,6 @@ update_comp_by_ids = function(ids, session, dep_graph_kind, seen)
     end
 end
 
---- Update a component and its deps in a new session, then debounce render.
----@param comp ManagedComponent The component to update.
----@param eager? boolean Whether to render immediately instead of debouncing.
----@param dep_graph_kind? DepGraphKind|DepGraphKind[] The kind(s) of dependency graph to update.
----@param seen? table<CompId, true> A cache of seen components to avoid infinite recursion.
-M.request_update_comp_graph = function(comp, eager, dep_graph_kind, seen)
-    require("witch-line.core.session").with_session(function(session)
-        update_comp(comp, session,
-            dep_graph_kind or { DepGraphKind.Event, DepGraphKind.Timer }, seen)
-        if eager then
-            Statusline.render()
-        else
-            Statusline.render_debounce()
-        end
-    end)
-end
-
 M.update_comp = update_comp
 M.update_comp_by_ids = update_comp_by_ids
 M.hide_component = hide_single_comp

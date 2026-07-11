@@ -1,5 +1,5 @@
 --- Tests for witch-line.engine.init
---- Tests only the public API: M.setup and M.request_update_comp_graph.
+--- Tests only the public API: M.setup and Request.update_comp.
 --- Internal functions (load_component, mount_component_tree, etc.) are
 --- verified indirectly through side effects on mocked dependencies.
 ---
@@ -184,11 +184,13 @@ stub_vim_api()
 -- ====================================================================
 -- Helper: fresh module + fresh mocks per sub-test
 -- ====================================================================
+local Request
 --- Only the module under test needs re-loading. Mocks are set via
 --- package.loaded (not preload) and reference mock_calls/registered
 --- which are cleared in-place by reset_mocks().
 local MOCK_MODULES = {
     "witch-line.engine.init",
+    "witch-line.engine.request",
 }
 
 local function fresh_engine()
@@ -198,6 +200,7 @@ local function fresh_engine()
     end
     local ok, eng = pcall(require, "witch-line.engine.init")
     if not ok then error("reload failed: " .. tostring(eng)) end
+    Request = require("witch-line.engine.request")
     return eng
 end
 
@@ -444,7 +447,7 @@ do
 end
 
 -- ---------------------------------------------------------------
-print("=== M.request_update_comp_graph ===")
+print("=== Request.update_comp ===")
 
 do
     local eng = run_setup({
@@ -457,9 +460,9 @@ do
 
     local base_render = mock_calls.render
 
-    eng.request_update_comp_graph(
+    Request.update_comp(
         { id = "wl.test.simple" },
-        true
+        nil, true
     )
 
     eq(mock_calls.render, base_render + 1, "eager render incremented")
@@ -476,9 +479,9 @@ do
 
     local base_debounce = mock_calls.render_debounce
 
-    eng.request_update_comp_graph(
+    Request.update_comp(
         { id = "wl.test.simple" },
-        false
+        nil, false
     )
 
     eq(mock_calls.render_debounce, base_debounce + 1, "debounce render incremented")
