@@ -1,5 +1,5 @@
 --- Unit tests for witch-line.core.comp.proxy
---- Covers: bind, field access, function memoization, ref resolution, newindex.
+--- Covers: bind, field access, function memoization, delegator resolution, newindex.
 
 local a = require("tests.helpers.assert")
 local Session = require("witch-line.core.session")
@@ -123,7 +123,7 @@ do
 end
 
 -- ============================================================
-print("=== proxy: function with ref chain ===")
+print("=== proxy: function with delegator chain ===")
 reset()
 
 do
@@ -131,14 +131,14 @@ do
     target.get_color = function(self) return "#target_color" end
     ManagedComps["target"] = target
 
-    local comp = { id = "c1", ref = { get_color = "target" } }
+    local comp = { id = "c1", delegator = { get_color = "target" } }
     ManagedComps["c1"] = comp
 
     local session = Session.new()
     local proxy = Proxy.bind(comp, session)
-    -- Accessing a ref-resolved function should work
+    -- Accessing a delegator-resolved function should work
     local fn = proxy.get_color
-    a.is_type(fn, "function", "ref function wrapped")
+    a.is_type(fn, "function", "delegator function wrapped")
     session:destroy()
 end
 

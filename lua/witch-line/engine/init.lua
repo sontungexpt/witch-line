@@ -96,24 +96,24 @@ load_component = function(comp, container_id)
         end
     end
 
-    if type(comp.setup) == "function" then
-        comp.setup(comp)
+    if type(comp.constructor) == "function" then
+        comp.constructor(comp)
     end
 
     local cid = resolve_comp_id(comp)
 
     --- Handle dependencies links
-    local ref = comp.ref
-    if type(ref) == "table" then
-        local ref_events, ref_timming, ref_hidden = ref.events, ref.timing, ref.hidden
-        if ref_events then
-            register_dependency_links(DepGraphKind.Event, ref_events, cid)
+    local delegator = comp.delegator
+    if type(delegator) == "table" then
+        local delegator_events, delegator_timming, delegator_hidden = delegator.events, delegator.timing, delegator.hidden
+        if delegator_events then
+            register_dependency_links(DepGraphKind.Event, delegator_events, cid)
         end
-        if ref_timming then
-            register_dependency_links(DepGraphKind.Timer, ref_timming, cid)
+        if delegator_timming then
+            register_dependency_links(DepGraphKind.Timer, delegator_timming, cid)
         end
-        if ref_hidden then
-            register_dependency_links(DepGraphKind.Visible, ref_hidden, cid)
+        if delegator_hidden then
+            register_dependency_links(DepGraphKind.Visible, delegator_hidden, cid)
         end
     end
 

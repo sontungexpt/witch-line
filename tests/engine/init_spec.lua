@@ -291,7 +291,7 @@ do
 end
 
 -- ---------------------------------------------------------------
-print("=== M.setup: dependency links via ref ===")
+print("=== M.setup: dependency links via delegator ===")
 
 do
     local eng = run_setup({
@@ -299,7 +299,7 @@ do
             id = "wl.test.simple",
             ___builtin = true,
             update = function() return "dep" end,
-            ref = { events = "wl.test.parent" },
+            delegator = { events = "wl.test.parent" },
         },
     })
 
@@ -318,7 +318,7 @@ do
             id = "wl.test.simple",
             ___builtin = true,
             update = function() return "multi" end,
-            ref = { events = { "wl.test.parent", "wl.test.simple" } },
+            delegator = { events = { "wl.test.parent", "wl.test.simple" } },
         },
     })
 
@@ -742,7 +742,7 @@ do
         global = {
             [0] = "wl.test.simple",
             id = "my.dep",
-            ref = { events = "wl.test.parent" },
+            delegator = { events = "wl.test.parent" },
         },
     })
 
@@ -782,13 +782,13 @@ do
 end
 
 -- ---------------------------------------------------------------
-print("=== M.setup: override comp[0] setup called ===")
+print("=== M.setup: override comp[0] constructor called ===")
 
 do
-    local setup_called = false
+    local constructor_called = false
     COMPONENT_DEFS["wl.test.installable"] = {
         id = "wl.test.installable", ___builtin = true,
-        setup = function(self) setup_called = true end,
+        constructor = function(self) constructor_called = true end,
         update = function() return "inst" end,
     }
 
@@ -800,7 +800,7 @@ do
         },
     })
 
-    is_true(setup_called, "setup function called on override comp")
+    is_true(constructor_called, "constructor function called on override comp")
 
     COMPONENT_DEFS["wl.test.installable"] = nil
 end

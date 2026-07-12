@@ -93,26 +93,26 @@ end
 do
     local target = { id = "bench.target", style = { fg = "#aaa" } }
     ManagedComps["bench.target"] = target
-    local comp = { id = "bench.ref1", ref = { style = "bench.target" } }
+    local comp = { id = "bench.ref1", delegator = { style = "bench.target" } }
     ManagedComps["bench.ref1"] = comp
-    local avg = bench("Resolver: 1-level ref chain", N, function()
+    local avg = bench("Resolver: 1-level delegator chain", N, function()
         Resolver.resolve_plain_field(comp, "style")
     end)
-    print(string.format("  %-40s %10s  (%d iters)", "1-level ref chain", fmt_ns(avg), N))
+    print(string.format("  %-40s %10s  (%d iters)", "1-level delegator chain", fmt_ns(avg), N))
 end
 
 do
-    -- 4-level ref chain
+    -- 4-level delegator chain
     local leaf = { id = "bench.leaf", style = { fg = "#leaf" } }
-    local d3 = { id = "bench.d3", ref = { style = "bench.leaf" } }
-    local d2 = { id = "bench.d2", ref = { style = "bench.d3" } }
-    local d1 = { id = "bench.d1", ref = { style = "bench.d2" } }
-    local root = { id = "bench.root", ref = { style = "bench.d1" } }
+    local d3 = { id = "bench.d3", delegator = { style = "bench.leaf" } }
+    local d2 = { id = "bench.d2", delegator = { style = "bench.d3" } }
+    local d1 = { id = "bench.d1", delegator = { style = "bench.d2" } }
+    local root = { id = "bench.root", delegator = { style = "bench.d1" } }
     for _, c in ipairs({ leaf, d3, d2, d1, root }) do ManagedComps[c.id] = c end
-    local avg = bench("Resolver: 4-level ref chain", N, function()
+    local avg = bench("Resolver: 4-level delegator chain", N, function()
         Resolver.resolve_plain_field(root, "style")
     end)
-    print(string.format("  %-40s %10s  (%d iters)", "4-level ref chain", fmt_ns(avg), N))
+    print(string.format("  %-40s %10s  (%d iters)", "4-level delegator chain", fmt_ns(avg), N))
 end
 
 do

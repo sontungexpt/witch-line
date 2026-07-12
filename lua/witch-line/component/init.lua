@@ -38,6 +38,9 @@ local require = require
 ---
 --- | "wl.search.count"
 --- | "wl.selection.count"
+---
+--- | "wl.spell"
+--- | "wl.macro.recording"
 
 --- @type table<DefaultId, fun(): DefaultComponent, any>
 local Loaders = {
@@ -78,6 +81,9 @@ local Loaders = {
 
     ["wl.search.count"]         = function() return require("witch-line.component.search").count end,
     ["wl.selection.count"]      = function() return require("witch-line.component.selection").count end,
+
+    ["wl.spell"]                = function() return require("witch-line.component.spell") end,
+    ["wl.macro.recording"]      = function() return require("witch-line.component.macro") end,
 }
 
 --- @type table<DefaultId, DefaultComponent>

@@ -234,7 +234,7 @@ Diff.Added = {
     config = {
         icon = "",
     },
-    ref = DIFF_SHARED_REF,
+    delegator = DIFF_SHARED_REF,
     style = { fg = colors.green },
     update = function(self, session)
         return diff_update(self, session, "added")
@@ -248,7 +248,7 @@ Diff.Modified = {
     config = {
         icon = "",
     },
-    ref = DIFF_SHARED_REF,
+    delegator = DIFF_SHARED_REF,
     style = { fg = colors.cyan },
     update = function(self, session)
         return diff_update(self, session, "modified")
@@ -262,7 +262,7 @@ Diff.Removed = {
     config = {
         icon = "",
     },
-    ref = DIFF_SHARED_REF,
+    delegator = DIFF_SHARED_REF,
     style = { fg = colors.red },
     update = function(self, session)
         return diff_update(self, session, "removed")

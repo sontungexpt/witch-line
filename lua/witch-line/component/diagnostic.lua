@@ -16,17 +16,18 @@ local get_config_signs_icon = function()
     return {}
 end
 
-local hidden = function(self, session)
+local hidden = function()
     return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 end
 
 local update_value = function(self, severity, session)
-    if hidden(self, session) then
+    local cache = session:cache()
+    if cache:memo(hidden) then
         return ""
     end
 
-    local cache = session:cache()
     local config = self.config
+    --- @cast config {icon: string}
     local icon = config.icon or cache:memo(get_config_signs_icon)[severity] or ""
     local count = cache:memo(get_diag_count)[severity] or 0
     return count > 0 and (icon ~= "" and icon .. " " or "") .. count or ""

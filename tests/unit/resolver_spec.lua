@@ -1,5 +1,5 @@
 --- Unit tests for witch-line.core.resolver
---- Covers: resolve_plain_field, resolve_field_owner, ref chains, caching, cycles.
+--- Covers: resolve_plain_field, resolve_field_owner, delegator chains, caching, cycles.
 
 local a = require("tests.helpers.assert")
 
@@ -53,39 +53,39 @@ do
 end
 
 -- ============================================================
-print("=== resolve_plain_field: ref chain ===")
+print("=== resolve_plain_field: delegator chain ===")
 reset()
 
 do
     local target = { id = "target", style = { fg = "#aaa" } }
     ManagedComps["target"] = target
-    local comp = { id = "c1", ref = { style = "target" } }
+    local comp = { id = "c1", delegator = { style = "target" } }
     ManagedComps["c1"] = comp
     local val, owner = Resolver.resolve_plain_field(comp, "style")
-    a.eq(val.fg, "#aaa", "ref chain resolved")
+    a.eq(val.fg, "#aaa", "delegator chain resolved")
     a.eq(owner.id, "target", "owner is target")
 end
 
 -- ============================================================
-print("=== resolve_plain_field: ref chain missing target ===")
+print("=== resolve_plain_field: delegator chain missing target ===")
 reset()
 
 do
-    local comp = { id = "c1", ref = { style = "nonexistent" } }
+    local comp = { id = "c1", delegator = { style = "nonexistent" } }
     ManagedComps["c1"] = comp
     local val, owner = Resolver.resolve_plain_field(comp, "style")
-    a.is_nil(val, "missing ref target => nil")
+    a.is_nil(val, "missing delegator target => nil")
     a.is_nil(owner)
 end
 
 -- ============================================================
-print("=== resolve_plain_field: local field takes precedence over ref ===")
+print("=== resolve_plain_field: local field takes precedence over delegator ===")
 reset()
 
 do
     local target = { id = "target", style = { fg = "#aaa" } }
     ManagedComps["target"] = target
-    local comp = { id = "c1", style = { fg = "#bbb" }, ref = { style = "target" } }
+    local comp = { id = "c1", style = { fg = "#bbb" }, delegator = { style = "target" } }
     ManagedComps["c1"] = comp
     local val, owner = Resolver.resolve_plain_field(comp, "style")
     a.eq(val.fg, "#bbb", "local field wins")
@@ -127,16 +127,16 @@ do
 end
 
 -- ============================================================
-print("=== resolve_field_owner: follows ref ===")
+print("=== resolve_field_owner: follows delegator ===")
 reset()
 
 do
     local target = { id = "target", style = { fg = "#aaa" } }
     ManagedComps["target"] = target
-    local comp = { id = "c1", ref = { style = "target" } }
+    local comp = { id = "c1", delegator = { style = "target" } }
     ManagedComps["c1"] = comp
     local owner = Resolver.resolve_field_owner(comp, "style")
-    a.eq(owner.id, "target", "owner is ref target")
+    a.eq(owner.id, "target", "owner is delegator target")
 end
 
 -- ============================================================
@@ -144,8 +144,8 @@ print("=== resolve_plain_field: cycle detection ===")
 reset()
 
 do
-    local a_comp = { id = "a", ref = { style = "b" } }
-    local b_comp = { id = "b", ref = { style = "a" } }
+    local a_comp = { id = "a", delegator = { style = "b" } }
+    local b_comp = { id = "b", delegator = { style = "a" } }
     ManagedComps["a"] = a_comp
     ManagedComps["b"] = b_comp
     local val = Resolver.resolve_plain_field(a_comp, "style")
@@ -166,18 +166,18 @@ do
 end
 
 -- ============================================================
-print("=== resolve_plain_field: ref chain depth 2 ===")
+print("=== resolve_plain_field: delegator chain depth 2 ===")
 reset()
 
 do
     local leaf = { id = "leaf", style = { fg = "#leaf" } }
-    local mid = { id = "mid", ref = { style = "leaf" } }
-    local root = { id = "root", ref = { style = "mid" } }
+    local mid = { id = "mid", delegator = { style = "leaf" } }
+    local root = { id = "root", delegator = { style = "mid" } }
     ManagedComps["leaf"] = leaf
     ManagedComps["mid"] = mid
     ManagedComps["root"] = root
     local val, owner = Resolver.resolve_plain_field(root, "style")
-    a.eq(val.fg, "#leaf", "deep ref chain resolved")
+    a.eq(val.fg, "#leaf", "deep delegator chain resolved")
     a.eq(owner.id, "leaf", "owner is the leaf")
 end
 

@@ -8,3 +8,5 @@ lualine                           5.277ms
 lualine                           5.145ms
 lualine                           5.145ms
 lualine                           5.431ms
+witch-line            mean=  1.821 ms  median=  1.809 ms  sd=  0.145 ms  min=  1.542 ms  max=  2.108 ms  (n=30)
+lualine               mean=  8.985 ms  median=  9.396 ms  sd=  1.096 ms  min=  6.740 ms  max= 11.285 ms  (n=30)

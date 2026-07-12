@@ -225,13 +225,13 @@ do
 end
 
 -- ====================================================================
-print("=== Setup: dependency links via ref ===")
+print("=== Setup: dependency links via delegator ===")
 
 do
     run_setup({ global = {
         id = "wl.test.simple", ___builtin = true,
         update = function() return "dep" end,
-        ref = { events = "wl.test.parent" },
+        delegator = { events = "wl.test.parent" },
     }})
     local found = false
     for _, ld in ipairs(mock_calls.link_dependency) do

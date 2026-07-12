@@ -20,7 +20,7 @@ local Registry = require("witch-line.core.registry")
 local Resolver = require("witch-line.core.resolver")
 ```
 
-- `Resolver.resolve_plain_field(comp, key)` — Read a value through the ref chain. Returns `value, owner` or `nil, nil`.
+- `Resolver.resolve_plain_field(comp, key)` — Read a value through the delegator chain. Returns `value, owner` or `nil, nil`.
 - `Resolver.resolve_field_owner(comp, key)` — Return only the owner component of a resolved field.
 
 ### Statusline (`witch-line.engine.statusline`)

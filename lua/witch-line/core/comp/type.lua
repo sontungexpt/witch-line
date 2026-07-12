@@ -61,7 +61,7 @@
 ---
 --- Called once when the component is created.
 --- Use this to configure or modify the component before initialization.
----@field setup? fun(comp: Component)
+---@field constructor? fun(comp: Component)
 ---
 --- User-configurable values.
 --- @field config? table
@@ -90,7 +90,7 @@
 --- @field events? string|string[]
 ---
 --- A table of references to other components that this component depends on
---- @field ref? Reference
+--- @field delegator? Reference
 ---
 --- Style for the left separator.
 --- - string: highlight group name.

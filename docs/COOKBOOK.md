@@ -51,11 +51,11 @@ local battery = {
   static = {
     icon_ok = "🔋",
     icon_low = "🪫",
-    icon Charging = "⚡",
+    icon_charging = "⚡",
     threshold = 20,
   },
   update = function(self, session)
-    local level = get_battery_level()        -- your own function
+    local level = get_battery_level()
     local icon = level <= self.static.threshold
         and self.static.icon_low
         or self.static.icon_ok
@@ -120,9 +120,14 @@ local mode = {
 }
 ```
 
-This component re-renders every time the mode changes. Without `events`, it would only update when something else triggers a full statusline render.
-
 **Event syntax** (same as `:autocmd`):
+
+| Syntax | Meaning |
+|---|---|
+| `"EventName"` | Fire on every occurrence. |
+| `"EventName pattern"` | Only when the buffer matches the pattern. |
+| `"EventName pattern ++once"` | Fire once, then auto-remove (`++once` must be last). |
+| `"User Name"` | User event (name passed as pattern to `nvim_create_autocmd`). |
 
 ```lua
 events = "BufEnter"                         -- fire on BufEnter
@@ -133,12 +138,24 @@ events = "User VeryLazy"                    -- user event
 events = "User LazyLoad ++once"             -- user event, once
 ```
 
-| Syntax | Meaning |
-|---|---|
-| `"EventName"` | Fire on every occurrence. |
-| `"EventName pattern"` | Only when the buffer matches the pattern. |
-| `"EventName pattern ++once"` | Fire once, then auto-remove (`++once` must be last). |
-| `"User Name"` | User event (name passed as pattern to `nvim_create_autocmd`). |
+### Accessing event data
+
+When a component triggers on an `event`, the raw autocmd data is available on the session:
+
+```lua
+local comp = {
+  id = "my.autocmd_info",
+  events = "BufEnter",
+  update = function(self, session)
+    local event_info = session:get("EventInfo")
+    if event_info then
+      local my_data = event_info[self.id]   -- per-component event data
+      return my_data and my_data.file or ""
+    end
+    return ""
+  end,
+}
+```
 
 ### `timing` — periodic updates
 
@@ -170,31 +187,23 @@ Set a `style` table to give your component a consistent look:
 local comp = {
   id = "my.status",
   style = { fg = "#ffffff", bg = "#333333", bold = true },
-  update = function(self, session)
-    return "OK"
-  end,
+  update = function(self, session) return "OK" end,
 }
 ```
 
-Available highlight fields: `fg`, `bg`, `bold`, `italic`, `underline`, ` strikethrough`, `sp` (special color), `reverse`. All are optional.
+Available highlight fields: `fg`, `bg`, `bold`, `italic`, `underline`, `strikethrough`, `sp` (special color), `reverse`. All are optional.
 
 ### Dynamic style
 
 Use a function to change style based on state:
 
 ```lua
-local comp = {
-  id = "my.modified",
-  style = function(self, session)
-    if vim.bo.modified then
-      return { fg = "#ffff00", bold = true }   -- yellow when modified
-    end
-    return { fg = "#888888" }                    -- grey otherwise
-  end,
-  update = function(self, session)
-    return vim.bo.modified and "[+]" or ""
-  end,
-}
+style = function(self, session)
+  if vim.bo.modified then
+    return { fg = "#ffff00", bold = true }
+  end
+  return { fg = "#888888" }
+end
 ```
 
 Return `nil` to use no highlight (default terminal colors).
@@ -251,7 +260,7 @@ left_style = { fg = "#ffffff", bg = "#333333" }  -- explicit
 
 ```lua
 hidden = function(self, session)
-  return vim.bo.buftype == "nofile"   -- hide in special buffers
+  return vim.bo.buftype == "nofile"
 end
 ```
 
@@ -275,19 +284,33 @@ A component with `flexible = 3` is hidden before `flexible = 2`, which is hidden
 
 ## Lifecycle
 
-### `init` — one-time setup
+### `constructor` — one-time creation
 
-Called once when the component is first loaded. Use it to set up autocmds, timers, or initialize state. There is no `session` argument.
+Called once when the component is first created (during load). Use this for setup that doesn't need a session:
+
+```lua
+local comp = {
+  id = "my.watcher",
+  constructor = function(self)
+    self.my_state = { count = 0 }
+  end,
+  update = function(self, session)
+    return "saves: " .. self.my_state.count
+  end,
+}
+```
+
+### `init` — one-time initialization
+
+Called once when the component is first mounted. Use this to set up autocmds, timers, or request initial renders:
 
 ```lua
 local comp = {
   id = "my.watcher",
   init = function(self)
-    self.my_state = { count = 0 }
     vim.api.nvim_create_autocmd("BufWritePost", {
       callback = function()
         self.my_state.count = self.my_state.count + 1
-        -- Request a re-render of this component:
         local Request = require("witch-line.engine.request")
         Request.update_comp(self)
       end,
@@ -318,7 +341,8 @@ end
 ### Full render cycle order
 
 ```
-init                    (once, at load)
+constructor              (once, at load)
+init                     (once, at mount)
   → pre_update
   → hidden              (if true → component disappears)
   → update              (returns text + optional inline style)
@@ -363,9 +387,11 @@ You can also pass a table `{ name = "global_handler_name", callback = function .
 
 ## Reusing Components
 
-### `ref` — live delegation
+There are several ways to share data between components. Pick the right mechanism for your use case.
 
-`ref` lets one component read another component's field values without copying. When the referenced component updates, the referring component sees the new value.
+### `delegator` — live field delegation
+
+`delegator` lets one component read another component's field values without copying. When the referenced component updates, the referring component sees the new value.
 
 ```lua
 -- Provider: computes shared data
@@ -383,7 +409,7 @@ local stats = {
 -- Consumer: displays the data
 local line_info = {
   id = "my.line_info",
-  ref = { context = "my.stats" },    -- delegate context to stats
+  delegator = { context = "my.stats" },
   update = function(self, session)
     local ctx = self:with_session(session).context(self, session)
     return ctx.current_line .. "/" .. ctx.total_lines
@@ -391,9 +417,9 @@ local line_info = {
 }
 ```
 
-**Why `self:with_session(session)`?** Without it, `self.context` on the consumer would give you the raw `ref` value (the string `"my.stats"`), not the resolved context table. `with_session` follows the ref chain and returns the actual value.
+**Why `self:with_session(session)`?** Without it, `self.context` on the consumer would give you the raw `delegator` value (the string `"my.stats"`), not the resolved context table. `with_session` follows the delegator chain and returns the actual value.
 
-**What ref keys create automatic update propagation?**
+**What delegator keys create automatic update propagation?**
 
 | Ref Key | Propagation Type | When the parent updates, the child... |
 |---|---|---|
@@ -402,12 +428,12 @@ local line_info = {
 | `hidden` | Visibility dependency | Re-checks visibility. |
 | `config`, `context`, `style`, etc. | None (passive) | Does NOT automatically re-render. Read via `with_session` when the child renders. |
 
-If you need a child to re-render when a parent's `context` changes, also ref the parent's `events`:
+If you need a child to re-render when a parent's `context` changes, also delegate the parent's `events`:
 
 ```lua
 local child = {
   id = "my.child",
-  ref = {
+  delegator = {
     context = "my.provider",
     events = "my.provider",           -- re-render when provider's events fire
   },
@@ -439,20 +465,20 @@ local child = {
 
 Child values override parent values. Parent functions run with `self = child`.
 
-### `ref` vs `inherit`
+### `delegator` vs `inherit`
 
-| | `ref` | `inherit` |
+| | `delegator` | `inherit` |
 |---|---|---|
 | **Mechanism** | Live read-through delegation | Copy on mount |
 | **Updates propagate?** | Yes (for dependency keys) | No |
 | **Coupling** | Loose (child reads parent at render time) | Tight (fields are copied) |
 | **Use when** | Sharing live events, styles, context | Creating variants of a base component |
 
-**Rule of thumb:** Start with `ref`. Use `inherit` only when you need to copy and override a base definition.
+**Rule of thumb:** Start with `delegator`. Use `inherit` only when you need to copy and override a base definition.
 
 ### `abstract` — provider without rendering
 
-A component with `abstract = true` never renders. It exists only to provide data to other components via `ref`:
+A component with `abstract = true` never renders. It exists only to provide data to other components via `delegator`:
 
 ```lua
 local file_info = {
@@ -470,7 +496,7 @@ local file_info = {
 
 local file_display = {
   id = "my.file_display",
-  ref = {
+  delegator = {
     context = "my.file_info",
     events = "my.file_info",
   },
@@ -502,26 +528,48 @@ Children inside a parent table inherit the parent's fields automatically:
 
 Both children inherit `style` from the parent. Each child is rendered as a separate statusline segment.
 
----
+### Sharing at runtime with `session:cache():memo()`
 
-## Accessing Event Data
-
-When a component triggers on an `event`, the raw autocmd data is available on the session:
+For expensive computations that multiple components need during the same render, use `session:cache():memo()`:
 
 ```lua
-local comp = {
-  id = "my.autocmd_info",
-  events = "BufEnter",
+-- Helper function (shared across components)
+local get_diag_count = function()
+  return vim.diagnostic.count(0)
+end
+
+-- Component A
+local error_count = {
+  id = "my.diag.error",
   update = function(self, session)
-    local event_info = session:get("EventInfo")
-    if event_info then
-      local my_data = event_info[self.id]   -- per-component event data
-      return my_data and my_data.file or ""
-    end
-    return ""
+    local cache = session:cache()
+    local count = cache:memo(get_diag_count)[1] or 0
+    return count > 0 and "E:" .. count or ""
+  end,
+}
+
+-- Component B (same cache hit)
+local warn_count = {
+  id = "my.diag.warn",
+  update = function(self, session)
+    local cache = session:cache()
+    local count = cache:memo(get_diag_count)[2] or 0
+    return count > 0 and "W:" .. count or ""
   end,
 }
 ```
+
+`get_diag_count` is called once; both components read from the same cached result. The cache lives for the duration of the current render cycle.
+
+### Which sharing mechanism to use?
+
+| | `delegator` | `inherit` | `session:cache():memo()` |
+|---|---|---|---|
+| **Shares** | Field values | Field values (copied) | Computed runtime values |
+| **When** | Field resolution time | Mount time | Inside `update` |
+| **Lifetime** | Permanent | Permanent | Per-render cycle |
+| **Propagation** | Yes (for events/timing/hidden) | No | N/A |
+| **Use when** | Multiple components need the same live fields | Creating variants of a base | Multiple components call the same expensive function |
 
 ---
 
@@ -536,8 +584,6 @@ local comp = {
   update = function(self, session)
     local scope = session:cache("my.heavy")
     local result = scope:memo(function()
-      -- This only runs once per render cycle,
-      -- no matter how many times update is called.
       return expensive_calculation()
     end)
     return tostring(result)
@@ -546,6 +592,8 @@ local comp = {
 ```
 
 `scope:memo(fn, ...)` caches by function reference. The same function always returns the cached result within the same scope, regardless of arguments. Use different functions or scopes to cache different values.
+
+See also: [Sharing at runtime with `session:cache():memo()`](#sharing-at-runtime-with-sessioncachememo) for cross-component caching patterns.
 
 ---
 
@@ -570,6 +618,95 @@ require("witch-line").setup({
 ```
 
 **Overrideable fields:** `padding`, `config`, `timing`, `lazy`, `style`, `left_style`, `right_style`, `left`, `right`, `flexible`, `theme_aware`.
+
+---
+
+## Built-in Components
+
+All built-in components are available by their `wl.*` ID string. Add them directly to your statusline config:
+
+```lua
+require("witch-line").setup({
+  statusline = {
+    global = {
+      "wl.mode", "wl.file.icon", "wl.file.name", "wl.file.modifier",
+      "%=",
+      "wl.git.branch", "wl.git.diff.added", "wl.git.diff.removed", "wl.git.diff.modified",
+      "wl.diagnostic.error", "wl.diagnostic.warn", "wl.diagnostic.info",
+      "wl.cursor.pos",
+    },
+  },
+})
+```
+
+### Mode
+
+| ID | Description |
+|---|---|
+| `wl.mode` | Current vim mode (NORMAL, INSERT, VISUAL, etc.) with per-mode colors. |
+
+### File
+
+| ID | Description |
+|---|---|
+| `wl.file.icon` | File type icon from nvim-web-devicons. |
+| `wl.file.name` | File basename. |
+| `wl.file.modifier` | Modified/readonly indicators (+, 🔒). |
+| `wl.file.size` | Human-readable file size. |
+
+### Git
+
+| ID | Description |
+|---|---|
+| `wl.git.branch` | Current branch name (reads `.git/HEAD` directly). |
+| `wl.git.diff.added` | Number of added lines. |
+| `wl.git.diff.removed` | Number of removed lines. |
+| `wl.git.diff.modified` | Number of modified lines. |
+
+### Diagnostics
+
+| ID | Description |
+|---|---|
+| `wl.diagnostic.error` | Error count. |
+| `wl.diagnostic.warn` | Warning count. |
+| `wl.diagnostic.info` | Info count. |
+| `wl.diagnostic.hint` | Hint count. |
+
+### Cursor
+
+| ID | Description |
+|---|---|
+| `wl.cursor.pos` | `line:col` position. |
+| `wl.cursor.progress` | Block-character progress through the file. |
+
+### Spell
+
+| ID | Description |
+|---|---|
+| `wl.spell` | Shows "SPELL" when spell checking is enabled. |
+
+### Macro Recording
+
+| ID | Description |
+|---|---|
+| `wl.macro.recording` | Shows the register name while recording a macro. |
+
+### Other
+
+| ID | Description |
+|---|---|
+| `wl.encoding` | File encoding (UTF-8, etc.). |
+| `wl.indent` | Shiftwidth value. |
+| `wl.lsp.clients` | Attached LSP client names. |
+| `wl.search.count` | `current/total` search matches. |
+| `wl.selection.count` | Visual selection character count. |
+| `wl.datetime` | Date/time with configurable format. |
+| `wl.battery` | Battery level with charging indicator. |
+| `wl.os_uname` | OS icon. |
+| `wl.nvim_dap` | DAP session status. |
+| `wl.copilot` | Copilot status with spinner. |
+| `wl.codeium` | Codeium status with spinner. |
+| `wl.codeium.neocodeium` | NeoCodeium status with spinner. |
 
 ---
 
@@ -620,6 +757,15 @@ vim.api.nvim_exec_autocmds("User", { data = { name = "MyPluginUpdate" } })
 }
 ```
 
+### Trigger re-render from external code
+
+```lua
+-- In your plugin's callback:
+local Request = require("witch-line.engine.request")
+Request.update_comp(comp)              -- single component
+Request.update_ids({ "my.a", "my.b" }) -- multiple components by ID
+```
+
 ---
 
 ## Field Summary
@@ -630,10 +776,9 @@ vim.api.nvim_exec_autocmds("User", { data = { name = "MyPluginUpdate" } })
 | `update` | `function(self, session)` | — | Returns display text (and optional inline style). Required. |
 | `static` | `table` | `nil` | Internal fixed data, not user-overridable. |
 | `config` | `table` | `nil` | User-overridable values. |
-| `context` | `table \| function(self, session)` | `nil` | Shared data consumed by other components via `ref`. |
+| `context` | `table \| function(self, session)` | `nil` | Shared data consumed by other components via `delegator`. |
 | `events` | `string \| string[]` | `nil` | Autocmd events that trigger re-render. |
 | `timing` | `boolean \| number` | `nil` | Timer interval in ms. `true` = 1000. |
-| `win_individual` | `boolean` | `false` | Re-render per window instead of globally. |
 | `style` | `table \| string \| function` | `nil` | Highlight: table, named group, or dynamic function. |
 | `padding` | `number \| table \| function` | `1` | Spaces around text. |
 | `left` / `right` | `string \| function` | `nil` | Separator characters. |
@@ -643,8 +788,9 @@ vim.api.nvim_exec_autocmds("User", { data = { name = "MyPluginUpdate" } })
 | `lazy` | `boolean` | `true` | `false` to update at startup before any events fire. |
 | `abstract` | `boolean` | `false` | Provider-only. Never rendered. |
 | `inherit` | `string` | `nil` | Parent ID to copy fields from. |
-| `ref` | `table` | `nil` | Live field delegation to another component. |
-| `init` | `function(self)` | `nil` | One-time setup. No `session`. |
+| `delegator` | `table` | `nil` | Live field delegation to another component. |
+| `constructor` | `function(self)` | `nil` | Called once when the component is created. No `session`. |
+| `init` | `function(self)` | `nil` | Called once when the component is first mounted. No `session`. |
 | `pre_update` | `function(self, session)` | `nil` | Before each render. |
 | `post_update` | `function(self, session)` | `nil` | After each render. |
 | `on_click` | `string \| function \| table` | `nil` | Click callback. |
@@ -653,52 +799,37 @@ vim.api.nvim_exec_autocmds("User", { data = { name = "MyPluginUpdate" } })
 
 ## API Reference
 
-### Request (`witch-line.engine.request`)
+### Request
 
 ```lua
 local Request = require("witch-line.engine.request")
 ```
 
-The Request module is the primary way to trigger re-renders from outside the standard event/timer cycle.
-
 - `Request.update_comp(comp, eager?, dep_graph_kind?, seen?)` — Re-render a single component. `eager = true` skips debounce.
 - `Request.update_ids(ids, dep_graph_kind?, eager?, event_info?)` — Re-render multiple components by ID.
 
-**Example — triggering from an autocmd:**
-
 ```lua
+-- Trigger from an autocmd:
 init = function(self)
   local Request = require("witch-line.engine.request")
   vim.api.nvim_create_autocmd("User MyPluginUpdate", {
     callback = function()
-      Request.update_comp(self, true)  -- eager = true, skip debounce
+      Request.update_comp(self, true)
     end,
   })
 end
 ```
 
-**Example — timer animation (neocodeium pattern):**
-
-```lua
-init = function(self)
-  local timer = assert(vim.uv.new_timer())
-  local fps = 4
-  timer:start(0, math.floor(1000 / fps), vim.schedule_wrap(function()
-    require("witch-line.engine.request").update_comp(self, true)
-  end))
-end
-```
-
-### Resolver (`witch-line.core.resolver`)
+### Resolver
 
 ```lua
 local Resolver = require("witch-line.core.resolver")
 ```
 
-- `Resolver.resolve_plain_field(comp, key)` — Read a value through the `ref` chain. Returns `value, owner` or `nil, nil`.
+- `Resolver.resolve_plain_field(comp, key)` — Read a value through the `delegator` chain. Returns `value, owner` or `nil, nil`.
 - `Resolver.resolve_field_owner(comp, key)` — Return only the owner component of a resolved field.
 
-### Registry (`witch-line.core.registry`)
+### Registry
 
 ```lua
 local Registry = require("witch-line.core.registry")
@@ -707,17 +838,9 @@ local Registry = require("witch-line.core.registry")
 - `Registry.get_comp_by_id(id)` — Get a registered component by ID, or nil.
 - `Registry.is_existed(id)` — Check if a component ID is registered.
 
-### Session
-
-```lua
--- During an event-triggered update, the raw autocmd args are stored on the session:
-local event_info = session:get("EventInfo")
-```
-
 ### Session Cache
 
 ```lua
--- Memoize expensive computations within a cache scope:
 local scope = session:cache("component_id")
 local result = scope:memo(expensive_fn, arg1, arg2)
 ```
@@ -726,14 +849,9 @@ local result = scope:memo(expensive_fn, arg1, arg2)
 
 ## Writing an AI Component
 
-Components that integrate with external tools (LSP, AI assistants, etc.) follow a common pattern: listen to external events, then request re-renders via `Request.update_comp`.
-
-### Neocodeium example
-
-The simplest approach — use the plugin's native events with a timer for animation:
+Components that integrate with external tools follow a common pattern: listen to external events, then request re-renders via `Request.update_comp`.
 
 ```lua
-local bo = vim.bo
 local neo_timer
 
 local Neocodeium = {
@@ -756,7 +874,7 @@ local Neocodeium = {
     event = event and event[self.id]
 
     if event and event.match == "NeoCodeiumLabelUpdated" then
-      if bo.buftype ~= "prompt" and event.data == " * " then
+      if vim.bo.buftype ~= "prompt" and event.data == " * " then
         neo_timer = neo_timer or assert(vim.uv.new_timer())
         if not neo_timer:is_active() then
           neo_timer:start(0, math.floor(1000 / self.config.fps),
@@ -791,9 +909,8 @@ local Neocodeium = {
 }
 ```
 
-**Key takeaways:**
-- Use `events` to listen for the plugin's User autocmds.
-- Use `vim.uv.new_timer` + `Request.update_comp(self, true)` for smooth animations.
-- The `session:get("EventInfo")` gives you the raw autocmd data.
-- `self.config` holds user-customizable values (icons, fps).
-- Return the text directly from `update` — no need for `init` unless you need to set up autocmds or timers that persist beyond the component lifecycle.
+**Key patterns:**
+- `events` listens for the plugin's User autocmds.
+- `vim.uv.new_timer` + `Request.update_comp(self, true)` for smooth animations.
+- `session:get("EventInfo")` gives raw autocmd data.
+- `self.config` holds user-customizable values.
