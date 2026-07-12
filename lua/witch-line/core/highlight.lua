@@ -21,14 +21,20 @@ nvim_get_color_by_name =
     api.nvim_get_hl,
     api.nvim_get_color_by_name
 
+local theme_aware_enabled = false
 
 local M = {}
 
+--- @class ThemeAwareHighlight : vim.api.keyset.highlight
+--- Whether the style adapts automatically to the current theme.
+--- @field theme_aware? boolean
+
+--- @alias HighlightStyle ThemeAwareHighlight | string
 
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
 
----@type table<string, CompStyle>
+---@type table<string, HighlightStyle>
 local Styles = {}
 
 --- Highlight all styles in the Styles table.
@@ -36,16 +42,6 @@ local function restore_highlight_styles()
     for hl_name, style in pairs(Styles) do
         M.highlight(hl_name, style)
     end
-end
-
---- Retrieves the style for a given component.
---- @param comp ManagedComponent The component to retrieve the style for.
---- @return CompStyle|nil style The style of the component or nil if not found.
-M.get_style = function(comp)
-    if comp.___resolved_hl_name then
-        return Styles[comp.___resolved_hl_name]
-    end
-    return nil
 end
 
 --- Sets the auto theme value.
@@ -113,71 +109,6 @@ end
 M.safe_nvim_get_hl = function(opts)
     local ok, style = pcall(nvim_get_hl, 0, opts)
     return ok and style or nil
-end
-
---- Merge a child highlight definition with a parent highlight or highlight group.
----
---- This function combines two highlight sources into one, giving priority to the
---- child’s properties. The parent can be either:
----   - A **table** containing highlight fields (e.g. `{ fg = "#ffffff", bold = true }`), or
----   - A **string** name of an existing highlight group (e.g. `"Comment"`).
----
---- Behavior:
---- 1. If `parent` is a table and has no `link` field, it merges directly with `child`.
---- 2. If `parent` is a table containing a `link`, it uses that linked group name instead.
---- 3. If `parent` is a string, it attempts to retrieve the highlight properties of that group
----    using `nvim_get_hl`, then merges them with the `child` table.
---- 4. Merge strategy uses `"keep"` mode — child properties take precedence over parent values.
----
---- Example:
---- ```lua
---- local child = { fg = "#ffffff" }
---- local merged = M.merge_hl(child, "Comment")
---- -- Result: child color kept, inherits missing fields from Comment group
---- ```
----
---- @param child CompStyle|nil The child highlight definition (fields take precedence).
---- @param parent CompStyle|nil The parent highlight definition or group name.
---- @return CompStyle merged The merged highlight table (or the child table if no merge occurred).
-M.merge_hl = function(child, parent)
-    if type(child) == "string" then
-        local hlid = hlID(child)
-        child = hlid ~= 0 and nvim_get_hl(0, {
-            id = hlid,
-            create = false,
-        }) or nil
-    end
-    local pt = type(parent)
-    if pt == "table" then
-        if not parent.link then
-            local merged = {}
-            for k, v in pairs(parent) do merged[k] = v end
-            if child then
-                for k, v in pairs(child) do merged[k] = v end
-            end
-            return merged
-        end
-        parent = parent.link
-        pt = "string"
-    end
-
-    if pt == "string" then
-        local hlid = hlID(parent)
-        local pstyle = hlid ~= 0 and nvim_get_hl(0, {
-            id = hlid,
-            create = false,
-        }) or nil
-        if pstyle then
-            local merged = {}
-            for k, v in pairs(pstyle) do merged[k] = v end
-            if child then
-                for k, v in pairs(child) do merged[k] = v end
-            end
-            return merged
-        end
-        return child
-    end
-    return child
 end
 
 local adjust
@@ -299,20 +230,13 @@ local resolve_color = function(c, field, auto_adjust)
     return num
 end
 
---- Defines or updates a Neovim highlight group with the given style.
+--- Define or update a Neovim highlight group.
+--- String style creates a link; table style resolves colors and sets directly.
+--- Caches in `Styles` for persistence across colorscheme reloads.
 ---
---- This function normalizes and resolves highlight properties (e.g. `fg`, `bg`, `foreground`, `background`)
---- before calling `nvim_set_hl()`. It also caches the style in `Styles` for persistence and automatic
---- restoration on colorscheme reload.
----
---- Behavior:
---- - If `hl_style` is a string, it creates a linked highlight group.
---- - If `hl_style` is a table, it resolves color names and sets the group directly.
---- - If empty or invalid, the function does nothing and returns false.
----
---- @param group_name string The name of the highlight group to define or update.
---- @param hl_style CompStyle The style definition — either a link target or a style table.
---- @return boolean success True if the highlight was applied successfully, false otherwise.
+--- @param group_name string The highlight group name.
+--- @param hl_style HighlightStyle A link target string or highlight style table.
+--- @return boolean applied True if the highlight was set successfully.
 M.highlight = function(group_name, hl_style)
     if group_name == "" then
         return false

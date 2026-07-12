@@ -286,7 +286,7 @@ do
         },
     })
 
-    eq(#mock_calls.register_cid, 1, "one component registered from list")
+    eq(#mock_calls.register_cid, 2, "component + literal registered")
     eq(#mock_calls.push, 2, "both children pushed")
 end
 
@@ -519,7 +519,7 @@ do
         },
     })
 
-    eq(#mock_calls.register_cid, 3, "container + 2 children registered")
+    eq(#mock_calls.register_cid, 4, "container + 2 children + literal registered")
     eq(#mock_calls.push, 4, "container + 2 children + literal pushed")
 
     eq(registered["wl.test.child1"].___parent_id, "wl.test.container", "child1 parent is container")

@@ -66,21 +66,20 @@ local function resolve_comp_id(comp)
         --- @cast id DefaultId
         return id
     elseif id then
-        if type(id) ~= "string" then
-            require("witch-line.util.notifier").error("Id must be a string")
-        elseif BuiltinComp[id] then
+        if type(id) == "string" and BuiltinComp[id] then
             require("witch-line.util.notifier").error("Id must be different from default id: " .. tostring(id))
         end
         return id
     else
-        id = tostring(comp) .. "\0"
+        --- Use the component itself as the id for anonymous components.
+        id = comp
         comp.id = id
         return id
     end
 end
 
 --- Loads a component, resolving its path if necessary
---- @param comp Component|table
+--- @param comp Component
 --- @return ManagedComponent
 load_component = function(comp, container_id)
     if comp.___loaded then
@@ -105,7 +104,8 @@ load_component = function(comp, container_id)
     --- Handle dependencies links
     local delegator = comp.delegator
     if type(delegator) == "table" then
-        local delegator_events, delegator_timming, delegator_hidden = delegator.events, delegator.timing, delegator.hidden
+        local delegator_events, delegator_timming, delegator_hidden = delegator.events, delegator.timing,
+            delegator.hidden
         if delegator_events then
             register_dependency_links(DepGraphKind.Event, delegator_events, cid)
         end
@@ -195,14 +195,22 @@ end
 
 --- Push a literal string onto the statusline segment list.
 --- Empty strings are silently ignored.
----@param comp string
+---@param comp string Non-empty string to push.
 ---@param win_id integer|nil  Window-local segment list when set.
----@return string  The input string.
+---@return Component  The input string.
 mount_literal_comp = function(comp, win_id)
-    if comp ~= "" then
-        Statusline.push(nil, comp, win_id)
-    end
-    return comp
+    --- @type Component
+
+    local literal_comp = {
+        update = comp,
+    }
+
+    local cid = literal_comp
+    literal_comp.id = cid
+    Registry.register(cid, literal_comp, win_id)
+
+    Statusline.push(nil, comp, win_id)
+    return literal_comp
 end
 
 ---Mount a combined component tree.
@@ -212,6 +220,9 @@ end
 mount_component_tree = function(comp, container_id, winid)
     local kind = type(comp)
     if kind == "string" then
+        if comp == "" then
+            return nil
+        end
         local required = BuiltinComp[comp]
         if not required then
             return mount_literal_comp(comp, winid)

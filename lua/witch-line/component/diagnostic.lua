@@ -1,10 +1,15 @@
 local diagnostic = vim.diagnostic
 local DiagnosticSeverity = diagnostic.severity
 
+--- Get the diagnostic count for a given severity.
+--- @return table<vim.diagnostic.Severity, integer>
 local get_diag_count = function()
     return diagnostic.count(0)
 end
 
+
+--- Get the signs icon from the diagnostic config.
+--- @return table
 local get_config_signs_icon = function()
     local signs = diagnostic.config().signs
     if type(signs) == "table" then
@@ -20,6 +25,9 @@ local hidden = function()
     return vim.bo.filetype == "lazy" or vim.api.nvim_buf_get_name(0):match("%.env$")
 end
 
+--- @param self DefaultComponent
+--- @param severity vim.diagnostic.Severity
+--- @param session Session
 local update_value = function(self, severity, session)
     local cache = session:cache()
     if cache:memo(hidden) then

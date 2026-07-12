@@ -36,17 +36,16 @@ local update_comp_by_ids
 ---
 --- @param comp ProxyComponent  Component to update.
 --- @param theme_aware boolean Optional auto-theme flag.
---- @param override_style? CompStyle  Optional style override.
+--- @param override_style? HighlightStyle  Optional style override.
 --- @param session Session  Session for dynamic style resolution.
 --- @return boolean updated  True if highlight changed, false if skipped.
---- @return CompStyle|nil style  The resolved style, or nil if unresolved.
+--- @return HighlightStyle|nil style  The resolved style, or nil if unresolved.
 local function update_comp_style(comp, theme_aware, override_style, session)
-    local style, dynamic, inherit_count = CompAPI.resolved_style(comp,
+    local style, dynamic, inherit_count = CompAPI.style(comp,
         function(id)
             local parent = ManagedComps[id]
             return parent and Proxy.bind(parent, session)
         end,
-        Highlight.merge_hl,
         override_style,
         theme_aware
     )
@@ -103,7 +102,7 @@ end
 ---@param session Session Runtime context.
 ---@param side "left"|"right" Side to update.
 ---@param main_hl_applied boolean Whether main highlight changed.
----@param main_style? CompStyle Main resolved style.
+---@param main_style? HighlightStyle Main resolved style.
 ---@param theme_aware boolean Enable theme adaptation.
 ---@return boolean updated Whether highlight changed.
 ---@return string|nil dynamic_hl Dynamic inherited highlight.
@@ -142,7 +141,7 @@ local function update_comp_side_style(
     -- Only executed when update is actually required.
     ----------------------------------------------------------------------
     local side_style, dynamic, inherited =
-        CompAPI.resolved_side_style(
+        CompAPI.side_style(
             comp,
             side,
             main_style,

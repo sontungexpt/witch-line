@@ -7,12 +7,9 @@
 ---| userdata
 ---| thread
 
---- @class ThemeAwareStyle : vim.api.keyset.highlight
---- Whether the style adapts automatically to the current theme.
---- @field theme_aware? boolean
 
 --- Unique identifier of a component.
---- @alias CompId string
+--- @alias CompId NotNil
 
 --- References other components for resolving dynamic fields.
 ---@class Reference
@@ -30,12 +27,11 @@
 --- @alias PaddingFunc fun(self: ManagedComponent, session: Session): integer|PaddingTable
 --- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
 ---
---- @alias UpdateFunc fun(self: ManagedComponent, session: Session): nil|string, nil|CompStyle
+--- @alias UpdateFunc fun(self: ManagedComponent, session: Session): nil|string, nil|HighlightStyle
 ---
---- @alias CompStyle ThemeAwareStyle|string
 ---
---- @alias StyleFunc fun(self: ManagedComponent, session: Session): CompStyle
---- @alias SideStyleFunc fun(self: ManagedComponent, session: Session): CompStyle|SepStyle
+--- @alias StyleFunc fun(self: ManagedComponent, session: Session): HighlightStyle
+--- @alias SideStyleFunc fun(self: ManagedComponent, session: Session): HighlightStyle|SepStyle
 ---
 --- @alias OnClickMouseButton "l"|"r"|"m"
 --- @alias OnClickModifier "s"|"c"|"a"|"m"
@@ -97,7 +93,7 @@
 --- - table: highlight properties (e.g. `{fg = "#fff", bold = true}`).
 --- - SepStyle: SepFg/SepBg/Reverse/Inherited.
 --- - function(self, ctx): called and return value used as above.
---- @field left_style? CompStyle|SideStyleFunc|SepStyle
+--- @field left_style? HighlightStyle|SideStyleFunc|SepStyle
 ---
 --- Left separator text.
 --- - string: used as is.
@@ -109,7 +105,7 @@
 --- - table: highlight properties.
 --- - SepStyle: SepFg/SepBg/Reverse/Inherited.
 --- - function(self, ctx): called and return value used as above.
---- @field right_style? CompStyle|SideStyleFunc|SepStyle
+--- @field right_style? HighlightStyle|SideStyleFunc|SepStyle
 ---
 --- Right separator text.
 --- - string: used as is.
@@ -131,7 +127,7 @@
 --- - table: highlight properties (e.g. `{fg = "#fff", bold = true}`).
 --- - nil: no style applied.
 --- - function(self, session): called and return value used as above.
---- @field style? CompStyle|StyleFunc
+--- @field style? HighlightStyle|StyleFunc
 ---
 --- A function that will be called before the component is updated.
 --- @field pre_update? fun(self: ManagedComponent, session: Session)
@@ -169,15 +165,15 @@
 --- @field ___right_hl_name? string Highlight group used for the right separator.
 --- @field ___click_handler? string Registered click handler name.
 
+--- @class ResolvedIdComponent : Component
+--- @field id CompId The id of the component.
 
---- @class DefaultComponent : Component
+--- @class DefaultComponent : ResolvedIdComponent
 --- @field [integer] DefaultComponent A table of child components, can be used to create a list of components
---- @field id DefaultId the id of default component
 --- @field ___builtin true Mark as created by witch-line
 
---- @class ManagedComponent : DefaultComponent | Component
+--- @class ManagedComponent : DefaultComponent | ResolvedIdComponent
 --- @field [integer] ManagedComponent A table of child components, can be used to create a list of components
---- @field id CompId the id of component
 --- @field ___loaded true Always `true` for managed components.
 --- @field ___parent_id CompId The id of the container component.
 

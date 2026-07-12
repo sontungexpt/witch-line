@@ -27,15 +27,56 @@ local ManagedComps = {}
 ---@type table<CompId, ManagedComponent>
 M.ManagedComps = setmetatable({}, { __index = ManagedComps })
 
+local GLOBAL = 0
+
+--- @type table<integer, CompId[]>
+--- Example
+--- ```
+--- {
+---     [GLOBAL] = {  }
+---     [winid] = {  }
+--- }
+--- ```
+local Layout = {
+    [GLOBAL] = {},
+}
+
+--- Removes the layout for a given window ID.
+--- @param winid integer
+M.remove_layout = function(winid)
+    Layout[winid] = nil
+end
+
+--- Returns the layout for a given window ID.
+--- @param winid? integer
+--- @return CompId[]
+M.get_layout = function(winid)
+    if winid == nil then
+        return Layout[GLOBAL]
+    end
+    return Layout[winid] or Layout[GLOBAL]
+end
+
 ---@param cid CompId
 ---@param comp Component
 ---@return ManagedComponent
-M.register = function(cid, comp)
+M.register = function(cid, comp, winid)
     comp.___loaded = true
     --- @cast comp ManagedComponent
     ManagedComps[cid] = comp
+
+    --- Registers the component in the layout for the given window ID.
+    local layout_key = winid or GLOBAL
+    local layout = Layout[layout_key]
+    if layout == nil then
+        Layout[layout_key] = { cid }
+    else
+        layout[#layout + 1] = cid
+    end
+
     return comp
 end
+
 
 
 ---@param kind DepGraphKind
