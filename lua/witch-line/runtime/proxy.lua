@@ -1,6 +1,6 @@
 local type, unpack, setmetatable = type, unpack, setmetatable
 
-local resolve_plain_field = require("witch-line.core.resolver").resolve_plain_field
+local resolve_plain_field = require("witch-line.runtime.resolver").resolve_plain_field
 
 --- @class ProxyComponent : ManagedComponent
 

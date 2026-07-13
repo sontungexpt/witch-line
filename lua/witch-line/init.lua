@@ -1,17 +1,17 @@
 local require, type = require, type
 
---- @class UserConfig.Disabled
---- @field filetypes? string[]
---- @field buftypes? string[]
+---@class UserConfig.Disabled
+---@field filetypes? string[]
+---@field buftypes? string[]
 ---
---- @class UserConfig.Statusline
---- @field global CombinedComponent
---- @field win? fun(winid: integer): CombinedComponent|nil
+---@class UserConfig.Statusline
+---@field global CombinedComponent
+---@field win? fun(winid: integer): CombinedComponent|nil
 
---- @class UserConfig : table
---- @field statusline? UserConfig.Statusline
---- @field disabled? UserConfig.Disabled
---- @field theme_aware? boolean
+---@class UserConfig : table
+---@field statusline? UserConfig.Statusline
+---@field disabled? UserConfig.Disabled
+---@field theme_aware? boolean
 
 --- Ensure defaults are applied to the user config table.
 --- Fills in missing `statusline.global` with the built-in default.
@@ -42,10 +42,9 @@ M.setup = function(user_config)
     M.user_config = user_config
 
     if user_config.theme_aware ~= false then
-        require("witch-line.core.highlight").set_theme_aware_enabled(true)
+        require("witch-line.render.highlight").set_theme_aware_enabled(true)
     end
 
-    require("witch-line.engine.statusline").setup(user_config.disabled)
     require("witch-line.engine").setup(user_config.statusline)
 
     vim.api.nvim_create_autocmd("CmdlineEnter", {

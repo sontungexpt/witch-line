@@ -1,5 +1,10 @@
 local unpack = unpack
 
+--- Debounces a function, ensuring it is only called after a specified delay.
+--- @generic Fn
+--- @param func Fn  The function to debounce.
+--- @param delay integer  The delay in milliseconds.
+--- @return Fn  The debounced function.
 return function(func, delay)
     local timer, args
 
@@ -8,7 +13,7 @@ return function(func, delay)
     end)
 
     return function(...)
-        if not timer then
+        if timer == nil then
             timer = assert((vim.uv or vim.loop).new_timer())
         end
 

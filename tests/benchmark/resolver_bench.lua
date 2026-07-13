@@ -20,11 +20,11 @@ package.preload["witch-line.component"] = function()
     return setmetatable({}, { __index = function() return nil end })
 end
 
-package.loaded["witch-line.core.resolver"] = nil
+package.loaded["witch-line.core.comp.resolver"] = nil
 package.loaded["witch-line.core.comp.behavior"] = nil
 package.loaded["witch-line.core.comp.proxy"] = nil
 
-local Resolver = require("witch-line.core.resolver")
+local Resolver = require("witch-line.core.comp.resolver")
 
 local function bench(name, iterations, fn)
     for _ = 1, math.min(iterations, 1000) do fn() end

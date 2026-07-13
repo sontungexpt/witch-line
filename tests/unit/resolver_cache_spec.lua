@@ -10,14 +10,14 @@ package.loaded["witch-line.core.registry"] = {
     ManagedComps = setmetatable({}, { __index = ManagedComps }),
 }
 package.loaded["witch-line.component"] = BuiltinComp
-package.loaded["witch-line.core.resolver"] = nil
-local Resolver = require("witch-line.core.resolver")
+package.loaded["witch-line.core.comp.resolver"] = nil
+local Resolver = require("witch-line.core.comp.resolver")
 
 local function clear(t) for k in pairs(t) do t[k] = nil end end
 local function reset()
     clear(ManagedComps)
-    package.loaded["witch-line.core.resolver"] = nil
-    Resolver = require("witch-line.core.resolver")
+    package.loaded["witch-line.core.comp.resolver"] = nil
+    Resolver = require("witch-line.core.comp.resolver")
 end
 
 local function cache_keys(key)

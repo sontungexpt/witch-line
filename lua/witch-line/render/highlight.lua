@@ -1,21 +1,7 @@
-local
-type,
-next,
-pcall,
-pairs,
-string_gsub =
-    type,
-    next,
-    pcall,
-    pairs,
-    string.gsub
+local type, next, pcall, pairs = type, next, pcall, pairs
 
 local api = vim.api
-local
-hlID,
-nvim_set_hl,
-nvim_get_hl,
-nvim_get_color_by_name =
+local hlID, nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
     vim.fn.hlID,
     api.nvim_set_hl,
     api.nvim_get_hl,
@@ -25,11 +11,10 @@ local theme_aware_enabled = false
 
 local M = {}
 
---- @class ThemeAwareHighlight : vim.api.keyset.highlight
---- Whether the style adapts automatically to the current theme.
+--- @class HighlightDef : vim.api.keyset.highlight
 --- @field theme_aware? boolean
 
---- @alias HighlightStyle ThemeAwareHighlight | string
+--- @alias HighlightStyle HighlightDef | string
 
 ---@type table<string, integer>
 local ColorRgb24Bit = {}
@@ -38,14 +23,14 @@ local ColorRgb24Bit = {}
 local Styles = {}
 
 --- Highlight all styles in the Styles table.
-local function restore_highlight_styles()
+local restore_highlight_styles = function()
     for hl_name, style in pairs(Styles) do
         M.highlight(hl_name, style)
     end
 end
 
 --- Sets the auto theme value.
----@param value boolean
+--- @param value boolean
 M.set_theme_aware_enabled = function(value)
     theme_aware_enabled = value
 end
@@ -79,29 +64,6 @@ end
 api.nvim_create_autocmd("ColorScheme", {
     callback = restore_highlight_styles,
 })
-
-
---- Generates a valid highlight group name from an ID.
---- @param id CompId The ID to generate the highlight name for.
---- @return string hl_name The generated highlight name.
-M.make_hl_name_from_id = function(id)
-    return "WL" .. string_gsub(id, "[^%w_]", "")
-end
-
---- Adds a highlight name to a string.hi
---- @param str string The string to which the highlight name will be added.
---- @param hl_name string|nil The highlight name to add.
-M.assign_highlight_name = function(str, hl_name)
-    return hl_name and str ~= "" and "%#" .. hl_name .. "#" .. str .. "%*" or str
-end
-
---- Replace a string contains highlight segment with new highlight name.
---- @param str string The string that may contains highlight segment.
---- @param new_hl_name string|nil The new string with the new replaced highlight name.
---- @param n? integer Whether to replace the first occurrence only.
-M.replace_highlight_name = function(str, new_hl_name, n)
-    return string_gsub(str, "%%#.-#", "%#" .. new_hl_name .. "#", n)
-end
 
 --- Safe nvim_get_hl with pcall.
 ---@param opts table
@@ -176,9 +138,6 @@ adjust = function(c, bg)
     return adjust(c, bg)
 end
 
---- Cache the id of StatusLine hl group to avoid repeated API calls.
-local STATUSLINE_HL = nil
-
 --- Resolve a color into a 24-bit RGB value, a highlight group property, or "NONE".
 ---
 --- Supports:
@@ -187,10 +146,10 @@ local STATUSLINE_HL = nil
 --- 3. Highlight groups (e.g., "Normal") → fetch `fg` or `bg` field.
 --- 4. "NONE" → returned as-is.
 ---
---- @param c string|integer|nil  Color name, RGB value, or highlight group.
+--- @param c? string|integer  Color name, RGB value, or highlight group.
 --- @param field "fg"|"bg"   Field to fetch from highlight group.
 --- @param auto_adjust? boolean  Adjust color based on statusline background if true.
---- @return integer|string|nil  Resolved 24-bit RGB, "NONE", or nil if not found.
+--- @return integer|string|"NONE"|nil  Resolved 24-bit RGB, "NONE", or nil if not found.
 local resolve_color = function(c, field, auto_adjust)
     local t = type(c)
     local num = c
@@ -221,10 +180,10 @@ local resolve_color = function(c, field, auto_adjust)
     end
     --- @cast num integer num is number here
     if theme_aware_enabled and auto_adjust then
-        STATUSLINE_HL = STATUSLINE_HL or {
-            id = api.nvim_get_hl_id_by_name("StatusLine"),
-        }
-        local stbg = nvim_get_hl(0, STATUSLINE_HL).bg
+        local stbg = nvim_get_hl(0, {
+            name = "StatusLine",
+            create = false,
+        }).bg
         return stbg and adjust(num, stbg) or num
     end
     return num
@@ -238,14 +197,17 @@ end
 --- @param hl_style HighlightStyle A link target string or highlight style table.
 --- @return boolean applied True if the highlight was set successfully.
 M.highlight = function(group_name, hl_style)
-    if group_name == "" then
-        return false
-    end
+    if group_name == "" then return false end
+
     local hl_style_type = type(hl_style)
-    if hl_style_type == "string" and hl_style ~= "" then
+    if hl_style_type == "string" then
+        if hl_style == "" then
+            return false
+        end
+
         nvim_set_hl(0, group_name, { link = hl_style, default = true })
         return true
-    elseif hl_style_type ~= "table" or not next(hl_style) then
+    elseif hl_style_type ~= "table" or next(hl_style) == nil then
         return false
     end
 

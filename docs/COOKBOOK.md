@@ -823,7 +823,7 @@ end
 ### Resolver
 
 ```lua
-local Resolver = require("witch-line.core.resolver")
+local Resolver = require("witch-line.core.comp.resolver")
 ```
 
 - `Resolver.resolve_plain_field(comp, key)` — Read a value through the `delegator` chain. Returns `value, owner` or `nil, nil`.

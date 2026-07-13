@@ -1,4 +1,4 @@
-local next, type = next, type
+local next, type, api = next, type, vim.api
 local str_byte, str_find, str_sub = string.byte, string.find, string.sub
 
 local M = {}
@@ -15,11 +15,9 @@ local ONCE = 0
 --- After registering "BufEnter" and "BufLeave ++once":
 ---   SimpleEvents = {
 ---     ["BufEnter"] = {
+---         [ONCE] = { cid2 }
 ---         [1] = cid1
 ---     },
----     ["BufLeave"] = {
----         [ONCE] = { cid2 }
----     }
 ---   }
 local VimEvents = {}
 
@@ -30,6 +28,7 @@ local VimEvents = {}
 ---   UserEvents = {
 ---     ["LazyLoad"] = {
 ---         [ONCE] = { cid1 }
+---         [1] = cid2
 ---     },
 ---     ["ColorScheme"] = {
 ---         [1] = cid2
@@ -46,6 +45,7 @@ local UserEvents = {}
 ---     ["*.lua"] = {
 ---         ["BufEnter"] = {
 ---             [ONCE] = { cid1 }
+---             [1] = cid2
 ---         },
 ---         ["BufWritePost"] = {
 ---              [1] = cid2
@@ -62,10 +62,10 @@ local add_to_bucket = function(bucket, comp_id, once)
     if once then
         local once_list = bucket[ONCE]
         if once_list == nil then
-            once_list = {}
-            bucket[ONCE] = once_list
+            bucket[ONCE] = { comp_id }
+        else
+            once_list[#once_list + 1] = comp_id
         end
-        once_list[#once_list + 1] = comp_id
     else
         bucket[#bucket + 1] = comp_id
     end
@@ -235,6 +235,18 @@ M.register_events = function(cid, events)
     end
 end
 
+--- Register a component to be updated once on VimEnter.
+--- Batches all IDs into a single autocmd.
+--- @param cid CompId
+M.register_vim_enter_once = function(cid)
+    local bucket = VimEvents["VimEnter"]
+    if bucket == nil then
+        bucket = {}
+        VimEvents["VimEnter"] = bucket
+    end
+    add_to_bucket(bucket, cid, true)
+end
+
 --- Print current registry state for debugging.
 M.inspect = function()
     require("witch-line.util.notifier").info(vim.inspect({
@@ -295,11 +307,10 @@ M.on_event = function(work)
         dispatch_debounce()
     end
 
-    local nvim_create_autocmd = vim.api.nvim_create_autocmd
-    local AUGROUP = vim.api.nvim_create_augroup("WitchLineAutocmd", { clear = true })
+    local AUGROUP = api.nvim_create_augroup("WitchLineAutocmd", { clear = true })
 
     if next(VimEvents) then
-        nvim_create_autocmd(tbl_keys(VimEvents), {
+        api.nvim_create_autocmd(tbl_keys(VimEvents), {
             group = AUGROUP,
             callback = function(e)
                 enqueue(VimEvents[e.event], e)
@@ -308,7 +319,7 @@ M.on_event = function(work)
     end
 
     if next(UserEvents) then
-        nvim_create_autocmd("User", {
+        api.nvim_create_autocmd("User", {
             pattern = tbl_keys(UserEvents),
             group = AUGROUP,
             callback = function(e)
@@ -319,7 +330,7 @@ M.on_event = function(work)
 
     --- Use next to reduce overhead
     for pattern, event_buckets in next, PatternEvents do
-        nvim_create_autocmd(tbl_keys(event_buckets), {
+        api.nvim_create_autocmd(tbl_keys(event_buckets), {
             pattern = pattern,
             group = AUGROUP,
             callback = function(e)

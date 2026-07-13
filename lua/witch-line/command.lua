@@ -1,11 +1,11 @@
 local M = {}
 
 --- Sentinel key for the fallback handler in the command trie.
-local FALLBACK_KEY = {}
+local FALLBACK = {}
 
 local COMMANDS = {
     toggle_theme_aware = function(...)
-        return require("witch-line.core.highlight").toggle_theme_aware(...)
+        return require("witch-line.render.highlight").toggle_theme_aware(...)
     end,
     inspect = {
         event_store = function(...)
@@ -19,19 +19,19 @@ local COMMANDS = {
                 return require("witch-line.core.registry").inspect(...)
             end,
             dep_store = function(...)
-                return require("witch-line.core.registry").inspect(...)
+                return require("witch-line.core.dependency").inspect(...)
             end,
         },
         highlight = {
             rgb24bit = function(...)
-                return require("witch-line.core.highlight").inspect(...)
+                return require("witch-line.render.highlight").inspect(...)
             end,
             styles = function(...)
-                return require("witch-line.core.highlight").inspect(...)
+                return require("witch-line.render.highlight").inspect(...)
             end,
         },
         statusline = function(...)
-            return require("witch-line.engine.statusline").inspect(...)
+            return require("witch-line.render.renderer").inspect(...)
         end,
     },
 }
@@ -61,7 +61,7 @@ local function get_trie_completions(arg_lead, cmd_line, cursor_pos)
 
     local completions = {}
     for key in pairs(node) do
-        if key ~= FALLBACK_KEY and key:find("^" .. vim.pesc(arg_lead)) then
+        if key ~= FALLBACK and key:find("^" .. vim.pesc(arg_lead)) then
             completions[#completions + 1] = key
         end
     end
@@ -85,7 +85,7 @@ vim.api.nvim_create_user_command("WitchLine", function(a)
     if type(work) == "function" then
         work(arg, a)
     elseif type(work) == "table" then
-        local fallback = work[FALLBACK_KEY]
+        local fallback = work[FALLBACK]
         if type(fallback) == "function" then
             fallback(arg, a)
         else

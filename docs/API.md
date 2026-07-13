@@ -14,10 +14,10 @@ local Registry = require("witch-line.core.registry")
 - `Registry.get_comp_by_id(id)` — Get a registered component by ID, or nil.
 - `Registry.is_existed(id)` — Check if a component ID is registered.
 
-### Resolver (`witch-line.core.resolver`)
+### Resolver (`witch-line.core.comp.resolver`)
 
 ```lua
-local Resolver = require("witch-line.core.resolver")
+local Resolver = require("witch-line.core.comp.resolver")
 ```
 
 - `Resolver.resolve_plain_field(comp, key)` — Read a value through the delegator chain. Returns `value, owner` or `nil, nil`.

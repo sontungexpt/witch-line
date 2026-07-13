@@ -1,0 +1,8 @@
+---@alias NotNil
+---| string
+---| number
+---| table
+---| boolean
+---| function
+---| userdata
+---| thread

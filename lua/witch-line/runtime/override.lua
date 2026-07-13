@@ -1,8 +1,5 @@
-local vim, type, pairs      = vim, type, pairs
+local islist, type, pairs, next = vim.islist, type, pairs, next
 
--- Shared type-set tables (defined once to avoid per-entry allocation).
--- Each maps a set of acceptable Lua types for a given override key.
--- Note: "function" is a reserved word in Lua, so it must be quoted as a key.
 local FN_TABLE              = { ["function"] = true, table = true }
 local STR_FN_TABLE          = { string = true, ["function"] = true }
 local BOOL_FN               = { boolean = true, ["function"] = true }
@@ -12,9 +9,7 @@ local BOOL_NUM              = { boolean = true, number = true }
 -- local NUM_FN                = { number = true, ["function"] = true }
 -- local ANY                   = { number = true, string = true, boolean = true, table = true, ["function"] = true }
 
--- Field-level type constraints for override values.
--- Each entry maps a component field name to the set of accepted Lua types.
--- The type check prevents users from setting fields to incompatible types.
+--- @type table<string, string|table<string, true>>
 local OVERRIDEABLE_TYPE_MAP = {
     padding     = NUM_TABLE,
     config      = "table",
@@ -36,13 +31,23 @@ local OVERRIDEABLE_TYPE_MAP = {
 
 --- Recursively merge `from` into `to` for table values.
 --- Lists (integer-indexed tables) are replaced entirely.
+--- @param to? table
+--- @param from? table
+--- @return table|nil
 local function merge_value(to, from)
-    if to == nil then return from end
-    if from == nil then return to end
-    if type(from) ~= "table" then return from end
-    if next(to) == nil then return from end
-    if next(from) == nil then return to end
-    if vim.islist(to) and vim.islist(from) then return from end
+    if to == nil then
+        return from
+    elseif from == nil then
+        return to
+    elseif type(from) ~= "table" then
+        return from
+    elseif next(to) == nil then
+        return from
+    elseif next(from) == nil then
+        return to
+    elseif islist(to) and islist(from) then
+        return from
+    end
 
     for k, v in pairs(from) do
         to[k] = merge_value(to[k], v)
@@ -52,20 +57,21 @@ end
 
 --- Apply user overrides to a built-in component.
 --- @param comp DefaultComponent
---- @param override table
---- @return Component
-local function apply_override(comp, override)
+--- @param override Component
+--- @return DefaultComponent
+local apply_override = function(comp, override)
     if type(override) ~= "table" then
         return comp
     end
 
     -- Respect user override for style
-    if override.style then
+    local style = override.style
+    if style then
         comp.___accept_returned_style = false
     end
 
     -- Respect user override for style
-    if override.style or override.left_style or override.right_style then
+    if style or override.left_style or override.right_style then
         comp.theme_aware = false
     end
 

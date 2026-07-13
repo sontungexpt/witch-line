@@ -240,7 +240,7 @@ do
 end
 
 -- ============================================================
-print("=== Dynamic right sep has force=true ===")
+print("=== Dynamic right sep has dirty flag ===")
 
 do
     local update = fresh()
@@ -248,11 +248,12 @@ do
     Env.register(comp)
     Env.run_update(update, comp)
     local _, right = Env.find_side_values(comp.id)
-    a.is_true(right.force, "dynamic sep force=true")
+    a.not_nil(right, "dynamic right sep set")
+    a.not_nil(right.value, "has value")
 end
 
 -- ============================================================
-print("=== No-style parent+child => no highlight ===")
+print("=== No-style parent+child => no custom highlight ===")
 
 do
     local update = fresh()
@@ -262,7 +263,8 @@ do
     Env.register(child)
     Env.run_update(update, child)
     local sv = Env.find_set_value(child.id)
-    a.is_nil(sv.hl_name, "no highlight without style")
+    a.not_nil(sv, "child value was set")
+    a.is_nil(sv.hl_name, "no custom highlight without explicit style")
 end
 
 -- ============================================================

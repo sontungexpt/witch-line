@@ -22,8 +22,8 @@ local function reset_mocks()
     }
 end
 
--- Mock CompAPI (resolver)
-package.loaded["witch-line.core.comp.resolver"] = {
+-- Mock CompAPI (behavior)
+package.loaded["witch-line.core.comp.behavior"] = {
     pre_update = function(_comp, _session)
         mock_calls.pre_update = mock_calls.pre_update + 1
     end,
@@ -64,6 +64,7 @@ package.loaded["witch-line.core.comp.proxy"] = {
 -- Mock Registry
 package.loaded["witch-line.core.registry"] = {
     ManagedComps = {},
+    DepGraphKind = { All = 1, Visible = 2, Event = 3, Timer = 4 },
 }
 
 -- Mock click manager

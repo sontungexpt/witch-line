@@ -178,22 +178,91 @@ local function run_update(update_mod, comp, kind)
     return session
 end
 
---- Find the set_value call for a component.
+--- Expand short hex colors (#aaa → #aaaaaa) for nvim_set_hl.
+local function expand_hex(color)
+    if type(color) ~= "string" then return color end
+    if color:sub(1, 1) == "#" then
+        local hex = color:sub(2)
+        if #hex == 3 then
+            local r, g, b = hex:sub(1, 1), hex:sub(2, 2), hex:sub(3, 3)
+            return "#" .. r .. r .. g .. g .. b .. b
+        elseif #hex ~= 6 then
+            return nil
+        end
+    end
+    return color
+end
+
+--- Strip witch-line-only fields (theme_aware) from style for nvim_set_hl.
+local function strip_wl_fields(style)
+    if not style then return nil end
+    local clean = {}
+    for k, v in pairs(style) do
+        if k ~= "theme_aware" then
+            clean[k] = expand_hex(v)
+        end
+    end
+    return clean
+end
+
+--- Find the state for a component after update.
 local function find_set_value(cid)
-    for _, c in ipairs(statusline_calls.set_value) do
-        if c.cid == cid then return c end
+    local State = require("witch-line.core.state")
+    local states = State.get_states()
+    local state = states[cid]
+    if state and state.value then
+        local hl_name = "WL" .. (string.gsub(tostring(cid), "[^%w_]", ""))
+        local style = state.style and state.style.style
+        if style and type(style) == "table" and next(style) then
+            vim.api.nvim_set_hl(0, hl_name, strip_wl_fields(style))
+        elseif style == nil or (type(style) == "table" and not next(style)) then
+            hl_name = nil
+        end
+        return { cid = cid, value = state.value, hl_name = hl_name, style = style }
     end
     return nil
 end
 
---- Find set_side_value calls for a component.
+--- Find side values from state.
 local function find_side_values(cid)
+    local State = require("witch-line.core.state")
+    local states = State.get_states()
+    local state = states[cid]
+    if not state then return nil, nil end
+
+    local base_hl = "WL" .. (string.gsub(tostring(cid), "[^%w_]", ""))
     local left, right
-    for _, c in ipairs(statusline_calls.set_side_value) do
-        if c.cid == cid then
-            if c.side == -1 then left = c end
-            if c.side == 1 then right = c end
+    if state.left then
+        local left_style = state.left_style and state.left_style.style
+        local left_hl_name
+        if left_style == 0 then
+            left_hl_name = base_hl
+        elseif type(left_style) == "string" then
+            left_hl_name = base_hl .. "left"
+            vim.api.nvim_set_hl(0, left_hl_name, { link = left_style })
+        elseif left_style and type(left_style) == "number" and left_style > 0 then
+            left_hl_name = base_hl .. "left"
+        elseif left_style and type(left_style) == "table" and next(left_style) then
+            left_hl_name = base_hl .. "left"
+            vim.api.nvim_set_hl(0, left_hl_name, strip_wl_fields(left_style))
         end
+        left = { side = -1, value = state.left, hl_name = left_hl_name, style = left_style }
+    end
+    if state.right then
+        local right_style = state.right_style and state.right_style.style
+        local right_hl_name
+        if right_style == 0 then
+            right_hl_name = base_hl
+        elseif type(right_style) == "string" then
+            right_hl_name = base_hl .. "right"
+            vim.api.nvim_set_hl(0, right_hl_name, { link = right_style })
+        elseif right_style and type(right_style) == "number" and right_style > 0 then
+            right_hl_name = base_hl .. "right"
+        elseif right_style and type(right_style) == "table" and next(right_style) then
+            right_hl_name = base_hl .. "right"
+            vim.api.nvim_set_hl(0, right_hl_name, strip_wl_fields(right_style))
+        end
+        right = { side = 1, value = state.right, hl_name = right_hl_name, style = right_style }
     end
     return left, right
 end
@@ -720,7 +789,7 @@ do
 end
 
 -- ---------------------------------------------------------------
-print("=== Dynamic right separator: force flag ===")
+print("=== Dynamic right separator: value resolved ===")
 do
     local update = fresh_update()
     reset_statusline_calls()
@@ -737,7 +806,7 @@ do
 
     local _, right = find_side_values(comp.id)
     not_nil(right, "right separator set")
-    is_true(right.force, "dynamic separator has force=true")
+    eq(right.value, ">", "dynamic separator resolved")
 end
 
 -- ---------------------------------------------------------------

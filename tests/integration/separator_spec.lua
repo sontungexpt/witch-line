@@ -485,7 +485,7 @@ end
 do
     local comp = make_comp({ left_style = function() return SepStyle.SepFg end })
     local s = B.side_style(comp, "left")
-    eq(type(s), "function", "side_style returns raw function, not resolved")
+    eq(type(s), "number", "side_style resolves dynamic function to SepFg")
 end
 
 do

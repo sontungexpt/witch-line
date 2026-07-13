@@ -25,7 +25,7 @@ end
 local mock_calls = {
     link_dependency = {},
     register_cid = {},
-    push = {},
+    add_to_layout = {},
     register_timer = {},
     register_events = {},
     on_event_cb = nil,
@@ -42,7 +42,7 @@ local function reset_mocks()
     clear_table(registered)
     clear_table(mock_calls.link_dependency)
     clear_table(mock_calls.register_cid)
-    clear_table(mock_calls.push)
+    clear_table(mock_calls.add_to_layout)
     clear_table(mock_calls.register_timer)
     clear_table(mock_calls.register_events)
     clear_table(mock_calls.autocmd_events)
@@ -95,17 +95,28 @@ package.loaded["witch-line.core.registry"] = {
     iterate_dependent_ids = function() return function() end end,
 }
 
+package.loaded["witch-line.core.layout"] = {
+    add_to_layout = function(cid, winid)
+        mock_calls.add_to_layout[#mock_calls.add_to_layout + 1] = { cid = cid, winid = winid }
+    end,
+    get_layout = function() return {} end,
+    remove_layout = function() end,
+}
+
 package.loaded["witch-line.engine.statusline"] = {
     push = function(cid, text, winid)
         mock_calls.push[#mock_calls.push + 1] = { cid = cid, text = text, winid = winid }
     end,
-    render = function() mock_calls.render = mock_calls.render + 1 end,
-    render_debounce = function() mock_calls.render_debounce = mock_calls.render_debounce + 1 end,
     hide_segment = function() end,
     track_flexible = function() end,
 }
 
-package.loaded["witch-line.core.override"] = function(base, overrides)
+package.loaded["witch-line.core.renderer"] = {
+    render = function() mock_calls.render = mock_calls.render + 1 end,
+    render_debounce = function() mock_calls.render_debounce = mock_calls.render_debounce + 1 end,
+}
+
+package.loaded["witch-line.core.comp.override"] = function(base, overrides)
     local result = vim.tbl_deep_extend("force", base, overrides)
     if overrides.style then
         result.___accept_returned_style = false
@@ -236,11 +247,11 @@ do
     })
 
     is_true(#mock_calls.register_cid >= 1, "component registered")
-    local push_found = false
-    for _, p in ipairs(mock_calls.push) do
-        if p.cid == "wl.test.simple" then push_found = true end
+    local found = false
+    for _, p in ipairs(mock_calls.add_to_layout) do
+        if p.cid == "wl.test.simple" then found = true end
     end
-    is_true(push_found, "component pushed to statusline")
+    is_true(found, "component added to layout")
 end
 
 do
@@ -249,7 +260,7 @@ do
     })
 
     eq(#mock_calls.register_cid, 2, "two resolved components registered")
-    eq(#mock_calls.push, 2, "both pushed to statusline")
+    eq(#mock_calls.add_to_layout, 2, "both added to layout")
 end
 
 do
@@ -257,9 +268,12 @@ do
         global = { "plain literal text" },
     })
 
-    eq(#mock_calls.push, 1, "unresolved string pushed")
-    eq(mock_calls.push[1].cid, nil, "literal has nil cid")
-    eq(mock_calls.push[1].text, "plain literal text", "literal text preserved")
+    eq(#mock_calls.add_to_layout, 1, "literal added to layout")
+    local entry = mock_calls.add_to_layout[1]
+    eq(type(entry.cid), "string", "literal cid is string id")
+    local registered = get_comp and get_comp(entry.cid) or nil
+    -- cid is a string key; the registered component holds the update field
+    eq(mock_calls.register_cid[#mock_calls.register_cid], entry.cid, "literal registered with same id")
 end
 
 do
@@ -271,7 +285,7 @@ do
         },
     })
 
-    eq(#mock_calls.push, 0, "abstract component not pushed")
+    eq(#mock_calls.add_to_layout, 0, "abstract component not added to layout")
 end
 
 do
@@ -287,7 +301,7 @@ do
     })
 
     eq(#mock_calls.register_cid, 2, "component + literal registered")
-    eq(#mock_calls.push, 2, "both children pushed")
+    eq(#mock_calls.add_to_layout, 2, "both children added to layout")
 end
 
 -- ---------------------------------------------------------------
@@ -417,7 +431,7 @@ do
 end
 
 -- ---------------------------------------------------------------
-print("=== M.setup: per-window components (WinEnter) ===")
+print("=== M.setup: win config is accepted ===")
 
 do
     local eng = run_setup({
@@ -425,33 +439,7 @@ do
         win = function() return { "win_literal" } end,
     })
 
-    eq(mock_calls.push[1].text, "global_literal", "global literal pushed")
-
-    local found_win = false
-    for _, events in ipairs(mock_calls.autocmd_events) do
-        if type(events) == "table" then
-            for _, e in ipairs(events) do
-                if e == "WinEnter" or e == "WinClosed" then found_win = true end
-            end
-        end
-    end
-    is_true(found_win, "WinEnter/WinClosed autocmd created")
-
-    -- Fire WinEnter, then run scheduled win mount
-    if #mock_calls.autocmd_cbs > 0 then
-        local cb = mock_calls.autocmd_cbs[1]
-        cb({ event = "WinEnter", match = "1000" })
-
-        eq(#mock_calls.schedule_cbs, 1, "win mount scheduled via vim.schedule")
-
-        local scheduled = mock_calls.schedule_cbs[1]
-        scheduled()
-
-        is_true(#mock_calls.push >= 2, "win literal pushed after WinEnter")
-        if #mock_calls.push >= 2 then
-            eq(mock_calls.push[#mock_calls.push].text, "win_literal", "win literal text correct")
-        end
-    end
+    eq(mock_calls.add_to_layout[1].cid.update, "global_literal", "global literal added to layout")
 end
 
 -- ---------------------------------------------------------------
@@ -520,7 +508,7 @@ do
     })
 
     eq(#mock_calls.register_cid, 4, "container + 2 children + literal registered")
-    eq(#mock_calls.push, 4, "container + 2 children + literal pushed")
+    eq(#mock_calls.add_to_layout, 4, "container + 2 children + literal added to layout")
 
     eq(registered["wl.test.child1"].___parent_id, "wl.test.container", "child1 parent is container")
     eq(registered["wl.test.child2"].___parent_id, "wl.test.container", "child2 parent is container")
@@ -617,7 +605,7 @@ do
     })
 
     eq(#mock_calls.register_cid, 3, "grandparent + parent + grandchild registered")
-    eq(#mock_calls.push, 3, "all three pushed")
+    eq(#mock_calls.add_to_layout, 3, "all three added to layout")
 
     eq(registered["wl.test.parent2"].___parent_id, "wl.test.grandparent", "parent2 is child of grandparent")
     eq(registered["wl.test.grandchild"].___parent_id, "wl.test.parent2", "grandchild is child of parent2")

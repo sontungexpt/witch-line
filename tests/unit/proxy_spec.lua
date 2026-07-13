@@ -15,7 +15,7 @@ package.loaded["witch-line.component"] = setmetatable({}, {
     __index = function() return nil end,
 })
 
-package.loaded["witch-line.core.resolver"] = nil
+package.loaded["witch-line.core.comp.resolver"] = nil
 package.loaded["witch-line.core.comp.proxy"] = nil
 local Proxy = require("witch-line.core.comp.proxy")
 

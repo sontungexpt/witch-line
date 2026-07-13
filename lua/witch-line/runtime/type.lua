@@ -1,52 +1,48 @@
----@alias NotNil
----| string
----| number
----| table
----| boolean
----| function
----| userdata
----| thread
-
-
---- Unique identifier of a component.
---- @alias CompId NotNil
+--- @alias CompId string|number
 
 --- References other components for resolving dynamic fields.
----@class Reference
----@field events? CompId|CompId[]
----@field timing? CompId|CompId[]
----@field hidden? CompId|CompId[]
----@field style? CompId
----@field left? CompId
----@field left_style? CompId
----@field right? CompId
----@field right_style? CompId
----@field [string] CompId
+--- @class Delegator
+--- @field events? CompId|CompId[]
+--- @field timing? CompId|CompId[]
+--- @field hidden? CompId|CompId[]
+--- @field style? CompId
+--- @field left? CompId
+--- @field left_style? CompId
+--- @field right? CompId
+--- @field right_style? CompId
+--- @field [string] CompId
 
+----------------------------------------------------------------------
+-- Component Definition
+----------------------------------------------------------------------
+
+--- @class PaddingTable
+--- @field left? integer|PaddingFunc
+--- @field right? integer|PaddingFunc
 
 --- @alias PaddingFunc fun(self: ManagedComponent, session: Session): integer|PaddingTable
---- @alias PaddingTable {left: integer|nil|PaddingFunc, right:integer|nil|PaddingFunc}
----
---- @alias UpdateFunc fun(self: ManagedComponent, session: Session): nil|string, nil|HighlightStyle
----
----
+--- @alias UpdateFunc fun(self: ManagedComponent, session: Session): string|nil, HighlightStyle|nil
 --- @alias StyleFunc fun(self: ManagedComponent, session: Session): HighlightStyle
 --- @alias SideStyleFunc fun(self: ManagedComponent, session: Session): HighlightStyle|SepStyle
----
+--- @alias HiddenFunc fun(self: ManagedComponent, session: Session): boolean|nil
+
 --- @alias OnClickMouseButton "l"|"r"|"m"
 --- @alias OnClickModifier "s"|"c"|"a"|"m"
 --- @alias OnClickFunc fun(self: ManagedComponent, minwid: 0, click_times: number, mouse_button: OnClickMouseButton, modifier_pressed: OnClickModifier)
---- @alias OnClickTable {callback: OnClickFunc|string, name: string|nil}
+---
+--- @class OnClickTable
+--- @field callback string|OnClickFunc
+--- @field name? string
 
 
 --- @class Component
+--- @field id? CompId Unique identifier of the component.
 --- @field [integer] Component A table of child components, can be used to create a list of components
 ---
---- @field id? CompId Unique identifier of the component.
 ---
---- Controls how often the component is updated.
---- - `true`: update once per second.
---- - `integer`: update every *n* timer ticks.
+--- Controls update interval.
+--- true = every second
+--- integer = every n ticks
 --- @field timing? boolean|integer
 ---
 --- Whether initialization is deferred until the component is first used.
@@ -55,9 +51,8 @@
 --- Whether the component can be rendered as a standalone component.
 --- @field renderable? boolean
 ---
---- Called once when the component is created.
 --- Use this to configure or modify the component before initialization.
----@field constructor? fun(comp: Component)
+--- @field constructor? fun(comp: Component)
 ---
 --- User-configurable values.
 --- @field config? table
@@ -72,50 +67,49 @@
 --- @field win_individual? boolean
 ---
 --- A table of events that the component will listen to.
----
---- Inline syntax (strings only): `<Event> [<Pat>[,<Pat>...]] [++once]`
----
----   `"ModeChanged"`                             — event only
----   `"BufEnter *.lua"`                          — event + pattern
----   `"BufEnter *.lua,*.py"`                     — event + multiple patterns
----   `"BufEnter ++once"`                         — event + fire once
----   `"BufEnter *.lua ++once"`                   — event + pattern + once
----   `"User VeryLazy"`                           — User event name as pattern
----   `"User VeryLazy ++once"`                    — User event + once
----   `{ "BufEnter", "BufEnter *.lua ++once" }`   — array of event strings
+--- Syntax (strings only): `<Event> [<Pat>[,<Pat>...]] [++once]`
+--- Exp:
+--- - `"ModeChanged"`                             — event only
+--- - `"BufEnter *.lua"`                          — event + pattern
+--- - `"BufEnter *.lua,*.py"`                     — event + multiple patterns
+--- - `"BufEnter ++once"`                         — event + fire once
+--- - `"BufEnter *.lua ++once"`                   — event + pattern + once
+--- - `"User VeryLazy"`                           — User event name as pattern
+--- - `"User VeryLazy ++once"`                    — User event + once
+--- - `{ "BufEnter", "BufEnter *.lua ++once" }`   — array of event strings
 --- @field events? string|string[]
 ---
 --- A table of references to other components that this component depends on
---- @field delegator? Reference
+--- @field delegator? Delegator
 ---
 --- Style for the left separator.
 --- - string: highlight group name.
 --- - table: highlight properties (e.g. `{fg = "#fff", bold = true}`).
 --- - SepStyle: SepFg/SepBg/Reverse/Inherited.
---- - function(self, ctx): called and return value used as above.
+--- - function(self, session): called and return value used as above.
 --- @field left_style? HighlightStyle|SideStyleFunc|SepStyle
 ---
 --- Left separator text.
 --- - string: used as is.
---- - function(self, ctx): called and return value used.
+--- - function(self, session): called and return value used.
 --- @field left? string|UpdateFunc
 ---
 --- Style for the right separator.
 --- - string: highlight group name.
 --- - table: highlight properties.
 --- - SepStyle: SepFg/SepBg/Reverse/Inherited.
---- - function(self, ctx): called and return value used as above.
+--- - function(self, session): called and return value used as above.
 --- @field right_style? HighlightStyle|SideStyleFunc|SepStyle
 ---
 --- Right separator text.
 --- - string: used as is.
---- - function(self, ctx): called and return value used.
+--- - function(self, session): called and return value used.
 --- @field right? string|UpdateFunc
 ---
 --- Padding around the component.
 --- - integer: spaces on both sides (default 1 if nil).
 --- - table: `{left = n, right = n}` per side, each defaults to 0 if nil.
----   - Each field can also be a function(self, session) returning a number.
+--- Each field can also be a function(self, session) returning a number.
 --- - function(self, session): return integer or table as above.
 --- @field padding? integer|PaddingTable|PaddingFunc
 ---
@@ -156,8 +150,6 @@
 ---
 --- @private
 --- @field ___loaded? boolean Component has been initialized.
---- @field ___hidden? boolean Cached visibility state.
---- @field ___parent_id? CompId The id of the container component.
 --- @field ___accept_returned_style? boolean Whether the style returned by `update()` should override `style`
 ---
 --- @field ___resolved_hl_name? string Highlight group used for the main content.
@@ -175,15 +167,15 @@
 --- @class ManagedComponent : DefaultComponent | ResolvedIdComponent
 --- @field [integer] ManagedComponent A table of child components, can be used to create a list of components
 --- @field ___loaded true Always `true` for managed components.
---- @field ___parent_id CompId The id of the container component.
+--- @field ___parent_id? CompId The id of the container component.
 
 
 ---@alias LiteralComponent string
 
 ---@alias CombinedComponent
----| CombinedComponent[]
 ---| DefaultId
 ---| LiteralComponent
 ---| DefaultComponent
 ---| Component
 ---| ManagedComponent
+---| CombinedComponent[]

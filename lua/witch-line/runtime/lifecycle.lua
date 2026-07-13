@@ -1,73 +1,15 @@
-local  require =  require
+local require = require
 
-local CompAPI = require("witch-line.core.comp.resolver")
-local Proxy = require("witch-line.core.comp.proxy")
+local CompAPI = require("witch-line.runtime.behavior")
+local Proxy = require("witch-line.runtime.proxy")
 
 local Registry = require("witch-line.core.registry")
 local ManagedComps = Registry.ManagedComps
 
+local State = require("witch-line.runtime.state")
+local ensure_state = State.ensure_state
+
 local M = {}
-
-----------------------------------------------------------------------
--- CompState: allocated once per component, mutated in place.
-----------------------------------------------------------------------
-
----@class HighlightState
----@field dirty? boolean
----@field style? HighlightStyle
-
---- @class CompState
---- @field hidden? boolean
---- @field click_handler? string
---- @field theme_aware_enabled? boolean
----
---- @field value? string
---- @field style? HighlightState
----
---- @field left? string
---- @field left_style? HighlightState
----
---- @field right? string
---- @field right_style? HighlightState
-
-
---- @type table<CompId, CompState>
-local GlobalStates = {}
-
-local WindowStateMT = {
-    __index = GlobalStates,
-}
-
----@type table<integer, table<CompId, CompState>>
-local WindowStates = setmetatable({}, {
-    __index = function(t, winid)
-        local state = setmetatable({}, WindowStateMT)
-        rawset(t, winid, state)
-        return state
-    end,
-})
-
----@param cid CompId
----@param winid? integer
----@return CompState
-local function ensure_state(cid, winid)
-    local states
-    if winid then
-        states = WindowStates[winid]
-    else
-        states = GlobalStates
-    end
-
-    local state = states[cid]
-    if state then
-        return state
-    end
-
-    state = {}
-
-    states[cid] = state
-    return state
-end
 
 
 --- Update the style for a component.
@@ -83,7 +25,8 @@ local function update_style(comp, dynamic_style, state, session)
             return parent and Proxy.bind(parent, session)
         end,
         dynamic_style,
-        state.theme_aware_enabled
+        state.theme_aware_enabled,
+        session
     )
 
     local hl_state = state.style
@@ -146,9 +89,9 @@ end
 --- Update a component's state.  Mutates existing CompState in place.
 --- @param comp ProxyComponent The component to update.
 --- @param session Session The session to use for this update.
---- @param winid number The window ID to use for this update.
+--- @param winid? number The window ID to use for this update.
 --- @return boolean hidden True if the component is hidden after update.
-local update_comp = function(comp, session, winid)
+M.update_comp = function(comp, session, winid)
     CompAPI.pre_update(comp, session)
 
     local cid = comp.id
@@ -222,21 +165,5 @@ local update_comp = function(comp, session, winid)
     CompAPI.post_update(comp, session)
     return hidden
 end
-
-----------------------------------------------------------------------
--- Exports
-----------------------------------------------------------------------
-
---- Get the state map for a window (or global if nil).
----@param winid? integer
----@return table<CompId, CompState>
-M.get_states = function(winid)
-    if winid then
-        return WindowStates[winid]
-    end
-    return GlobalStates
-end
-
-M.update_comp = update_comp
 
 return M

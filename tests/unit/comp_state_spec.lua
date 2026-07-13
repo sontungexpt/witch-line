@@ -23,8 +23,8 @@ local function configure_mocks(config)
     last_mock_config = config
 end
 
--- Mock CompAPI (resolver)
-package.loaded["witch-line.core.comp.resolver"] = {
+-- Mock CompAPI (behavior)
+package.loaded["witch-line.core.comp.behavior"] = {
     pre_update = function(_comp, _session)
         if last_mock_config.pre_update then
             last_mock_config.pre_update(_comp, _session)
@@ -81,6 +81,7 @@ package.loaded["witch-line.core.comp.proxy"] = {
 -- Mock Registry
 package.loaded["witch-line.core.registry"] = {
     ManagedComps = {},
+    DepGraphKind = { All = 1, Visible = 2, Event = 3, Timer = 4 },
 }
 
 -- Mock click manager

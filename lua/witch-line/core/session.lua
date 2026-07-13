@@ -24,9 +24,10 @@ function CacheScope:get(key)
 end
 
 ---Store a value in this cache scope.
+---@generic V
 ---@param key any Cache key.
----@param value any Value to store.
----@return any value The stored value.
+---@param value V Value to store.
+---@return V value The stored value.
 function CacheScope:set(key, value)
     rawset(self._node, key, value)
     return value
@@ -38,9 +39,10 @@ end
 ---independent cached result inside the scope.
 ---
 ---The function is executed only on the first call.
----@param fn fun(...): ...any Function to memoize.
----@param ... any Arguments passed to `fn` on cache miss.
----@return ...any Cached or newly computed results.
+---@generic A, R
+---@param fn fun(...:A): ...R Function to memoize.
+---@param ... A Arguments passed to `fn` on cache miss.
+---@return ...R Cached or newly computed results.
 function CacheScope:memo(fn, ...)
     local cached = rawget(self._node, fn)
 
@@ -72,14 +74,14 @@ Session.__index = Session
 ---@return any value Stored value, or nil if absent.
 function Session:get(key)
     local store = self._store
-
     return store and rawget(store, key)
 end
 
 ---Store a value in session storage.
+---@generic V
 ---@param key any Storage key.
----@param value any Value to store.
----@return any value The stored value.
+---@param value V Value to store.
+---@return V value The stored value.
 function Session:set(key, value)
     local store = self._store
 

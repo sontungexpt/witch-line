@@ -1,4 +1,4 @@
---- Unit tests for witch-line.core.resolver
+--- Unit tests for witch-line.core.comp.resolver (delegator chain)
 --- Covers: resolve_plain_field, resolve_field_owner, delegator chains, caching, cycles.
 
 local a = require("tests.helpers.assert")
@@ -14,8 +14,8 @@ package.loaded["witch-line.core.registry"] = {
 
 package.loaded["witch-line.component"] = setmetatable({}, { __index = function() return nil end })
 
-package.loaded["witch-line.core.resolver"] = nil
-local Resolver = require("witch-line.core.resolver")
+package.loaded["witch-line.core.comp.resolver"] = nil
+local Resolver = require("witch-line.core.comp.resolver")
 
 local function clear(t)
     for k in pairs(t) do t[k] = nil end
@@ -24,8 +24,8 @@ end
 local function reset()
     clear(ManagedComps)
     -- Force-reload resolver to clear its internal cache
-    package.loaded["witch-line.core.resolver"] = nil
-    Resolver = require("witch-line.core.resolver")
+    package.loaded["witch-line.core.comp.resolver"] = nil
+    Resolver = require("witch-line.core.comp.resolver")
 end
 
 -- ============================================================

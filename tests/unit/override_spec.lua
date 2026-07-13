@@ -1,10 +1,10 @@
---- Unit tests for witch-line.core.override
+--- Unit tests for witch-line.core.comp.override
 --- Covers: type validation, merge behavior, accept_returned_style, theme_aware.
 
 local a = require("tests.helpers.assert")
 
 -- Load override (it returns a function directly)
-local apply_override = require("witch-line.core.override")
+local apply_override = require("witch-line.core.comp.override")
 
 -- ============================================================
 print("=== override: basic field override ===")
