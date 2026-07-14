@@ -1,3 +1,6 @@
+local next = next
+local noop = function() end
+
 local M = {}
 
 ---@enum DepGraphKind
@@ -5,7 +8,6 @@ M.DepGraphKind = {
     Event = 1,
     Visible = 2,
     Timer = 3,
-    All = 4,
 }
 
 
@@ -14,10 +16,8 @@ local DepGraph = {
     [M.DepGraphKind.Event] = {},
     [M.DepGraphKind.Timer] = {},
     [M.DepGraphKind.Visible] = {},
-    [M.DepGraphKind.All] = {},
 }
 
-local noop = function() end
 
 ---@param kind DepGraphKind
 ---@param source_id CompId
@@ -51,14 +51,10 @@ M.iterate_dependent_ids = function(kind, comp_id)
     return noop
 end
 
----@param target "dep_graph"|nil
-M.inspect = function(target)
+M.inspect = function()
     local notifier = require("witch-line.util.notifier")
-    if target == "dep_graph" then
-        notifier.info(vim.inspect(DepGraph))
-    else
-        notifier.info(vim.inspect(DepGraph))
-    end
+    notifier.info(vim.inspect(DepGraph))
+    return DepGraph
 end
 
 return M

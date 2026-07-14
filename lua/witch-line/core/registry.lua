@@ -17,19 +17,10 @@ M.register = function(cid, comp)
     return comp
 end
 
----@param target "dep_graph"|"comps"
-M.inspect = function(target)
+M.inspect = function()
     local notifier = require("witch-line.util.notifier")
-    if target == "dep_graph" then
-        Dependency.inspect(target)
-    elseif target == "comps" then
-        notifier.info(vim.inspect(ManagedComps))
-    else
-        notifier.info(vim.inspect({
-            DepGraph = "(see dep_graph)",
-            Comps = ManagedComps,
-        }))
-    end
+    notifier.info(vim.inspect(ManagedComps))
+    return ManagedComps
 end
 
 return M

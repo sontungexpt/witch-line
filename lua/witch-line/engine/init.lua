@@ -37,7 +37,7 @@ local resolve_id = function(comp)
     if comp.___builtin then
         --- @cast id DefaultId
         return id
-    elseif id  then
+    elseif id ~= nil then
         local id_type = type(id)
         if id_type ~= "string" and id_type ~= "number" then
             require("witch-line.util.notifier").error("Id must be a string or number: " .. tostring(id))
@@ -53,11 +53,12 @@ local resolve_id = function(comp)
     end
 end
 
-local DelegatorDepMap = {
+local DelegateDepMap = {
     events = DepGraphKind.Event,
     timing = DepGraphKind.Timer,
     hidden = DepGraphKind.Visible,
 }
+
 --- Loads a component, resolving its path if necessary
 --- @param comp Component
 --- @param parent_id? CompId
@@ -72,7 +73,7 @@ load_component = function(comp, parent_id)
     if type(path) == "string" then
         local builtin = BuiltinComp[path]
         if builtin then
-            comp = require("witch-line.runtime.override")(builtin, comp)
+            comp = require("witch-line.components.util")(builtin, comp)
         end
     end
 
@@ -83,10 +84,10 @@ load_component = function(comp, parent_id)
     local cid = resolve_id(comp)
 
     --- Handle dependencies links
-    local delegator = comp.delegator
-    if type(delegator) == "table" then
-        for field, kind in pairs(DelegatorDepMap) do
-            local dependency = delegator[field]
+    local delegate = comp.delegate
+    if type(delegate) == "table" then
+        for field, kind in pairs(DelegateDepMap) do
+            local dependency = delegate[field]
             if dependency then
                 if type(dependency) == "table" then
                     for i = 1, #dependency do
@@ -103,11 +104,9 @@ load_component = function(comp, parent_id)
                     end
                 elseif ManagedComps[dependency] == nil then
                     local builtin = BuiltinComp[dependency]
-
                     if builtin then
                         load_component(builtin)
                     end
-
                     link_dependency(kind, dependency, cid)
                 end
             end
@@ -115,7 +114,9 @@ load_component = function(comp, parent_id)
     end
 
     if parent_id then
-        link_dependency(DepGraphKind.All, parent_id, cid)
+        for field, kind in pairs(DelegateDepMap) do
+            link_dependency(kind, parent_id, cid)
+        end
     end
 
     --- Bind update conditions

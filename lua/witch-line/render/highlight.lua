@@ -14,10 +14,12 @@ local M = {}
 --- @class HighlightDef : vim.api.keyset.highlight
 --- @field theme_aware? boolean
 
---- @alias HighlightStyle HighlightDef | string
+--- @alias HighlightStyle
+--- | HighlightDef
+--- | string
 
 ---@type table<string, integer>
-local ColorRgb24Bit = {}
+local Rgb24bit = {}
 
 ---@type table<string, HighlightStyle>
 local Styles = {}
@@ -35,20 +37,23 @@ M.set_theme_aware_enabled = function(value)
     theme_aware_enabled = value
 end
 
---- Inspects the current highlight cache.
+--- Inspects the current highlight cache for debug.
 --- @param target "rgb24bit"|"styles"|nil target to inspect
+--- @return table<string, integer>|table<string, HighlightStyle>
 M.inspect = function(target)
+    local view = {
+        rgb24bit = Rgb24bit,
+        styles = Styles,
+    }
+
     local notifier = require("witch-line.util.notifier")
-    if target == "rgb24bit" then
-        notifier.info(vim.inspect(ColorRgb24Bit))
-    elseif target == "styles" then
-        notifier.info(vim.inspect(Styles))
-    else
-        notifier.info(vim.inspect {
-            ColorRgb24Bit = ColorRgb24Bit,
-            Styles = Styles,
-        })
+    if target then
+        notifier.info(vim.inspect(view[target]))
+        return view[target]
     end
+
+    notifier.info(vim.inspect(view))
+    return view
 end
 
 
@@ -160,12 +165,12 @@ local resolve_color = function(c, field, auto_adjust)
             return nil
         end
         -- Read cache
-        num = ColorRgb24Bit[c]
+        num = Rgb24bit[c]
         if not num then
             num = nvim_get_color_by_name(c)
             if num ~= -1 then
                 -- cache color
-                ColorRgb24Bit[c] = num
+                Rgb24bit[c] = num
             else
                 local hlid = hlID(c)
                 if hlid == 0 then

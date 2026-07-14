@@ -82,7 +82,7 @@ local Name = {
     id = "wl.file.name",
     ___builtin = true,
 
-    delegator = {
+    delegate = {
         events = INTERFACE_ID,
         context = INTERFACE_ID,
     },
@@ -101,7 +101,7 @@ local Icon = {
     id = "wl.file.icon",
     ___builtin = true,
 
-    delegator = {
+    delegate = {
         events = INTERFACE_ID,
         context = INTERFACE_ID,
     },

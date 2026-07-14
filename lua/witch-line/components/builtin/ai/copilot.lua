@@ -5,7 +5,7 @@ local is_enabled
 local uv = vim.uv or vim.loop
 
 local request_update = function(comp, eager)
-    require("witch-line.engine.request").update_comp(comp, eager)
+    require("witch-line.engine.scheduler").update_comp(comp, eager)
 end
 
 local Copilot = {

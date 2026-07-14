@@ -2,7 +2,7 @@ local vim = vim
 local uv, api, bo = vim.uv or vim.loop, vim.api, vim.bo
 local colors = require("witch-line.constant.color")
 
-local function get_root_by_git(dir_path)
+local get_root_by_git = function(dir_path)
     local dir = dir_path or uv.cwd()
     local prev = ""
     while dir ~= prev do
@@ -54,7 +54,7 @@ local Branch = {
         local git_root = nil
 
         local function refresh_branch()
-            if not git_root then
+            if git_root == nil then
                 branch_name = ""
                 return
             end
@@ -68,14 +68,16 @@ local Branch = {
             end
         end
 
-        local watcher, watcher_opts = nil, nil
         local on_head_change = vim.schedule_wrap(function()
             refresh_branch()
-            require("witch-line.engine.request").update_comp(self)
+            require("witch-line.engine.scheduler").update_comp(self)
         end)
 
-        local function update_repo(new_dir_path)
-            if not watcher then
+        local watcher, watcher_opts
+        --- Updates the repository root and starts watching for changes.
+        --- @param new_dir_path? string The new directory path to watch.
+        local update_repo = function(new_dir_path)
+            if watcher == nil then
                 if uv.os_uname().sysname == "Windows_NT" then
                     watcher = assert(uv.new_fs_poll())
                     watcher_opts = 1000
@@ -138,7 +140,10 @@ local function process_diff(stdout)
     return { added = added, modified = modified, removed = removed }
 end
 
---- @type DefaultComponent
+
+--- @class DiffInterface : DefaultComponent
+--- @field _processes table<integer, vim.SystemObj>
+--- @field _diff_cache table<integer, DiffResult>
 Diff.Interface = {
     id = "wl.git.diff.interface",
     ___builtin = true,
@@ -149,6 +154,8 @@ Diff.Interface = {
         self._processes = self._processes or {}
         self._diff_cache = self._diff_cache or {}
 
+        --- Kills the diff process for the given buffer.
+        --- @param bufnr integer
         local kill_process = function(bufnr)
             local proc = self._processes[bufnr]
             if proc and not proc:is_closing() then
@@ -158,6 +165,10 @@ Diff.Interface = {
             self._diff_cache[bufnr] = nil
         end
 
+        --- Spawns a diff process for the given buffer.
+        --- @param bufnr integer
+        --- @param parent_dir string
+        --- @param filename string
         local spawn_diff = function(bufnr, parent_dir, filename)
             if self._processes[bufnr] then return end
             self._processes[bufnr] = vim.system({
@@ -168,10 +179,10 @@ Diff.Interface = {
                 if out.code == 15 then return end
                 vim.schedule(function()
                     if not api.nvim_buf_is_valid(bufnr) then return end
-                    if out.stdout and #out.stdout > 0 then
+                    if out.stdout and out.stdout ~= "" then
                         self._diff_cache[bufnr] = process_diff(out.stdout)
                     end
-                    require("witch-line.engine.request").update_comp(self)
+                    require("witch-line.engine.scheduler").update_comp(self)
                 end)
             end)
         end
@@ -196,7 +207,7 @@ Diff.Interface = {
                         spawn_diff(bufnr, parent_dir, filename)
                     end
                 else
-                    require("witch-line.engine.request").update_comp(self)
+                    require("witch-line.engine.scheduler").update_comp(self)
                 end
             end,
         })
@@ -210,7 +221,7 @@ Diff.Interface = {
 }
 
 
-local function diff_update(self, session, field)
+local diff_update = function(self, session, field)
     local ctx = self.context(self, session)
     if ctx.diff then
         local v = ctx.diff[field]
@@ -234,7 +245,7 @@ Diff.Added = {
     config = {
         icon = "",
     },
-    delegator = DIFF_SHARED_REF,
+    delegate = DIFF_SHARED_REF,
     style = { fg = colors.green },
     update = function(self, session)
         return diff_update(self, session, "added")
@@ -248,7 +259,7 @@ Diff.Modified = {
     config = {
         icon = "",
     },
-    delegator = DIFF_SHARED_REF,
+    delegate = DIFF_SHARED_REF,
     style = { fg = colors.cyan },
     update = function(self, session)
         return diff_update(self, session, "modified")
@@ -262,7 +273,7 @@ Diff.Removed = {
     config = {
         icon = "",
     },
-    delegator = DIFF_SHARED_REF,
+    delegate = DIFF_SHARED_REF,
     style = { fg = colors.red },
     update = function(self, session)
         return diff_update(self, session, "removed")

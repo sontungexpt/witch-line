@@ -6,8 +6,13 @@ local M = {}
 --- Sentinel key for once-only ids (unique table ref, can't collide with numeric keys).
 local ONCE = 0
 
+--- ```
+--- {
+---     comp1, comp2,
+---     [ONCE] = { comp_once1, comp_once2 }
+--- }
+--- ```
 --- @alias EventBucket table<table|integer,CompId|CompId[]>
---- { [1] = comp1, [2] = comp2, [ONCE] = { comp_once1, comp_once2 } }
 
 --- @type table<string, EventBucket>
 --- Patternless events, combined into one autocmd at compile time.
@@ -53,6 +58,19 @@ local UserEvents = {}
 ---     }
 ---   }
 local PatternEvents = {}
+
+--- Get or create an entry in a store table.
+---@param store table
+---@param key any
+---@return table
+local ensure = function(store, key)
+    local b = store[key]
+    if b == nil then
+        b = {}
+        store[key] = b
+    end
+    return b
+end
 
 --- Add comp_id to a bucket. Normal → numeric index, once → bucket[ONCE].
 ---@param bucket EventBucket
@@ -105,12 +123,7 @@ local register_string_event = function(e, comp_id)
     local s_at = str_find(e, " ", pos, true)
     if s_at == nil then
         local name = str_sub(e, pos)
-        local bucket = VimEvents[name]
-        if bucket == nil then
-            bucket = {}
-            VimEvents[name] = bucket
-        end
-        add_to_bucket(bucket, comp_id, false)
+        add_to_bucket(ensure(VimEvents, name), comp_id, false)
         return
     end
     local event_name = str_sub(e, pos, s_at - 1)
@@ -120,12 +133,7 @@ local register_string_event = function(e, comp_id)
         pos = pos + 1
     end
     if pos > slen then
-        local bucket = VimEvents[event_name]
-        if bucket == nil then
-            bucket = {}
-            VimEvents[event_name] = bucket
-        end
-        add_to_bucket(bucket, comp_id, false)
+        add_to_bucket(ensure(VimEvents, event_name), comp_id, false)
         return
     end
 
@@ -181,35 +189,14 @@ local register_string_event = function(e, comp_id)
 
     if event_name == "User" then
         for i = 1, npat do
-            local bucket = UserEvents[patterns[i]]
-            if bucket == nil then
-                bucket = {}
-                UserEvents[patterns[i]] = bucket
-            end
-            add_to_bucket(bucket, comp_id, once)
+            add_to_bucket(ensure(UserEvents, patterns[i]), comp_id, once)
         end
     elseif npat > 0 then
         for i = 1, npat do
-            local pat = patterns[i]
-            local pat_bucket = PatternEvents[pat]
-            if pat_bucket == nil then
-                pat_bucket = {}
-                PatternEvents[pat] = pat_bucket
-            end
-            local bucket = pat_bucket[event_name]
-            if bucket == nil then
-                bucket = {}
-                pat_bucket[event_name] = bucket
-            end
-            add_to_bucket(bucket, comp_id, once)
+            add_to_bucket(ensure(ensure(PatternEvents, patterns[i]), event_name), comp_id, once)
         end
     else
-        local bucket = VimEvents[event_name]
-        if bucket == nil then
-            bucket = {}
-            VimEvents[event_name] = bucket
-        end
-        add_to_bucket(bucket, comp_id, once)
+        add_to_bucket(ensure(VimEvents, event_name), comp_id, once)
     end
 end
 
@@ -239,21 +226,19 @@ end
 --- Batches all IDs into a single autocmd.
 --- @param cid CompId
 M.register_vim_enter_once = function(cid)
-    local bucket = VimEvents["VimEnter"]
-    if bucket == nil then
-        bucket = {}
-        VimEvents["VimEnter"] = bucket
-    end
-    add_to_bucket(bucket, cid, true)
+    add_to_bucket(ensure(VimEvents, "VimEnter"), cid, true)
 end
 
 --- Print current registry state for debugging.
+--- @return table
 M.inspect = function()
-    require("witch-line.util.notifier").info(vim.inspect({
-        SimpleEvents = VimEvents,
+    local view = {
+        VimEvents = VimEvents,
         UserEvents = UserEvents,
         PatternEvents = PatternEvents,
-    }))
+    }
+    require("witch-line.util.notifier").info(vim.inspect(view))
+    return view
 end
 
 --- Get a table's keys as a list.
@@ -271,7 +256,7 @@ end
 
 --- Compile registries into Neovim autocmds (call once after all register_events).
 ---
---- Autocmds created: 1 for SimpleEvents + 1 for UserEvents + 1 per PatternEvents key.
+--- Autocmds created: 1 for VimEvents + 1 for UserEvents + 1 per PatternEvents key.
 --- ONCE is managed in-callback (dispatch bucket[ONCE] then nil it) instead of
 --- Neovim's `once=true`, avoiding one autocmd per (event, pattern, once) triple.
 ---

@@ -218,15 +218,15 @@ end
 --- Static: returns nil if invalid. Dynamic: returns "" if invalid.
 --- @param comp ManagedComponent
 --- @param side "left"|"right"
---- @param resolve_parent_fn fun(id: CompId): ManagedComponent|nil
+--- @param resolve_parent fun(id: CompId): ManagedComponent|nil
 --- @param session Session
 --- @return string|nil value
 --- @return boolean dynamic
-function M.side(comp, side, resolve_parent_fn, session)
+function M.side(comp, side, resolve_parent, session)
     local value, dynamic = resolve_inherited_value(
         comp,
         side,
-        resolve_parent_fn,
+        resolve_parent,
         nil,
         nil,
         session
@@ -357,12 +357,11 @@ end
 --- @param comp ManagedComponent
 --- @param resolve_parent fun(id: CompId): ManagedComponent|nil
 --- @param dynamic_style? HighlightStyle
---- @param theme_aware boolean
 --- @param session Session
 --- @return HighlightStyle|nil
 --- @return boolean
 --- @return integer
-M.style = function(comp, resolve_parent, dynamic_style, theme_aware, session, ...)
+M.style = function(comp, resolve_parent, dynamic_style, session, ...)
     local dynamic_style_type = type(dynamic_style)
     if comp.___accept_returned_style == false
         or (
@@ -389,19 +388,18 @@ M.style = function(comp, resolve_parent, dynamic_style, theme_aware, session, ..
 
     --- Use local value only
     if inherit_count == 0 then
-        local delegator = comp.delegator
-        if type(delegator) == "table" then
-            local delegator_id = delegator.style
-            if delegator_id then
-                --- Link to the delegator's style
+        local delegate = comp.delegate
+        if type(delegate) == "table" then
+            local delegate_id = delegate.style
+            if delegate_id then
+                --- Link to the delegate's style
                 local resolve_hl_name = require("witch-line.runtime.resolver").hl_name
-                style = resolve_hl_name(delegator_id)
+                style = resolve_hl_name(delegate_id)
                 return style, dynamic, inherit_count
             end
         end
     end
 
-    normalize_style(style, theme_aware)
     return style, dynamic, inherit_count
 end
 

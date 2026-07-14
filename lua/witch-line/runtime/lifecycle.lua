@@ -25,7 +25,6 @@ local function update_style(comp, dynamic_style, state, session)
             return parent and Proxy.bind(parent, session)
         end,
         dynamic_style,
-        state.theme_aware_enabled,
         session
     )
 
@@ -65,7 +64,6 @@ local function update_side_style(
         comp,
         side,
         main_hl_state and main_hl_state.style,
-        state.theme_aware_enabled,
         session
     )
 
@@ -162,6 +160,7 @@ M.update_comp = function(comp, session, winid)
             end
         end
     end
+
     CompAPI.post_update(comp, session)
     return hidden
 end

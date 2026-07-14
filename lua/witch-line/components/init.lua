@@ -53,8 +53,8 @@ local Loaders = {
     ["wl.file.size"]            = function() return require("witch-line.components.builtin.file").size end,
 
     ["wl.copilot"]              = function() return require("witch-line.components.builtin.ai.copilot") end,
-    ["wl.codeium"]              = function() return require("witch-line.components.builtin.ai.codeium") end,
-    ["wl.codeium.neocodeium"]   = function() return require("witch-line.components.builtin.ai.neocodeium") end,
+    ["wl.codeium"]              = function() return require("witch-line.components.builtin.ai.codeium.codeium") end,
+    ["wl.codeium.neocodeium"]   = function() return require("witch-line.components.builtin.ai.codeium.neocodeium") end,
 
     ["wl.diagnostic.error"]     = function() return require("witch-line.components.builtin.diagnostic").error end,
     ["wl.diagnostic.warn"]      = function() return require("witch-line.components.builtin.diagnostic").warn end,
@@ -88,7 +88,7 @@ local Loaders = {
 
 --- @type table<DefaultId, DefaultComponent>
 local Components = setmetatable({}, {
-    __index = function(self, id)
+    __index = function(_, id)
         local loader = Loaders[id]
         return loader and loader()
     end,

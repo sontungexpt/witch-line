@@ -6,7 +6,7 @@ local ManagedComps = require("witch-line.core.registry").ManagedComps
 local M = {}
 
 ----------------------------------------------------------------------
--- Delegator chain resolution
+-- Delegate chain resolution
 ----------------------------------------------------------------------
 
 ---@alias RawValueResult { value: any, owner: ManagedComponent|DefaultComponent }
@@ -14,11 +14,11 @@ local M = {}
 ---@type table<string, table<CompId, vim.NIL|RawValueResult>>
 local raw_field_cache = {}
 
---- Resolve a field by following the component's `delegator` chain.
+--- Resolve a field by following the component's `delegate` chain.
 ---
 --- Lookup order:
 --- 1. Check the component's own field first.
---- 2. Follow `delegator[key]` references until a value is found.
+--- 2. Follow `delegate[key]` references until a value is found.
 --- 3. Cache the resolved result for all traversed components.
 ---
 --- Cache behavior:
@@ -50,9 +50,9 @@ local function resolve_raw_field(raw_comp, key)
 
     local seen = { [current_id] = true }
 
-    local delegator = raw_comp.delegator
-    while type(delegator) == "table" do
-        local next_id = delegator[key]
+    local delegate = raw_comp.delegate
+    while type(delegate) == "table" do
+        local next_id = delegate[key]
         if next_id == nil or seen[next_id] then
             break
         end
@@ -77,7 +77,7 @@ local function resolve_raw_field(raw_comp, key)
             break
         end
 
-        delegator = comp.delegator
+        delegate = comp.delegate
     end
 
     result = result or NIL
@@ -106,7 +106,7 @@ end
 
 --- Resolve the component that owns a field.
 ---
---- This performs a normal delegator-chain lookup but only returns the component
+--- This performs a normal delegate-chain lookup but only returns the component
 --- in which the field is defined.
 ---
 --- @param comp ManagedComponent|DefaultComponent Component to resolve from.
@@ -120,11 +120,13 @@ M.resolve_field_owner = function(comp, key)
     return r[2]
 end
 
---- Inspect the set of cached component IDs for a field key.
+--- Inspect the set of cached component for debug.
 --- @param key? any
+--- @return table
 M.inspect = function(key)
     local cache = key and raw_field_cache[key] or raw_field_cache
     require("witch-line.util.notifier").info(vim.inspect(cache))
+    return cache
 end
 
 --- Clear the entire raw field cache, or cache for a specific key.
@@ -133,8 +135,9 @@ M.clear_cache = function(key)
     if key then
         raw_field_cache[key] = nil
     else
-        for k in pairs(raw_field_cache) do raw_field_cache[k] = nil end
+        raw_field_cache = {}
     end
 end
+
 
 return M

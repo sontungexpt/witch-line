@@ -1,5 +1,5 @@
 local request_update = function(comp, eager)
-    require("witch-line.engine.request").update_comp(comp, eager)
+    require("witch-line.engine.scheduler").update_comp(comp, eager)
 end
 
 ---@type DefaultComponent

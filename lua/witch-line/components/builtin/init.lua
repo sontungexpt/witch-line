@@ -16,6 +16,6 @@ return {
     nvim_dap = require("witch-line.components.builtin.nvim_dap"),
     os_uname = require("witch-line.components.builtin.os_uname"),
     copilot = require("witch-line.components.builtin.ai.copilot"),
-    codeium = require("witch-line.components.builtin.ai.codeium"),
-    neocodeium = require("witch-line.components.builtin.ai.neocodeium"),
+    codeium = require("witch-line.components.builtin.ai.codeium.codeium"),
+    neocodeium = require("witch-line.components.builtin.ai.codeium.neocodeium"),
 }

@@ -9,10 +9,10 @@ local COMMANDS = {
     end,
     inspect = {
         event_store = function(...)
-            return require("witch-line.event.event").inspect(...)
+            return require("witch-line.event.event").inspect()
         end,
         timer_store = function(...)
-            return require("witch-line.event.timer").inspect(...)
+            return require("witch-line.event.timer").inspect()
         end,
         comp_manager = {
             comps = function(...)

@@ -1,7 +1,7 @@
 --- @alias CompId string|number
 
 --- References other components for resolving dynamic fields.
---- @class Delegator
+--- @class Delegate
 --- @field events? CompId|CompId[]
 --- @field timing? CompId|CompId[]
 --- @field hidden? CompId|CompId[]
@@ -80,7 +80,7 @@
 --- @field events? string|string[]
 ---
 --- A table of references to other components that this component depends on
---- @field delegator? Delegator
+--- @field delegate? Delegate
 ---
 --- Style for the left separator.
 --- - string: highlight group name.

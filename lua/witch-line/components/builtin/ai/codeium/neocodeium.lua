@@ -44,7 +44,7 @@ local Neocodeium = {
                         0,
                         math.floor(1000 / self.config.fps),
                         vim.schedule_wrap(function()
-                            require("witch-line.engine.request").update_comp(self, true)
+                            require("witch-line.engine.scheduler").update_comp(self, true)
                         end)
                     )
                 end
