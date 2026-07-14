@@ -240,83 +240,49 @@ function M.side(comp, side, resolve_parent, session)
 end
 
 
---- Attach theme metadata to style.
---- @param style HighlightStyle
---- @param enable_theme_aware boolean
---- @return HighlightStyle
-local normalize_style = function(style, enable_theme_aware)
-    if type(style) == "table" and style.theme_aware == nil then
-        style.theme_aware = enable_theme_aware
-    end
-    return style
-end
-M.normalize_style = normalize_style
-
----@param value? HighlightStyle|string|number
----@param seen? table<any, boolean>
----@return HighlightDef|nil
-local function resolve_hl(value, seen)
+---@param value? HighlightDef|string|number
+---@return HighlightDef
+local resolve_hl = function(value)
     local t = type(value)
-
+    local theme_aware = nil
     if t == "table" then
+        theme_aware = value.theme_aware
         local link = value.link
-
-        if link ~= nil then
-            seen = seen or {}
-
-            if seen[link] then
-                return nil
-            end
-
-            seen[link] = true
-
-            return resolve_hl(link, seen)
+        if link == nil then
+            return value
         end
 
-        return value
+        --- link to other highlight
+        value = link
+        t = type(value)
     end
 
-
+    local hl
     if t == "string" then
-        local ok, style = pcall(nvim_get_hl, 0, {
+        hl = nvim_get_hl(0, {
             name = value,
-            link = true,
+            create = false,
+            link = false
         })
 
-        if not ok then
-            return nil
+        --- @cast hl HighlightDef
+        hl.theme_aware = theme_aware
+        return hl
+    elseif t == "number" then
+        -- id must be a positive integer
+        if value < 1 then
+            return {}
         end
-        if style.link ~= nil then
-            return resolve_hl(style.link, seen)
-        end
-
-        return style
-    end
-
-
-    if t == "number" then
-        if value == 0 then
-            return nil
-        end
-
-        local ok, style = pcall(nvim_get_hl, 0, {
+        hl = nvim_get_hl(0, {
             id = value,
-            link = true,
+            create  = false,
+            link = false
         })
-
-        if not ok then
-            return nil
-        end
-
-        if style.link ~= nil then
-            return resolve_hl(style.link, seen)
-        end
-
-        return style
+        --- @cast hl HighlightDef
+        hl.theme_aware = theme_aware
+        return hl
     end
-
-
-    return nil
+    error("Invalid highlight value: " .. tostring(value) .. " type: " .. t)
 end
 
 --- Merge child highlight with a parent highlight or highlight group name.
@@ -464,7 +430,6 @@ M.side_style = function(
     end
 
     if t == "table" then
-        normalize_style(side_style, theme_aware)
         return side_style, dynamic
     elseif t == "number" then
         return side_style, dynamic

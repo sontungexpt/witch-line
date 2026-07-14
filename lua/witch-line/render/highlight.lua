@@ -1,8 +1,7 @@
 local type, next, pcall, pairs = type, next, pcall, pairs
 
 local api = vim.api
-local hlID, nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
-    vim.fn.hlID,
+local nvim_set_hl, nvim_get_hl, nvim_get_color_by_name =
     api.nvim_set_hl,
     api.nvim_get_hl,
     api.nvim_get_color_by_name
@@ -172,12 +171,12 @@ local resolve_color = function(c, field, auto_adjust)
                 -- cache color
                 Rgb24bit[c] = num
             else
-                local hlid = hlID(c)
-                if hlid == 0 then
-                    return nil
-                end
                 -- Not cache here because c can be changed by user
-                num = nvim_get_hl(0, { id = hlid, create = false })[field]
+                num = nvim_get_hl(0, {
+                    name = c,
+                    link = false, -- return color table instead of link name
+                    create = false, -- do not create if it not exists and return empty dict instead of error
+                })[field]
             end
         end
     elseif t ~= "number" then
@@ -187,11 +186,22 @@ local resolve_color = function(c, field, auto_adjust)
     if theme_aware_enabled and auto_adjust then
         local stbg = nvim_get_hl(0, {
             name = "StatusLine",
-            create = false,
+            create = false, -- do not create if it not exists and return empty dict instead of error
         }).bg
         return stbg and adjust(num, stbg) or num
     end
     return num
+end
+
+--- Attach theme metadata to style.
+--- @param style HighlightStyle
+--- @param enable_theme_aware boolean
+--- @return HighlightStyle
+M.normalize_style = function(style, enable_theme_aware)
+    if type(style) == "table" and style.theme_aware == nil then
+        style.theme_aware = enable_theme_aware
+    end
+    return style
 end
 
 --- Define or update a Neovim highlight group.
