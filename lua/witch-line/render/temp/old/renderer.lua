@@ -73,8 +73,10 @@ local function ensure_side_hl_name(comp, side)
 end
 
 
+
+
 ----------------------------------------------------------------------
--- Phase 4: Render — highlight + output
+-- Build statusline string from state
 ----------------------------------------------------------------------
 
 --- Apply a dirty highlight from state and clear the dirty flag.
@@ -87,85 +89,78 @@ local function apply_if_dirty(hl_name, hl_state)
     end
 end
 
---- Render a side separator: ensure highlight, apply if dirty, emit string.
---- @param out table Output buffer.
---- @param n integer Current output index.
---- @param comp ManagedComponent
---- @param side "left"|"right"
---- @param text string Separator text.
---- @param hl_state? HighlightState
---- @return integer n Updated output index.
-local function render_side(out, n, comp, side, text, hl_state)
-    if hl_state and hl_state.style then
-        local hl = ensure_side_hl_name(comp, side)
-        apply_if_dirty(hl, hl_state)
-        n = n + 1
-        out[n] = assign_highlight_name(text, hl)
-    else
-        -- No separate side style: inherit from main highlight group
-        local main_hl = ensure_hl_name(comp)
-        n = n + 1
-        out[n] = assign_highlight_name(text, main_hl)
-    end
-    return n
-end
-
 --- Build the statusline string by reading values and styles from state.
---- Applies dirty highlights as a side effect (lazy highlight application).
----
---- Algorithm:
----   For each component in layout:
----     if not hidden:
----       if left  → ensure left hl,  apply dirty, render left
----       if value → ensure main hl,  apply dirty, render value
----       if right → ensure right hl, apply dirty, render right
----
+--- Applies dirty highlights as a side effect.
 ---@param layout CompId[]
 ---@param states table<CompId, CompState>
+---@param skip? integer  Bitmask of slot indices to skip.
 ---@return string
-local function build_value(layout, states)
+local function build_value(layout, states, skip)
     local out, n = {}, 0
     for i = 1, #layout do
         local comp_id = layout[i]
         local s = states[comp_id]
         if s and not s.hidden then
-            local comp = ManagedComps[comp_id]
-            if comp then
-                -- Click handler start
-                local ch = s.click_handler
-                if ch then
-                    n = n + 1
-                    out[n] = ch
-                end
-
-                -- Left separator (independent of main value)
-                local left = s.left
-                if left and left ~= "" then
-                    n = render_side(out, n, comp, "left", left, s.left_style)
-                    s.left_width = nvim_strwidth(left)
-                end
-
-                -- Main value
-                local val = s.value
-                if val and val ~= "" then
+            local val = s.value
+            if val and val ~= "" then
+                local comp = ManagedComps[comp_id]
+                if comp then
                     local hl_name = ensure_hl_name(comp)
+
+                    -- Apply main highlight if dirty
                     apply_if_dirty(hl_name, s.style)
+
+                    -- Click handler
+                    local ch = s.click_handler
+                    if ch then
+                        n = n + 1
+                        out[n] = ch
+                    end
+
+                    -- Left separator
+                    local left = s.left
+                    if left and left ~= "" then
+                        local lhs = s.left_style
+                        local lhl
+                        if lhs and lhs.style then
+                            lhl = ensure_side_hl_name(comp, "left")
+                            apply_if_dirty(lhl, lhs)
+                        else
+                            lhl = hl_name
+                        end
+                        n = n + 1
+                        out[n] = assign_highlight_name(left, lhl)
+                    end
+
+                    -- Main value
                     n = n + 1
                     out[n] = assign_highlight_name(val, hl_name)
+
+                    -- Right separator
+                    local right = s.right
+                    if right and right ~= "" then
+                        local rhs = s.right_style
+                        local rhl
+                        if rhs and rhs.style then
+                            rhl = ensure_side_hl_name(comp, "right")
+                            apply_if_dirty(rhl, rhs)
+                        else
+                            rhl = hl_name
+                        end
+                        n = n + 1
+                        out[n] = assign_highlight_name(right, rhl)
+                    end
+
+                    -- Click handler end
+                    if ch then
+                        n = n + 1
+                        out[n] = "%X"
+                    end
+
+                    -- Widths for flex truncation
                     s.width = nvim_strwidth(val)
-                end
-
-                -- Right separator (independent of main value)
-                local right = s.right
-                if right and right ~= "" then
-                    n = render_side(out, n, comp, "right", right, s.right_style)
-                    s.right_width = nvim_strwidth(right)
-                end
-
-                -- Click handler end
-                if ch then
-                    n = n + 1
-                    out[n] = "%X"
+                    if left then s.left_width = nvim_strwidth(left) end
+                    if right then s.right_width = nvim_strwidth(right) end
                 end
             end
         end

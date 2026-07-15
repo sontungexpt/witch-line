@@ -152,9 +152,9 @@ end
 ---
 --- @param c? string|integer  Color name, RGB value, or highlight group.
 --- @param field "fg"|"bg"   Field to fetch from highlight group.
---- @param theme_aware? boolean  Adjust color based on statusline background if true.
+--- @param auto_adjust? boolean  Adjust color based on statusline background if true.
 --- @return integer|string|"NONE"|nil  Resolved 24-bit RGB, "NONE", or nil if not found.
-local resolve_color = function(c, field, theme_aware)
+local resolve_color = function(c, field, auto_adjust)
     local t = type(c)
     local num = c
     if t == "string" then
@@ -165,7 +165,7 @@ local resolve_color = function(c, field, theme_aware)
         end
         -- Read cache
         num = Rgb24bit[c]
-        if num == nil then
+        if not num then
             num = nvim_get_color_by_name(c)
             if num ~= -1 then
                 -- cache color
@@ -182,16 +182,14 @@ local resolve_color = function(c, field, theme_aware)
     elseif t ~= "number" then
         return nil
     end
-
     --- @cast num integer num is number here
-    if theme_aware_enabled and theme_aware then
+    if theme_aware_enabled and auto_adjust then
         local stbg = nvim_get_hl(0, {
             name = "StatusLine",
             create = false, -- do not create if it not exists and return empty dict instead of error
         }).bg
         return stbg and adjust(num, stbg) or num
     end
-
     return num
 end
 

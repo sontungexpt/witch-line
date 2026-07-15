@@ -277,6 +277,8 @@ M.on_event = function(work)
         dispatch_debounce(...)
     end
 
+    ---@param bucket EventBucket
+    ---@param e vim.api.keyset.create_autocmd.callback_args
     local enqueue = function(bucket, e)
         if bucket == nil then return end
         for i = 1, #bucket do

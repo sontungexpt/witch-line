@@ -31,53 +31,42 @@ local raw_field_cache = {}
 --- @return RawValueResult|vim.NIL `{ value, owner }` if found, otherwise `vim.NIL`.
 local function resolve_raw_field(raw_comp, key)
     local value = raw_comp[key]
-
-    -- Local value return immediately
     if value ~= nil then
         return { value, raw_comp }
     end
 
     local current_id = raw_comp.id
 
-    -- Check cache
     local field_cache = raw_field_cache[key]
-    local result = field_cache and field_cache[current_id]
+    if field_cache == nil then
+        field_cache = {}
+        raw_field_cache[key] = field_cache
+    end
+
+    local result = field_cache[current_id]
     if result then
         return result
     end
 
+    local seen = { [current_id] = true }
 
-    -- Check delegate map
     local delegate = raw_comp.delegate
-
-    -- Fast path: delegate is not table, no need to resolve.
-    if type(delegate) ~= "table" then
-        return NIL
-    end
-
-
-    -- Mark comp as seen
-    local seen = {
-        [current_id] = true,
-    }
-
-    repeat
-        local delegate_id = delegate[key]
-        if delegate_id == nil or seen[delegate_id] then
+    while type(delegate) == "table" do
+        local next_id = delegate[key]
+        if next_id == nil or seen[next_id] then
             break
         end
 
-        -- Mark current_id
-        current_id = delegate_id
-        seen[delegate_id] = true
+        current_id = next_id
+        seen[current_id] = true
 
-        result = field_cache and field_cache[delegate_id]
+        result = field_cache[current_id]
         if result then
             break
         end
 
         --- Get the component from the managed comps or lazy required builtin comps.
-        local comp = ManagedComps[delegate_id] or require("witch-line.components")[delegate_id]
+        local comp = ManagedComps[current_id] or require("witch-line.components")[current_id]
         if comp == nil then
             break
         end
@@ -89,17 +78,11 @@ local function resolve_raw_field(raw_comp, key)
         end
 
         delegate = comp.delegate
-    until type(delegate) ~= "table"
-
-    result = result or NIL
-    seen[current_id] = nil
-
-    --- No cache then create
-    if field_cache == nil then
-        field_cache = {}
-        raw_field_cache[key] = field_cache
     end
 
+    result = result or NIL
+
+    seen[current_id] = nil
     for id in pairs(seen) do
         field_cache[id] = result
     end
